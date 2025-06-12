@@ -1834,6 +1834,7 @@ ERROR: <input>:1:24: unsupported syntax '?'
                         "*expr.Constant_BytesValue"
                     ),
                     Val::Null => &format!("null^#{}:{}#", expr.id, "*expr.Constant_NullValue"),
+                    t => &format!("WUT? {t:?}"),
                 },
                 Expr::Map(map) => {
                     self.push("{");
