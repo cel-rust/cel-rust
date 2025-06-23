@@ -17,6 +17,7 @@ pub enum Val {
     Struct,
     Timestamp,
     Type,
+    TypeParam,
     UInt(u64),
     Unknown,
 }
