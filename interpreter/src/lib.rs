@@ -1,3 +1,18 @@
+/// # CEL
+///
+/// ## Usage example:
+///
+/// ```compile_fail
+/// let expression = "foo.bar == 42";
+///
+/// let env = Env::Builder().add_type().add_variable("foo", "type").build();
+/// let ast = env.parse(expression).unwrap();
+/// let checked_ast = env.check(ast).unwrap();
+/// let program = env.program(checked_ast).unwrap();
+///
+/// let result = program.eval(input);
+/// ```
+
 extern crate core;
 
 use std::convert::TryFrom;
