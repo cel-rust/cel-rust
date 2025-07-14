@@ -1,23 +1,24 @@
+use std::time::{Duration, SystemTime};
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Val {
     Unspecified,
+    Error,
     Dyn,
     Any,
     Boolean(bool),
     Bytes(Vec<u8>),
     Double(f64),
-    Duration,
-    Error,
+    Duration(Duration),
     Int(i64),
     List,
     Map,
     Null,
     Opaque,
     String(String),
-    Struct,
-    Timestamp,
+    Object,
+    Timestamp(SystemTime),
     Type,
-    TypeParam,
     UInt(u64),
     Unknown,
 }

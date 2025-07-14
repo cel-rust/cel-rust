@@ -12,7 +12,6 @@
 ///
 /// let result = program.eval(input);
 /// ```
-
 extern crate core;
 
 use std::convert::TryFrom;
