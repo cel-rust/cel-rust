@@ -59,7 +59,7 @@ impl Display for ParseErrors {
             if i != 0 {
                 writeln!(f)?;
             }
-            write!(f, "{}", e)?;
+            write!(f, "{e}")?;
         }
         Ok(())
     }
@@ -86,7 +86,7 @@ impl Display for ParseError {
         )?;
         if let Some(info) = &self.source_info {
             if let Some(line) = info.snippet(self.pos.0 - 1) {
-                write!(f, "\n| {}", line)?;
+                write!(f, "\n| {line}")?;
                 write!(f, "\n| {:.>width$}", "^", width = self.pos.1 as usize)?;
             }
         }
@@ -743,7 +743,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
             Some(id) => {
                 let mut id = id.get_text().to_string();
                 if ctx.leadingDot.is_some() {
-                    id = format!(".{}", id);
+                    id = format!(".{id}");
                 }
                 let op_id = self.helper.next_id_for_token(ctx.op.as_deref());
                 let args = ctx
@@ -804,7 +804,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
             message_name.push_str(id.get_text());
         }
         if ctx.leadingDot.is_some() {
-            message_name = format!(".{}", message_name);
+            message_name = format!(".{message_name}");
         }
         let op_id = match &ctx.op {
             None => {

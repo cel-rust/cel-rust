@@ -216,12 +216,12 @@ mod tests {
 
     fn assert_duration(input: &str, expected: Duration) {
         let (_, duration) = parse_duration(input).unwrap();
-        assert_eq!(duration, expected, "{}", input);
+        assert_eq!(duration, expected, "{input}");
     }
 
     fn assert_print_duration(input: Duration, expected: &str) {
         let actual = format_duration(&input);
-        assert_eq!(actual, expected, "{}", input);
+        assert_eq!(actual, expected, "{input}");
     }
 
     macro_rules! assert_durations {

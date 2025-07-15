@@ -102,10 +102,10 @@ impl serde::Serialize for Key {
 impl Display for Key {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         match self {
-            Key::Int(v) => write!(f, "{}", v),
-            Key::Uint(v) => write!(f, "{}", v),
-            Key::Bool(v) => write!(f, "{}", v),
-            Key::String(v) => write!(f, "{}", v),
+            Key::Int(v) => write!(f, "{v}"),
+            Key::Uint(v) => write!(f, "{v}"),
+            Key::Bool(v) => write!(f, "{v}"),
+            Key::String(v) => write!(f, "{v}"),
         }
     }
 }
@@ -1093,7 +1093,7 @@ mod tests {
 
         let program = Program::compile("has(data.x) && data.x.startsWith(\"foo\")").unwrap();
         let value = program.execute(&context);
-        println!("{:?}", value);
+        println!("{value:?}");
         assert!(
             value.is_ok(),
             "The AND expression should support short-circuit evaluation."

@@ -79,7 +79,7 @@ pub fn size(ftx: &FunctionContext, This(this): This<Value>) -> Result<i64> {
         Value::Map(m) => m.map.len(),
         Value::String(s) => s.len(),
         Value::Bytes(b) => b.len(),
-        value => return Err(ftx.error(format!("cannot determine the size of {:?}", value))),
+        value => return Err(ftx.error(format!("cannot determine the size of {value:?}"))),
     };
     Ok(size as i64)
 }
@@ -160,7 +160,7 @@ pub fn string(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
         Value::UInt(v) => Value::String(v.to_string().into()),
         Value::Float(v) => Value::String(v.to_string().into()),
         Value::Bytes(v) => Value::String(Arc::new(String::from_utf8_lossy(v.as_slice()).into())),
-        v => return Err(ftx.error(format!("cannot convert {:?} to string", v))),
+        v => return Err(ftx.error(format!("cannot convert {v:?} to string"))),
     })
 }
 
@@ -178,7 +178,7 @@ pub fn double(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
         Value::Float(v) => Value::Float(v),
         Value::Int(v) => Value::Float(v as f64),
         Value::UInt(v) => Value::Float(v as f64),
-        v => return Err(ftx.error(format!("cannot convert {:?} to double", v))),
+        v => return Err(ftx.error(format!("cannot convert {v:?} to double"))),
     })
 }
 
@@ -200,7 +200,7 @@ pub fn uint(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
                 .map_err(|_| ftx.error("unsigned integer overflow"))?,
         ),
         Value::UInt(v) => Value::UInt(v),
-        v => return Err(ftx.error(format!("cannot convert {:?} to uint", v))),
+        v => return Err(ftx.error(format!("cannot convert {v:?} to uint"))),
     })
 }
 
@@ -219,7 +219,7 @@ pub fn int(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
         }
         Value::Int(v) => Value::Int(v),
         Value::UInt(v) => Value::Int(v.try_into().map_err(|_| ftx.error("integer overflow"))?),
-        v => return Err(ftx.error(format!("cannot convert {:?} to int", v))),
+        v => return Err(ftx.error(format!("cannot convert {v:?} to int"))),
     })
 }
 
@@ -462,7 +462,7 @@ mod tests {
         for (name, script) in tests {
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", std::collections::HashMap::from([("bar", 1)]));
-            assert_eq!(test_script(script, Some(ctx)), Ok(true.into()), "{}", name);
+            assert_eq!(test_script(script, Some(ctx)), Ok(true.into()), "{name}");
         }
     }
 
@@ -717,7 +717,7 @@ mod tests {
         ];
 
         for (name, script) in tests {
-            assert_eq!(test_script(script, None), Ok(true.into()), "{}", name);
+            assert_eq!(test_script(script, None), Ok(true.into()), "{name}");
         }
     }
 
