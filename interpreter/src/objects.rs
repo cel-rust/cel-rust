@@ -189,6 +189,7 @@ impl From<Val> for Value {
             Val::Double(d) => Value::Float(d),
             Val::Bytes(bytes) => Value::Bytes(Arc::new(bytes)),
             Val::Null => Value::Null,
+            v => unimplemented!("{v:?}"),
         }
     }
 }
