@@ -55,7 +55,7 @@ pub fn map_macro_benchmark(c: &mut Criterion) {
     let sizes = vec![1, 10, 100, 1000, 10000, 100000];
 
     for size in sizes {
-        group.bench_function(format!("map_{}", size).as_str(), |b| {
+        group.bench_function(format!("map_{size}").as_str(), |b| {
             let list = (0..size).collect::<Vec<_>>();
             let program = Program::compile("list.map(x, x * 2)").unwrap();
             let mut ctx = Context::default();
