@@ -278,7 +278,7 @@ mod tests {
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             let res = test_script(script, Some(ctx));
-            assert_eq!(res, error.into(), "{}", name);
+            assert_eq!(res, error.into(), "{name}");
         }
     }
 }

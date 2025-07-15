@@ -105,13 +105,7 @@ mod tests {
         }
 
         for (expected, value) in tests.iter() {
-            assert_eq!(
-                value.json().unwrap(),
-                *expected,
-                "{:?}={:?}",
-                value,
-                expected
-            );
+            assert_eq!(value.json().unwrap(), *expected, "{value:?}={expected:?}");
         }
     }
 }

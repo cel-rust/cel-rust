@@ -51,7 +51,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
             match chars.next() {
                 None => {
                     return Err(ParseSequenceError::InvalidEscape {
-                        escape: format!("{}", c),
+                        escape: format!("{c}"),
                         index: idx,
                         string: String::from(s),
                     });
@@ -119,7 +119,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                         }
                         _ => {
                             return Err(ParseSequenceError::InvalidEscape {
-                                escape: format!("{}{}", c, c2),
+                                escape: format!("{c}{c2}"),
                                 index: idx,
                                 string: String::from(s),
                             });
@@ -263,7 +263,7 @@ fn parse_quoted_string(
             match chars.next() {
                 None => {
                     return Err(ParseSequenceError::InvalidEscape {
-                        escape: format!("{}", c),
+                        escape: format!("{c}"),
                         index: idx,
                         string: String::from(s),
                     });
@@ -314,7 +314,7 @@ fn parse_quoted_string(
                             })?,
                         _ => {
                             return Err(ParseSequenceError::InvalidEscape {
-                                escape: format!("{}{}", c, c2),
+                                escape: format!("{c}{c2}"),
                                 index: idx,
                                 string: String::from(s),
                             });
@@ -486,7 +486,7 @@ mod tests {
 
         for (s, expected) in tests {
             let result = parse_string(s);
-            assert_eq!(result, expected, "Testing {}", s);
+            assert_eq!(result, expected, "Testing {s}");
         }
     }
 
@@ -519,7 +519,7 @@ mod tests {
 
         for (s, expected) in tests {
             let result = parse_string(s);
-            assert_eq!(result, expected, "Testing {}", s);
+            assert_eq!(result, expected, "Testing {s}");
         }
     }
 
