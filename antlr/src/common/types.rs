@@ -122,7 +122,7 @@ pub const TIMESTAMP_TYPE: Type = Type {
 
 pub const TYPE_TYPE: Type = Type::simple_type(Kind::Type, "type");
 
-pub const TYPE_UINT: Type = Type {
+pub const UINT_TYPE: Type = Type {
     kind: Kind::UInt,
     parameters: &[],
     runtime_type_name: "uint",
@@ -136,7 +136,7 @@ pub const TYPE_UINT: Type = Type {
 
 pub const UNKNOWN_TYPE: Type = Type::simple_type(Kind::Unknown, "unknown");
 
-impl Type<'_> {
+impl<'a> Type<'a> {
     pub const fn simple_type(kind: Kind, name: &str) -> Type<'_> {
         Type {
             kind,
@@ -146,7 +146,7 @@ impl Type<'_> {
         }
     }
 
-    pub const fn new_list_type<'a>(param: &'a [&'a Type<'a>; 1]) -> Type<'a> {
+    pub const fn new_list_type<'b>(param: &'b [&'b Type<'b>; 1]) -> Type<'b> {
         Type {
             kind: Kind::List,
             parameters: param,
@@ -159,7 +159,7 @@ impl Type<'_> {
         }
     }
 
-    pub const fn new_map_type<'a>(param: &'a [&'a Type<'a>; 2]) -> Type<'a> {
+    pub const fn new_map_type<'b>(param: &'b [&'b Type<'b>; 2]) -> Type<'b> {
         Type {
             kind: Kind::Map,
             parameters: param,
@@ -169,6 +169,14 @@ impl Type<'_> {
                 | traits::ITERABLE_TYPE
                 | traits::SIZER_TYPE,
         }
+    }
+
+    pub fn name(&self) -> &'a str {
+        self.runtime_type_name
+    }
+
+    pub fn has_trait(&self, t: u16) -> bool {
+        self.trait_mask & t == t
     }
 }
 
