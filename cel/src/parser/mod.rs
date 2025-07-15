@@ -4,8 +4,6 @@ mod gen;
 
 pub mod ast;
 
-pub mod common;
-pub mod reference;
 pub mod references;
 
 pub use ast::IdedExpr as Expression;

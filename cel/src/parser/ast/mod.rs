@@ -1,4 +1,4 @@
-use crate::parser::reference::Val;
+use crate::common::reference::CelVal;
 use std::collections::BTreeMap;
 
 pub mod operators;
@@ -26,7 +26,7 @@ pub enum Expr {
     List(ListExpr),
 
     /// LiteralKind represents a primitive scalar literal.
-    Literal(Val),
+    Literal(CelVal),
 
     /// MapKind represents a map literal expression.
     Map(MapExpr),

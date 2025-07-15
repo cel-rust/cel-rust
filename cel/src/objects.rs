@@ -1,7 +1,6 @@
 use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::parser::ast::{operators, EntryExpr, Expr};
-use crate::parser::reference::Val;
 use crate::{ExecutionError, Expression};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -13,6 +12,7 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
+use crate::common::reference::CelVal;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 
@@ -212,16 +212,16 @@ pub enum Value {
     Null,
 }
 
-impl From<Val> for Value {
-    fn from(val: Val) -> Self {
+impl From<CelVal> for Value {
+    fn from(val: CelVal) -> Self {
         match val {
-            Val::String(s) => Value::String(Arc::new(s)),
-            Val::Boolean(b) => Value::Bool(b),
-            Val::Int(i) => Value::Int(i),
-            Val::UInt(u) => Value::UInt(u),
-            Val::Double(d) => Value::Float(d),
-            Val::Bytes(bytes) => Value::Bytes(Arc::new(bytes)),
-            Val::Null => Value::Null,
+            CelVal::String(s) => Value::String(Arc::new(s)),
+            CelVal::Boolean(b) => Value::Bool(b),
+            CelVal::Int(i) => Value::Int(i),
+            CelVal::UInt(u) => Value::UInt(u),
+            CelVal::Double(d) => Value::Float(d),
+            CelVal::Bytes(bytes) => Value::Bytes(Arc::new(bytes)),
+            CelVal::Null => Value::Null,
             v => unimplemented!("{v:?}"),
         }
     }

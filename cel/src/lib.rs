@@ -6,6 +6,7 @@ use thiserror::Error;
 
 mod macros;
 
+pub mod common;
 pub mod context;
 pub mod parser;
 

@@ -1,5 +1,11 @@
 use crate::common::traits;
 
+mod bool;
+mod int;
+
+pub use bool::Bool;
+pub use int::Int;
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Kind {
     Unspecified,
