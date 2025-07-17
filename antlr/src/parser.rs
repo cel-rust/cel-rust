@@ -1,3 +1,4 @@
+use crate::ast::Expr::Literal;
 use crate::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
@@ -96,18 +97,29 @@ impl Display for ParseError {
 
 impl Error for ParseError {}
 
+#[derive(Debug, Default)]
+pub struct ParserConfig {
+    pub enable_optional_syntax: bool,
+}
+
 pub struct Parser {
     ast: ast::Ast,
+    config: ParserConfig,
     helper: ParserHelper,
     errors: Vec<ParseError>,
 }
 
 impl Parser {
     pub fn new() -> Self {
+        Self::new_with_config(ParserConfig::default())
+    }
+
+    pub fn new_with_config(config: ParserConfig) -> Self {
         Self {
             ast: ast::Ast {
                 expr: IdedExpr::default(),
             },
+            config,
             helper: ParserHelper::default(),
             errors: Vec::default(),
         }
@@ -251,20 +263,26 @@ impl Parser {
                 Some(ident) => {
                     let field_name = ident.get_text().to_string();
                     let value = self.visit(ctx.values[i].as_ref());
-                    if let Some(opt) = &field.opt {
-                        self.report_error::<ParseError, _>(
-                            opt.as_ref(),
-                            None,
-                            "unsupported syntax '?'",
-                        );
-                        continue;
-                    }
+                    let optional = if let Some(opt) = &field.opt {
+                        if self.config.enable_optional_syntax {
+                            true
+                        } else {
+                            self.report_error::<ParseError, _>(
+                                opt.as_ref(),
+                                None,
+                                "unsupported syntax '?'",
+                            );
+                            continue;
+                        }
+                    } else {
+                        false
+                    };
                     fields.push(IdedEntryExpr {
                         id,
                         expr: EntryExpr::StructField(StructFieldExpr {
                             field: field_name,
                             value,
-                            optional: false,
+                            optional,
                         }),
                     });
                 }
@@ -286,42 +304,57 @@ impl Parser {
             }
             let id = self.helper.next_id(col);
             let key = self.visit(keys[i].as_ref());
-            if let Some(opt) = &keys[i].opt {
-                self.report_error::<ParseError, _>(opt.as_ref(), None, "unsupported syntax '?'");
-                continue;
-            }
+            let optional = if let Some(opt) = &keys[i].opt {
+                if self.config.enable_optional_syntax {
+                    true
+                } else {
+                    self.report_error::<ParseError, _>(
+                        opt.as_ref(),
+                        None,
+                        "unsupported syntax '?'",
+                    );
+                    continue;
+                }
+            } else {
+                false
+            };
             let value = self.visit(vals[i].as_ref());
             entries.push(IdedEntryExpr {
                 id,
                 expr: EntryExpr::MapEntry(MapEntryExpr {
                     key,
                     value,
-                    optional: false,
+                    optional,
                 }),
             })
         }
         entries
     }
 
-    fn list_initializer_list(&mut self, ctx: &ListInitContextAll) -> Vec<IdedExpr> {
+    fn list_initializer_list(&mut self, ctx: &ListInitContextAll) -> (Vec<IdedExpr>, Vec<usize>) {
         let mut list = Vec::default();
-        for e in &ctx.elems {
+        let mut opt_indices = Vec::default();
+        for (index, e) in ctx.elems.iter().enumerate() {
             match &e.e {
-                None => return Vec::default(),
+                None => return (Vec::default(), Vec::default()),
                 Some(exp) => {
                     if let Some(opt) = &e.opt {
-                        self.report_error::<ParseError, _>(
-                            opt.as_ref(),
-                            None,
-                            "unsupported syntax '?'",
-                        );
-                        continue;
+                        if self.config.enable_optional_syntax {
+                            opt_indices.push(index);
+                        } else {
+                            self.report_error::<ParseError, _>(
+                                opt.as_ref(),
+                                None,
+                                "unsupported syntax '?'",
+                            );
+                            continue;
+                        }
                     }
                     list.push(self.visit(exp.as_ref()));
                 }
             }
         }
-        list
+        (list, opt_indices)
     }
 
     fn report_error<E: Error + 'static, S: Into<String>>(
@@ -668,20 +701,31 @@ impl gen::CELVisitorCompat<'_> for Parser {
             let operand = self.visit(member.as_ref());
             let field = id.get_text();
             if let Some(_opt) = &ctx.opt {
-                return self.report_error::<ParseError, _>(
+                if self.config.enable_optional_syntax {
+                    let field_expr = self
+                        .helper
+                        .next_expr(&id.start(), Literal(Val::String(field)));
+                    self.helper.next_expr(
+                        op.as_ref(),
+                        Expr::Call(CallExpr {
+                            func_name: operators::OPT_SELECT.to_string(),
+                            target: None,
+                            args: vec![operand, field_expr],
+                        }),
+                    )
+                } else {
+                    self.report_error::<ParseError, _>(op.as_ref(), None, "unsupported syntax '.?'")
+                }
+            } else {
+                self.helper.next_expr(
                     op.as_ref(),
-                    None,
-                    "unsupported syntax '.?'",
-                );
+                    Expr::Select(SelectExpr {
+                        operand: Box::new(operand),
+                        field,
+                        test: false,
+                    }),
+                )
             }
-            self.helper.next_expr(
-                op.as_ref(),
-                Expr::Select(SelectExpr {
-                    operand: Box::new(operand),
-                    field,
-                    test: false,
-                }),
-            )
         } else {
             self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete `SelectContext`!")
         }
@@ -704,18 +748,21 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 Some(op) => {
                     let op_id = self.helper.next_id(op);
                     let index = self.visit(index.as_ref());
-                    if let Some(_opt) = &ctx.opt {
-                        return self.report_error::<ParseError, _>(
-                            op.as_ref(),
-                            None,
-                            "unsupported syntax '[?'",
-                        );
+                    let operator = if let Some(_opt) = &ctx.opt {
+                        if self.config.enable_optional_syntax {
+                            operators::OPT_INDEX
+                        } else {
+                            return self.report_error::<ParseError, _>(
+                                op.as_ref(),
+                                None,
+                                "unsupported syntax '[?'",
+                            );
+                        }
+                    } else {
+                        operators::INDEX
                     }
-                    self.global_call_or_macro(
-                        op_id,
-                        operators::INDEX.to_string(),
-                        vec![target, index],
-                    )
+                    .to_string();
+                    self.global_call_or_macro(op_id, operator.to_string(), vec![target, index])
                 }
             }
         } else {
@@ -773,13 +820,16 @@ impl gen::CELVisitorCompat<'_> for Parser {
 
     fn visit_CreateList(&mut self, ctx: &CreateListContext<'_>) -> Self::Return {
         let list_id = self.helper.next_id_for_token(ctx.op.as_deref());
-        let elements = match &ctx.elems {
-            None => Vec::default(),
+        let (elements, opt_indices) = match &ctx.elems {
+            None => (Vec::default(), Vec::default()),
             Some(elements) => self.list_initializer_list(elements.deref()),
         };
         IdedExpr {
             id: list_id,
-            expr: Expr::List(ListExpr { elements }),
+            expr: Expr::List(ListExpr {
+                elements,
+                opt_indices,
+            }),
         }
     }
 
@@ -1048,8 +1098,9 @@ mod tests {
         // m: String,
 
         // Opts contains the list of options to be configured with the parser before parsing the expression.
-        // Opts []Option
+        opts: ParserConfig,
     }
+
     #[test]
     fn test() {
         let test_cases = [
@@ -1057,56 +1108,67 @@ mod tests {
                 i: r#""A""#,
                 p: r#""A"^#1:*expr.Constant_StringValue#"#,
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: r#"true"#,
                 p: r#"true^#1:*expr.Constant_BoolValue#"#,
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: r#"false"#,
                 p: r#"false^#1:*expr.Constant_BoolValue#"#,
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "0",
                 p: "0^#1:*expr.Constant_Int64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "42",
                 p: "42^#1:*expr.Constant_Int64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "0xF",
                 p: "15^#1:*expr.Constant_Int64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "0u",
                 p: "0u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "23u",
                 p: "23u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "24u",
                 p: "24u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "0xFu",
                 p: "15u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "-1",
                 p: "-1^#1:*expr.Constant_Int64Value#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "4--4",
@@ -1115,6 +1177,7 @@ mod tests {
     -4^#3:*expr.Constant_Int64Value#
 )^#2:*expr.Expr_CallExpr#"#,
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "4--4.1",
@@ -1123,16 +1186,19 @@ mod tests {
     -4.1^#3:*expr.Constant_DoubleValue#
 )^#2:*expr.Expr_CallExpr#"#,
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: r#"b"abc""#,
                 p: r#"b"abc"^#1:*expr.Constant_BytesValue#"#,
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "23.39",
                 p: "23.39^#1:*expr.Constant_DoubleValue#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "!a",
@@ -1140,16 +1206,19 @@ mod tests {
     a^#2:*expr.Expr_IdentExpr#
 )^#1:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "null",
                 p: "null^#1:*expr.Constant_NullValue#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a",
                 p: "a^#1:*expr.Expr_IdentExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a?b:c",
@@ -1159,6 +1228,7 @@ mod tests {
     c^#4:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a || b",
@@ -1167,6 +1237,7 @@ mod tests {
     b^#2:*expr.Expr_IdentExpr#
 )^#3:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a || b || c || d || e || f ",
@@ -1187,6 +1258,7 @@ mod tests {
     )^#11:*expr.Expr_CallExpr#
 )^#7:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a && b",
@@ -1195,6 +1267,7 @@ mod tests {
     b^#2:*expr.Expr_IdentExpr#
 )^#3:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a && b && c && d && e && f && g",
@@ -1218,6 +1291,7 @@ mod tests {
     )^#13:*expr.Expr_CallExpr#
 )^#9:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a && b && c && d || e && f && g && h",
@@ -1244,6 +1318,7 @@ mod tests {
     )^#12:*expr.Expr_CallExpr#
 )^#15:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a + b",
@@ -1252,6 +1327,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a - b",
@@ -1260,6 +1336,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a * b",
@@ -1268,6 +1345,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a / b",
@@ -1276,6 +1354,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a % b",
@@ -1284,6 +1363,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a in b",
@@ -1292,6 +1372,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a == b",
@@ -1300,6 +1381,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a != b",
@@ -1308,6 +1390,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a > b",
@@ -1316,6 +1399,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a >= b",
@@ -1324,6 +1408,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a < b",
@@ -1332,6 +1417,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a <= b",
@@ -1340,16 +1426,19 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a.b",
                 p: "a^#1:*expr.Expr_IdentExpr#.b^#2:*expr.Expr_SelectExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a.b.c",
                 p: "a^#1:*expr.Expr_IdentExpr#.b^#2:*expr.Expr_SelectExpr#.c^#3:*expr.Expr_SelectExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a[b]",
@@ -1357,29 +1446,34 @@ mod tests {
     a^#1:*expr.Expr_IdentExpr#,
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "(a)",
                 p: "a^#1:*expr.Expr_IdentExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "((a))",
                 p: "a^#1:*expr.Expr_IdentExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a()",
                 p: "a()^#1:*expr.Expr_CallExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a(b)",
                 p: "a(
     b^#2:*expr.Expr_IdentExpr#
 )^#1:*expr.Expr_CallExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a(b, c)",
@@ -1387,12 +1481,14 @@ mod tests {
     b^#2:*expr.Expr_IdentExpr#,
     c^#3:*expr.Expr_IdentExpr#
 )^#1:*expr.Expr_CallExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a.b()",
                 p: "a^#1:*expr.Expr_IdentExpr#.b()^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a.b(c)",
@@ -1400,11 +1496,13 @@ mod tests {
     c^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "foo{ }",
                 p: "foo{}^#1:*expr.Expr_StructExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "foo{ a:b }",
@@ -1412,6 +1510,7 @@ mod tests {
     a:b^#3:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "foo{ a:b, c:d }",
@@ -1420,11 +1519,13 @@ mod tests {
     c:d^#5:*expr.Expr_IdentExpr#^#4:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "{}",
                 p: "{}^#1:*expr.Expr_StructExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "{a: b, c: d}",
@@ -1433,18 +1534,21 @@ mod tests {
     c^#6:*expr.Expr_IdentExpr#:d^#7:*expr.Expr_IdentExpr#^#5:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "[]",
                 p: "[]^#1:*expr.Expr_ListExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "[a]",
                 p: "[
     a^#2:*expr.Expr_IdentExpr#
 ]^#1:*expr.Expr_ListExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "[a, b, c]",
@@ -1453,12 +1557,14 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#,
     c^#4:*expr.Expr_IdentExpr#
 ]^#1:*expr.Expr_ListExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "has(m.f)",
                 p: "m^#2:*expr.Expr_IdentExpr#.f~test-only~^#4:*expr.Expr_SelectExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "m.exists(v, f)",
@@ -1484,7 +1590,8 @@ _||_(
 )^#10:*expr.Expr_CallExpr#,
 // Result
 @result^#11:*expr.Expr_IdentExpr#)^#12:*expr.Expr_ComprehensionExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "m.all(v, f)",
@@ -1508,7 +1615,8 @@ _&&_(
 )^#9:*expr.Expr_CallExpr#,
 // Result
 @result^#10:*expr.Expr_IdentExpr#)^#11:*expr.Expr_ComprehensionExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "m.existsOne(v, f)",
@@ -1537,7 +1645,8 @@ _==_(
     @result^#12:*expr.Expr_IdentExpr#,
     1^#13:*expr.Constant_Int64Value#
 )^#14:*expr.Expr_CallExpr#)^#15:*expr.Expr_ComprehensionExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "m.map(v, f)",
@@ -1561,7 +1670,8 @@ _+_(
 )^#9:*expr.Expr_CallExpr#,
 // Result
 @result^#10:*expr.Expr_IdentExpr#)^#11:*expr.Expr_ComprehensionExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "m.map(v, p, f)",
@@ -1589,7 +1699,8 @@ _?_:_(
 )^#12:*expr.Expr_CallExpr#,
 // Result
 @result^#13:*expr.Expr_IdentExpr#)^#14:*expr.Expr_ComprehensionExpr#",
-                e: "",
+                e: "", 
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "m.filter(v, p)",
@@ -1618,6 +1729,7 @@ _?_:_(
 // Result
 @result^#12:*expr.Expr_IdentExpr#)^#13:*expr.Expr_ComprehensionExpr#",
                 e: "",
+                opts: ParserConfig::default(),
             },
             // Parse error tests
             TestInfo {
@@ -1626,6 +1738,7 @@ _?_:_(
                 e: "ERROR: <input>:1:1: invalid int literal
 | 0xFFFFFFFFFFFFFFFFF
 | ^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "0xFFFFFFFFFFFFFFFFFu",
@@ -1633,6 +1746,7 @@ _?_:_(
                 e: "ERROR: <input>:1:1: invalid uint literal
 | 0xFFFFFFFFFFFFFFFFFu
 | ^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "1.99e90000009",
@@ -1640,6 +1754,7 @@ _?_:_(
                 e: "ERROR: <input>:1:1: invalid double literal
 | 1.99e90000009
 | ^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "{",
@@ -1647,6 +1762,7 @@ _?_:_(
                 e: "ERROR: <input>:1:2: Syntax error: mismatched input '<EOF>' expecting {'[', '{', '}', '(', '.', ',', '-', '!', '?', 'true', 'false', 'null', NUM_FLOAT, NUM_INT, NUM_UINT, STRING, BYTES, IDENTIFIER}
 | {
 | .^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "*@a | b",
@@ -1662,7 +1778,8 @@ ERROR: <input>:1:5: Syntax error: token recognition error at: '| '
 | ....^
 ERROR: <input>:1:7: Syntax error: extraneous input 'b' expecting <EOF>
 | *@a | b
-| ......^", 
+| ......^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a | b",
@@ -1673,6 +1790,7 @@ ERROR: <input>:1:7: Syntax error: extraneous input 'b' expecting <EOF>
 ERROR: <input>:1:5: Syntax error: extraneous input 'b' expecting <EOF>
 | a | b
 | ....^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "a.?b && a[?b]",
@@ -1683,6 +1801,71 @@ ERROR: <input>:1:5: Syntax error: extraneous input 'b' expecting <EOF>
 ERROR: <input>:1:10: unsupported syntax '[?'
 | a.?b && a[?b]
 | .........^",
+                opts: ParserConfig::default(),
+            },
+            TestInfo {
+                i: "a.?b[?0] && a[?c]",
+                opts: ParserConfig {
+                    enable_optional_syntax: true,
+                },
+                p: r##"_&&_(
+    _[?_](
+        _?._(
+            a^#1:*expr.Expr_IdentExpr#,
+            "b"^#2:*expr.Constant_StringValue#
+        )^#3:*expr.Expr_CallExpr#,
+        0^#5:*expr.Constant_Int64Value#
+    )^#4:*expr.Expr_CallExpr#,
+    _[?_](
+        a^#6:*expr.Expr_IdentExpr#,
+        c^#8:*expr.Expr_IdentExpr#
+    )^#7:*expr.Expr_CallExpr#
+)^#9:*expr.Expr_CallExpr#"##,
+                e: "", 
+            },
+            TestInfo {
+                i: "{?'key': value}",
+                opts: ParserConfig {
+                    enable_optional_syntax: true,
+                },
+                p: r#"{
+    ?"key"^#3:*expr.Constant_StringValue#:value^#4:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
+}^#1:*expr.Expr_StructExpr#"#,
+                e: "",
+            },
+            TestInfo {
+                i: "[?a, ?b]", 
+                opts: ParserConfig {
+                    enable_optional_syntax: true,
+                },
+                p: "[
+    a^#2:*expr.Expr_IdentExpr#,
+    b^#3:*expr.Expr_IdentExpr#
+]^#1:*expr.Expr_ListExpr#",
+                e: "",
+            },
+            TestInfo {
+                i: "[?a[?b]]",
+                opts: ParserConfig {
+                    enable_optional_syntax: true,
+                },
+                p: "[
+    _[?_](
+        a^#2:*expr.Expr_IdentExpr#,
+        b^#4:*expr.Expr_IdentExpr#
+    )^#3:*expr.Expr_CallExpr#
+]^#1:*expr.Expr_ListExpr#",
+                e: "",
+            },
+            TestInfo {
+                i: "Msg{?field: value}",
+                opts: ParserConfig {
+                    enable_optional_syntax: true,
+                },
+                p: "Msg{
+    ?field:value^#3:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
+}^#1:*expr.Expr_StructExpr#",
+                e: "",
             },
             TestInfo {
                 i: "a.?b && a[?b]",
@@ -1693,6 +1876,7 @@ ERROR: <input>:1:10: unsupported syntax '[?'
 ERROR: <input>:1:10: unsupported syntax '[?'
 | a.?b && a[?b]
 | .........^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "Msg{?field: value} && {?'key': value}",
@@ -1703,13 +1887,15 @@ ERROR: <input>:1:10: unsupported syntax '[?'
 ERROR: <input>:1:24: unsupported syntax '?'
 | Msg{?field: value} && {?'key': value}
 | .......................^",
+                opts: ParserConfig::default(),
             },
             TestInfo 	{
                 i: "has(m)",
                 p: "",
                 e: "ERROR: <input>:1:5: invalid argument to has() macro
 | has(m)
-| ....^"
+| ....^",
+                opts: ParserConfig::default(),
             },
             TestInfo {
                 i: "1.all(2, 3)",
@@ -1717,11 +1903,13 @@ ERROR: <input>:1:24: unsupported syntax '?'
                 e: "ERROR: <input>:1:7: argument must be a simple name
 | 1.all(2, 3)
 | ......^",
+                opts: ParserConfig::default(),
             },
         ];
 
         for test_case in test_cases {
-            let parser = Parser::new();
+            let cfg = test_case.opts;
+            let parser = Parser::new_with_config(cfg);
             let result = parser.parse(test_case.i);
             if !test_case.p.is_empty() {
                 assert_eq!(
@@ -1844,6 +2032,9 @@ ERROR: <input>:1:24: unsupported syntax '?'
                         match &entry.expr {
                             EntryExpr::StructField(_) => panic!("WAT?!"),
                             EntryExpr::MapEntry(e) => {
+                                if e.optional {
+                                    self.push("?");
+                                }
                                 self.buffer(&e.key);
                                 self.push(":");
                                 self.buffer(&e.value);
@@ -1880,6 +2071,9 @@ ERROR: <input>:1:24: unsupported syntax '?'
                     for (i, entry) in s.entries.iter().enumerate() {
                         match &entry.expr {
                             EntryExpr::StructField(field) => {
+                                if field.optional {
+                                    self.push("?");
+                                }
                                 self.push(&field.field);
                                 self.push(":");
                                 self.buffer(&field.value);
