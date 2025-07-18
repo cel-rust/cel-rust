@@ -129,7 +129,7 @@ impl TryInto<Key> for Value {
 // Implement conversion from HashMap<K, V> into CelMap
 impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     fn from(map: HashMap<K, V>) -> Self {
-        let mut new_map = HashMap::new();
+        let mut new_map = HashMap::with_capacity(map.len());
         for (k, v) in map {
             new_map.insert(k.into(), v.into());
         }
@@ -655,7 +655,7 @@ impl Value {
                 Value::List(list.into()).into()
             }
             Expr::Map(map_expr) => {
-                let mut map = HashMap::default();
+                let mut map = HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
                     let (k, v) = match &entry.expr {
                         EntryExpr::StructField(_) => panic!("WAT?"),
