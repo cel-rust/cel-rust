@@ -731,10 +731,14 @@ impl Value {
         // If the property is both an attribute and a method, then we
         // give priority to the property. Maybe we can implement lookahead
         // to see if the next token is a function call?
-        match (child, ctx.has_function(&name)) {
-            (None, false) => ExecutionError::NoSuchKey(name).into(),
-            (Some(child), _) => child.into(),
-            (None, true) => Value::Function(name, Some(self.into())).into(),
+        if let Some(child) = child {
+            child.into()
+        } else {
+            if ctx.has_function(&name) {
+                Value::Function(name.clone(), Some(self.into())).into()
+            } else {
+                ExecutionError::NoSuchKey(name.clone()).into()
+            }
         }
     }
 
