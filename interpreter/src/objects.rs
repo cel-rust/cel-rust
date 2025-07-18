@@ -851,7 +851,7 @@ impl ops::Sub<Value> for Value {
                 .map(Value::Timestamp),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Timestamp(r)) => {
-                let d = l.signed_duration_since(&r);
+                let d = l.signed_duration_since(r);
                 Ok(Value::Duration(d))
             }
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(

@@ -49,4 +49,4 @@ jobs:
       - name: Run fuzz tests
         run: |
           cd fuzz
-          cargo fuzz run value_binop -dict="fuzz_targets/value_binop.dict" -- -max_total_time=60 || true
+          cargo fuzz run value_binop -- -dict="fuzz_targets/value_binop.dict" -max_total_time=60 || true
