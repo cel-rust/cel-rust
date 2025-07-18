@@ -850,10 +850,10 @@ impl ops::Sub<Value> for Value {
                 .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Timestamp),
             #[cfg(feature = "chrono")]
-            (Value::Timestamp(l), Value::Timestamp(r)) => {
-                let d = l.signed_duration_since(r);
-                Ok(Value::Duration(d))
-            }
+            (Value::Timestamp(l), Value::Timestamp(r)) => l
+                .checked_sub_signed(r)
+                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .map(Value::Duration),
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
                 "sub", left, right,
             )),
