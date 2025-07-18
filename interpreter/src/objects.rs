@@ -800,29 +800,20 @@ impl ops::Add<Value> for Value {
                 Ok(Value::String(l))
             }
             #[cfg(feature = "chrono")]
-            (Value::Duration(l), Value::Duration(r)) => Value::Duration(
-                l.checked_add(&r)
-                    .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))?,
-            )
-            .into(),
+            (Value::Duration(l), Value::Duration(r)) => l
+                .checked_add(&r)
+                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .map(Value::Duration),
             #[cfg(feature = "chrono")]
-            (Value::Timestamp(l), Value::Duration(r)) => {
-                Value::Timestamp(l.checked_add_signed(r).ok_or(ExecutionError::Overflow(
-                    "add",
-                    l.into(),
-                    r.into(),
-                ))?)
-                .into()
-            }
+            (Value::Timestamp(l), Value::Duration(r)) => l
+                .checked_add_signed(r)
+                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .map(Value::Timestamp),
             #[cfg(feature = "chrono")]
-            (Value::Duration(l), Value::Timestamp(r)) => {
-                Value::Timestamp(r.checked_add_signed(l).ok_or(ExecutionError::Overflow(
-                    "add",
-                    l.into(),
-                    r.into(),
-                ))?)
-                .into()
-            }
+            (Value::Duration(l), Value::Timestamp(r)) => r
+                .checked_add_signed(l)
+                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .map(Value::Timestamp),
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
                 "add", left, right,
             )),
@@ -848,13 +839,21 @@ impl ops::Sub<Value> for Value {
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l - r).into(),
 
-            // todo: implement checked sub for these over-flowable operations
             #[cfg(feature = "chrono")]
-            (Value::Duration(l), Value::Duration(r)) => Value::Duration(l - r).into(),
+            (Value::Duration(l), Value::Duration(r)) => l
+                .checked_sub(&r)
+                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .map(Value::Duration),
             #[cfg(feature = "chrono")]
-            (Value::Timestamp(l), Value::Duration(r)) => Value::Timestamp(l - r).into(),
+            (Value::Timestamp(l), Value::Duration(r)) => l
+                .checked_add_signed(-r)
+                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .map(Value::Timestamp),
             #[cfg(feature = "chrono")]
-            (Value::Timestamp(l), Value::Timestamp(r)) => Value::Duration(l - r).into(),
+            (Value::Timestamp(l), Value::Timestamp(r)) => {
+                let d = l.signed_duration_since(&r);
+                Ok(Value::Duration(d))
+            }
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
                 "sub", left, right,
             )),
