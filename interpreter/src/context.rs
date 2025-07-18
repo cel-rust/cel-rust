@@ -3,7 +3,6 @@ use crate::objects::{TryIntoValue, Value};
 use crate::{functions, ExecutionError};
 use cel_parser::Expression;
 use std::collections::HashMap;
-use std::sync::Arc;
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.
@@ -77,16 +76,21 @@ impl Context<'_> {
         }
     }
 
-    pub fn get_variable(&self, name: &String) -> Result<Value, ExecutionError> {
+    pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
+    where
+      S: AsRef<str>
+    {
+        let name = name.as_ref();
         match self {
-            Context::Child { variables, parent } => match variables.get(name) {
-                Some(value) => Ok(value.clone()),
-                None => parent.get_variable(name),
-            },
+            Context::Child { variables, parent } => variables
+                .get(name)
+                .cloned()
+                .or_else(|| parent.get_variable(name).ok())
+                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
             Context::Root { variables, .. } => variables
                 .get(name)
                 .cloned()
-                .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.into()))),
+                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
         }
     }
 
