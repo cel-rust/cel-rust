@@ -43,4 +43,4 @@ jobs:
       - name: Run fuzz tests
         run: |
           cd fuzz
-          timeout 60s cargo fuzz run value_binop -- -max_total_time=60 || true
+          cargo fuzz run value_binop -- -max_total_time=60 || true
