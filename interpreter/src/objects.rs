@@ -846,7 +846,7 @@ impl ops::Sub<Value> for Value {
                 .map(Value::Duration),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Duration(r)) => l
-                .checked_add_signed(-r)
+                .checked_sub_signed(r)
                 .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Timestamp),
             #[cfg(feature = "chrono")]
