@@ -100,8 +100,8 @@ pub enum ExecutionError {
     DivisionByZero(Value),
     #[error("Remainder by zero of {0:?}")]
     RemainderByZero(Value),
-    #[error("Integer overflow from binary operator '{0}': {1:?}, {2:?}")]
-    IntegerOverflow(&'static str, Value, Value),
+    #[error("Overflow from binary operator '{0}': {1:?}, {2:?}")]
+    Overflow(&'static str, Value, Value),
 }
 
 impl ExecutionError {
