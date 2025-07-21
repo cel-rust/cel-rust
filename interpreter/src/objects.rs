@@ -733,12 +733,10 @@ impl Value {
         // to see if the next token is a function call?
         if let Some(child) = child {
             child.into()
+        } else if ctx.has_function(&name) {
+            Value::Function(name.clone(), Some(self.into())).into()
         } else {
-            if ctx.has_function(&name) {
-                Value::Function(name.clone(), Some(self.into())).into()
-            } else {
-                ExecutionError::NoSuchKey(name.clone()).into()
-            }
+            ExecutionError::NoSuchKey(name.clone()).into()
         }
     }
 
