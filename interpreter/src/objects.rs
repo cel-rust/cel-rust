@@ -129,7 +129,7 @@ impl TryInto<Key> for Value {
 // Implement conversion from HashMap<K, V> into CelMap
 impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     fn from(map: HashMap<K, V>) -> Self {
-        let mut new_map = HashMap::new();
+        let mut new_map = HashMap::with_capacity(map.len());
         for (k, v) in map {
             new_map.insert(k.into(), v.into());
         }
@@ -655,7 +655,7 @@ impl Value {
                 Value::List(list.into()).into()
             }
             Expr::Map(map_expr) => {
-                let mut map = HashMap::default();
+                let mut map = HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
                     let (k, v) = match &entry.expr {
                         EntryExpr::StructField(_) => panic!("WAT?"),
@@ -731,10 +731,12 @@ impl Value {
         // If the property is both an attribute and a method, then we
         // give priority to the property. Maybe we can implement lookahead
         // to see if the next token is a function call?
-        match (child, ctx.has_function(&name)) {
-            (None, false) => ExecutionError::NoSuchKey(name).into(),
-            (Some(child), _) => child.into(),
-            (None, true) => Value::Function(name, Some(self.into())).into(),
+        if let Some(child) = child {
+            child.into()
+        } else if ctx.has_function(&name) {
+            Value::Function(name.clone(), Some(self.into())).into()
+        } else {
+            ExecutionError::NoSuchKey(name.clone()).into()
         }
     }
 

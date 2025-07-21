@@ -76,21 +76,21 @@ impl Context<'_> {
         }
     }
 
-    // todo! The Into<String> here is probably unnecessary, as the lookup only requires &str.
     pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
     where
-        S: Into<String>,
+        S: AsRef<str>,
     {
-        let name = name.into();
+        let name = name.as_ref();
         match self {
-            Context::Child { variables, parent } => match variables.get(&name) {
-                Some(value) => Ok(value.clone()),
-                None => parent.get_variable(name),
-            },
-            Context::Root { variables, .. } => variables
-                .get(&name)
+            Context::Child { variables, parent } => variables
+                .get(name)
                 .cloned()
-                .ok_or_else(|| ExecutionError::UndeclaredReference(name.into())),
+                .or_else(|| parent.get_variable(name).ok())
+                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
+            Context::Root { variables, .. } => variables
+                .get(name)
+                .cloned()
+                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
         }
     }
 

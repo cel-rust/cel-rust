@@ -27,6 +27,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         ("size_str_2", "size('a')"),
         ("size_map", "{1:2}.size()"),
         ("size_map_2", "size({1:2})"),
+        ("member", "foo.bar"),
         ("map has", "has(foo.bar.baz)"),
         ("map macro", "[1, 2, 3].map(x, x * 2)"),
         ("filter macro", "[1, 2, 3].filter(x, x > 2)"),
