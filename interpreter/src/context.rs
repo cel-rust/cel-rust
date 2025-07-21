@@ -78,7 +78,7 @@ impl Context<'_> {
 
     pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
     where
-      S: AsRef<str>
+        S: AsRef<str>,
     {
         let name = name.as_ref();
         match self {
