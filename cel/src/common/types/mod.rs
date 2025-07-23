@@ -6,6 +6,7 @@ mod double;
 mod duration;
 mod int;
 mod null;
+mod optional;
 mod string;
 mod timestamp;
 mod uint;
@@ -50,15 +51,6 @@ pub struct Type<'a> {
     parameters: &'a [&'a Type<'a>],
     runtime_type_name: &'a str,
     trait_mask: u16,
-}
-
-pub fn unspecified_type(name: &str) -> Type<'_> {
-    Type {
-        kind: Kind::Unspecified,
-        parameters: &[],
-        runtime_type_name: name,
-        trait_mask: 0,
-    }
 }
 
 pub const ANY_TYPE: Type = Type {
@@ -197,6 +189,24 @@ impl<'a> Type<'a> {
                 | traits::INDEXER_TYPE
                 | traits::ITERABLE_TYPE
                 | traits::SIZER_TYPE,
+        }
+    }
+
+    pub const fn new_unspecified_type(name: &str) -> Type<'_> {
+        Type {
+            kind: Kind::Unspecified,
+            parameters: &[],
+            runtime_type_name: name,
+            trait_mask: 0,
+        }
+    }
+
+    pub const fn new_opaque_type(name: &str) -> Type<'_> {
+        Type {
+            kind: Kind::Opaque,
+            parameters: &[],
+            runtime_type_name: name,
+            trait_mask: 0,
         }
     }
 

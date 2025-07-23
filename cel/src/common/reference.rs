@@ -34,7 +34,7 @@ pub trait Val {
 impl Val for CelVal {
     fn get_type(&self) -> Type {
         match self {
-            CelVal::Unspecified => types::unspecified_type("unspecified"),
+            CelVal::Unspecified => Type::new_unspecified_type("unspecified"),
             CelVal::Error => types::ERROR_TYPE,
             CelVal::Dyn => types::DYN_TYPE,
             CelVal::Any => types::ANY_TYPE,
