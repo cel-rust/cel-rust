@@ -7,6 +7,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0](https://github.com/cel-rust/cel-rust/compare/cel-interpreter-v0.9.1...cel-interpreter-v0.10.0) - 2025-07-23
+
+### Added
+
+- *(antlr)* 🔥 previous parser
+- *(antlr)* Good ridance .unwrap()s - part 2 of 2
+- *(antlr)* offending whitespaces are fine
+- *(antlr)* deal with lexer errors
+- *(antlr)* support multiple errors from parsing
+- *(antlr)* impl _[_]
+- *(antlr)* test only SelectExpr
+- *(macros)* Comprehensions
+- *(antlr)* Expr are now ID'ed
+
+### Fixed
+
+- Mistakenly Public API changes reverted
+- Do not expose internal comprehension var idents
+- Do not resolve left operand twice
+- has defaults to false on non container types
+- don't drop the IdedExpr
+- has(_[_]) is that a thing?
+- double eval, and lazy eval of right hand expr
+- dunno why this changed
+
+### Other
+
+- Updated GH urls to new org ([#158](https://github.com/cel-rust/cel-rust/pull/158))
+- Optimizations around member lookups ([#156](https://github.com/cel-rust/cel-rust/pull/156))
+- Fixing fuzz test ([#157](https://github.com/cel-rust/cel-rust/pull/157))
+- :uninlined_format_args fixes ([#153](https://github.com/cel-rust/cel-rust/pull/153))
+- Add basic infrastructure for fuzzing and one target for Value binops ([#152](https://github.com/cel-rust/cel-rust/pull/152))
+- Append to lists and strings in place instead of cloning when possible ([#149](https://github.com/cel-rust/cel-rust/pull/149))
+- Remove non-standard binary operators ([#147](https://github.com/cel-rust/cel-rust/pull/147))
+- Make ExecutionError non-exhaustive ([#148](https://github.com/cel-rust/cel-rust/pull/148))
+- Avoid panics due to division by zero and integer overflow ([#145](https://github.com/cel-rust/cel-rust/pull/145))
+- Remove redundant clone
+- Remove redundant string/error allocations/clones during name resolution
+- cargo fmt
+- deleted dead code
+- add test for 3 args map macro
+- deleting fn replaced with macros
+- fmt & clippy
+- Interpreter adapted to compile using new parser
+- simplify function binding magic as an IntoFunction trait ([#133](https://github.com/cel-rust/cel-rust/pull/133))
+
 ## [0.9.1](https://github.com/cel-rust/cel-rust/compare/cel-interpreter-v0.9.0...cel-interpreter-v0.9.1) - 2025-04-29
 
 ### Added
