@@ -1,12 +1,26 @@
 use crate::common::traits;
 
 mod bool;
+mod bytes;
+mod double;
+mod duration;
 mod int;
+mod null;
+mod string;
+mod timestamp;
+mod uint;
 
 pub use bool::Bool;
+pub use bytes::Bytes;
+pub use double::Double;
+pub use duration::Duration;
 pub use int::Int;
+pub use null::Null;
+pub use string::String;
+pub use timestamp::Timestamp;
+pub use uint::UInt;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Kind {
     Unspecified,
     Error,
@@ -30,12 +44,21 @@ pub enum Kind {
     Unknown,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Type<'a> {
     kind: Kind,
     parameters: &'a [&'a Type<'a>],
     runtime_type_name: &'a str,
     trait_mask: u16,
+}
+
+pub fn unspecified_type(name: &str) -> Type<'_> {
+    Type {
+        kind: Kind::Unspecified,
+        parameters: &[],
+        runtime_type_name: name,
+        trait_mask: 0,
+    }
 }
 
 pub const ANY_TYPE: Type = Type {
@@ -199,7 +222,7 @@ mod tests {
             trait_mask: 0,
         };
 
-        let t = String::from("List");
+        let t = std::string::String::from("List");
         let parameterized_list = Type {
             kind: Kind::List,
             parameters: &[&param],
