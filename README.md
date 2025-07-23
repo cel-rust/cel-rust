@@ -1,6 +1,6 @@
 # Common Expression Language (Rust)
 
-[![Rust](https://github.com/clarkmcc/cel-rust/actions/workflows/rust.yml/badge.svg)](https://github.com/clarkmcc/cel-rust/actions/workflows/rust.yml)
+[![Rust](https://github.com/cel-rust/cel-rust/actions/workflows/rust.yml/badge.svg)](https://github.com/cel-rust/cel-rust/actions/workflows/rust.yml)
 
 The [Common Expression Language (CEL)](https://github.com/google/cel-spec) is a non-Turing complete language designed
 for simplicity, speed, safety, and

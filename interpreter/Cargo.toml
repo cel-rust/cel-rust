@@ -1,9 +1,9 @@
 [package]
 name = "cel-interpreter"
 description = "An interpreter for the Common Expression Language (CEL)"
-repository = "https://github.com/clarkmcc/cel-rust"
+repository = "https://github.com/cel-rust/cel-rust"
 version = "0.9.1"
-authors = ["Tom Forbes <tom@tomforb.es>", "Clark McCauley <me@clarkmccauley.com>"]
+authors = ["Tom Forbes <tom@tomforb.es>", "Clark McCauley <me@clarkmccauley.com>", "Alex Snaps <alex@wcgw.dev>"]
 edition = "2021"
 license = "MIT"
 categories = ["compilers"]

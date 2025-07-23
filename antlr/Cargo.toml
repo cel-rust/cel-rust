@@ -1,7 +1,7 @@
 [package]
 name = "cel-parser"
 description = "An antlr-based parser for the Common Expression Language (CEL)"
-repository = "https://github.com/clarkmcc/cel-rust"
+repository = "https://github.com/cel-rust/cel-rust"
 version = "0.10.0"
 authors = ["Alex Snaps <alex@wcgw.dev>"]
 edition = "2021"

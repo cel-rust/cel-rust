@@ -23,7 +23,7 @@ struct Input {
 }
 
 // Ensure that the binary operators on `Value` do not panic,
-// c.f. https://github.com/clarkmcc/cel-rust/pull/145.
+// c.f. https://github.com/cel-rust/cel-rust/pull/145.
 fuzz_target!(|input: Input| {
     match input.op {
         BinOp::Add => _ = black_box(input.lhs + input.rhs),
