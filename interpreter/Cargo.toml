@@ -9,7 +9,7 @@ license = "MIT"
 categories = ["compilers"]
 
 [dependencies]
-cel-parser = { path = "../antlr" }
+cel-parser = { path = "../antlr", version = "0.10.1" }
 
 nom = "7.1.3"
 
