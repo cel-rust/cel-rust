@@ -50,3 +50,26 @@ jobs:
         run: |
           cd fuzz
           cargo fuzz run value_binop -- -max_total_time=60
+  examples:
+    name: Run Examples
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Run example-simple
+        run: cargo run --bin example-simple --manifest-path example/Cargo.toml
+      - name: Run example-variables
+        run: cargo run --bin example-variables --manifest-path example/Cargo.toml
+      - name: Run example-functions
+        run: cargo run --bin example-functions --manifest-path example/Cargo.toml --features chrono
+      - name: Run example-threads
+        run: cargo run --bin example-threads --manifest-path example/Cargo.toml
+      - name: Run example-serde
+        run: cargo run --bin example-serde --manifest-path example/Cargo.toml
+      - name: Run example-json
+        run: cargo run --bin example-json --manifest-path example/Cargo.toml --features json
+      - name: Run example-anyhow
+        run: cargo run --bin example-anyhow --manifest-path example/Cargo.toml --features anyhow
+        # Build, don't run since it starts an HTTP server
+      - name: Run example-axum
+        run: cargo build --bin example-axum --manifest-path example/Cargo.toml --features axum
