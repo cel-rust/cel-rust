@@ -438,6 +438,17 @@ mod tests {
         assert_eq!(test_script(input.1, None), Ok(true.into()), "{}", input.0);
     }
 
+    fn assert_error(input: &(&str, &str, &str)) {
+        assert_eq!(
+            test_script(input.1, None)
+                .expect_err("expected error")
+                .to_string(),
+            input.2,
+            "{}",
+            input.0
+        );
+    }
+
     #[test]
     fn test_size() {
         [
@@ -650,10 +661,48 @@ mod tests {
                 "timestamp getMilliseconds",
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
+            (
+                "timestamp min",
+                "timestamp('0001-01-01T00:00:00Z') || true",
+            ),
+            (
+                "timestamp max",
+                "timestamp('9999-12-31T23:59:59.999999999Z') || true",
+            ),
 
         ]
         .iter()
         .for_each(assert_script);
+
+        [
+            (
+                "timestamp out of range",
+                "timestamp('0000-01-00T00:00:00Z')",
+                "Error executing function 'timestamp': input is out of range",
+            ),
+            (
+                "timestamp out of range",
+                "timestamp('9999-12-32T23:59:59.999999999Z')",
+                "Error executing function 'timestamp': input is out of range",
+            ),
+            (
+                "timestamp overflow",
+                "timestamp('9999-12-31T23:59:59Z') + duration('1s')",
+                "Overflow from binary operator 'add': Timestamp(9999-12-31T23:59:59+00:00), Duration(TimeDelta { secs: 1, nanos: 0 })",
+            ),
+            (
+                "timestamp underflow",
+                "timestamp('0001-01-01T00:00:00Z') - duration('1s')",
+                "Overflow from binary operator 'sub': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: 1, nanos: 0 })",
+            ),
+            (
+                "timestamp underflow",
+                "timestamp('0001-01-01T00:00:00Z') + duration('-1s')",
+                "Overflow from binary operator 'add': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: -1, nanos: 0 })",
+            ),
+        ]
+        .iter()
+        .for_each(assert_error)
     }
 
     #[cfg(feature = "chrono")]
