@@ -11,7 +11,7 @@ fn main() {
         // ERROR: <input>:1:5: Syntax error: extraneous input '1' expecting <EOF>
         // | 1 @ 1
         // | ....^
-        eprintln!("{}", e);
+        eprintln!("{e}");
     }
 }
 
