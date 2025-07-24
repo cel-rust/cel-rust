@@ -1,4 +1,4 @@
-use cel_interpreter::Program;
+use cel::Program;
 
 /// This example demonstrates that compilation errors can be reported with anyhow.
 fn main() {
