@@ -16,10 +16,10 @@ use chrono::TimeZone;
 
 #[cfg(feature = "chrono")]
 lazy_static::lazy_static! {
-    /// Timestamp values are limited to the range of values which can be serialized as a string:
-    /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
-    /// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
-    /// we need to perform our own spec-compliant overflow checks.
+    // Timestamp values are limited to the range of values which can be serialized as a string:
+    // `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
+    // and the min is a larger timestamp than what is possible to represent with [`DateTime`],
+    // we need to perform our own spec-compliant overflow checks.
     ///
     /// https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow
     static ref MAX_TIMESTAMP: chrono::DateTime<chrono::FixedOffset> = {
@@ -27,14 +27,14 @@ lazy_static::lazy_static! {
             .unwrap()
             .and_hms_nano_opt(23, 59, 59, 999_999_999)
             .unwrap();
-        chrono::FixedOffset::east(0).from_utc_datetime(&naive)
+        chrono::FixedOffset::east_opt(0).unwrap().from_utc_datetime(&naive)
     };
     static ref MIN_TIMESTAMP: chrono::DateTime<chrono::FixedOffset> = {
         let naive = chrono::NaiveDate::from_ymd_opt(1, 1, 1)
             .unwrap()
             .and_hms_opt(0, 0, 0)
             .unwrap();
-        chrono::FixedOffset::east(0).from_utc_datetime(&naive)
+        chrono::FixedOffset::east_opt(0).unwrap().from_utc_datetime(&naive)
     };
 }
 
