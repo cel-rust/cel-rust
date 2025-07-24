@@ -84,6 +84,13 @@ pub struct MapExpr {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ListExpr {
     pub elements: Vec<IdedExpr>,
+    pub opt_indices: Vec<usize>,
+}
+
+impl ListExpr {
+    pub fn id_optional(&self, index: usize) -> bool {
+        self.opt_indices.contains(&index)
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]

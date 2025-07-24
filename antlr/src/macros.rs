@@ -225,7 +225,10 @@ fn map_macro_expander(
     let func = args.pop().unwrap();
     let v = extract_ident(args.remove(0), helper)?;
 
-    let init = helper.next_expr(Expr::List(ListExpr { elements: vec![] }));
+    let init = helper.next_expr(Expr::List(ListExpr {
+        elements: vec![],
+        opt_indices: vec![],
+    }));
     let result_binding = "@result".to_string();
     let condition = helper.next_expr(Expr::Literal(Boolean(true)));
 
@@ -235,6 +238,7 @@ fn map_macro_expander(
         helper.next_expr(Expr::Ident(result_binding.clone())),
         helper.next_expr(Expr::List(ListExpr {
             elements: vec![func],
+            opt_indices: vec![],
         })),
     ];
     let step = helper.next_expr(Expr::Call(CallExpr {
@@ -285,7 +289,10 @@ fn filter_macro_expander(
     let v = extract_ident(var.clone(), helper)?;
     let filter = args.pop().unwrap();
 
-    let init = helper.next_expr(Expr::List(ListExpr { elements: vec![] }));
+    let init = helper.next_expr(Expr::List(ListExpr {
+        elements: vec![],
+        opt_indices: vec![],
+    }));
     let result_binding = "@result".to_string();
     let condition = helper.next_expr(Expr::Literal(Boolean(true)));
 
@@ -293,6 +300,7 @@ fn filter_macro_expander(
         helper.next_expr(Expr::Ident(result_binding.clone())),
         helper.next_expr(Expr::List(ListExpr {
             elements: vec![var],
+            opt_indices: vec![],
         })),
     ];
     let step = helper.next_expr(Expr::Call(CallExpr {
