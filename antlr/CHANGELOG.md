@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2](https://github.com/cel-rust/cel-rust/compare/cel-parser-v0.10.1...cel-parser-v0.10.2) - 2025-07-24
+
+### Other
+
+- Using Boxable `ANTLRError` as our Error::source
+- Removed non-`Send`+`Sync` errors from `ParseError`
+
 ## [0.10.1](https://github.com/cel-rust/cel-rust/compare/cel-parser-v0.10.0...cel-parser-v0.10.1) - 2025-07-23
 
 ### Fixed
