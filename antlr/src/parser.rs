@@ -32,6 +32,7 @@ use std::fmt::Display;
 use std::mem;
 use std::ops::Deref;
 use std::rc::Rc;
+use std::sync::Arc;
 
 pub struct MacroExprHelper<'a> {
     helper: &'a mut ParserHelper,
@@ -74,7 +75,7 @@ pub struct ParseError {
     pub pos: (isize, isize),
     pub msg: String,
     pub expr_id: u64,
-    pub source_info: Option<Rc<SourceInfo>>,
+    pub source_info: Option<Arc<SourceInfo>>,
 }
 
 impl Display for ParseError {
@@ -207,7 +208,7 @@ impl Parser {
         };
 
         let info = self.helper.source_info;
-        let source_info = Rc::new(info);
+        let source_info = Arc::new(info);
 
         let mut errors = parse_errors.take();
         errors.extend(self.errors);
