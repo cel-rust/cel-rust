@@ -1,5 +1,5 @@
+#![allow(clippy::module_inception)]
 #[allow(clippy::all)]
-#[allow(clippy::module_inception)]
 mod gen;
 
 pub mod ast;
