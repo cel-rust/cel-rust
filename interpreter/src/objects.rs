@@ -11,6 +11,33 @@ use std::ops;
 use std::ops::Deref;
 use std::sync::Arc;
 
+#[cfg(feature = "chrono")]
+use chrono::TimeZone;
+
+#[cfg(feature = "chrono")]
+lazy_static::lazy_static! {
+    /// Timestamp values are limited to the range of values which can be serialized as a string:
+    /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
+    /// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
+    /// we need to perform our own spec-compliant overflow checks.
+    ///
+    /// https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow
+    static ref MAX_TIMESTAMP: chrono::DateTime<chrono::FixedOffset> = {
+        let naive = chrono::NaiveDate::from_ymd_opt(9999, 12, 31)
+            .unwrap()
+            .and_hms_nano_opt(23, 59, 59, 999_999_999)
+            .unwrap();
+        chrono::FixedOffset::east(0).from_utc_datetime(&naive)
+    };
+    static ref MIN_TIMESTAMP: chrono::DateTime<chrono::FixedOffset> = {
+        let naive = chrono::NaiveDate::from_ymd_opt(1, 1, 1)
+            .unwrap()
+            .and_hms_opt(0, 0, 0)
+            .unwrap();
+        chrono::FixedOffset::east(0).from_utc_datetime(&naive)
+    };
+}
+
 #[derive(Debug, PartialEq, Clone)]
 #[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Map {
@@ -807,10 +834,7 @@ impl ops::Add<Value> for Value {
                 .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Duration),
             #[cfg(feature = "chrono")]
-            (Value::Timestamp(l), Value::Duration(r)) => l
-                .checked_add_signed(r)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
-                .map(Value::Timestamp),
+            (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Add, &l, &r),
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Timestamp(r)) => r
                 .checked_add_signed(l)
@@ -847,10 +871,7 @@ impl ops::Sub<Value> for Value {
                 .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Duration),
             #[cfg(feature = "chrono")]
-            (Value::Timestamp(l), Value::Duration(r)) => l
-                .checked_sub_signed(r)
-                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
-                .map(Value::Timestamp),
+            (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Sub, &l, &r),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Timestamp(r)) => {
                 Value::Duration(l.signed_duration_since(r)).into()
@@ -942,6 +963,53 @@ impl ops::Rem<Value> for Value {
                 "rem", left, right,
             )),
         }
+    }
+}
+
+/// Op represents a binary arithmetic operation supported on a timestamp
+enum TsOp {
+    Add,
+    Sub,
+}
+
+impl TsOp {
+    fn str(&self) -> &'static str {
+        match self {
+            TsOp::Add => "add",
+            TsOp::Sub => "sub",
+        }
+    }
+}
+
+/// Performs a checked arithmetic operation [`TsOp`] on a timestamp and a duration and ensures that
+/// the resulting timestamp does not overflow the data type internal limits, as well as the timestamp
+/// limits defined in the cel-spec. See [`MAX_TIMESTAMP`] and [`MIN_TIMESTAMP`] for more details.
+#[cfg(feature = "chrono")]
+fn checked_op(
+    op: TsOp,
+    lhs: &chrono::DateTime<chrono::FixedOffset>,
+    rhs: &chrono::Duration,
+) -> ResolveResult {
+    // Add lhs and rhs together, checking for data type overflow
+    let result = match op {
+        TsOp::Add => lhs.checked_add_signed(*rhs),
+        TsOp::Sub => lhs.checked_sub_signed(*rhs),
+    }
+    .ok_or(ExecutionError::Overflow(
+        op.str(),
+        (*lhs).into(),
+        (*rhs).into(),
+    ))?;
+
+    // Check for cel-spec limits
+    if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
+        Err(ExecutionError::Overflow(
+            op.str(),
+            (*lhs).into(),
+            (*rhs).into(),
+        ))
+    } else {
+        Value::Timestamp(result).into()
     }
 }
 

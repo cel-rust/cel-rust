@@ -22,6 +22,7 @@ base64 = { version = "0.22.1", optional = true }
 thiserror = "1.0"
 paste = "1.0"
 arbitrary = { version = "1.4.1", optional = true, features = ["derive"] }
+lazy_static = { version = "1.5.0", optional = true }
 
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
@@ -35,5 +36,5 @@ harness = false
 default = ["regex", "chrono"]
 json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
-chrono = ["dep:chrono"]
+chrono = ["dep:chrono", "dep:lazy_static"]
 arbitrary = ["dep:arbitrary", "chrono?/arbitrary", "chrono?/std"]
