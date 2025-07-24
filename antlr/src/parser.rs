@@ -71,7 +71,7 @@ impl Error for ParseErrors {}
 #[allow(dead_code)]
 #[derive(Debug)]
 pub struct ParseError {
-    pub source: Option<String>,
+    pub source: Option<Box<dyn Error + Send + Sync + 'static>>,
     pub pos: (isize, isize),
     pub msg: String,
     pub expr_id: u64,
@@ -199,7 +199,7 @@ impl Parser {
         let r = match prsr.start() {
             Ok(t) => Ok(self.visit(t.deref())),
             Err(e) => Err(ParseError {
-                source: Some(e.to_string()),
+                source: Some(Box::new(e)),
                 pos: (0, 0),
                 msg: "UNKNOWN".to_string(),
                 expr_id: 0,
@@ -325,14 +325,14 @@ impl Parser {
         list
     }
 
-    fn report_error<E: Error + 'static, S: Into<String>>(
+    fn report_error<E: Error + Send + Sync + 'static, S: Into<String>>(
         &mut self,
         token: &CommonToken,
         e: Option<E>,
         s: S,
     ) -> IdedExpr {
         let error = ParseError {
-            source: e.map(|e| e.to_string()),
+            source: e.map(|e| e.into()),
             pos: (token.line, token.column + 1),
             msg: s.into(),
             expr_id: 0,

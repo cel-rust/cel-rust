@@ -9,5 +9,5 @@ license = "MIT"
 categories = ["parsing"]
 
 [dependencies]
-antlr4rust = "0.3.0-beta2"
+antlr4rust = "0.3.0-beta3"
 lazy_static = "1.5.0"
