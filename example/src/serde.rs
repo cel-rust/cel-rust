@@ -1,4 +1,4 @@
-use cel_interpreter::{Context, Program};
+use cel::{Context, Program};
 use serde::Serialize;
 
 // An example struct that derives Serialize

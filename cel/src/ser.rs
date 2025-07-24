@@ -23,7 +23,7 @@ pub struct KeySerializer;
 /// # Examples
 ///
 /// ```
-/// use cel_interpreter::{Context, Duration, Program};
+/// use cel::{Context, Duration, Program};
 /// use serde::Serialize;
 ///
 /// #[derive(Serialize)]
@@ -110,7 +110,7 @@ impl ser::Serialize for Duration {
 /// # Examples
 ///
 /// ```
-/// use cel_interpreter::{Context, Timestamp, Program};
+/// use cel::{Context, Timestamp, Program};
 /// use serde::Serialize;
 ///
 /// #[derive(Serialize)]

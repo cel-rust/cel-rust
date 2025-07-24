@@ -1,9 +1,9 @@
 use crate::context::Context;
 use crate::magic::{Arguments, This};
 use crate::objects::Value;
+use crate::parser::Expression;
 use crate::resolvers::Resolver;
 use crate::ExecutionError;
-use cel_parser::Expression;
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::sync::Arc;

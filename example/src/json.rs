@@ -1,4 +1,4 @@
-use cel_interpreter::{Context, Program};
+use cel::{Context, Program};
 
 fn main() {
     // Create a CEL program that returns a JSON object

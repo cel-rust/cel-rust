@@ -1,5 +1,5 @@
-use cel_interpreter::context::Context;
-use cel_interpreter::Program;
+use cel::context::Context;
+use cel::Program;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::collections::HashMap;
 

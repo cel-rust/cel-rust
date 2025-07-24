@@ -1,4 +1,4 @@
-use cel_interpreter::{Context, Program};
+use cel::{Context, Program};
 use std::thread::scope;
 
 fn main() {

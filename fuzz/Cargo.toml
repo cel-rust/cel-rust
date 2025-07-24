@@ -1,5 +1,5 @@
 [package]
-name = "cel-parser-fuzz"
+name = "cel-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2021"
@@ -11,8 +11,8 @@ cargo-fuzz = true
 arbitrary = { version = "1.4.1", features = ["derive"] }
 libfuzzer-sys = "0.4"
 
-[dependencies.cel-interpreter]
-path = "../interpreter"
+[dependencies.cel]
+path = "../cel"
 features = ["arbitrary"]
 
 [[bin]]

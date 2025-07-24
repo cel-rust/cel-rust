@@ -7,13 +7,15 @@ use thiserror::Error;
 mod macros;
 
 pub mod context;
-pub use cel_parser::ast::IdedExpr;
-use cel_parser::ast::SelectExpr;
-use cel_parser::{Expression, ExpressionReferences, Parser};
-pub use cel_parser::{ParseError, ParseErrors};
+pub mod parser;
+
 pub use context::Context;
 pub use functions::FunctionContext;
 pub use objects::{ResolveResult, Value};
+pub use parser::ast::IdedExpr;
+use parser::ast::SelectExpr;
+use parser::{Expression, ExpressionReferences, Parser};
+pub use parser::{ParseError, ParseErrors};
 pub mod functions;
 mod magic;
 pub mod objects;
@@ -165,7 +167,7 @@ impl Program {
     ///
     /// # Example
     /// ```rust
-    /// # use cel_interpreter::Program;
+    /// # use cel::Program;
     /// let program = Program::compile("size(foo) > 0").unwrap();
     /// let references = program.references();
     ///

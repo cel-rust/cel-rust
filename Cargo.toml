@@ -1,5 +1,5 @@
 [workspace]
-members = ["antlr", "interpreter", "example", "fuzz"]
+members = ["cel", "example", "fuzz"]
 resolver = "2"
 
 [profile.bench]

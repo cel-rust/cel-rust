@@ -1,6 +1,6 @@
 #![allow(clippy::too_many_arguments)]
-use cel_interpreter::extractors::This;
-use cel_interpreter::{Context, ExecutionError, FunctionContext, Program, ResolveResult, Value};
+use cel::extractors::This;
+use cel::{Context, ExecutionError, FunctionContext, Program, ResolveResult, Value};
 use chrono::{DateTime, Duration, FixedOffset};
 use std::sync::Arc;
 
