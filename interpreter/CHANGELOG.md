@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1](https://github.com/cel-rust/cel-rust/compare/cel-interpreter-v0.10.0...cel-interpreter-v0.10.1) - 2025-07-24
+
+### Other
+
+- Checked add/sub for timestamps ([#168](https://github.com/cel-rust/cel-rust/pull/168))
+
 ## [0.10.0](https://github.com/cel-rust/cel-rust/compare/cel-interpreter-v0.9.1...cel-interpreter-v0.10.0) - 2025-07-23
 
 ### Added
