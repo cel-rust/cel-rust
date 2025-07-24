@@ -1051,6 +1051,16 @@ mod tests {
         // Opts contains the list of options to be configured with the parser before parsing the expression.
         // Opts []Option
     }
+
+    #[test]
+    fn test_anyhow() {
+        let parser = Parser::new();
+        let e = parser.parse("@foo").err();
+        assert!(e.is_some());
+        let e: anyhow::Error = e.map(anyhow::Error::new).unwrap();
+        println!("{e:#?}");
+    }
+
     #[test]
     fn test() {
         let test_cases = [

@@ -11,3 +11,6 @@ categories = ["parsing"]
 [dependencies]
 antlr4rust = "0.3.0-beta2"
 lazy_static = "1.5.0"
+
+[dev-dependencies]
+anyhow = "1.0.98"
