@@ -25,7 +25,7 @@ impl Value {
     ///
     /// # Example
     /// ```
-    /// use cel_interpreter::{Context, Program};
+    /// use cel::{Context, Program};
     ///
     /// let program = Program::compile("null").unwrap();
     /// let value = program.execute(&Context::default()).unwrap();
