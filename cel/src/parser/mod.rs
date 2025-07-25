@@ -1,3 +1,4 @@
+#![allow(clippy::module_inception)]
 #[allow(clippy::all)]
 mod gen;
 

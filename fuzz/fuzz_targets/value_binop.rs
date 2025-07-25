@@ -1,6 +1,6 @@
 #![no_main]
 
-use cel_interpreter::Value;
+use cel::Value;
 use libfuzzer_sys::fuzz_target;
 use std::hint::black_box;
 

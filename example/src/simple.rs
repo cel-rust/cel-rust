@@ -1,4 +1,4 @@
-use cel_interpreter::{Context, Program};
+use cel::{Context, Program};
 
 fn main() {
     let program = Program::compile("1 == 1").unwrap();

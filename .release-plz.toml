@@ -1,0 +1,15 @@
+[workspace]
+git_release_enable = true
+pr_branch_prefix = "release-plz-" # PR branch prefix
+publish_allow_dirty = true
+publish_timeout = "10m" # set a timeout for `cargo publish`
+release_commits = "^feat:" # prepare release only if at least one commit matches a regex
+
+[[package]] # the double square brackets define a TOML table array
+name = "cel"
+changelog_path = "cel/CHANGELOG.md" # use a custom changelog path for `package_a`
+changelog_update = true # enable changelog update for `package_a`
+git_release_enable = true # enable GitHub/Gitea releases for `package_a`
+
+[changelog]
+protect_breaking_commits = true # always include commits with breaking changes in the changelog

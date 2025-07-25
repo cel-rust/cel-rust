@@ -1,7 +1,7 @@
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
+use crate::parser::Expression;
 use crate::{functions, ExecutionError};
-use cel_parser::Expression;
 use std::collections::HashMap;
 
 /// Context is a collection of variables and functions that can be used
@@ -139,7 +139,7 @@ impl Context<'_> {
     ///
     /// # Example
     /// ```
-    /// use cel_interpreter::Context;
+    /// use cel::Context;
     /// let mut context = Context::empty();
     /// context.add_function("add", |a: i64, b: i64| a + b);
     /// ```

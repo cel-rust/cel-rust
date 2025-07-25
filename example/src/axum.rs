@@ -30,7 +30,7 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
-use cel_interpreter::{Context, Program, Value};
+use cel::{Context, Program, Value};
 use serde::{Deserialize, Serialize};
 
 // Policies dictating which text TODOs may contain
@@ -118,11 +118,11 @@ impl PolicyDecider {
 #[derive(Debug, thiserror::Error)]
 enum TodosError {
     #[error("CEL execution error: {0}")]
-    Execution(#[from] cel_interpreter::ExecutionError),
+    Execution(#[from] cel::ExecutionError),
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error("CEL parse error: {0}")]
-    Parse(#[from] cel_interpreter::ParseErrors),
+    Parse(#[from] cel::ParseErrors),
     #[error("invalid TODO")]
     Invalid,
 }

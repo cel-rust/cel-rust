@@ -1,6 +1,6 @@
-use crate::ast::{operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr};
-use crate::reference::Val::{Boolean, Int};
-use crate::{macros, MacroExprHelper, ParseError};
+use crate::parser::ast::{operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr};
+use crate::parser::reference::Val::{Boolean, Int};
+use crate::parser::{MacroExprHelper, ParseError};
 
 pub type MacroExpander = fn(
     helper: &mut MacroExprHelper,
@@ -14,20 +14,16 @@ pub fn find_expander(
     args: &[IdedExpr],
 ) -> Option<MacroExpander> {
     match func_name {
-        operators::HAS if args.len() == 1 && target.is_none() => Some(macros::has_macro_expander),
-        operators::EXISTS if args.len() == 2 && target.is_some() => {
-            Some(macros::exists_macro_expander)
-        }
-        operators::ALL if args.len() == 2 && target.is_some() => Some(macros::all_macro_expander),
+        operators::HAS if args.len() == 1 && target.is_none() => Some(has_macro_expander),
+        operators::EXISTS if args.len() == 2 && target.is_some() => Some(exists_macro_expander),
+        operators::ALL if args.len() == 2 && target.is_some() => Some(all_macro_expander),
         operators::EXISTS_ONE | "existsOne" if args.len() == 2 && target.is_some() => {
-            Some(macros::exists_one_macro_expander)
+            Some(exists_one_macro_expander)
         }
         operators::MAP if (args.len() == 2 || args.len() == 3) && target.is_some() => {
-            Some(macros::map_macro_expander)
+            Some(map_macro_expander)
         }
-        operators::FILTER if args.len() == 2 && target.is_some() => {
-            Some(macros::filter_macro_expander)
-        }
+        operators::FILTER if args.len() == 2 && target.is_some() => Some(filter_macro_expander),
         _ => None,
     }
 }

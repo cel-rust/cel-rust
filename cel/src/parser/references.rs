@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::ast::{Expr, IdedExpr};
+use crate::parser::ast::{Expr, IdedExpr};
 
 /// A collection of all the references that an expression makes to variables and functions.
 pub struct ExpressionReferences<'expr> {
@@ -13,7 +13,7 @@ impl ExpressionReferences<'_> {
     ///
     /// # Example
     /// ```rust
-    /// # use cel_parser::Parser;
+    /// # use cel::parser::Parser;
     /// let expression = Parser::new().parse("foo.bar == true").unwrap();
     /// let references = expression.references();
     /// assert!(references.has_variable("foo"));
@@ -26,7 +26,7 @@ impl ExpressionReferences<'_> {
     ///
     /// # Example
     /// ```rust
-    /// # use cel_parser::Parser;
+    /// # use cel::parser::Parser;
     /// let expression = Parser::new().parse("size(foo) > 0").unwrap();
     /// let references = expression.references();
     /// assert!(references.has_function("size"));
@@ -39,7 +39,7 @@ impl ExpressionReferences<'_> {
     ///
     /// # Example
     /// ```rust
-    /// # use cel_parser::Parser;
+    /// # use cel::parser::Parser;
     /// let expression = Parser::new().parse("foo.bar == true").unwrap();
     /// let references = expression.references();
     /// assert_eq!(vec!["foo"], references.variables());
@@ -52,7 +52,7 @@ impl ExpressionReferences<'_> {
     ///
     /// # Example
     /// ```rust
-    /// # use cel_parser::Parser;
+    /// # use cel::parser::Parser;
     /// let expression = Parser::new().parse("size(foo) > 0").unwrap();
     /// let references = expression.references();
     /// assert!(references.functions().contains(&"_>_"));
@@ -68,7 +68,7 @@ impl IdedExpr {
     ///
     /// # Example
     /// ```rust
-    /// # use cel_parser::Parser;
+    /// # use cel::parser::Parser;
     /// let expression = Parser::new().parse("foo && size(foo) > 0").unwrap();
     /// let references = expression.references();
     ///
@@ -124,10 +124,10 @@ impl IdedExpr {
             Expr::Map(map) => {
                 for entry in &map.entries {
                     match &entry.expr {
-                        crate::ast::EntryExpr::StructField(field) => {
+                        crate::parser::ast::EntryExpr::StructField(field) => {
                             field.value._references(variables, functions);
                         }
-                        crate::ast::EntryExpr::MapEntry(map_entry) => {
+                        crate::parser::ast::EntryExpr::MapEntry(map_entry) => {
                             map_entry.key._references(variables, functions);
                             map_entry.value._references(variables, functions);
                         }
@@ -140,10 +140,10 @@ impl IdedExpr {
             Expr::Struct(struct_expr) => {
                 for entry in &struct_expr.entries {
                     match &entry.expr {
-                        crate::ast::EntryExpr::StructField(field) => {
+                        crate::parser::ast::EntryExpr::StructField(field) => {
                             field.value._references(variables, functions);
                         }
-                        crate::ast::EntryExpr::MapEntry(map_entry) => {
+                        crate::parser::ast::EntryExpr::MapEntry(map_entry) => {
                             map_entry.key._references(variables, functions);
                             map_entry.value._references(variables, functions);
                         }

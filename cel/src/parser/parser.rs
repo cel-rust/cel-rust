@@ -1,8 +1,8 @@
-use crate::ast::{
+use crate::parser::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
-use crate::gen::{
+use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CalcContext, CalcContextAttrs,
     ConditionalAndContext, ConditionalOrContext, ConstantLiteralContext,
     ConstantLiteralContextAttrs, CreateListContext, CreateMessageContext, CreateStructContext,
@@ -14,8 +14,8 @@ use crate::gen::{
     PrimaryExprContextAttrs, RelationContext, RelationContextAttrs, SelectContext,
     SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
 };
-use crate::reference::Val;
-use crate::{ast, gen, macros, parse};
+use crate::parser::reference::Val;
+use crate::parser::{ast, gen, macros, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
 use antlr4rust::error_listener::ErrorListener;
 use antlr4rust::errors::ANTLRError;
@@ -1029,8 +1029,8 @@ impl LogicManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ast::{ComprehensionExpr, Expr};
-    use crate::reference::Val;
+    use crate::parser::ast::{ComprehensionExpr, Expr};
+    use crate::parser::reference::Val;
     use std::iter;
 
     struct TestInfo {

@@ -1,7 +1,7 @@
 use crate::macros::{impl_conversions, impl_handler};
+use crate::parser::ast::Expr;
 use crate::resolvers::{AllArguments, Argument};
 use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
-use cel_parser::ast::Expr;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -85,8 +85,8 @@ pub(crate) trait FromContext<'a, 'context> {
 /// # Using `This`
 /// ```
 /// # use std::sync::Arc;
-/// # use cel_interpreter::{Program, Context};
-/// use cel_interpreter::extractors::This;
+/// # use cel::{Program, Context};
+/// use cel::extractors::This;
 /// # let mut context = Context::default();
 /// # context.add_function("startsWith", starts_with);
 ///
@@ -215,8 +215,8 @@ impl From<Identifier> for String {
 /// ```
 ///
 /// ```rust
-/// # use cel_interpreter::{Value};
-/// use cel_interpreter::extractors::Arguments;
+/// # use cel::{Value};
+/// use cel::extractors::Arguments;
 /// pub fn sum(Arguments(args): Arguments) -> Value {
 ///     args.iter().fold(0.0, |acc, val| match val {
 ///         Value::Int(x) => *x as f64 + acc,

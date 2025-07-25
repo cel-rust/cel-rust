@@ -5,12 +5,12 @@ edition = "2021"
 
 [features]
 axum = ["dep:axum", "dep:tokio", "dep:thiserror"]
-json = ["dep:serde_json", "cel-interpreter/json"]
-chrono = ["dep:chrono", "cel-interpreter/chrono"]
+json = ["dep:serde_json", "cel/json"]
+chrono = ["dep:chrono", "cel/chrono"]
 anyhow = ["dep:anyhow"]
 
 [dependencies]
-cel-interpreter = { path = "../interpreter", default-features = false }
+cel = { path = "../cel", default-features = false }
 
 chrono = { version = "0.4", optional = true }
 
