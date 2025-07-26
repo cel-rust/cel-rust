@@ -703,8 +703,8 @@ impl Value {
                 }))
             }
             Expr::Comprehension(comprehension) => {
-                let accu_init = Value::resolve(comprehension.accu_init.deref(), ctx)?;
-                let iter = Value::resolve(comprehension.iter_range.deref(), ctx)?;
+                let accu_init = Value::resolve(&comprehension.accu_init, ctx)?;
+                let iter = Value::resolve(&comprehension.iter_range, ctx)?;
                 let mut ctx = ctx.new_inner_scope();
                 ctx.add_variable(&comprehension.accu_var, accu_init)
                     .expect("Failed to add accu variable");
@@ -716,7 +716,7 @@ impl Value {
                                 break;
                             }
                             ctx.add_variable_from_value(&comprehension.iter_var, item.clone());
-                            let accu = Value::resolve(comprehension.loop_step.deref(), &ctx)?;
+                            let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
                             ctx.add_variable_from_value(&comprehension.accu_var, accu);
                         }
                     }
@@ -726,13 +726,13 @@ impl Value {
                                 break;
                             }
                             ctx.add_variable_from_value(&comprehension.iter_var, key.clone());
-                            let accu = Value::resolve(comprehension.loop_step.deref(), &ctx)?;
+                            let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
                             ctx.add_variable_from_value(&comprehension.accu_var, accu);
                         }
                     }
                     t => todo!("Support {t:?}"),
                 }
-                Value::resolve(comprehension.result.deref(), &ctx)
+                Value::resolve(&comprehension.result, &ctx)
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),

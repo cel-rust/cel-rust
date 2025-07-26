@@ -56,7 +56,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 pub fn criterion_benchmark_parsing(c: &mut Criterion) {
     let mut parsing_group = c.benchmark_group("parse");
     for (name, expr) in black_box(&EXPRESSIONS) {
-       parsing_group.bench_function(BenchmarkId::from_parameter(name), |b| {
+        parsing_group.bench_function(BenchmarkId::from_parameter(name), |b| {
             b.iter(|| Program::compile(expr).expect("Parsing failed"))
         });
     }
@@ -78,7 +78,7 @@ pub fn map_macro_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!{
+criterion_group! {
     name = benches;
     config = Criterion::default();
     targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark
@@ -99,12 +99,10 @@ fn main() {
     // If adding new criterion groups, do so here.
 
     // Dropping the dhat profiler prints information to stderr: https://docs.rs/dhat/latest/dhat/
-    // Doing so before the below ensures profiler doesn't measure Criterion's summary code. 
+    // Doing so before the below ensures profiler doesn't measure Criterion's summary code.
     // It still may measure other bits of Criterion during the benchmark, of course..
     #[cfg(feature = "dhat-heap")]
     drop(profiler);
 
-    Criterion::default()
-        .configure_from_args()
-        .final_summary();
+    Criterion::default().configure_from_args().final_summary();
 }
