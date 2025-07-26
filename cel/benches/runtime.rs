@@ -83,4 +83,28 @@ criterion_group!{
     config = Criterion::default();
     targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark
 }
-criterion_main!(benches);
+
+#[cfg(feature = "dhat-heap")]
+#[global_allocator]
+static ALLOC: dhat::Alloc = dhat::Alloc;
+
+/// This is the following macro expanded:
+/// criterion_main!(benches);
+/// But expanded manually so that we can keep the dhat profiler in scope until after benchmarks run
+fn main() {
+    #[cfg(feature = "dhat-heap")]
+    let profiler = dhat::Profiler::new_heap();
+
+    benches();
+    // If adding new criterion groups, do so here.
+
+    // Dropping the dhat profiler prints information to stderr: https://docs.rs/dhat/latest/dhat/
+    // Doing so before the below ensures profiler doesn't measure Criterion's summary code. 
+    // It still may measure other bits of Criterion during the benchmark, of course..
+    #[cfg(feature = "dhat-heap")]
+    drop(profiler);
+
+    Criterion::default()
+        .configure_from_args()
+        .final_summary();
+}
