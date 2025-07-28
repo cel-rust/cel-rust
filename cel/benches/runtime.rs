@@ -1,6 +1,6 @@
 use cel::context::Context;
 use cel::Program;
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use std::collections::HashMap;
 
 const EXPRESSIONS: [(&str, &str); 34] = [
