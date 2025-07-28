@@ -2,11 +2,9 @@
 #[allow(clippy::all)]
 mod gen;
 
-pub mod ast;
-
 pub mod references;
 
-pub use ast::IdedExpr as Expression;
+pub use crate::common::ast::IdedExpr as Expression;
 
 mod macros;
 mod parse;

@@ -1,8 +1,9 @@
-use crate::common::reference::CelVal;
-use crate::parser::ast::{
+use crate::common::ast;
+use crate::common::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
+use crate::common::reference::CelVal;
 use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CalcContext, CalcContextAttrs,
     ConditionalAndContext, ConditionalOrContext, ConstantLiteralContext,
@@ -15,7 +16,7 @@ use crate::parser::gen::{
     PrimaryExprContextAttrs, RelationContext, RelationContextAttrs, SelectContext,
     SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
 };
-use crate::parser::{ast, gen, macros, parse};
+use crate::parser::{gen, macros, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
 use antlr4rust::error_listener::ErrorListener;
 use antlr4rust::errors::ANTLRError;
@@ -1033,7 +1034,7 @@ impl LogicManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ast::{ComprehensionExpr, EntryExpr, Expr};
+    use crate::common::ast::{ComprehensionExpr, EntryExpr, Expr};
     use crate::IdedExpr;
     use std::iter;
 
