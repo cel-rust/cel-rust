@@ -177,6 +177,11 @@ impl Program {
     pub fn references(&self) -> ExpressionReferences {
         self.expression.references()
     }
+
+    /// Returns the contained expression
+    pub fn expression(&self) -> &Expression {
+        &self.expression
+    }
 }
 
 impl TryFrom<&str> for Program {
