@@ -5,7 +5,7 @@
 
 use crate::{objects::Key, Value};
 use serde::{
-    ser::{self, Impossible, SerializeStruct},
+    ser::{self, Impossible},
     Serialize,
 };
 use std::{collections::HashMap, fmt::Display, iter::FromIterator, sync::Arc};
@@ -13,6 +13,8 @@ use thiserror::Error;
 
 #[cfg(feature = "chrono")]
 use chrono::FixedOffset;
+#[cfg(feature = "chrono")]
+use serde::ser::SerializeStruct;
 
 pub struct Serializer;
 pub struct KeySerializer;
