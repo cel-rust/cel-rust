@@ -9,7 +9,9 @@ use std::convert::{Infallible, TryFrom, TryInto};
 use std::fmt::{Display, Formatter};
 use std::ops;
 use std::ops::Deref;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
+#[cfg(feature = "chrono")]
+use std::sync::LazyLock;
 
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -971,11 +973,14 @@ impl ops::Rem<Value> for Value {
 }
 
 /// Op represents a binary arithmetic operation supported on a timestamp
+///
+#[cfg(feature = "chrono")]
 enum TsOp {
     Add,
     Sub,
 }
 
+#[cfg(feature = "chrono")]
 impl TsOp {
     fn str(&self) -> &'static str {
         match self {
