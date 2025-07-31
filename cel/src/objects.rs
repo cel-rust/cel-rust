@@ -701,8 +701,10 @@ impl Value {
                     match &left {
                         Value::Map(map) => {
                             for key in map.map.deref().keys() {
-                                if key.to_string().eq(&select.field) {
-                                    return Ok(Value::Bool(true));
+                                if let Key::String(k) = key {
+                                    if k == &select.field {
+                                        return Ok(Value::Bool(true));
+                                    }
                                 }
                             }
                             Ok(Value::Bool(false))
@@ -791,7 +793,7 @@ impl Value {
         // This will always either be because we're trying to access
         // a property on self, or a method on self.
         let child = match self {
-            Value::Map(ref m) => m.map.get(&name.clone().into()).cloned(),
+            Value::Map(ref m) => m.map.get(&Key::String(name.clone())),
             _ => None,
         };
 
@@ -799,7 +801,7 @@ impl Value {
         // give priority to the property. Maybe we can implement lookahead
         // to see if the next token is a function call?
         if let Some(child) = child {
-            child.into()
+            child.clone().into()
         } else {
             ExecutionError::NoSuchKey(name.clone()).into()
         }

@@ -1,5 +1,6 @@
 use crate::common::value::CelVal;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 pub mod operators;
 
@@ -66,7 +67,7 @@ pub struct CallExpr {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct SelectExpr {
     pub operand: Box<IdedExpr>,
-    pub field: String,
+    pub field: Arc<String>,
     pub test: bool,
 }
 
