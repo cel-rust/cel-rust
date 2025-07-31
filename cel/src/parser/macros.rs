@@ -94,16 +94,18 @@ fn exists_macro_expander(
 
     let result = helper.next_expr(Expr::Ident(result_binding.clone()));
 
-    Ok(helper.next_expr(Expr::Comprehension(ComprehensionExpr {
-        iter_range: Box::new(target.unwrap()),
-        iter_var: v,
-        iter_var2: None,
-        accu_var: result_binding,
-        accu_init: init.into(),
-        loop_cond: condition.into(),
-        loop_step: step.into(),
-        result: result.into(),
-    })))
+    Ok(
+        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+            iter_range: target.unwrap(),
+            iter_var: v,
+            iter_var2: None,
+            accu_var: result_binding,
+            accu_init: init,
+            loop_cond: condition,
+            loop_step: step,
+            result,
+        }))),
+    )
 }
 fn all_macro_expander(
     helper: &mut MacroExprHelper,
@@ -138,16 +140,18 @@ fn all_macro_expander(
 
     let result = helper.next_expr(Expr::Ident(result_binding.clone()));
 
-    Ok(helper.next_expr(Expr::Comprehension(ComprehensionExpr {
-        iter_range: Box::new(target.unwrap()),
-        iter_var: v,
-        iter_var2: None,
-        accu_var: result_binding,
-        accu_init: init.into(),
-        loop_cond: condition.into(),
-        loop_step: step.into(),
-        result: result.into(),
-    })))
+    Ok(
+        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+            iter_range: target.unwrap(),
+            iter_var: v,
+            iter_var2: None,
+            accu_var: result_binding,
+            accu_init: init,
+            loop_cond: condition,
+            loop_step: step,
+            result,
+        }))),
+    )
 }
 
 fn exists_one_macro_expander(
@@ -194,16 +198,18 @@ fn exists_one_macro_expander(
         args: vec![accu, one],
     }));
 
-    Ok(helper.next_expr(Expr::Comprehension(ComprehensionExpr {
-        iter_range: Box::new(target.unwrap()),
-        iter_var: v,
-        iter_var2: None,
-        accu_var: result_binding,
-        accu_init: init.into(),
-        loop_cond: condition.into(),
-        loop_step: step.into(),
-        result: result.into(),
-    })))
+    Ok(
+        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+            iter_range: target.unwrap(),
+            iter_var: v,
+            iter_var2: None,
+            accu_var: result_binding,
+            accu_init: init,
+            loop_cond: condition,
+            loop_step: step,
+            result,
+        }))),
+    )
 }
 
 fn map_macro_expander(
@@ -253,16 +259,18 @@ fn map_macro_expander(
 
     let result = helper.next_expr(Expr::Ident(result_binding.clone()));
 
-    Ok(helper.next_expr(Expr::Comprehension(ComprehensionExpr {
-        iter_range: Box::new(target.unwrap()),
-        iter_var: v,
-        iter_var2: None,
-        accu_var: result_binding,
-        accu_init: init.into(),
-        loop_cond: condition.into(),
-        loop_step: step.into(),
-        result: result.into(),
-    })))
+    Ok(
+        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+            iter_range: target.unwrap(),
+            iter_var: v,
+            iter_var2: None,
+            accu_var: result_binding,
+            accu_init: init,
+            loop_cond: condition,
+            loop_step: step,
+            result,
+        }))),
+    )
 }
 
 fn filter_macro_expander(
@@ -306,16 +314,18 @@ fn filter_macro_expander(
 
     let result = helper.next_expr(Expr::Ident(result_binding.clone()));
 
-    Ok(helper.next_expr(Expr::Comprehension(ComprehensionExpr {
-        iter_range: Box::new(target.unwrap()),
-        iter_var: v,
-        iter_var2: None,
-        accu_var: result_binding,
-        accu_init: init.into(),
-        loop_cond: condition.into(),
-        loop_step: step.into(),
-        result: result.into(),
-    })))
+    Ok(
+        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+            iter_range: target.unwrap(),
+            iter_var: v,
+            iter_var2: None,
+            accu_var: result_binding,
+            accu_init: init,
+            loop_cond: condition,
+            loop_step: step,
+            result,
+        }))),
+    )
 }
 
 fn extract_ident(expr: IdedExpr, helper: &mut MacroExprHelper) -> Result<String, ParseError> {

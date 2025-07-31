@@ -25,6 +25,7 @@ arbitrary = { version = "1.4.1", optional = true, features = ["derive"] }
 [dev-dependencies]
 criterion = { version = "0.5.1", features = ["html_reports"] }
 serde_bytes = "0.11.14"
+dhat = { version = "0.3.3" }
 
 [[bench]]
 name = "runtime"
@@ -36,3 +37,4 @@ json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
 chrono = ["dep:chrono"]
 arbitrary = ["dep:arbitrary", "chrono?/arbitrary", "chrono?/std"]
+dhat-heap = [ ] # if you are doing heap profiling

@@ -1943,22 +1943,22 @@ ERROR: <input>:1:24: unsupported syntax '?'
             self.push(comprehension.iter_var.as_str());
             self.push(",\n");
             self.push("// Target\n");
-            self.buffer(comprehension.iter_range.as_ref());
+            self.buffer(&comprehension.iter_range);
             self.push(",\n");
             self.push("// Accumulator\n");
             self.push(comprehension.accu_var.as_str());
             self.push(",\n");
             self.push("// Init\n");
-            self.buffer(comprehension.accu_init.as_ref());
+            self.buffer(&comprehension.accu_init);
             self.push(",\n");
             self.push("// LoopCondition\n");
-            self.buffer(comprehension.loop_cond.as_ref());
+            self.buffer(&comprehension.loop_cond);
             self.push(",\n");
             self.push("// LoopStep\n");
-            self.buffer(comprehension.loop_step.as_ref());
+            self.buffer(&comprehension.loop_step);
             self.push(",\n");
             self.push("// Result\n");
-            self.buffer(comprehension.result.as_ref());
+            self.buffer(&comprehension.result);
         }
     }
 }
