@@ -755,7 +755,7 @@ impl Value {
         // This will always either be because we're trying to access
         // a property on self, or a method on self.
         let child = match self {
-            Value::Map(ref m) => m.map.get(&name.clone().into()),
+            Value::Map(ref m) => m.map.get(&Key::String(name.clone())),
             _ => None,
         };
 
