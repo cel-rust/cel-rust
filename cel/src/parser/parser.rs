@@ -1,7 +1,9 @@
-use crate::parser::ast::{
+use crate::common::ast;
+use crate::common::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
+use crate::common::value::CelVal;
 use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CalcContext, CalcContextAttrs,
     ConditionalAndContext, ConditionalOrContext, ConstantLiteralContext,
@@ -14,8 +16,7 @@ use crate::parser::gen::{
     PrimaryExprContextAttrs, RelationContext, RelationContextAttrs, SelectContext,
     SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
 };
-use crate::parser::reference::Val;
-use crate::parser::{ast, gen, macros, parse};
+use crate::parser::{gen, macros, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
 use antlr4rust::error_listener::ErrorListener;
 use antlr4rust::errors::ANTLRError;
@@ -845,7 +846,8 @@ impl gen::CELVisitorCompat<'_> for Parser {
             Ok(v) => v,
             Err(e) => return self.report_error(token, Some(e), "invalid int literal"),
         };
-        self.helper.next_expr(token, Expr::Literal(Val::Int(val)))
+        self.helper
+            .next_expr(token, Expr::Literal(CelVal::Int(val)))
     }
 
     fn visit_Uint(&mut self, ctx: &UintContext<'_>) -> Self::Return {
@@ -860,14 +862,17 @@ impl gen::CELVisitorCompat<'_> for Parser {
             Ok(v) => v,
             Err(e) => return self.report_error(token, Some(e), "invalid uint literal"),
         };
-        self.helper.next_expr(token, Expr::Literal(Val::UInt(val)))
+        self.helper
+            .next_expr(token, Expr::Literal(CelVal::UInt(val)))
     }
 
     fn visit_Double(&mut self, ctx: &DoubleContext<'_>) -> Self::Return {
         let string = ctx.get_text();
         let token = ctx.tok.as_ref().expect("Has to have double!");
         match string.parse::<f64>() {
-            Ok(d) if d.is_finite() => self.helper.next_expr(token, Expr::Literal(Val::Double(d))),
+            Ok(d) if d.is_finite() => self
+                .helper
+                .next_expr(token, Expr::Literal(CelVal::Double(d))),
             Err(e) => self.report_error(token, Some(e), "invalid double literal"),
             _ => self.report_error(token, None::<ParseError>, "invalid double literal"),
         }
@@ -878,7 +883,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
         match parse::parse_string(&ctx.get_text()) {
             Ok(string) => self
                 .helper
-                .next_expr(token, Expr::Literal(Val::String(string))),
+                .next_expr(token, Expr::Literal(CelVal::String(string))),
             Err(e) => self.report_error::<ParseError, _>(
                 token,
                 None,
@@ -893,7 +898,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
         match parse::parse_bytes(&string[2..string.len() - 1]) {
             Ok(bytes) => self
                 .helper
-                .next_expr(token, Expr::Literal(Val::Bytes(bytes))),
+                .next_expr(token, Expr::Literal(CelVal::Bytes(bytes))),
             Err(e) => {
                 self.report_error::<ParseError, _>(
                     token,
@@ -908,21 +913,21 @@ impl gen::CELVisitorCompat<'_> for Parser {
     fn visit_BoolTrue(&mut self, ctx: &BoolTrueContext<'_>) -> Self::Return {
         self.helper.next_expr(
             ctx.tok.as_deref().expect("Has to be `true`!"),
-            Expr::Literal(Val::Boolean(true)),
+            Expr::Literal(CelVal::Boolean(true)),
         )
     }
 
     fn visit_BoolFalse(&mut self, ctx: &BoolFalseContext<'_>) -> Self::Return {
         self.helper.next_expr(
             ctx.tok.as_deref().expect("Has to be `false`!"),
-            Expr::Literal(Val::Boolean(false)),
+            Expr::Literal(CelVal::Boolean(false)),
         )
     }
 
     fn visit_Null(&mut self, ctx: &NullContext<'_>) -> Self::Return {
         self.helper.next_expr(
             ctx.tok.as_deref().expect("Has to be `null`!"),
-            Expr::Literal(Val::Null),
+            Expr::Literal(CelVal::Null),
         )
     }
 }
@@ -1029,8 +1034,8 @@ impl LogicManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::parser::ast::{ComprehensionExpr, Expr};
-    use crate::parser::reference::Val;
+    use crate::common::ast::{ComprehensionExpr, EntryExpr, Expr};
+    use crate::IdedExpr;
     use std::iter;
 
     struct TestInfo {
@@ -1818,22 +1823,27 @@ ERROR: <input>:1:24: unsupported syntax '?'
                     &format!("^#{}:{}#", expr.id, "*expr.Expr_ListExpr")
                 }
                 Expr::Literal(val) => match val {
-                    Val::String(s) => {
+                    CelVal::String(s) => {
                         &format!("\"{s}\"^#{}:{}#", expr.id, "*expr.Constant_StringValue")
                     }
-                    Val::Boolean(b) => &format!("{b}^#{}:{}#", expr.id, "*expr.Constant_BoolValue"),
-                    Val::Int(i) => &format!("{i}^#{}:{}#", expr.id, "*expr.Constant_Int64Value"),
-                    Val::UInt(u) => &format!("{u}u^#{}:{}#", expr.id, "*expr.Constant_Uint64Value"),
-                    Val::Double(f) => {
+                    CelVal::Boolean(b) => {
+                        &format!("{b}^#{}:{}#", expr.id, "*expr.Constant_BoolValue")
+                    }
+                    CelVal::Int(i) => &format!("{i}^#{}:{}#", expr.id, "*expr.Constant_Int64Value"),
+                    CelVal::UInt(u) => {
+                        &format!("{u}u^#{}:{}#", expr.id, "*expr.Constant_Uint64Value")
+                    }
+                    CelVal::Double(f) => {
                         &format!("{f}^#{}:{}#", expr.id, "*expr.Constant_DoubleValue")
                     }
-                    Val::Bytes(bytes) => &format!(
+                    CelVal::Bytes(bytes) => &format!(
                         "b\"{}\"^#{}:{}#",
                         String::from_utf8_lossy(bytes),
                         expr.id,
                         "*expr.Constant_BytesValue"
                     ),
-                    Val::Null => &format!("null^#{}:{}#", expr.id, "*expr.Constant_NullValue"),
+                    CelVal::Null => &format!("null^#{}:{}#", expr.id, "*expr.Constant_NullValue"),
+                    t => &format!("WUT? {t:?}"),
                 },
                 Expr::Map(map) => {
                     self.push("{");

@@ -1,5 +1,5 @@
-use crate::parser::ast::{operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr};
-use crate::parser::reference::Val::{Boolean, Int};
+use crate::common::ast::{operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr};
+use crate::common::value::CelVal::{Boolean, Int};
 use crate::parser::{MacroExprHelper, ParseError};
 
 pub type MacroExpander = fn(

@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::parser::ast::{Expr, IdedExpr};
+use crate::common::ast::{Expr, IdedExpr};
 
 /// A collection of all the references that an expression makes to variables and functions.
 pub struct ExpressionReferences<'expr> {
@@ -124,10 +124,10 @@ impl IdedExpr {
             Expr::Map(map) => {
                 for entry in &map.entries {
                     match &entry.expr {
-                        crate::parser::ast::EntryExpr::StructField(field) => {
+                        crate::common::ast::EntryExpr::StructField(field) => {
                             field.value._references(variables, functions);
                         }
-                        crate::parser::ast::EntryExpr::MapEntry(map_entry) => {
+                        crate::common::ast::EntryExpr::MapEntry(map_entry) => {
                             map_entry.key._references(variables, functions);
                             map_entry.value._references(variables, functions);
                         }
@@ -140,10 +140,10 @@ impl IdedExpr {
             Expr::Struct(struct_expr) => {
                 for entry in &struct_expr.entries {
                     match &entry.expr {
-                        crate::parser::ast::EntryExpr::StructField(field) => {
+                        crate::common::ast::EntryExpr::StructField(field) => {
                             field.value._references(variables, functions);
                         }
-                        crate::parser::ast::EntryExpr::MapEntry(map_entry) => {
+                        crate::common::ast::EntryExpr::MapEntry(map_entry) => {
                             map_entry.key._references(variables, functions);
                             map_entry.value._references(variables, functions);
                         }
