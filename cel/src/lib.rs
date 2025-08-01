@@ -249,7 +249,7 @@ mod tests {
     fn references() {
         let p = Program::compile("[1, 1].map(x, x * 2)").unwrap();
         assert!(p.references().has_variable("x"));
-        assert_eq!(p.references().variables().len(), 1);
+        assert_eq!(p.references().variables().collect::<Vec<&str>>(), ["x"]);
     }
 
     #[test]
