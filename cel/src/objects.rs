@@ -12,7 +12,7 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
-use crate::common::reference::CelVal;
+use crate::common::value::CelVal;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 

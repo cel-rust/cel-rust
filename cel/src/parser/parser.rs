@@ -3,7 +3,7 @@ use crate::common::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
-use crate::common::reference::CelVal;
+use crate::common::value::CelVal;
 use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CalcContext, CalcContextAttrs,
     ConditionalAndContext, ConditionalOrContext, ConstantLiteralContext,
