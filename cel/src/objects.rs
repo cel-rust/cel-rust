@@ -480,22 +480,43 @@ impl Value {
                     };
                 }
                 if call.args.len() == 2 {
-                    let left = Value::resolve(&call.args[0], ctx)?;
                     match call.func_name.as_str() {
-                        operators::ADD => return left + Value::resolve(&call.args[1], ctx)?,
-                        operators::SUBSTRACT => return left - Value::resolve(&call.args[1], ctx)?,
-                        operators::DIVIDE => return left / Value::resolve(&call.args[1], ctx)?,
-                        operators::MULTIPLY => return left * Value::resolve(&call.args[1], ctx)?,
-                        operators::MODULO => return left % Value::resolve(&call.args[1], ctx)?,
+                        operators::ADD => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                + Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::SUBSTRACT => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                - Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::DIVIDE => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                / Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::MULTIPLY => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                * Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::MODULO => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                % Value::resolve(&call.args[1], ctx)?
+                        }
                         operators::EQUALS => {
-                            return Value::Bool(left.eq(&Value::resolve(&call.args[1], ctx)?))
-                                .into()
+                            return Value::Bool(
+                                Value::resolve(&call.args[0], ctx)?
+                                    .eq(&Value::resolve(&call.args[1], ctx)?),
+                            )
+                            .into()
                         }
                         operators::NOT_EQUALS => {
-                            return Value::Bool(left.ne(&Value::resolve(&call.args[1], ctx)?))
-                                .into()
+                            return Value::Bool(
+                                Value::resolve(&call.args[0], ctx)?
+                                    .ne(&Value::resolve(&call.args[1], ctx)?),
+                            )
+                            .into()
                         }
                         operators::LESS => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
                             let right = Value::resolve(&call.args[1], ctx)?;
                             return Value::Bool(
                                 left.partial_cmp(&right)
@@ -505,6 +526,7 @@ impl Value {
                             .into();
                         }
                         operators::LESS_EQUALS => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
                             let right = Value::resolve(&call.args[1], ctx)?;
                             return Value::Bool(
                                 left.partial_cmp(&right)
@@ -514,6 +536,7 @@ impl Value {
                             .into();
                         }
                         operators::GREATER => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
                             let right = Value::resolve(&call.args[1], ctx)?;
                             return Value::Bool(
                                 left.partial_cmp(&right)
@@ -523,6 +546,7 @@ impl Value {
                             .into();
                         }
                         operators::GREATER_EQUALS => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
                             let right = Value::resolve(&call.args[1], ctx)?;
                             return Value::Bool(
                                 left.partial_cmp(&right)
@@ -532,6 +556,7 @@ impl Value {
                             .into();
                         }
                         operators::IN => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
                             let right = Value::resolve(&call.args[1], ctx)?;
                             match (left, right) {
                                 (Value::String(l), Value::String(r)) => {
@@ -550,6 +575,7 @@ impl Value {
                             }
                         }
                         operators::LOGICAL_OR => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
                             return if left.to_bool() {
                                 left.into()
                             } else {
@@ -557,6 +583,7 @@ impl Value {
                             };
                         }
                         operators::LOGICAL_AND => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
                             return if !left.to_bool() {
                                 Value::Bool(false)
                             } else {
@@ -566,7 +593,7 @@ impl Value {
                             .into();
                         }
                         operators::INDEX => {
-                            let value = left;
+                            let value = Value::resolve(&call.args[0], ctx)?;
                             let idx = Value::resolve(&call.args[1], ctx)?;
                             return match (value, idx) {
                                 (Value::List(items), Value::Int(idx)) => items
@@ -1249,5 +1276,33 @@ mod tests {
         for (expr, err) in cases {
             test_execution_error(expr, err);
         }
+    }
+
+    #[test]
+    fn test_function_identifier() {
+        fn with(
+            ftx: &crate::FunctionContext,
+            crate::extractors::This(this): crate::extractors::This<Value>,
+            ident: crate::extractors::Identifier,
+            expr: crate::parser::Expression,
+        ) -> crate::ResolveResult {
+            let mut ptx = ftx.ptx.new_inner_scope();
+            ptx.add_variable_from_value(&ident, this);
+            ptx.resolve(&expr)
+        }
+        let mut context = Context::default();
+        context.add_function("with", with);
+
+        let program = Program::compile("[1,2].with(a, a + a)").unwrap();
+        let value = program.execute(&context);
+        assert_eq!(
+            value,
+            Ok(Value::List(Arc::new(vec![
+                Value::Int(1),
+                Value::Int(2),
+                Value::Int(1),
+                Value::Int(2)
+            ])))
+        );
     }
 }
