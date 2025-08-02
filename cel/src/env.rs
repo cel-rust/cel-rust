@@ -35,10 +35,13 @@ impl EnvBuilder {
         self
     }
 
-    pub fn add_variable(&mut self, binding: &str, t: Type) -> &mut Self {
+    /// Adds [`t`], if unknown or added with [add_type] prior.
+    /// Should this be called `variable`, what if the [`binding`] already is declared?
+    pub fn add_variable(&mut self, binding: &str, t: &Type) -> &mut Self {
         self
     }
 
+    /// Same as [`add_variable`], which includes collisions for [`overload_name`]?
     pub fn add_overload<T: 'static, F>(
         &mut self,
         fn_name: &str,
@@ -52,7 +55,8 @@ impl EnvBuilder {
     {
         self
     }
-    
+
+    /// Same as [`add_overload`], including issues
     pub fn add_member_overload<T: 'static, F>(
         &mut self,
         fn_name: &str,
