@@ -8,7 +8,7 @@
 //!
 //! let env = cel::Env::builder()
 //!     .add_type(opaque_type)
-//!     .add_variable("answer", cel::common::types::UINT_TYPE)
+//!     .add_variable("answer", &cel::common::types::UINT_TYPE)
 //!     .add_overload("is_it", "is_it_uint", &[&cel::common::types::UINT_TYPE], &cel::common::types::BOOL_TYPE, is_it)
 //!     .add_member_overload("is_it", "is_it_on_uint", &cel::common::types::UINT_TYPE, &[], &cel::common::types::BOOL_TYPE, is_it)
 //!     .build();
