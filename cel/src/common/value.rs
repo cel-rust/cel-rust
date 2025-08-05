@@ -31,6 +31,10 @@ pub trait Val: Any + Debug {
 
     fn into_inner(self) -> Box<dyn Any>;
 
+    fn as_adder(&self) -> Option<&dyn Adder> {
+        None
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val>;
 }
 
@@ -43,7 +47,7 @@ impl dyn Val {
 impl Adder for CelVal {
     fn add(&self, rhs: &dyn Val) -> Box<dyn Val> {
         if let CelVal::Int(i) = self {
-            let i: types::Int = i.clone().into();
+            let i: types::Int = (*i).into();
             return i.add(rhs);
         }
         Box::new(CelVal::Error)

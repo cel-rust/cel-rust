@@ -15,6 +15,10 @@ impl Val for Int {
         Box::new(self.0)
     }
 
+    fn as_adder(&self) -> Option<&dyn traits::Adder> {
+        Some(self as &dyn traits::Adder)
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Int(self.0))
     }
