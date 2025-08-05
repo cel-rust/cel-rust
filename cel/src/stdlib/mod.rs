@@ -1,3 +1,6 @@
-pub fn optional_syntax(enabled: bool) -> LibOption {
+#[allow(dead_code)]
+pub struct LibOption;
+
+pub fn optional_syntax(_enabled: bool) -> LibOption {
     todo!()
 }

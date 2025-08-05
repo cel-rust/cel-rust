@@ -1,3 +1,4 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
@@ -14,6 +15,8 @@ impl Val for Bool {
         Box::new(self.0)
     }
 }
+
+impl traits::Adder for Bool {}
 
 impl From<Bool> for bool {
     fn from(value: Bool) -> Self {
