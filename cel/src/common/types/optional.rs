@@ -1,7 +1,9 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
+#[derive(Debug)]
 pub struct Optional(Option<Box<dyn Val>>);
 
 const OPTIONAL_TYPE: Type = Type::new_opaque_type("optional_type");
@@ -37,3 +39,5 @@ impl From<Optional> for Option<Box<dyn Val>> {
         val.0
     }
 }
+
+impl traits::Adder for Optional {}

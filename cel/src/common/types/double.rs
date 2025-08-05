@@ -1,7 +1,9 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
+#[derive(Debug)]
 pub struct Double(f64);
 
 impl Val for Double {
@@ -29,3 +31,5 @@ impl From<f64> for Double {
         Self(value)
     }
 }
+
+impl traits::Adder for Double {}

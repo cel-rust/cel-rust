@@ -1,7 +1,9 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
+#[derive(Debug)]
 pub struct UInt(u64);
 
 impl Val for UInt {
@@ -29,3 +31,5 @@ impl From<u64> for UInt {
         Self(value)
     }
 }
+
+impl traits::Adder for UInt {}

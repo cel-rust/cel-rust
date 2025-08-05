@@ -1,7 +1,9 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
+#[derive(Debug)]
 pub struct Bytes(Vec<u8>);
 
 impl Val for Bytes {
@@ -29,3 +31,5 @@ impl From<Bytes> for Vec<u8> {
         value.0
     }
 }
+
+impl traits::Adder for Bytes {}

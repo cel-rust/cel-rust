@@ -2,11 +2,13 @@ use crate::common::functions;
 use crate::common::types::Type;
 use std::collections::HashMap;
 
+#[allow(dead_code)]
 pub struct FunctionDecl<'a> {
     name: String,
     overloads: HashMap<String, OverloadDecl<'a>>,
 }
 
+#[allow(dead_code)]
 pub struct OverloadDecl<'a> {
     id: String,
     arg_types: Vec<Type<'a>>,

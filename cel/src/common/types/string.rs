@@ -1,8 +1,10 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 use std::string::String as StdString;
 
+#[derive(Debug)]
 pub struct String(StdString);
 
 impl Val for String {
@@ -30,6 +32,8 @@ impl From<String> for StdString {
         v.0
     }
 }
+
+impl traits::Adder for String {}
 
 impl String {
     pub fn new(str: &str) -> Self {
