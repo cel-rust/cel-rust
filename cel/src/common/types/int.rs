@@ -14,6 +14,10 @@ impl Val for Int {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
     }
+
+    fn as_adder(&self) -> Option<&dyn traits::Adder> {
+        Some(self as &dyn traits::Adder)
+    }
 }
 
 impl traits::Adder for Int {
