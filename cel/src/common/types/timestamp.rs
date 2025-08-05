@@ -1,8 +1,10 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 use std::time::SystemTime;
 
+#[derive(Debug)]
 pub struct Timestamp(SystemTime);
 
 impl Val for Timestamp {
@@ -30,3 +32,5 @@ impl From<Timestamp> for SystemTime {
         timestamp.0
     }
 }
+
+impl traits::Adder for Timestamp {}

@@ -1,3 +1,4 @@
+use crate::common::traits::Adder;
 use crate::common::types;
 use crate::common::types::Type;
 use std::any::Any;
@@ -25,12 +26,28 @@ pub enum CelVal {
     Unknown,
 }
 
-pub trait Val {
+pub trait Val: Any + Debug {
     fn get_type(&self) -> Type<'_>;
 
     fn into_inner(self) -> Box<dyn Any>;
 
     fn clone_as_boxed(&self) -> Box<dyn Val>;
+}
+
+impl dyn Val {
+    pub fn downcast_ref<T: Val>(&self) -> Option<&T> {
+        (self as &dyn Any).downcast_ref::<T>()
+    }
+}
+
+impl Adder for CelVal {
+    fn add(&self, rhs: &dyn Val) -> Box<dyn Val> {
+        if let CelVal::Int(i) = self {
+            let i: types::Int = i.clone().into();
+            return i.add(rhs);
+        }
+        Box::new(CelVal::Error)
+    }
 }
 
 impl Val for CelVal {
@@ -111,5 +128,53 @@ mod test {
         assert!(test(borrowed.as_ref()));
         assert!(test(cow.as_ref()));
         assert!(test(borrowed.to_owned().as_ref()));
+    }
+}
+
+impl CelVal {
+    pub fn into_val(self) -> Box<dyn Val> {
+        match self {
+            CelVal::Unspecified => todo!(),
+            CelVal::Error => todo!(),
+            CelVal::Dyn => todo!(),
+            CelVal::Any => todo!(),
+            CelVal::Boolean(b) => {
+                let b: types::Bool = b.into();
+                Box::new(b)
+            }
+            CelVal::Bytes(bytes) => {
+                let bytes: types::Bytes = bytes.into();
+                Box::new(bytes)
+            }
+            CelVal::Double(d) => {
+                let d: types::Double = d.into();
+                Box::new(d)
+            }
+            CelVal::Duration(d) => {
+                let d: types::Duration = d.into();
+                Box::new(d)
+            }
+            CelVal::Int(i) => {
+                let i: types::Int = i.into();
+                Box::new(i)
+            }
+            CelVal::List => todo!(),
+            CelVal::Map => todo!(),
+            CelVal::Null => Box::new(types::Null),
+            CelVal::String(s) => {
+                let s: types::String = s.into();
+                Box::new(s)
+            }
+            CelVal::Timestamp(t) => {
+                let t: types::Timestamp = t.into();
+                Box::new(t)
+            }
+            CelVal::Type => todo!(),
+            CelVal::UInt(u) => {
+                let u: types::UInt = u.into();
+                Box::new(u)
+            }
+            CelVal::Unknown => todo!(),
+        }
     }
 }
