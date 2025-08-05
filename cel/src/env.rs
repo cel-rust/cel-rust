@@ -4,24 +4,27 @@ use crate::magic::IntoFunction;
 
 pub struct Env {}
 
+pub type Error = String;
+
 impl Env {
     pub fn builder() -> EnvBuilder {
         EnvBuilder::default()
     }
 
-    pub fn parse(&self, _text: &str) -> Result<Ast, ()> {
+    pub fn parse(&self, _text: &str) -> Result<Ast, Error> {
         todo!("Implement this!")
     }
 
-    pub fn check(&self, ast: Ast) -> Result<Ast, ()> {
+    pub fn check(&self, ast: Ast) -> Result<Ast, Error> {
         Ok(ast)
     }
 
-    pub fn compile(&self, text: &str) -> Result<Ast, ()> {
+    pub fn compile(&self, text: &str) -> Result<Ast, Error> {
         self.check(self.parse(text)?)
     }
 }
 
+#[derive(Default)]
 pub struct EnvBuilder {}
 
 impl EnvBuilder {
@@ -71,16 +74,9 @@ impl EnvBuilder {
     }
 }
 
-impl Default for EnvBuilder {
-    fn default() -> Self {
-        Self {}
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use crate::common::ast::operators;
-    use crate::common::traits::Adder;
     use crate::common::types;
     use crate::common::value::Val;
     use crate::Env;
@@ -104,8 +100,8 @@ mod tests {
 
         let int: types::Int = 16.into();
         let val: &dyn Val = &int;
-        if let Some(i) = val.downcast_ref::<types::Int>() {
-            println!("{:?}", i.add(&int));
+        if let Some(adder) = val.as_adder() {
+            println!("{:?}", adder.add(&int));
         }
 
         //let total = val.as_trait::<traits::Adder>().unwrap().add(&int);
