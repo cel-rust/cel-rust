@@ -28,5 +28,3 @@ impl From<Timestamp> for SystemTime {
         timestamp.0
     }
 }
-
-impl traits::Adder for Timestamp {}

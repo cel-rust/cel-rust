@@ -27,5 +27,3 @@ impl From<u64> for UInt {
         Self(value)
     }
 }
-
-impl traits::Adder for UInt {}

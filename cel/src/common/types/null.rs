@@ -15,5 +15,3 @@ impl Val for Null {
         Box::new(None::<()>)
     }
 }
-
-impl traits::Adder for Null {}
