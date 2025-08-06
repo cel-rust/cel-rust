@@ -49,7 +49,7 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
-    fn add(&self, _rhs: &dyn Val) -> Box<dyn Val> {
+    fn add(&self, _rhs: Box<dyn Val>) -> Box<dyn Val> {
         Box::new(CelVal::Error)
     }
 }
