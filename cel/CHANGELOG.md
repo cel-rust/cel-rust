@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0](https://github.com/cel-rust/cel-rust/compare/cel-v0.10.0...cel-v0.11.0) - 2025-08-06
+
+### Other
+
+- Fix CEL readme ([#180](https://github.com/cel-rust/cel-rust/pull/180))
+- Merge pull request #154 from alexsnaps/types
+- Fix usage of identifier in custom functions ([#174](https://github.com/cel-rust/cel-rust/pull/174))
+- Merge pull request #169 from cgettys-microsoft/shrink-expr-01
+- Make Program expose the Expr ([#171](https://github.com/cel-rust/cel-rust/pull/171))
+- unused struct, using ([#170](https://github.com/cel-rust/cel-rust/pull/170))
+
 ## [0.10.0](https://github.com/cel-rust/cel-rust/compare/cel-interpreter-v0.9.1...cel-interpreter-v0.10.0) - 2025-07-23
 
 ### Added
