@@ -1,4 +1,5 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::value::CelVal;
 use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
@@ -12,7 +13,6 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
-use crate::common::value::CelVal;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 
@@ -472,6 +472,7 @@ impl Value {
         match &expr.expr {
             Expr::Literal(val) => Ok(val.clone().into()),
             Expr::Call(call) => {
+                // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
                     let cond = Value::resolve(&call.args[0], ctx)?;
                     return if cond.to_bool()? {
@@ -482,6 +483,94 @@ impl Value {
                 }
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
+                        operators::LOGICAL_OR => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
+                            return if left.to_bool()? {
+                                left.into()
+                            } else {
+                                Value::resolve(&call.args[1], ctx)
+                            };
+                        }
+                        operators::LOGICAL_AND => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
+                            return if !left.to_bool()? {
+                                Value::Bool(false)
+                            } else {
+                                let right = Value::resolve(&call.args[1], ctx)?;
+                                Value::Bool(right.to_bool()?)
+                            }
+                            .into();
+                        }
+                        operators::EQUALS => {
+                            return Value::Bool(
+                                Value::resolve(&call.args[0], ctx)?
+                                    .eq(&Value::resolve(&call.args[1], ctx)?),
+                            )
+                            .into()
+                        }
+                        operators::NOT_EQUALS => {
+                            return Value::Bool(
+                                Value::resolve(&call.args[0], ctx)?
+                                    .ne(&Value::resolve(&call.args[1], ctx)?),
+                            )
+                            .into()
+                        }
+                        operators::INDEX => {
+                            let value = Value::resolve(&call.args[0], ctx)?;
+                            let idx = Value::resolve(&call.args[1], ctx)?;
+                            return match (value, idx) {
+                                (Value::List(items), Value::Int(idx)) => {
+                                    if idx >= 0 && (idx as usize) < items.len() {
+                                        items[idx as usize].clone().into()
+                                    } else {
+                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
+                                    }
+                                }
+                                (Value::List(items), Value::UInt(idx)) => {
+                                    if (idx as usize) < items.len() {
+                                        items[idx as usize].clone().into()
+                                    } else {
+                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
+                                    }
+                                }
+                                (Value::String(_), Value::Int(idx)) => {
+                                    Err(ExecutionError::NoSuchKey(idx.to_string().into()))
+                                }
+                                (Value::Map(map), Value::String(property)) => map
+                                    .get(&property.into())
+                                    .cloned()
+                                    .unwrap_or(Value::Null)
+                                    .into(),
+                                (Value::Map(map), Value::Bool(property)) => map
+                                    .get(&property.into())
+                                    .cloned()
+                                    .unwrap_or(Value::Null)
+                                    .into(),
+                                (Value::Map(map), Value::Int(property)) => map
+                                    .get(&property.into())
+                                    .cloned()
+                                    .unwrap_or(Value::Null)
+                                    .into(),
+                                (Value::Map(map), Value::UInt(property)) => map
+                                    .get(&property.into())
+                                    .cloned()
+                                    .unwrap_or(Value::Null)
+                                    .into(),
+                                (Value::Map(_), index) => {
+                                    Err(ExecutionError::UnsupportedMapIndex(index))
+                                }
+                                (Value::List(_), index) => {
+                                    Err(ExecutionError::UnsupportedListIndex(index))
+                                }
+                                (value, index) => {
+                                    Err(ExecutionError::UnsupportedIndex(value, index))
+                                }
+                            };
+                        }
+                        // OPT_SELECT, OPT_INDEX:
+                        // END OF SPECIAL CASES
+
+                        // all below is NOT special in the interpreter
                         operators::ADD => {
                             return Value::resolve(&call.args[0], ctx)?
                                 + Value::resolve(&call.args[1], ctx)?
@@ -501,20 +590,6 @@ impl Value {
                         operators::MODULO => {
                             return Value::resolve(&call.args[0], ctx)?
                                 % Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .eq(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
-                        }
-                        operators::NOT_EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .ne(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
                         }
                         operators::LESS => {
                             let left = Value::resolve(&call.args[0], ctx)?;
@@ -574,76 +649,6 @@ impl Value {
                                     Err(ExecutionError::ValuesNotComparable(left, right))?
                                 }
                             }
-                        }
-                        operators::LOGICAL_OR => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            return if left.to_bool()? {
-                                left.into()
-                            } else {
-                                Value::resolve(&call.args[1], ctx)
-                            };
-                        }
-                        operators::LOGICAL_AND => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            return if !left.to_bool()? {
-                                Value::Bool(false)
-                            } else {
-                                let right = Value::resolve(&call.args[1], ctx)?;
-                                Value::Bool(right.to_bool()?)
-                            }
-                            .into();
-                        }
-                        operators::INDEX => {
-                            let value = Value::resolve(&call.args[0], ctx)?;
-                            let idx = Value::resolve(&call.args[1], ctx)?;
-                            return match (value, idx) {
-                                (Value::List(items), Value::Int(idx)) => {
-                                    if idx >= 0 && (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::List(items), Value::UInt(idx)) => {
-                                    if (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::String(_), Value::Int(idx)) => {
-                                    Err(ExecutionError::NoSuchKey(idx.to_string().into()))
-                                }
-                                (Value::Map(map), Value::String(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::Bool(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::Int(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::UInt(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(_), index) => {
-                                    Err(ExecutionError::UnsupportedMapIndex(index))
-                                }
-                                (Value::List(_), index) => {
-                                    Err(ExecutionError::UnsupportedListIndex(index))
-                                }
-                                (value, index) => {
-                                    Err(ExecutionError::UnsupportedIndex(value, index))
-                                }
-                            };
                         }
                         _ => (),
                     }
