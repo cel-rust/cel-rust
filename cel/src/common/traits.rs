@@ -1,4 +1,5 @@
-use crate::common::value::{CelVal, Val};
+use crate::common::types;
+use crate::common::value::Val;
 
 /// ADDER_TYPE types provide a '+' operator overload.
 pub const ADDER_TYPE: u16 = 1;
@@ -49,7 +50,7 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
-    fn add(&self, _rhs: Box<dyn Val>) -> Box<dyn Val> {
-        Box::new(CelVal::Error)
+    fn add(&self, rhs: Box<dyn Val>) -> Box<dyn Val> {
+        types::Err::maybe_no_such_overload(rhs)
     }
 }
