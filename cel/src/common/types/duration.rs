@@ -32,5 +32,3 @@ impl From<Duration> for StdDuration {
         duration.0
     }
 }
-
-impl traits::Adder for Duration {}
