@@ -1,9 +1,6 @@
 [workspace]
 git_release_enable = true
 pr_branch_prefix = "release-plz-" # PR branch prefix
-publish_allow_dirty = true
-publish_timeout = "10m" # set a timeout for `cargo publish`
-release_commits = "^feat:" # prepare release only if at least one commit matches a regex
 
 [[package]] # the double square brackets define a TOML table array
 name = "cel"
