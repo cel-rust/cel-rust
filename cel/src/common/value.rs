@@ -44,16 +44,6 @@ impl dyn Val {
     }
 }
 
-impl Adder for CelVal {
-    fn add(&self, rhs: &dyn Val) -> Box<dyn Val> {
-        if let CelVal::Int(i) = self {
-            let i: types::Int = (*i).into();
-            return i.add(rhs);
-        }
-        Box::new(CelVal::Error)
-    }
-}
-
 impl Val for CelVal {
     fn get_type(&self) -> Type<'_> {
         match self {
