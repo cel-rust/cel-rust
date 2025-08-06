@@ -24,10 +24,18 @@ auth.claims.email_verified && resources.all(r, r.startsWith(auth.claims.email))
 
 ## Getting Started
 
-This project includes a CEL-parser and an interpreter which means that it can be used to evaluate CEL-expressions. The
-library aims to be very simple to use, while still being fast, safe, and customizable.
+Add `cel` to your `Cargo.toml`:
+
+```toml
+[dependencies]
+cel = "0.10.1"
+```
+
+Create and execute a simple CEL expression:
 
 ```rust
+use cel::{Context, Program};
+
 fn main() {
     let program = Program::compile("add(2, 3) == 5").unwrap();
     let mut context = Context::default();
