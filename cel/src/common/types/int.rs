@@ -1,5 +1,5 @@
 use crate::common::types::Type;
-use crate::common::value::{CelVal, Val};
+use crate::common::value::Val;
 use crate::common::{traits, types};
 use std::any::Any;
 
@@ -25,12 +25,12 @@ impl Val for Int {
 }
 
 impl traits::Adder for Int {
-    fn add(&self, rhs: &dyn Val) -> Box<dyn Val> {
-        if let Some(i) = (rhs as &dyn Any).downcast_ref::<Int>() {
+    fn add(&self, other: Box<dyn Val>) -> Box<dyn Val> {
+        if let Some(i) = (other.as_ref() as &dyn Any).downcast_ref::<Int>() {
             let t: types::Int = (self.0 + i.0).into();
             Box::new(t)
         } else {
-            Box::new(CelVal::Error)
+            types::Err::maybe_no_such_overload(other)
         }
     }
 }
