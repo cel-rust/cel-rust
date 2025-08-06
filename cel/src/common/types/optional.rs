@@ -39,5 +39,3 @@ impl From<Optional> for Option<Box<dyn Val>> {
         val.0
     }
 }
-
-impl traits::Adder for Optional {}

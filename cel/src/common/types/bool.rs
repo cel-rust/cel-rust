@@ -20,8 +20,6 @@ impl Val for Bool {
     }
 }
 
-impl traits::Adder for Bool {}
-
 impl From<Bool> for bool {
     fn from(value: Bool) -> Self {
         value.0

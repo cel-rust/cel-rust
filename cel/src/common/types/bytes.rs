@@ -31,5 +31,3 @@ impl From<Bytes> for Vec<u8> {
         value.0
     }
 }
-
-impl traits::Adder for Bytes {}

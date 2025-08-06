@@ -31,5 +31,3 @@ impl From<f64> for Double {
         Self(value)
     }
 }
-
-impl traits::Adder for Double {}
