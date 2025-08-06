@@ -3,7 +3,7 @@ use crate::common::value::{CelVal, Val};
 use crate::common::{traits, types};
 use std::any::Any;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Int(i64);
 
 impl Val for Int {

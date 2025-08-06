@@ -4,7 +4,7 @@ use crate::common::value::Val;
 use std::any::Any;
 use std::time::SystemTime;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Timestamp(SystemTime);
 
 impl Val for Timestamp {
