@@ -4,7 +4,7 @@ use crate::common::value::Val;
 use std::any::Any;
 use std::time::Duration as StdDuration;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Duration(StdDuration);
 
 impl Val for Duration {

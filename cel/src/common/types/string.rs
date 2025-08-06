@@ -4,7 +4,7 @@ use crate::common::value::Val;
 use std::any::Any;
 use std::string::String as StdString;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct String(StdString);
 
 impl Val for String {

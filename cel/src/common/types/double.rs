@@ -3,7 +3,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Double(f64);
 
 impl Val for Double {
