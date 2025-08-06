@@ -1,4 +1,5 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::value::CelVal;
 use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
@@ -14,7 +15,6 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
-use crate::common::value::CelVal;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 
@@ -788,6 +788,7 @@ impl Value {
         match &expr.expr {
             Expr::Literal(val) => Ok(val.clone().into()),
             Expr::Call(call) => {
+                // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
                     let cond = Value::resolve(&call.args[0], ctx)?;
                     return if cond.to_bool()? {
@@ -798,99 +799,6 @@ impl Value {
                 }
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
-                        operators::ADD => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                + Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::SUBSTRACT => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                - Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::DIVIDE => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                / Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::MULTIPLY => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                * Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::MODULO => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                % Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .eq(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
-                        }
-                        operators::NOT_EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .ne(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
-                        }
-                        operators::LESS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    == Ordering::Less,
-                            )
-                            .into();
-                        }
-                        operators::LESS_EQUALS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    != Ordering::Greater,
-                            )
-                            .into();
-                        }
-                        operators::GREATER => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    == Ordering::Greater,
-                            )
-                            .into();
-                        }
-                        operators::GREATER_EQUALS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    != Ordering::Less,
-                            )
-                            .into();
-                        }
-                        operators::IN => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            match (left, right) {
-                                (Value::String(l), Value::String(r)) => {
-                                    return Value::Bool(r.contains(&*l)).into()
-                                }
-                                (any, Value::List(v)) => {
-                                    return Value::Bool(v.contains(&any)).into()
-                                }
-                                (any, Value::Map(m)) => match KeyRef::try_from(&any) {
-                                    Ok(key) => return Value::Bool(m.contains_key(&key)).into(),
-                                    Err(_) => return Value::Bool(false).into(),
-                                },
-                                (left, right) => {
-                                    Err(ExecutionError::ValuesNotComparable(left, right))?
-                                }
-                            }
-                        }
                         operators::LOGICAL_OR => {
                             let left = Value::resolve(&call.args[0], ctx)?;
                             return if left.to_bool()? {
@@ -908,6 +816,20 @@ impl Value {
                                 Value::Bool(right.to_bool()?)
                             }
                             .into();
+                        }
+                        operators::EQUALS => {
+                            return Value::Bool(
+                                Value::resolve(&call.args[0], ctx)?
+                                    .eq(&Value::resolve(&call.args[1], ctx)?),
+                            )
+                            .into()
+                        }
+                        operators::NOT_EQUALS => {
+                            return Value::Bool(
+                                Value::resolve(&call.args[0], ctx)?
+                                    .ne(&Value::resolve(&call.args[1], ctx)?),
+                            )
+                            .into()
                         }
                         operators::INDEX | operators::OPT_INDEX => {
                             let mut value = Value::resolve(&call.args[0], ctx)?;
@@ -1005,6 +927,87 @@ impl Value {
                                 operand.member(&field)?,
                             ))));
                         }
+                        // END OF SPECIAL CASES
+
+                        // all below is NOT special in the interpreter
+                        operators::ADD => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                + Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::SUBSTRACT => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                - Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::DIVIDE => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                / Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::MULTIPLY => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                * Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::MODULO => {
+                            return Value::resolve(&call.args[0], ctx)?
+                                % Value::resolve(&call.args[1], ctx)?
+                        }
+                        operators::LESS => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
+                            let right = Value::resolve(&call.args[1], ctx)?;
+                            return Value::Bool(
+                                left.partial_cmp(&right)
+                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
+                                    == Ordering::Less,
+                            )
+                            .into();
+                        }
+                        operators::LESS_EQUALS => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
+                            let right = Value::resolve(&call.args[1], ctx)?;
+                            return Value::Bool(
+                                left.partial_cmp(&right)
+                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
+                                    != Ordering::Greater,
+                            )
+                            .into();
+                        }
+                        operators::GREATER => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
+                            let right = Value::resolve(&call.args[1], ctx)?;
+                            return Value::Bool(
+                                left.partial_cmp(&right)
+                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
+                                    == Ordering::Greater,
+                            )
+                            .into();
+                        }
+                        operators::GREATER_EQUALS => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
+                            let right = Value::resolve(&call.args[1], ctx)?;
+                            return Value::Bool(
+                                left.partial_cmp(&right)
+                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
+                                    != Ordering::Less,
+                            )
+                            .into();
+                        }
+                        operators::IN => {
+                            let left = Value::resolve(&call.args[0], ctx)?;
+                            let right = Value::resolve(&call.args[1], ctx)?;
+                            match (left, right) {
+                                (Value::String(l), Value::String(r)) => {
+                                    return Value::Bool(r.contains(&*l)).into()
+                                }
+                                (any, Value::List(v)) => {
+                                    return Value::Bool(v.contains(&any)).into()
+                                }
+                                (any, Value::Map(m)) => match KeyRef::try_from(&any) {
+                                    Ok(key) => return Value::Bool(m.contains_key(&key)).into(),
+                                    Err(_) => return Value::Bool(false).into(),
+                                },
+                                (left, right) => {
+                                    Err(ExecutionError::ValuesNotComparable(left, right))?
+                                }
+                            }                        }
                         _ => (),
                     }
                 }

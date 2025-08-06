@@ -32,12 +32,16 @@ impl Err {
 }
 
 impl Val for Err {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         types::ERROR_TYPE
     }
 
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self)
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        todo!()
     }
 }
 
