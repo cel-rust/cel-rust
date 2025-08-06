@@ -3,7 +3,7 @@ use crate::common::value::Val;
 use crate::common::{traits, types};
 use std::any::Any;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub struct Int(i64);
 
 impl Val for Int {
@@ -44,5 +44,11 @@ impl From<Int> for i64 {
 impl From<i64> for Int {
     fn from(value: i64) -> Self {
         Self(value)
+    }
+}
+
+impl Default for Int {
+    fn default() -> Self {
+        Self(i64::default())
     }
 }
