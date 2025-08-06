@@ -32,7 +32,7 @@ impl Err {
 }
 
 impl Val for Err {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         types::ERROR_TYPE
     }
 
