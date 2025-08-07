@@ -1,5 +1,5 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
-use crate::common::value::CelVal;
+use crate::common::value::{CelVal, Val};
 use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
@@ -16,6 +16,8 @@ use std::sync::LazyLock;
 
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
+use nom::combinator::{cond, map, value};
+use paste::{expr, item};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -693,18 +695,22 @@ impl Value {
         Ok(Value::List(res.into()))
     }
 
-    #[inline(always)]
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
+        todo!()
+    }
+
+    #[inline(always)]
+    pub fn resolve_val(expr: &Expression, ctx: &Context) -> Result<Box<dyn Val>, ExecutionError> {
         match &expr.expr {
-            Expr::Literal(val) => Ok(val.clone().into()),
+            Expr::Literal(val) => Ok(val.to_value()),
             Expr::Call(call) => {
                 // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
                     let cond = Value::resolve(&call.args[0], ctx)?;
                     return if cond.to_bool()? {
-                        Value::resolve(&call.args[1], ctx)
+                        Value::resolve_val(&call.args[1], ctx)
                     } else {
-                        Value::resolve(&call.args[2], ctx)
+                        Value::resolve_val(&call.args[2], ctx)
                     };
                 }
                 if call.args.len() == 2 {
@@ -714,7 +720,7 @@ impl Value {
                             return if left.to_bool()? {
                                 left.into()
                             } else {
-                                Value::resolve(&call.args[1], ctx)
+                                Value::resolve_val(&call.args[1], ctx)
                             };
                         }
                         operators::LOGICAL_AND => {
