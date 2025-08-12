@@ -319,10 +319,6 @@ impl FunctionRegistry {
     pub(crate) fn get(&self, name: &str) -> Option<&Function> {
         self.functions.get(name)
     }
-
-    pub(crate) fn has(&self, name: &str) -> bool {
-        self.functions.contains_key(name)
-    }
 }
 
 pub type Function = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + Sync>;
