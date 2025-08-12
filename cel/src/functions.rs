@@ -661,15 +661,6 @@ mod tests {
                 "timestamp getMilliseconds",
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
-            (
-                "timestamp min",
-                "timestamp('0001-01-01T00:00:00Z') || true",
-            ),
-            (
-                "timestamp max",
-                "timestamp('9999-12-31T23:59:59.999999999Z') || true",
-            ),
-
         ]
         .iter()
         .for_each(assert_script);
@@ -858,5 +849,49 @@ mod tests {
         ]
         .iter()
         .for_each(assert_script);
+    }
+
+    #[test]
+    fn no_bool_coercion() {
+        // todo the real expected error here should be `no such overload`
+        [
+            (
+                "string || bool",
+                "'' || false",
+                "Unexpected type: got 'string', want 'bool'",
+            ),
+            (
+                "int || bool",
+                "1 || false",
+                "Unexpected type: got 'int', want 'bool'",
+            ),
+            (
+                "int || bool",
+                "1u || false",
+                "Unexpected type: got 'uint', want 'bool'",
+            ),
+            (
+                "float || bool",
+                "0.1|| false",
+                "Unexpected type: got 'float', want 'bool'",
+            ),
+            (
+                "list || bool",
+                "[] || false",
+                "Unexpected type: got 'list', want 'bool'",
+            ),
+            (
+                "map || bool",
+                "{} || false",
+                "Unexpected type: got 'map', want 'bool'",
+            ),
+            (
+                "null || bool",
+                "null || false",
+                "Unexpected type: got 'null', want 'bool'",
+            ),
+        ]
+        .iter()
+        .for_each(assert_error)
     }
 }
