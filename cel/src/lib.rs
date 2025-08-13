@@ -233,6 +233,7 @@ mod tests {
 
         // Test methods
         assert_output("size([1, 2, 3]) == 3", Ok(true.into()));
+        assert_output("size([size([42]), 2, 3]) == 3", Ok(true.into()));
         assert_output("size([]) == 3", Ok(false.into()));
 
         // Test variable attribute traversals

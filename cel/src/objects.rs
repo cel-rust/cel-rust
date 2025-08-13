@@ -704,7 +704,7 @@ impl Value {
                         _ => Ok(Value::Bool(false)),
                     }
                 } else {
-                    left.member(&select.field, ctx)
+                    left.member(&select.field)
                 }
             }
             Expr::List(list_expr) => {
@@ -777,7 +777,7 @@ impl Value {
     //               Attribute("b")),
     //        FunctionCall([Ident("c")]))
 
-    fn member(self, name: &str, ctx: &Context) -> ResolveResult {
+    fn member(self, name: &str) -> ResolveResult {
         // todo! Ideally we would avoid creating a String just to create a Key for lookup in the
         // map, but this would require something like the `hashbrown` crate's `Equivalent` trait.
         let name: Arc<String> = name.to_owned().into();
@@ -794,8 +794,6 @@ impl Value {
         // to see if the next token is a function call?
         if let Some(child) = child {
             child.into()
-        } else if ctx.has_function(&name) {
-            Value::Function(name.clone(), Some(self.into())).into()
         } else {
             ExecutionError::NoSuchKey(name.clone()).into()
         }
