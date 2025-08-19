@@ -805,10 +805,7 @@ impl Value {
     fn to_bool(&self) -> Result<bool, ExecutionError> {
         match self {
             Value::Bool(v) => Ok(*v),
-            _ => Err(ExecutionError::UnexpectedType {
-                got: self.type_of().to_string(),
-                want: ValueType::Bool.to_string(),
-            }),
+            _ => Err(ExecutionError::NoSuchOverload),
         }
     }
 }

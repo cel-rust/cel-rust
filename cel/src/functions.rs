@@ -853,43 +853,14 @@ mod tests {
 
     #[test]
     fn no_bool_coercion() {
-        // todo the real expected error here should be `no such overload`
         [
-            (
-                "string || bool",
-                "'' || false",
-                "Unexpected type: got 'string', want 'bool'",
-            ),
-            (
-                "int || bool",
-                "1 || false",
-                "Unexpected type: got 'int', want 'bool'",
-            ),
-            (
-                "int || bool",
-                "1u || false",
-                "Unexpected type: got 'uint', want 'bool'",
-            ),
-            (
-                "float || bool",
-                "0.1|| false",
-                "Unexpected type: got 'float', want 'bool'",
-            ),
-            (
-                "list || bool",
-                "[] || false",
-                "Unexpected type: got 'list', want 'bool'",
-            ),
-            (
-                "map || bool",
-                "{} || false",
-                "Unexpected type: got 'map', want 'bool'",
-            ),
-            (
-                "null || bool",
-                "null || false",
-                "Unexpected type: got 'null', want 'bool'",
-            ),
+            ("string || bool", "'' || false", "No such overload"),
+            ("int || bool", "1 || false", "No such overload"),
+            ("int || bool", "1u || false", "No such overload"),
+            ("float || bool", "0.1|| false", "No such overload"),
+            ("list || bool", "[] || false", "No such overload"),
+            ("map || bool", "{} || false", "No such overload"),
+            ("null || bool", "null || false", "No such overload"),
         ]
         .iter()
         .for_each(assert_error)
