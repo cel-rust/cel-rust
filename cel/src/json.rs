@@ -33,7 +33,7 @@ impl Value {
     ///
     /// assert_eq!(result, serde_json::Value::Null);
     /// ```
-    pub fn json(&self) -> Result<serde_json::Value, ConvertToJsonError> {
+    pub fn json(&self) -> Result<serde_json::Value, ConvertToJsonError<'_>> {
         Ok(match *self {
             Value::List(ref vec) => serde_json::Value::Array(
                 vec.iter()

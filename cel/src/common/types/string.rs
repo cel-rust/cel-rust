@@ -6,7 +6,7 @@ use std::string::String as StdString;
 pub struct String(StdString);
 
 impl Val for String {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::STRING_TYPE
     }
 

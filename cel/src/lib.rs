@@ -179,7 +179,7 @@ impl Program {
     /// assert!(references.has_function("size"));
     /// assert!(references.has_variable("foo"));
     /// ```
-    pub fn references(&self) -> ExpressionReferences {
+    pub fn references(&self) -> ExpressionReferences<'_> {
         self.expression.references()
     }
 

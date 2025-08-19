@@ -6,7 +6,7 @@ use std::any::Any;
 pub struct Bool(bool);
 
 impl Val for Bool {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::BOOL_TYPE
     }
 

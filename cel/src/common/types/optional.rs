@@ -7,7 +7,7 @@ pub struct Optional(Option<Box<dyn Val>>);
 const OPTIONAL_TYPE: Type = Type::new_opaque_type("optional_type");
 
 impl Val for Optional {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         OPTIONAL_TYPE
     }
 

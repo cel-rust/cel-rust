@@ -26,13 +26,13 @@ pub enum CelVal {
 }
 
 pub trait Val {
-    fn get_type(&self) -> Type;
+    fn get_type(&self) -> Type<'_>;
 
     fn into_inner(self) -> Box<dyn Any>;
 }
 
 impl Val for CelVal {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         match self {
             CelVal::Unspecified => Type::new_unspecified_type("unspecified"),
             CelVal::Error => types::ERROR_TYPE,

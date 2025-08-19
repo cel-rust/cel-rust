@@ -125,7 +125,7 @@ impl Context<'_> {
         Value::resolve_all(exprs, self)
     }
 
-    pub fn new_inner_scope(&self) -> Context {
+    pub fn new_inner_scope(&self) -> Context<'_> {
         Context::Child {
             parent: self,
             variables: Default::default(),

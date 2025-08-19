@@ -6,7 +6,7 @@ use std::time::Duration as StdDuration;
 pub struct Duration(StdDuration);
 
 impl Val for Duration {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::DURATION_TYPE
     }
 

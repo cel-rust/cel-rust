@@ -5,7 +5,7 @@ use std::any::Any;
 pub struct Int(i64);
 
 impl Val for Int {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::INT_TYPE
     }
 

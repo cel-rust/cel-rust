@@ -6,7 +6,7 @@ use std::time::SystemTime;
 pub struct Timestamp(SystemTime);
 
 impl Val for Timestamp {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::TIMESTAMP_TYPE
     }
 
