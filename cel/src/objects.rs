@@ -474,7 +474,7 @@ impl Value {
             Expr::Call(call) => {
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
                     let cond = Value::resolve(&call.args[0], ctx)?;
-                    return if cond.to_bool() {
+                    return if cond.to_bool()? {
                         Value::resolve(&call.args[1], ctx)
                     } else {
                         Value::resolve(&call.args[2], ctx)
@@ -577,7 +577,7 @@ impl Value {
                         }
                         operators::LOGICAL_OR => {
                             let left = Value::resolve(&call.args[0], ctx)?;
-                            return if left.to_bool() {
+                            return if left.to_bool()? {
                                 left.into()
                             } else {
                                 Value::resolve(&call.args[1], ctx)
@@ -585,11 +585,11 @@ impl Value {
                         }
                         operators::LOGICAL_AND => {
                             let left = Value::resolve(&call.args[0], ctx)?;
-                            return if !left.to_bool() {
+                            return if !left.to_bool()? {
                                 Value::Bool(false)
                             } else {
                                 let right = Value::resolve(&call.args[1], ctx)?;
-                                Value::Bool(right.to_bool())
+                                Value::Bool(right.to_bool()?)
                             }
                             .into();
                         }
@@ -645,7 +645,7 @@ impl Value {
                 if call.args.len() == 1 {
                     let expr = Value::resolve(&call.args[0], ctx)?;
                     match call.func_name.as_str() {
-                        operators::LOGICAL_NOT => return Ok(Value::Bool(!expr.to_bool())),
+                        operators::LOGICAL_NOT => return Ok(Value::Bool(!expr.to_bool()?)),
                         operators::NEGATE => {
                             return match expr {
                                 Value::Int(i) => Ok(Value::Int(-i)),
@@ -742,7 +742,7 @@ impl Value {
                 match iter {
                     Value::List(items) => {
                         for item in items.deref() {
-                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool() {
+                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
                                 break;
                             }
                             ctx.add_variable_from_value(&comprehension.iter_var, item.clone());
@@ -752,7 +752,7 @@ impl Value {
                     }
                     Value::Map(map) => {
                         for key in map.map.deref().keys() {
-                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool() {
+                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
                                 break;
                             }
                             ctx.add_variable_from_value(&comprehension.iter_var, key.clone());
@@ -800,22 +800,10 @@ impl Value {
     }
 
     #[inline(always)]
-    fn to_bool(&self) -> bool {
+    fn to_bool(&self) -> Result<bool, ExecutionError> {
         match self {
-            Value::List(v) => !v.is_empty(),
-            Value::Map(v) => !v.map.is_empty(),
-            Value::Int(v) => *v != 0,
-            Value::UInt(v) => *v != 0,
-            Value::Float(v) => *v != 0.0,
-            Value::String(v) => !v.is_empty(),
-            Value::Bytes(v) => !v.is_empty(),
-            Value::Bool(v) => *v,
-            Value::Null => false,
-            #[cfg(feature = "chrono")]
-            Value::Duration(v) => v.num_nanoseconds().map(|n| n != 0).unwrap_or(false),
-            #[cfg(feature = "chrono")]
-            Value::Timestamp(v) => v.timestamp_nanos_opt().unwrap_or_default() > 0,
-            Value::Function(_, _) => false,
+            Value::Bool(v) => Ok(*v),
+            _ => Err(ExecutionError::NoSuchOverload),
         }
     }
 }

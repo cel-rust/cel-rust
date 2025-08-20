@@ -5,7 +5,7 @@ use std::any::Any;
 pub struct Bytes(Vec<u8>);
 
 impl Val for Bytes {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::BYTES_TYPE
     }
 

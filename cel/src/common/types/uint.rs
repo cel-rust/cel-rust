@@ -5,7 +5,7 @@ use std::any::Any;
 pub struct UInt(u64);
 
 impl Val for UInt {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::UINT_TYPE
     }
 

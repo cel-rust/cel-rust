@@ -75,7 +75,7 @@ impl IdedExpr {
     /// assert!(references.has_variable("foo"));
     /// assert!(references.has_function("size"));
     /// ```
-    pub fn references(&self) -> ExpressionReferences {
+    pub fn references(&self) -> ExpressionReferences<'_> {
         let mut variables = HashSet::new();
         let mut functions = HashSet::new();
         self._references(&mut variables, &mut functions);

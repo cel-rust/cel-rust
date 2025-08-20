@@ -5,7 +5,7 @@ use std::any::Any;
 pub struct Double(f64);
 
 impl Val for Double {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::DOUBLE_TYPE
     }
 

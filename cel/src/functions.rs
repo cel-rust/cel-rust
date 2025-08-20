@@ -661,15 +661,6 @@ mod tests {
                 "timestamp getMilliseconds",
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
-            (
-                "timestamp min",
-                "timestamp('0001-01-01T00:00:00Z') || true",
-            ),
-            (
-                "timestamp max",
-                "timestamp('9999-12-31T23:59:59.999999999Z') || true",
-            ),
-
         ]
         .iter()
         .for_each(assert_script);
@@ -858,5 +849,20 @@ mod tests {
         ]
         .iter()
         .for_each(assert_script);
+    }
+
+    #[test]
+    fn no_bool_coercion() {
+        [
+            ("string || bool", "'' || false", "No such overload"),
+            ("int || bool", "1 || false", "No such overload"),
+            ("int || bool", "1u || false", "No such overload"),
+            ("float || bool", "0.1|| false", "No such overload"),
+            ("list || bool", "[] || false", "No such overload"),
+            ("map || bool", "{} || false", "No such overload"),
+            ("null || bool", "null || false", "No such overload"),
+        ]
+        .iter()
+        .for_each(assert_error)
     }
 }

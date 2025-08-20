@@ -5,7 +5,7 @@ use std::any::Any;
 pub struct Null;
 
 impl Val for Null {
-    fn get_type(&self) -> Type {
+    fn get_type(&self) -> Type<'_> {
         super::NULL_TYPE
     }
 
