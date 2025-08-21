@@ -4,7 +4,7 @@ use std::collections::BTreeMap;
 pub mod operators;
 
 pub struct Ast {
-    pub expr: IdedExpr,
+    pub(crate) expr: IdedExpr,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
