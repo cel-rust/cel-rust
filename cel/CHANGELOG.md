@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.1](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.0...cel-v0.11.1) - 2025-08-20
+
+### Fixed
+
+- *(clippy)* hiding a lifetime that's elided elsewhere is confusing
+- Added proper `ExecutionError::NoSuchOverload`
+- no bool coercion
+
+### Other
+
+- Merge pull request #185 from alexsnaps/cleanup-coerce-into-bool
+
 ## [0.11.0](https://github.com/cel-rust/cel-rust/compare/cel-v0.10.0...cel-v0.11.0) - 2025-08-06
 
 ### Other
