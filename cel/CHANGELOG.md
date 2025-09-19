@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.2](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.1...cel-v0.11.2) - 2025-09-19
+
+### Other
+
+- updated antlr4rust to v0.3.0-rc1 explicitly ([#189](https://github.com/cel-rust/cel-rust/pull/189))
+
 ## [0.11.1](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.0...cel-v0.11.1) - 2025-08-20
 
 ### Fixed
