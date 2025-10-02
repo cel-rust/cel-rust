@@ -1056,6 +1056,15 @@ mod tests {
         // Opts contains the list of options to be configured with the parser before parsing the expression.
         // Opts []Option
     }
+
+    #[test]
+    fn test_bad_input() {
+        let src = r#"1 +
+(
+)"#;
+        assert!(Parser::new().parse(src).is_err());
+    }
+
     #[test]
     fn test() {
         let test_cases = [
