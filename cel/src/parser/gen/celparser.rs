@@ -1626,7 +1626,9 @@ impl<'input> Deref for UnaryContextAll<'input> {
 }
 impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for UnaryContextAll<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        self.deref().accept(visitor)
+        if !matches!(self, UnaryContextAll::Error(_)) {
+            self.deref().accept(visitor)
+        }
     }
 }
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for UnaryContextAll<'input> {
