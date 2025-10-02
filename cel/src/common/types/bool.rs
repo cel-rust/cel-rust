@@ -10,7 +10,7 @@ impl Val for Bool {
         super::BOOL_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
+    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 
@@ -53,7 +53,7 @@ mod tests {
 
     #[test]
     fn test_into_inner() {
-        let value = Bool(true);
+        let value: Box<dyn Val> = Box::new(Bool(true));
         let inner = value.into_inner();
         let option = inner.downcast::<bool>();
         let b = option.unwrap();
