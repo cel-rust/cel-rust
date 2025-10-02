@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.3](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.2...cel-v0.11.3) - 2025-10-02
+
+### Fixed
+
+- *(parsing)* stop navigating AST on err
+
 ## [0.11.2](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.1...cel-v0.11.2) - 2025-09-19
 
 ### Other
