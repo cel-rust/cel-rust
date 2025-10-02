@@ -806,9 +806,9 @@ impl Value {
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
+                            let left = Value::resolve_val(&call.args[0], ctx)?;
                             return if left.to_bool()? {
-                                left.into()
+                                Ok(left)
                             } else {
                                 Value::resolve_val(&call.args[1], ctx)
                             };
@@ -825,8 +825,8 @@ impl Value {
                         }
                         operators::EQUALS => {
                             return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .eq(&Value::resolve(&call.args[1], ctx)?),
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?),
                             )
                             .into()
                         }
