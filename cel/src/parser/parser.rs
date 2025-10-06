@@ -618,7 +618,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 IdedExpr::default()
             }
             Some(member) => {
-                if ctx.ops.len() % 2 == 0 {
+                if ctx.ops.len().is_multiple_of(2) {
                     self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
@@ -634,7 +634,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 self.report_error::<ParseError, _>(&ctx.start(), None, "No `MemberContextAll`!")
             }
             Some(member) => {
-                if ctx.ops.len() % 2 == 0 {
+                if ctx.ops.len().is_multiple_of(2) {
                     self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
