@@ -2938,7 +2938,9 @@ impl<'input> Deref for PrimaryContextAll<'input> {
 }
 impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for PrimaryContextAll<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        self.deref().accept(visitor)
+        if !matches!(self, PrimaryContextAll::Error(_)) {
+            self.deref().accept(visitor)
+        }
     }
 }
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for PrimaryContextAll<'input> {

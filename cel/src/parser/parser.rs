@@ -1059,10 +1059,14 @@ mod tests {
 
     #[test]
     fn test_bad_input() {
-        let src = r#"1 +
-(
-)"#;
-        assert!(Parser::new().parse(src).is_err());
+        let expressions = ["1 + ()", "/", ".", "@foo"];
+        for expr in expressions {
+            assert!(
+                Parser::new().parse(expr).is_err(),
+                "Expression `{}` should not parse",
+                expr
+            );
+        }
     }
 
     #[test]
