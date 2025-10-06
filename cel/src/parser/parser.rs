@@ -618,7 +618,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 IdedExpr::default()
             }
             Some(member) => {
-                if ctx.ops.len() % 2 == 0 {
+                if ctx.ops.len().is_multiple_of(2) {
                     self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
@@ -634,7 +634,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 self.report_error::<ParseError, _>(&ctx.start(), None, "No `MemberContextAll`!")
             }
             Some(member) => {
-                if ctx.ops.len() % 2 == 0 {
+                if ctx.ops.len().is_multiple_of(2) {
                     self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
@@ -1059,10 +1059,14 @@ mod tests {
 
     #[test]
     fn test_bad_input() {
-        let src = r#"1 +
-(
-)"#;
-        assert!(Parser::new().parse(src).is_err());
+        let expressions = ["1 + ()", "/", ".", "@foo"];
+        for expr in expressions {
+            assert!(
+                Parser::new().parse(expr).is_err(),
+                "Expression `{}` should not parse",
+                expr
+            );
+        }
     }
 
     #[test]
