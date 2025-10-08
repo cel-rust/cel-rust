@@ -1,5 +1,8 @@
 use crate::common::ast;
-use crate::common::ast::{operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, LiteralValue, MapEntryExpr, MapExpr, SelectExpr, SourceInfo, StructExpr, StructFieldExpr};
+use crate::common::ast::{
+    operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, LiteralValue,
+    MapEntryExpr, MapExpr, SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
+};
 use crate::common::value::CelVal;
 use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType,
@@ -2148,7 +2151,9 @@ ERROR: <input>:1:24: unsupported syntax '?'
                     LiteralValue::Boolean(b) => {
                         &format!("{b}^#{}:{}#", expr.id, "*expr.Constant_BoolValue")
                     }
-                    LiteralValue::Int(i) => &format!("{i}^#{}:{}#", expr.id, "*expr.Constant_Int64Value"),
+                    LiteralValue::Int(i) => {
+                        &format!("{i}^#{}:{}#", expr.id, "*expr.Constant_Int64Value")
+                    }
                     LiteralValue::UInt(u) => {
                         &format!("{u}u^#{}:{}#", expr.id, "*expr.Constant_Uint64Value")
                     }
@@ -2161,7 +2166,9 @@ ERROR: <input>:1:24: unsupported syntax '?'
                         expr.id,
                         "*expr.Constant_BytesValue"
                     ),
-                    LiteralValue::Null => &format!("null^#{}:{}#", expr.id, "*expr.Constant_NullValue"),
+                    LiteralValue::Null => {
+                        &format!("null^#{}:{}#", expr.id, "*expr.Constant_NullValue")
+                    }
                     t => &format!("WUT? {t:?}"),
                 },
                 Expr::Map(map) => {

@@ -36,8 +36,8 @@ impl Val for Err {
         types::ERROR_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
-        Box::new(self)
+    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+        self
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

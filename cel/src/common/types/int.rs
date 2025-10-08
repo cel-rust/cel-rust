@@ -2,16 +2,27 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::common::{traits, types};
 use std::any::Any;
+use std::ops::Deref;
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Int(i64);
+
+impl Int {}
+
+impl Deref for Int {
+    type Target = i64;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Val for Int {
     fn get_type(&self) -> Type<'_> {
         super::INT_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
+    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 
