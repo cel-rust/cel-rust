@@ -3,7 +3,7 @@ use crate::common::value::Val;
 use std::any::Any;
 use std::time::SystemTime;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Timestamp(SystemTime);
 
 impl Val for Timestamp {
@@ -11,7 +11,7 @@ impl Val for Timestamp {
         super::TIMESTAMP_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
+    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 

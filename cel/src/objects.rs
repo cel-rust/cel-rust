@@ -1,7 +1,7 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::common::value::{CelVal, Val};
 use crate::context::Context;
-use crate::functions::FunctionContext;
+use crate::functions::{matches, FunctionContext};
 use crate::{ExecutionError, Expression};
 use std::any::Any;
 use std::cmp::Ordering;
@@ -14,6 +14,8 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
+use crate::common::types;
+use crate::ExecutionError::NoSuchOverload;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 use nom::combinator::{cond, map, value};
@@ -406,12 +408,12 @@ impl Debug for Value {
 impl From<CelVal> for Value {
     fn from(val: CelVal) -> Self {
         match val {
-            CelVal::String(s) => Value::String(Arc::new(s)),
-            CelVal::Boolean(b) => Value::Bool(b),
-            CelVal::Int(i) => Value::Int(i),
-            CelVal::UInt(u) => Value::UInt(u),
-            CelVal::Double(d) => Value::Float(d),
-            CelVal::Bytes(bytes) => Value::Bytes(Arc::new(bytes)),
+            CelVal::String(s) => Value::String(Arc::new(s.into_inner())),
+            CelVal::Boolean(b) => Value::Bool(*b),
+            CelVal::Int(i) => Value::Int(*i),
+            CelVal::UInt(u) => Value::UInt(*u),
+            CelVal::Double(d) => Value::Float(*d),
+            CelVal::Bytes(bytes) => Value::Bytes(Arc::new(bytes.into_inner())),
             CelVal::Null => Value::Null,
             v => unimplemented!("{v:?}"),
         }
@@ -696,56 +698,74 @@ impl Value {
     }
 
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
-        todo!()
+        Self::resolve_val(expr, ctx).map(|v| v.into())
     }
 
     #[inline(always)]
-    pub fn resolve_val(expr: &Expression, ctx: &Context) -> Result<Box<dyn Val>, ExecutionError> {
+    pub fn resolve_val(expr: &Expression, ctx: &Context) -> Result<CelVal, ExecutionError> {
         match &expr.expr {
             Expr::Literal(val) => Ok(val.to_value()),
             Expr::Call(call) => {
                 // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
-                    let cond = Value::resolve(&call.args[0], ctx)?;
-                    return if cond.to_bool()? {
-                        Value::resolve_val(&call.args[1], ctx)
+                    let cond = Value::resolve_val(&call.args[0], ctx)?;
+                    return if let CelVal::Boolean(b) = cond {
+                        if *b {
+                            Value::resolve_val(&call.args[1], ctx)
+                        } else {
+                            Value::resolve_val(&call.args[2], ctx)
+                        }
                     } else {
-                        Value::resolve_val(&call.args[2], ctx)
+                        Err(NoSuchOverload)
                     };
                 }
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
                             let left = Value::resolve_val(&call.args[0], ctx)?;
-                            return if left.to_bool()? {
-                                Ok(left)
+                            return if let CelVal::Boolean(b) = &left {
+                                if **b {
+                                    Ok(left)
+                                } else {
+                                    let right = Value::resolve_val(&call.args[1], ctx)?;
+                                    if right.get_type() == types::BOOL_TYPE {
+                                        Ok(right)
+                                    } else {
+                                        Err(NoSuchOverload)
+                                    }
+                                }
                             } else {
-                                Value::resolve_val(&call.args[1], ctx)
+                                Err(NoSuchOverload)
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            return if !left.to_bool()? {
-                                Value::Bool(false)
+                            let left = Value::resolve_val(&call.args[0], ctx)?;
+                            return if let CelVal::Boolean(b) = &left {
+                                if !**b {
+                                    Ok(left)
+                                } else {
+                                    let right = Value::resolve_val(&call.args[1], ctx)?;
+                                    if right.get_type() == types::BOOL_TYPE {
+                                        Ok(right)
+                                    } else {
+                                        Err(NoSuchOverload)
+                                    }
+                                }
                             } else {
-                                let right = Value::resolve(&call.args[1], ctx)?;
-                                Value::Bool(right.to_bool()?)
-                            }
-                            .into();
+                                Err(NoSuchOverload)
+                            };
                         }
                         operators::EQUALS => {
-                            return Value::Bool(
+                            return Ok(CelVal::Boolean(
                                 Value::resolve_val(&call.args[0], ctx)?
-                                    .eq(&Value::resolve_val(&call.args[1], ctx)?),
-                            )
-                            .into()
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?).into(),
+                            ))
                         }
                         operators::NOT_EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .ne(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
+                            return Ok(CelVal::Boolean(
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .ne(&Value::resolve_val(&call.args[1], ctx)?).into(),
+                            ))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
                             let mut value = Value::resolve(&call.args[0], ctx)?;
@@ -1099,7 +1119,7 @@ impl Value {
                     }
                     t => todo!("Support {t:?}"),
                 }
-                Value::resolve(&comprehension.result, &ctx)
+                Value::resolve_val(&comprehension.result, &ctx)
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),

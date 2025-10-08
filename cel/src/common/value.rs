@@ -3,7 +3,7 @@ use crate::common::types;
 use crate::common::types::Type;
 use std::any::Any;
 use std::fmt::Debug;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CelVal {
@@ -11,18 +11,18 @@ pub enum CelVal {
     Error,
     Dyn,
     Any,
-    Boolean(bool),
-    Bytes(Vec<u8>),
-    Double(f64),
-    Duration(Duration),
-    Int(i64),
+    Boolean(types::Bool),
+    Bytes(types::Bytes),
+    Double(types::Double),
+    Duration(types::Duration),
+    Int(types::Int),
     List,
     Map,
     Null,
-    String(String),
-    Timestamp(SystemTime),
+    String(types::String),
+    Timestamp(types::Timestamp),
     Type,
-    UInt(u64),
+    UInt(types::UInt),
     Unknown,
 }
 
