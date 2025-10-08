@@ -3,7 +3,7 @@ use crate::common::value::Val;
 use std::any::Any;
 use std::time::Duration as StdDuration;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Duration(StdDuration);
 
 impl Val for Duration {
@@ -11,7 +11,7 @@ impl Val for Duration {
         super::DURATION_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
+    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 

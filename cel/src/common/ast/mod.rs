@@ -1,6 +1,7 @@
-use crate::common::value::Val;
-use std::collections::BTreeMap;
 use crate::common::types;
+use crate::common::value::{CelVal, Val};
+use std::clone;
+use std::collections::BTreeMap;
 
 pub mod operators;
 
@@ -51,15 +52,15 @@ pub enum LiteralValue {
 }
 
 impl LiteralValue {
-    pub fn to_value(&self) -> Box<dyn Val> {
+    pub fn to_value(&self) -> CelVal {
         match &self {
-            LiteralValue::Boolean(b) => Box::new(types::Bool::from(*b)),
-            LiteralValue::Bytes(b) => Box::new(types::Bytes::from(b.clone())),
-            LiteralValue::Double(f) =>   Box::new(types::Double::from(*f)),
-            LiteralValue::Int(i) => Box::new(types::Int::from(*i)),
-            LiteralValue::Null => Box::new(types::Null),
-            LiteralValue::String(s) => Box::new(types::String::from(s.clone())),
-            LiteralValue::UInt(ui) => Box::new(types::UInt::from(*ui)),
+            LiteralValue::Boolean(b) => CelVal::Boolean(types::Bool::from(*b)),
+            LiteralValue::Bytes(b) => CelVal::Bytes(types::Bytes::from(b.clone())),
+            LiteralValue::Double(f) => CelVal::Double(types::Double::from(*f)),
+            LiteralValue::Int(i) => CelVal::Int(types::Int::from(*i)),
+            LiteralValue::Null => CelVal::Null,
+            LiteralValue::String(s) => CelVal::String(types::String::from(s.clone())),
+            LiteralValue::UInt(ui) => CelVal::UInt(types::UInt::from(*ui)),
         }
     }
 }

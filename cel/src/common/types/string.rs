@@ -2,17 +2,36 @@ use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
+use std::ops::Deref;
 use std::string::String as StdString;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct String(StdString);
+
+impl String {
+    pub fn into_inner(self) -> StdString {
+        self.0
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
+}
+
+impl Deref for String {
+    type Target = std::string::String;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Val for String {
     fn get_type(&self) -> Type<'_> {
         super::STRING_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
+    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 
