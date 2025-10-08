@@ -109,6 +109,8 @@ pub enum ExecutionError {
     RemainderByZero(Value),
     #[error("Overflow from binary operator '{0}': {1:?}, {2:?}")]
     Overflow(&'static str, Value, Value),
+    #[error("Index out of bounds: {0:?}")]
+    IndexOutOfBounds(Value),
 }
 
 impl ExecutionError {

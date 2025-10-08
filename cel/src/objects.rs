@@ -597,11 +597,20 @@ impl Value {
                             let value = Value::resolve(&call.args[0], ctx)?;
                             let idx = Value::resolve(&call.args[1], ctx)?;
                             return match (value, idx) {
-                                (Value::List(items), Value::Int(idx)) => items
-                                    .get(idx as usize)
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
+                                (Value::List(items), Value::Int(idx)) => {
+                                    if idx >= 0 && (idx as usize) < items.len() {
+                                        items[idx as usize].clone().into()
+                                    } else {
+                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
+                                    }
+                                }
+                                (Value::List(items), Value::UInt(idx)) => {
+                                    if (idx as usize) < items.len() {
+                                        items[idx as usize].clone().into()
+                                    } else {
+                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
+                                    }
+                                }
                                 (Value::String(_), Value::Int(idx)) => {
                                     Err(ExecutionError::NoSuchKey(idx.to_string().into()))
                                 }
@@ -1171,7 +1180,35 @@ mod tests {
             .add_variable("list", Value::List(Arc::new(vec![])))
             .unwrap();
         let result = program.execute(&context);
-        assert_eq!(result.unwrap(), Value::Null);
+        assert_eq!(
+            result,
+            Err(ExecutionError::IndexOutOfBounds(Value::Int(10)))
+        );
+    }
+
+    #[test]
+    fn out_of_bound_list_access_negative() {
+        let program = Program::compile("list[-1]").unwrap();
+        let mut context = Context::default();
+        context
+            .add_variable("list", Value::List(Arc::new(vec![])))
+            .unwrap();
+        let result = program.execute(&context);
+        assert_eq!(
+            result,
+            Err(ExecutionError::IndexOutOfBounds(Value::Int(-1)))
+        );
+    }
+
+    #[test]
+    fn list_access_uint() {
+        let program = Program::compile("list[1u]").unwrap();
+        let mut context = Context::default();
+        context
+            .add_variable("list", Value::List(Arc::new(vec![1.into(), 2.into()])))
+            .unwrap();
+        let result = program.execute(&context);
+        assert_eq!(result, Ok(Value::Int(2.into())));
     }
 
     #[test]
