@@ -247,7 +247,10 @@ mod tests {
         assert_output("arr[0] == 1", Ok(true.into()));
 
         // Test that we can index into a string
-        assert_output("str[0] == 'f'", Ok(true.into()));
+        assert_output(
+            "str[0]",
+            Err(ExecutionError::NoSuchKey("0".to_string().into())),
+        );
     }
 
     #[test]

@@ -602,11 +602,8 @@ impl Value {
                                     .cloned()
                                     .unwrap_or(Value::Null)
                                     .into(),
-                                (Value::String(str), Value::Int(idx)) => {
-                                    match str.get(idx as usize..(idx + 1) as usize) {
-                                        None => Ok(Value::Null),
-                                        Some(str) => Ok(Value::String(str.to_string().into())),
-                                    }
+                                (Value::String(_), Value::Int(idx)) => {
+                                    Err(ExecutionError::NoSuchKey(idx.to_string().into()))
                                 }
                                 (Value::Map(map), Value::String(property)) => map
                                     .get(&property.into())
