@@ -1056,7 +1056,9 @@ mod tests {
 
     #[test]
     fn test_bad_input() {
-        let expressions = ["1 + ()", "/", ".", "@foo", "x(1,)", "\x0a", "\n", ""];
+        let expressions = [
+            "1 + ()", "/", ".", "@foo", "x(1,)", "\x0a", "\n", "", "!-\u{1}",
+        ];
         for expr in expressions {
             assert!(
                 Parser::new().parse(expr).is_err(),
