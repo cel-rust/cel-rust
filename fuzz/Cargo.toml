@@ -21,3 +21,10 @@ path = "fuzz_targets/value_binop.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "program_compile"
+path = "fuzz_targets/program_compile.rs"
+test = false
+doc = false
+bench = false

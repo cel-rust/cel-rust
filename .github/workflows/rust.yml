@@ -50,6 +50,7 @@ jobs:
         run: |
           cd fuzz
           cargo fuzz run value_binop -- -max_total_time=60
+          cargo fuzz run program_compile -- -max_total_time=60
   examples:
     name: Run Examples
     runs-on: ubuntu-latest
