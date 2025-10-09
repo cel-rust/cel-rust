@@ -1,14 +1,13 @@
-use crate::common::traits::Adder;
+use crate::common::traits::{Adder, Indexer, Lister};
 use crate::common::types;
 use crate::common::types::Type;
 use std::any::Any;
 use std::fmt::Debug;
-use std::time::SystemTime;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CelVal {
     Unspecified,
-    Error,
+    Error(types::Err),
     Dyn,
     Any,
     Boolean(types::Bool),
@@ -16,7 +15,7 @@ pub enum CelVal {
     Double(types::Double),
     Duration(types::Duration),
     Int(types::Int),
-    List,
+    List(Box<dyn Lister>),
     Map,
     Null,
     String(types::String),
@@ -34,6 +33,10 @@ pub trait Val: Any + Debug {
     fn as_adder(&self) -> Option<&dyn Adder> {
         None
     }
+
+    fn as_indexer(&self) -> Option<&dyn Indexer> {
+        None
+    }
 }
 
 impl dyn Val {
@@ -46,7 +49,7 @@ impl Val for CelVal {
     fn get_type(&self) -> Type<'_> {
         match self {
             CelVal::Unspecified => Type::new_unspecified_type("unspecified"),
-            CelVal::Error => types::ERROR_TYPE,
+            CelVal::Error(_err) => types::ERROR_TYPE,
             CelVal::Dyn => types::DYN_TYPE,
             CelVal::Any => types::ANY_TYPE,
             CelVal::Boolean(_) => types::BOOL_TYPE,
@@ -54,7 +57,7 @@ impl Val for CelVal {
             CelVal::Double(_) => types::DOUBLE_TYPE,
             CelVal::Duration(_) => types::DURATION_TYPE,
             CelVal::Int(_) => types::INT_TYPE,
-            CelVal::List => types::LIST_TYPE,
+            CelVal::List(_) => types::LIST_TYPE,
             CelVal::Map => types::MAP_TYPE,
             CelVal::Null => types::NULL_TYPE,
             CelVal::String(_) => types::STRING_TYPE,
@@ -68,7 +71,7 @@ impl Val for CelVal {
     fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         match *self {
             CelVal::Unspecified => todo!(),
-            CelVal::Error => todo!(),
+            CelVal::Error(_err) => todo!(),
             CelVal::Dyn => todo!(),
             CelVal::Any => todo!(),
             CelVal::Boolean(b) => Box::new(b),
@@ -76,7 +79,7 @@ impl Val for CelVal {
             CelVal::Double(d) => Box::new(d),
             CelVal::Duration(d) => Box::new(d),
             CelVal::Int(i) => Box::new(i),
-            CelVal::List => todo!(),
+            CelVal::List(list) => list,
             CelVal::Map => todo!(),
             CelVal::Null => todo!(),
             CelVal::String(s) => Box::new(s),
@@ -92,7 +95,7 @@ impl CelVal {
     pub fn into_val(self) -> Box<dyn Val> {
         match self {
             CelVal::Unspecified => todo!(),
-            CelVal::Error => todo!(),
+            CelVal::Error(_err) => todo!(),
             CelVal::Dyn => todo!(),
             CelVal::Any => todo!(),
             CelVal::Boolean(b) => {
@@ -115,7 +118,7 @@ impl CelVal {
                 let i: types::Int = i.into();
                 Box::new(i)
             }
-            CelVal::List => todo!(),
+            CelVal::List(_) => todo!(),
             CelVal::Map => todo!(),
             CelVal::Null => Box::new(types::Null),
             CelVal::String(s) => {

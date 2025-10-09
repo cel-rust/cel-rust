@@ -542,12 +542,15 @@ impl Value {
                             ))
                         }
                         operators::INDEX => {
-                            let value = Value::resolve(&call.args[0], ctx)?;
-                            let idx = Value::resolve(&call.args[1], ctx)?;
+                            let value = Value::resolve_val(&call.args[0], ctx)?;
+                            let idx = Value::resolve_val(&call.args[1], ctx)?;
+                            if let Some(indexer) = value.as_indexer() {
+
+                            }
                             return match (value, idx) {
-                                (Value::List(items), Value::Int(idx)) => {
-                                    if idx >= 0 && (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
+                                (CelVal::List(items), CelVal::Int(idx)) => {
+                                    if *idx >= 0 && (*idx as usize) < items.len() {
+                                        items[*idx as usize].clone().into()
                                     } else {
                                         Err(ExecutionError::IndexOutOfBounds(idx.into()))
                                     }

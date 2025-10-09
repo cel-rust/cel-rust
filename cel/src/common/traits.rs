@@ -54,3 +54,13 @@ pub trait Adder {
         types::Err::maybe_no_such_overload(rhs)
     }
 }
+
+pub trait Indexer {
+    fn get(&self, idx: Box<dyn Val>) -> Box<dyn Val> {
+        types::Err::maybe_no_such_overload(idx)
+    }
+}
+
+pub trait Lister {
+    fn as_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>>;
+}
