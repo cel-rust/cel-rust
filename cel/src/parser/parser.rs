@@ -181,6 +181,7 @@ impl Parser {
     }
 
     pub fn parse(mut self, source: &str) -> Result<IdedExpr, ParseErrors> {
+        let source = source.trim();
         let parse_errors = Rc::new(RefCell::new(Vec::<ParseError>::new()));
         let stream = InputStream::new(source);
         let mut lexer = gen::CELLexer::new(stream);
@@ -365,23 +366,19 @@ impl<'a, T: Recognizer<'a>> ErrorListener<'a, T> for ParserErrorListener {
     fn syntax_error(
         &self,
         _recognizer: &T,
-        offending_symbol: Option<&<T::TF as TokenFactory<'a>>::Inner>,
+        _offending_symbol: Option<&<T::TF as TokenFactory<'a>>::Inner>,
         line: isize,
         column: isize,
         msg: &str,
         _error: Option<&ANTLRError>,
     ) {
-        match offending_symbol {
-            Some(offending_symbol)
-                if offending_symbol.get_token_type() == gen::cellexer::WHITESPACE => {}
-            _ => self.parse_errors.borrow_mut().push(ParseError {
-                source: None,
-                pos: (line, column + 1),
-                msg: format!("Syntax error: {msg}"),
-                expr_id: 0,
-                source_info: None,
-            }),
-        }
+        self.parse_errors.borrow_mut().push(ParseError {
+            source: None,
+            pos: (line, column + 1),
+            msg: format!("Syntax error: {msg}"),
+            expr_id: 0,
+            source_info: None,
+        })
     }
 }
 
@@ -1059,7 +1056,9 @@ mod tests {
 
     #[test]
     fn test_bad_input() {
-        let expressions = ["1 + ()", "/", ".", "@foo", "x(1,)"];
+        let expressions = [
+            "1 + ()", "/", ".", "@foo", "x(1,)", "\x0a", "\n", "", "!-\u{1}",
+        ];
         for expr in expressions {
             assert!(
                 Parser::new().parse(expr).is_err(),
