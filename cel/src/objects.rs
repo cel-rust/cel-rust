@@ -768,8 +768,14 @@ impl Value {
                             ))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
-                            let mut value = Value::resolve(&call.args[0], ctx)?;
-                            let idx = Value::resolve(&call.args[1], ctx)?;
+                            let mut value = Value::resolve_val(&call.args[0], ctx)?;
+                            let idx = Value::resolve_val(&call.args[1], ctx)?;
+                            
+                            if let Some(indexer) = value.as_indexer() {
+                                
+                            }
+                            
+                            
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
 
                             if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
