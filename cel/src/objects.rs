@@ -21,6 +21,7 @@ use crate::ExecutionError::NoSuchOverload;
 use chrono::TimeZone;
 use nom::combinator::{cond, map, value};
 use paste::{expr, item};
+use crate::common::traits::Indexer;
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -853,71 +854,19 @@ impl Value {
                         }
                         operators::NOT_EQUALS => {
                             return Ok(CelVal::Boolean(
-                                Value::resolve_val(&call.args[0], ctx)?
-                                    .ne(&Value::resolve_val(&call.args[1], ctx)?).into(),
+                                (!Value::resolve_val(&call.args[0], ctx)?
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?)).into(),
                             ))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
-                            let mut value = Value::resolve(&call.args[0], ctx)?;
-                            let idx = Value::resolve(&call.args[1], ctx)?;
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
-
-                            if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                                is_optional = true;
-                                value = match opt_val.value() {
-                                    Some(inner) => inner.clone(),
-                                    None => {
-                                        return Ok(Value::Opaque(Arc::new(OptionalValue::none())))
-                                    }
-                                };
-                            }
-
-                            let result = match (value, idx) {
-                                (Value::List(items), Value::Int(idx)) => {
-                                    if idx >= 0 && (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
+                            let value = Value::resolve_val(&call.args[0], ctx)?;
+                            let result = match value.as_indexer() {
+                                Some(indexer) => {
+                                    let idx = Value::resolve_val(&call.args[1], ctx)?;
+                                    Ok(indexer.get(&idx).into())
                                 }
-                                (Value::List(items), Value::UInt(idx)) => {
-                                    if (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::String(_), Value::Int(idx)) => {
-                                    Err(ExecutionError::NoSuchKey(idx.to_string().into()))
-                                }
-                                (Value::Map(map), Value::String(property)) => map
-                                    .get(&KeyRef::String(property.as_str()))
-                                    .cloned()
-                                    .ok_or_else(|| ExecutionError::NoSuchKey(property)),
-                                (Value::Map(map), Value::Bool(property)) => {
-                                    map.get(&KeyRef::Bool(property)).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(map), Value::Int(property)) => {
-                                    map.get(&KeyRef::Int(property)).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(map), Value::UInt(property)) => {
-                                    map.get(&KeyRef::Uint(property)).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(_), index) => {
-                                    Err(ExecutionError::UnsupportedMapIndex(index))
-                                }
-                                (Value::List(_), index) => {
-                                    Err(ExecutionError::UnsupportedListIndex(index))
-                                }
-                                (value, index) => {
-                                    Err(ExecutionError::UnsupportedIndex(value, index))
-                                }
+                                None => Err(NoSuchOverload),
                             };
 
                             return if is_optional {

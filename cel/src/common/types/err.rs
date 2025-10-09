@@ -5,16 +5,17 @@ use std::any::Any;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
+use std::sync::Arc;
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Err {
     msg: String,
-    src: Option<Box<dyn Error + Sync + Send + 'static>>,
-    pub val: Option<Box<dyn Val>>,
+    src: Option<Arc<dyn Error + Sync + Send + 'static>>,
+    pub val: Option<Arc<dyn Val>>,
 }
 
 impl Err {
-    pub fn maybe_no_such_overload(val: Box<dyn Val>) -> Box<dyn Val> {
+    pub fn maybe_no_such_overload(val: &dyn Val) -> Box<dyn Val> {
         if val.get_type() == types::UNKNOWN_TYPE || val.get_type() == types::ERROR_TYPE {
             val
         } else {
@@ -56,5 +57,11 @@ impl Error for Err {
         self.src
             .as_ref()
             .map(|e| e.deref() as &(dyn Error + 'static))
+    }
+}
+
+impl PartialEq for Err {
+    fn eq(&self, other: &Self) -> bool {
+        false
     }
 }
