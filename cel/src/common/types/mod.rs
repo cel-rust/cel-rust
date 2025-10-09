@@ -6,6 +6,7 @@ mod double;
 mod duration;
 mod err;
 mod int;
+mod list;
 mod null;
 mod optional;
 mod string;
