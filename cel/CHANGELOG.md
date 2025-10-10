@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.4](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.3...cel-v0.11.4) - 2025-10-09
+
+### Fixed
+
+- antlr4rust update, and fix to allow for linefeed ParseErr
+- *(parser)* Gets rid of ever invoking Visitable with no impl
+- *(string)* String index accesses err out
+- *(clippy)* manual_is_multiple_of
+- *(parser)* Stop traversing AST on PrimaryContextAll::Error
+
+### Other
+
+- add coverage
+- Merge pull request #199 from cel-rust/issue-198
+
 ## [0.11.3](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.2...cel-v0.11.3) - 2025-10-02
 
 ### Fixed
