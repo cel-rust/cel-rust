@@ -7,6 +7,7 @@ authors = ["Clark McCauley <me@clarkmccauley.com>", "Alex Snaps <alex@wcgw.dev>"
 edition = "2021"
 license = "MIT"
 categories = ["compilers"]
+rust-version = "1.87"
 
 [dependencies]
 antlr4rust = "0.3.0-rc2"
