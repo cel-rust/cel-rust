@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.5](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.4...cel-v0.11.5) - 2025-10-15
+
+### Fixed
+
+- support 1.82 onwards ([#207](https://github.com/cel-rust/cel-rust/pull/207))
+
+### Other
+
+- Update README.md
+
 ## [0.11.4](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.3...cel-v0.11.4) - 2025-10-09
 
 ### Fixed
