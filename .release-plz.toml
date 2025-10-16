@@ -11,11 +11,13 @@ git_release_enable = true # enable GitHub/Gitea releases for `package_a`
 [[package]]
 name = "example"
 release = false
+publish = false
 changelog_update = false
 
 [[package]]
 name = "fuzz"
 release = false
+publish = false
 changelog_update = false
 
 [changelog]
