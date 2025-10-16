@@ -8,5 +8,15 @@ changelog_path = "cel/CHANGELOG.md" # use a custom changelog path for `package_a
 changelog_update = true # enable changelog update for `package_a`
 git_release_enable = true # enable GitHub/Gitea releases for `package_a`
 
+[[package]]
+name = "example"
+release = false
+changelog_update = false
+
+[[package]]
+name = "fuzz"
+release = false
+changelog_update = false
+
 [changelog]
 protect_breaking_commits = true # always include commits with breaking changes in the changelog
