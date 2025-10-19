@@ -205,7 +205,10 @@ impl Parser {
         prsr.add_error_listener(Box::new(ParserErrorListener {
             parse_errors: parse_errors.clone(),
         }));
-        prsr.add_parse_listener(Box::new(RecursionListener { max: self.max_recursion_depth, depth: 0 }));
+        prsr.add_parse_listener(Box::new(RecursionListener {
+            max: self.max_recursion_depth,
+            depth: 0,
+        }));
         let r = match prsr.start() {
             Ok(t) => Ok(self.visit(t.deref())),
             Err(e) => Err(ParseError {
@@ -371,7 +374,15 @@ struct RecursionListener {
     depth: u16,
 }
 
-impl<'a> CELListener<'a> for RecursionListener {}
+impl<'a> CELListener<'a> for RecursionListener {
+    fn enter_calc(&mut self, _ctx: &CalcContext<'a>) {
+        self.depth += 1;
+    }
+
+    fn exit_calc(&mut self, _ctx: &CalcContext<'a>) {
+        self.depth -= 1;
+    }
+}
 
 impl<'a> ParseTreeListener<'a, CELParserContextType> for RecursionListener {
     fn enter_every_rule(
@@ -388,7 +399,6 @@ impl<'a> ParseTreeListener<'a, CELParserContextType> for RecursionListener {
                 source_info: None,
             })));
         }
-        self.depth += 1;
         Ok(())
     }
 
@@ -396,7 +406,6 @@ impl<'a> ParseTreeListener<'a, CELParserContextType> for RecursionListener {
         &mut self,
         _ctx: &<CELParserContextType as ParserNodeType>::Type,
     ) -> Result<(), ANTLRError> {
-        self.depth = self.depth.saturating_sub(1);
         Ok(())
     }
 }
@@ -1100,20 +1109,29 @@ mod tests {
     #[test]
     fn test_bad_input() {
         let expressions = [
-            "1 + ()",
-            "/",
-            ".",
-            "@foo",
-            "x(1,)",
-            "\x0a",
-            "\n",
-            "",
-            "!-\u{1}",
-            "[[[[[[[[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]]]]]]]]",
+            "1 + ()", "/", ".", "@foo", "x(1,)", "\x0a", "\n", "", "!-\u{1}",
         ];
         for expr in expressions {
             assert!(
-                Parser::new().max_recursion_depth(32).parse(expr).is_err(),
+                Parser::new().parse(expr).is_err(),
+                "Expression `{}` should not parse",
+                expr
+            );
+        }
+    }
+
+    #[test]
+    fn recursion_limits() {
+        let expressions = [
+            "[[[[[[[[[[[[1]]]]]]]]]]]]",
+            "((((((((((((1))))))))))))",
+            "{1: {2: {3: {4: {5: {6: {1: {2: {3: {4: {5: {6: 'none'}}}}}}}}}}}}",
+            "type(type(type(type(type(type(type(type(type(type(type(type(1))))))))))))",
+            "[{'a': size([{'1':size([{'1':size([[[[]]]])}])}])}]",
+        ];
+        for expr in expressions {
+            assert!(
+                Parser::new().max_recursion_depth(13).parse(expr).is_err(),
                 "Expression `{}` should not parse",
                 expr
             );
