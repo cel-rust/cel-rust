@@ -4,18 +4,7 @@ use crate::common::ast::{
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
 use crate::common::value::CelVal;
-use crate::parser::gen::{
-    BoolFalseContext, BoolTrueContext, BytesContext, CalcContext, CalcContextAttrs,
-    ConditionalAndContext, ConditionalOrContext, ConstantLiteralContext,
-    ConstantLiteralContextAttrs, CreateListContext, CreateMessageContext, CreateStructContext,
-    DoubleContext, ExprContext, FieldInitializerListContext, GlobalCallContext, IdentContext,
-    IndexContext, IndexContextAttrs, IntContext, ListInitContextAll, LogicalNotContext,
-    LogicalNotContextAttrs, MapInitializerListContextAll, MemberCallContext,
-    MemberCallContextAttrs, MemberExprContext, MemberExprContextAttrs, NegateContext,
-    NegateContextAttrs, NestedContext, NullContext, OptFieldContextAttrs, PrimaryExprContext,
-    PrimaryExprContextAttrs, RelationContext, RelationContextAttrs, SelectContext,
-    SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
-};
+use crate::parser::gen::{BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType, CalcContext, CalcContextAttrs, ConditionalAndContext, ConditionalOrContext, ConstantLiteralContext, ConstantLiteralContextAttrs, CreateListContext, CreateMessageContext, CreateStructContext, DoubleContext, ExprContext, FieldInitializerListContext, GlobalCallContext, IdentContext, IndexContext, IndexContextAttrs, IntContext, ListInitContextAll, LogicalNotContext, LogicalNotContextAttrs, MapInitializerListContextAll, MemberCallContext, MemberCallContextAttrs, MemberExprContext, MemberExprContextAttrs, NegateContext, NegateContextAttrs, NestedContext, NullContext, OptFieldContextAttrs, PrimaryExprContext, PrimaryExprContextAttrs, RelationContext, RelationContextAttrs, SelectContext, SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext};
 use crate::parser::{gen, macros, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
 use antlr4rust::error_listener::ErrorListener;
@@ -25,7 +14,7 @@ use antlr4rust::parser_rule_context::ParserRuleContext;
 use antlr4rust::recognizer::Recognizer;
 use antlr4rust::token::{CommonToken, Token};
 use antlr4rust::token_factory::TokenFactory;
-use antlr4rust::tree::{ParseTree, ParseTreeVisitorCompat, VisitChildren};
+use antlr4rust::tree::{ParseTree, ParseTreeListener, ParseTreeVisitorCompat, VisitChildren};
 use antlr4rust::{InputStream, Parser as AntlrParser};
 use std::cell::RefCell;
 use std::error::Error;
@@ -198,6 +187,10 @@ impl Parser {
         prsr.add_error_listener(Box::new(ParserErrorListener {
             parse_errors: parse_errors.clone(),
         }));
+        prsr.add_parse_listener(Box::new(RecursionListener {
+            max: 2,
+            depth: 0,
+        }));
         let r = match prsr.start() {
             Ok(t) => Ok(self.visit(t.deref())),
             Err(e) => Err(ParseError {
@@ -357,6 +350,27 @@ impl Parser {
         expr
     }
 }
+
+struct RecursionListener {
+    max: u16,
+    depth: u16,
+}
+
+impl<'a> CELListener<'a> for RecursionListener {}
+
+impl<'a> ParseTreeListener<'a, CELParserContextType> for RecursionListener {
+    fn enter_every_rule(&mut self, ctx: &<CELParserContextType as ParserNodeType>::Type) {
+        if self.depth >= self.max {
+            println!("Depth: {}", self.depth);
+        }
+        self.depth += 1;
+    }
+
+    fn exit_every_rule(&mut self, _ctx: &<CELParserContextType as ParserNodeType>::Type) {
+        self.depth = self.depth.saturating_sub(1);
+    }
+}
+
 
 struct ParserErrorListener {
     parse_errors: Rc<RefCell<Vec<ParseError>>>,
@@ -1071,6 +1085,11 @@ mod tests {
     #[test]
     fn test() {
         let test_cases = [
+            TestInfo {
+                i: "[[[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]]]",
+                p: r#""""#,
+                e: "",
+            },
             TestInfo {
                 i: r#""A""#,
                 p: r#""A"^#1:*expr.Constant_StringValue#"#,
