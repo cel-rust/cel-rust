@@ -4,7 +4,18 @@ use crate::common::ast::{
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
 use crate::common::value::CelVal;
-use crate::parser::gen::{BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType, CalcContext, CalcContextAttrs, ConditionalAndContext, ConditionalOrContext, ConstantLiteralContext, ConstantLiteralContextAttrs, CreateListContext, CreateMessageContext, CreateStructContext, DoubleContext, ExprContext, FieldInitializerListContext, GlobalCallContext, IdentContext, IndexContext, IndexContextAttrs, IntContext, ListInitContextAll, LogicalNotContext, LogicalNotContextAttrs, MapInitializerListContextAll, MemberCallContext, MemberCallContextAttrs, MemberExprContext, MemberExprContextAttrs, NegateContext, NegateContextAttrs, NestedContext, NullContext, OptFieldContextAttrs, PrimaryExprContext, PrimaryExprContextAttrs, RelationContext, RelationContextAttrs, SelectContext, SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext};
+use crate::parser::gen::{
+    BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType,
+    CalcContext, CalcContextAttrs, ConditionalAndContext, ConditionalOrContext,
+    ConstantLiteralContext, ConstantLiteralContextAttrs, CreateListContext, CreateMessageContext,
+    CreateStructContext, DoubleContext, ExprContext, Field_initializer_listContext,
+    GlobalCallContext, IdentContext, IndexContext, IndexContextAttrs, IntContext,
+    ListInitContextAll, LogicalNotContext, LogicalNotContextAttrs, MapInitializerListContextAll,
+    MemberCallContext, MemberCallContextAttrs, MemberExprContext, MemberExprContextAttrs,
+    NegateContext, NegateContextAttrs, NestedContext, NullContext, OptFieldContextAttrs,
+    PrimaryExprContext, PrimaryExprContextAttrs, RelationContext, RelationContextAttrs,
+    SelectContext, SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
+};
 use crate::parser::{gen, macros, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
 use antlr4rust::error_listener::ErrorListener;
@@ -91,6 +102,7 @@ pub struct Parser {
     ast: ast::Ast,
     helper: ParserHelper,
     errors: Vec<ParseError>,
+    max_recursion_depth: u16,
 }
 
 impl Parser {
@@ -101,7 +113,13 @@ impl Parser {
             },
             helper: ParserHelper::default(),
             errors: Vec::default(),
+            max_recursion_depth: 96,
         }
+    }
+
+    pub fn max_recursion_depth(mut self, max: u16) -> Self {
+        self.max_recursion_depth = max;
+        self
     }
 
     fn new_logic_manager(&self, func: &str, term: IdedExpr) -> LogicManager {
@@ -187,10 +205,7 @@ impl Parser {
         prsr.add_error_listener(Box::new(ParserErrorListener {
             parse_errors: parse_errors.clone(),
         }));
-        prsr.add_parse_listener(Box::new(RecursionListener {
-            max: 2,
-            depth: 0,
-        }));
+        prsr.add_parse_listener(Box::new(RecursionListener { max: self.max_recursion_depth, depth: 0 }));
         let r = match prsr.start() {
             Ok(t) => Ok(self.visit(t.deref())),
             Err(e) => Err(ParseError {
@@ -226,7 +241,7 @@ impl Parser {
 
     fn field_initializer_list(
         &mut self,
-        ctx: &FieldInitializerListContext<'_>,
+        ctx: &Field_initializer_listContext<'_>,
     ) -> Vec<IdedEntryExpr> {
         let mut fields = Vec::with_capacity(ctx.fields.len());
         for (i, field) in ctx.fields.iter().enumerate() {
@@ -359,18 +374,32 @@ struct RecursionListener {
 impl<'a> CELListener<'a> for RecursionListener {}
 
 impl<'a> ParseTreeListener<'a, CELParserContextType> for RecursionListener {
-    fn enter_every_rule(&mut self, ctx: &<CELParserContextType as ParserNodeType>::Type) {
+    fn enter_every_rule(
+        &mut self,
+        ctx: &<CELParserContextType as ParserNodeType>::Type,
+    ) -> Result<(), ANTLRError> {
         if self.depth >= self.max {
-            println!("Depth: {}", self.depth);
+            let pos = (ctx.start().get_start(), ctx.stop().get_stop());
+            return Err(ANTLRError::OtherError(Arc::new(ParseError {
+                source: None,
+                pos,
+                msg: format!("Recursion limit of {} exceeded", self.max),
+                expr_id: 0,
+                source_info: None,
+            })));
         }
         self.depth += 1;
+        Ok(())
     }
 
-    fn exit_every_rule(&mut self, _ctx: &<CELParserContextType as ParserNodeType>::Type) {
+    fn exit_every_rule(
+        &mut self,
+        _ctx: &<CELParserContextType as ParserNodeType>::Type,
+    ) -> Result<(), ANTLRError> {
         self.depth = self.depth.saturating_sub(1);
+        Ok(())
     }
 }
-
 
 struct ParserErrorListener {
     parse_errors: Rc<RefCell<Vec<ParseError>>>,
@@ -1071,11 +1100,20 @@ mod tests {
     #[test]
     fn test_bad_input() {
         let expressions = [
-            "1 + ()", "/", ".", "@foo", "x(1,)", "\x0a", "\n", "", "!-\u{1}",
+            "1 + ()",
+            "/",
+            ".",
+            "@foo",
+            "x(1,)",
+            "\x0a",
+            "\n",
+            "",
+            "!-\u{1}",
+            "[[[[[[[[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]]]]]]]]",
         ];
         for expr in expressions {
             assert!(
-                Parser::new().parse(expr).is_err(),
+                Parser::new().max_recursion_depth(32).parse(expr).is_err(),
                 "Expression `{}` should not parse",
                 expr
             );
@@ -1085,11 +1123,6 @@ mod tests {
     #[test]
     fn test() {
         let test_cases = [
-            TestInfo {
-                i: "[[[[[[[[[[[[[[[[[[[1]]]]]]]]]]]]]]]]]]]",
-                p: r#""""#,
-                e: "",
-            },
             TestInfo {
                 i: r#""A""#,
                 p: r#""A"^#1:*expr.Constant_StringValue#"#,
