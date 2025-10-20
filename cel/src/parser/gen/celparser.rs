@@ -234,7 +234,7 @@ where
     }
 
     pub fn with_strategy(input: I, strategy: H) -> Self {
-        antlr4rust::recognizer::check_version("0", "3");
+        antlr4rust::recognizer::check_version("0", "4");
         let interpreter = Arc::new(ParserATNSimulator::new(
             _ATN.clone(),
             _decision_to_DFA.clone(),
