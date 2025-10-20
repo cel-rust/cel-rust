@@ -118,7 +118,7 @@ impl Parser {
     }
 
     pub fn max_recursion_depth(mut self, max: u16) -> Self {
-        self.max_recursion_depth = max;
+        self.max_recursion_depth = if max == u16::MAX { max } else { max + 1 };
         self
     }
 
@@ -375,11 +375,11 @@ struct RecursionListener {
 }
 
 impl<'a> CELListener<'a> for RecursionListener {
-    fn enter_calc(&mut self, _ctx: &CalcContext<'a>) {
+    fn enter_expr(&mut self, _ctx: &ExprContext<'a>) {
         self.depth += 1;
     }
 
-    fn exit_calc(&mut self, _ctx: &CalcContext<'a>) {
+    fn exit_expr(&mut self, _ctx: &ExprContext<'a>) {
         self.depth -= 1;
     }
 }
@@ -389,7 +389,7 @@ impl<'a> ParseTreeListener<'a, CELParserContextType> for RecursionListener {
         &mut self,
         ctx: &<CELParserContextType as ParserNodeType>::Type,
     ) -> Result<(), ANTLRError> {
-        if self.depth >= self.max {
+        if self.depth > self.max || self.depth == u16::MAX {
             let pos = (ctx.start().get_start(), ctx.stop().get_stop());
             return Err(ANTLRError::OtherError(Arc::new(ParseError {
                 source: None,
@@ -1123,6 +1123,26 @@ mod tests {
     #[test]
     fn recursion_limits() {
         let expressions = [
+            "[[[1]]]",
+            "(((1)))",
+            "{1: {2: {3: 'none'}}}",
+            "type(type(type(1)))",
+            "[{'a': size([])}]",
+            "{}.map(a, a.map(b, b.map(c, c)))",
+        ];
+        for expr in expressions {
+            assert!(
+                Parser::new().max_recursion_depth(3).parse(expr).is_ok(),
+                "Expression `{}` should parse",
+                expr
+            );
+            assert!(
+                Parser::new().max_recursion_depth(2).parse(expr).is_err(),
+                "Expression `{}` should not parse",
+                expr
+            );
+        }
+        let expressions = [
             "[[[[[[[[[[[[1]]]]]]]]]]]]",
             "((((((((((((1))))))))))))",
             "{1: {2: {3: {4: {5: {6: {1: {2: {3: {4: {5: {6: 'none'}}}}}}}}}}}}",
@@ -1131,11 +1151,21 @@ mod tests {
         ];
         for expr in expressions {
             assert!(
-                Parser::new().max_recursion_depth(13).parse(expr).is_err(),
+                Parser::new().max_recursion_depth(12).parse(expr).is_ok(),
+                "Expression `{}` should parse",
+                expr
+            );
+            assert!(
+                Parser::new().max_recursion_depth(11).parse(expr).is_err(),
                 "Expression `{}` should not parse",
                 expr
             );
         }
+        assert!(Parser::new().max_recursion_depth(0).parse("1 + 1").is_ok());
+        assert!(Parser::new()
+            .max_recursion_depth(0)
+            .parse("(1 + 1)")
+            .is_err());
     }
 
     #[test]
