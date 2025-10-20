@@ -878,106 +878,138 @@ impl gen::CELVisitorCompat<'_> for Parser {
     }
 
     fn visit_ConstantLiteral(&mut self, ctx: &ConstantLiteralContext<'_>) -> Self::Return {
-        <Self as ParseTreeVisitorCompat>::visit(
-            self,
-            ctx.literal().as_deref().expect("Has to have literal!"),
-        )
+        if let Some(literal) = ctx.literal().as_deref() {
+            <Self as ParseTreeVisitorCompat>::visit(self, literal)
+        } else {
+            self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete ConstantLiteral!")
+        }
     }
 
     fn visit_Int(&mut self, ctx: &IntContext<'_>) -> Self::Return {
         let string = ctx.get_text();
-        let token = ctx.tok.as_ref().expect("Has to have int!");
-        let val = match if let Some(string) = string.strip_prefix("0x") {
-            i64::from_str_radix(string, 16)
+        if let Some(token) = ctx.tok.as_ref() {
+            let val = match if let Some(string) = string.strip_prefix("0x") {
+                i64::from_str_radix(string, 16)
+            } else {
+                string.parse::<i64>()
+            } {
+                Ok(v) => v,
+                Err(e) => return self.report_error(token, Some(e), "invalid int literal"),
+            };
+            self.helper
+                .next_expr(token, Expr::Literal(CelVal::Int(val)))
         } else {
-            string.parse::<i64>()
-        } {
-            Ok(v) => v,
-            Err(e) => return self.report_error(token, Some(e), "invalid int literal"),
-        };
-        self.helper
-            .next_expr(token, Expr::Literal(CelVal::Int(val)))
+            self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete Int!")
+        }
     }
 
     fn visit_Uint(&mut self, ctx: &UintContext<'_>) -> Self::Return {
         let mut string = ctx.get_text();
         string.truncate(string.len() - 1);
-        let token = ctx.tok.as_ref().expect("Has to have uint!");
-        let val = match if let Some(string) = string.strip_prefix("0x") {
-            u64::from_str_radix(string, 16)
+        if let Some(token) = ctx.tok.as_ref() {
+            let val = match if let Some(string) = string.strip_prefix("0x") {
+                u64::from_str_radix(string, 16)
+            } else {
+                string.parse::<u64>()
+            } {
+                Ok(v) => v,
+                Err(e) => return self.report_error(token, Some(e), "invalid uint literal"),
+            };
+            self.helper
+                .next_expr(token, Expr::Literal(CelVal::UInt(val)))
         } else {
-            string.parse::<u64>()
-        } {
-            Ok(v) => v,
-            Err(e) => return self.report_error(token, Some(e), "invalid uint literal"),
-        };
-        self.helper
-            .next_expr(token, Expr::Literal(CelVal::UInt(val)))
+            self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete Uint!")
+        }
     }
 
     fn visit_Double(&mut self, ctx: &DoubleContext<'_>) -> Self::Return {
         let string = ctx.get_text();
-        let token = ctx.tok.as_ref().expect("Has to have double!");
-        match string.parse::<f64>() {
-            Ok(d) if d.is_finite() => self
-                .helper
-                .next_expr(token, Expr::Literal(CelVal::Double(d))),
-            Err(e) => self.report_error(token, Some(e), "invalid double literal"),
-            _ => self.report_error(token, None::<ParseError>, "invalid double literal"),
+        if let Some(token) = ctx.tok.as_ref() {
+            match string.parse::<f64>() {
+                Ok(d) if d.is_finite() => self
+                    .helper
+                    .next_expr(token, Expr::Literal(CelVal::Double(d))),
+                Err(e) => self.report_error(token, Some(e), "invalid double literal"),
+                _ => self.report_error(token, None::<ParseError>, "invalid double literal"),
+            }
+        } else {
+            self.report_error::<ParseError, _>(
+                &ctx.start(),
+                None::<ParseError>,
+                "Incomplete double!",
+            )
         }
     }
 
     fn visit_String(&mut self, ctx: &StringContext<'_>) -> Self::Return {
-        let token = ctx.tok.as_deref().expect("Has to have string!");
-        match parse::parse_string(&ctx.get_text()) {
-            Ok(string) => self
-                .helper
-                .next_expr(token, Expr::Literal(CelVal::String(string))),
-            Err(e) => self.report_error::<ParseError, _>(
-                token,
-                None,
-                format!("invalid string literal: {e:?}"),
-            ),
+        if let Some(token) = ctx.tok.as_deref() {
+            match parse::parse_string(&ctx.get_text()) {
+                Ok(string) => self
+                    .helper
+                    .next_expr(token, Expr::Literal(CelVal::String(string))),
+                Err(e) => self.report_error::<ParseError, _>(
+                    token,
+                    None,
+                    format!("invalid string literal: {e:?}"),
+                ),
+            }
+        } else {
+            self.report_error::<ParseError, _>(
+                &ctx.start(),
+                None::<ParseError>,
+                "Incomplete string!",
+            )
         }
     }
 
     fn visit_Bytes(&mut self, ctx: &BytesContext<'_>) -> Self::Return {
-        let token = ctx.tok.as_deref().expect("Has to have bytes!");
-        let string = ctx.get_text();
-        match parse::parse_bytes(&string[2..string.len() - 1]) {
-            Ok(bytes) => self
-                .helper
-                .next_expr(token, Expr::Literal(CelVal::Bytes(bytes))),
-            Err(e) => {
-                self.report_error::<ParseError, _>(
-                    token,
-                    None,
-                    format!("invalid bytes literal: {e:?}"),
-                );
-                IdedExpr::default()
+        if let Some(token) = ctx.tok.as_deref() {
+            let string = ctx.get_text();
+            match parse::parse_bytes(&string[2..string.len() - 1]) {
+                Ok(bytes) => self
+                    .helper
+                    .next_expr(token, Expr::Literal(CelVal::Bytes(bytes))),
+                Err(e) => {
+                    self.report_error::<ParseError, _>(
+                        token,
+                        None,
+                        format!("invalid bytes literal: {e:?}"),
+                    );
+                    IdedExpr::default()
+                }
             }
+        } else {
+            self.report_error::<ParseError, _>(
+                &ctx.start(),
+                None::<ParseError>,
+                "Incomplete bytes!",
+            )
         }
     }
 
     fn visit_BoolTrue(&mut self, ctx: &BoolTrueContext<'_>) -> Self::Return {
-        self.helper.next_expr(
-            ctx.tok.as_deref().expect("Has to be `true`!"),
-            Expr::Literal(CelVal::Boolean(true)),
-        )
+        match ctx.tok.as_deref() {
+            Some(tok) => self
+                .helper
+                .next_expr(tok, Expr::Literal(CelVal::Boolean(true))),
+            None => self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete bool!"),
+        }
     }
 
     fn visit_BoolFalse(&mut self, ctx: &BoolFalseContext<'_>) -> Self::Return {
-        self.helper.next_expr(
-            ctx.tok.as_deref().expect("Has to be `false`!"),
-            Expr::Literal(CelVal::Boolean(false)),
-        )
+        match ctx.tok.as_deref() {
+            Some(token) => self
+                .helper
+                .next_expr(token, Expr::Literal(CelVal::Boolean(false))),
+            None => self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete bool!"),
+        }
     }
 
     fn visit_Null(&mut self, ctx: &NullContext<'_>) -> Self::Return {
-        self.helper.next_expr(
-            ctx.tok.as_deref().expect("Has to be `null`!"),
-            Expr::Literal(CelVal::Null),
-        )
+        match ctx.tok.as_deref() {
+            Some(token) => self.helper.next_expr(token, Expr::Literal(CelVal::Null)),
+            None => self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete null!"),
+        }
     }
 }
 
