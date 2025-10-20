@@ -10,7 +10,7 @@ license = "MIT"
 categories = ["compilers"]
 
 [dependencies]
-antlr4rust = { git = "https://github.com/antlr4rust/antlr4", branch = "listeners_err" }
+antlr4rust = "0.4.0"
 lazy_static = "1.5.0"
 nom = "7.1.3"
 chrono = { version = "0.4", default-features = false, features = ["alloc", "serde"], optional = true }
