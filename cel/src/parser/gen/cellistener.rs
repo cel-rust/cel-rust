@@ -1,5 +1,5 @@
 #![allow(nonstandard_style)]
-// Generated from /Users/asnaps/src/github.com/clarkmcc/cel-rust/antlr/src/gen/CEL.g4 by ANTLR 4.8
+// Generated from CEL.g4 by ANTLR 4.8
 use super::celparser::*;
 use antlr4rust::tree::ParseTreeListener;
 
@@ -253,15 +253,15 @@ pub trait CELListener<'input>: ParseTreeListener<'input, CELParserContextType> {
      */
     fn exit_listInit(&mut self, _ctx: &ListInitContext<'input>) {}
     /**
-     * Enter a parse tree produced by {@link CELParser#fieldInitializerList}.
+     * Enter a parse tree produced by {@link CELParser#field_initializer_list}.
      * @param ctx the parse tree
      */
-    fn enter_fieldInitializerList(&mut self, _ctx: &FieldInitializerListContext<'input>) {}
+    fn enter_field_initializer_list(&mut self, _ctx: &Field_initializer_listContext<'input>) {}
     /**
-     * Exit a parse tree produced by {@link CELParser#fieldInitializerList}.
+     * Exit a parse tree produced by {@link CELParser#field_initializer_list}.
      * @param ctx the parse tree
      */
-    fn exit_fieldInitializerList(&mut self, _ctx: &FieldInitializerListContext<'input>) {}
+    fn exit_field_initializer_list(&mut self, _ctx: &Field_initializer_listContext<'input>) {}
     /**
      * Enter a parse tree produced by {@link CELParser#optField}.
      * @param ctx the parse tree

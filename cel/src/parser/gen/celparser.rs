@@ -1,4 +1,4 @@
-// Generated from /Users/asnaps/src/github.com/clarkmcc/cel-rust/antlr/src/gen/CEL.g4 by ANTLR 4.8
+// Generated from CEL.g4 by ANTLR 4.8
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -87,13 +87,13 @@ pub const RULE_member: usize = 7;
 pub const RULE_primary: usize = 8;
 pub const RULE_exprList: usize = 9;
 pub const RULE_listInit: usize = 10;
-pub const RULE_fieldInitializerList: usize = 11;
+pub const RULE_field_initializer_list: usize = 11;
 pub const RULE_optField: usize = 12;
 pub const RULE_mapInitializerList: usize = 13;
 pub const RULE_escapeIdent: usize = 14;
 pub const RULE_optExpr: usize = 15;
 pub const RULE_literal: usize = 16;
-pub const ruleNames: [&str; 17] = [
+pub const ruleNames: [&'static str; 17] = [
     "start",
     "expr",
     "conditionalOr",
@@ -105,7 +105,7 @@ pub const ruleNames: [&str; 17] = [
     "primary",
     "exprList",
     "listInit",
-    "fieldInitializerList",
+    "field_initializer_list",
     "optField",
     "mapInitializerList",
     "escapeIdent",
@@ -234,7 +234,7 @@ where
     }
 
     pub fn with_strategy(input: I, strategy: H) -> Self {
-        antlr4rust::recognizer::check_version("0", "3");
+        antlr4rust::recognizer::check_version("0", "4");
         let interpreter = Arc::new(ParserATNSimulator::new(
             _ATN.clone(),
             _decision_to_DFA.clone(),
@@ -440,13 +440,15 @@ pub struct StartContextExt<'input> {
 impl<'input> CELParserContext<'input> for StartContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for StartContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_start(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_start(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -515,8 +517,8 @@ where
         recog.base.enter_rule(_localctx.clone(), 0, RULE_start);
         let mut _localctx: Rc<StartContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule expr*/
                 recog.base.set_state(34);
@@ -537,7 +539,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -559,13 +561,15 @@ pub struct ExprContextExt<'input> {
 impl<'input> CELParserContext<'input> for ExprContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for ExprContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_expr(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_expr(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -658,8 +662,8 @@ where
         let mut _localctx: Rc<ExprContextAll> = _localctx;
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule conditionalOr*/
                 recog.base.set_state(37);
@@ -703,7 +707,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -727,13 +731,15 @@ pub struct ConditionalOrContextExt<'input> {
 impl<'input> CELParserContext<'input> for ConditionalOrContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for ConditionalOrContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_conditionalOr(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_conditionalOr(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -823,8 +829,8 @@ where
         let mut _localctx: Rc<ConditionalOrContextAll> = _localctx;
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule conditionalAnd*/
                 recog.base.set_state(45);
@@ -881,7 +887,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -905,13 +911,15 @@ pub struct ConditionalAndContextExt<'input> {
 impl<'input> CELParserContext<'input> for ConditionalAndContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for ConditionalAndContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_conditionalAnd(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_conditionalAnd(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -1001,8 +1009,8 @@ where
         let mut _localctx: Rc<ConditionalAndContextAll> = _localctx;
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule relation*/
                 recog.base.set_state(53);
@@ -1061,7 +1069,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -1080,13 +1088,15 @@ pub struct RelationContextExt<'input> {
 impl<'input> CELParserContext<'input> for RelationContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for RelationContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_relation(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_relation(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -1226,8 +1236,8 @@ where
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: isize;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 {
                     /*InvokeRule calc*/
@@ -1242,7 +1252,7 @@ where
                 _alt = recog.interpreter.adaptive_predict(3, &mut recog.base)?;
                 while { _alt != 2 && _alt != INVALID_ALT } {
                     if _alt == 1 {
-                        recog.trigger_exit_rule_event();
+                        recog.trigger_exit_rule_event()?;
                         _prevctx = _localctx.clone();
                         {
                             {
@@ -1253,7 +1263,7 @@ where
                                     tmp.clone(),
                                     _startState,
                                     RULE_relation,
-                                );
+                                )?;
                                 _localctx = tmp;
                                 recog.base.set_state(64);
                                 if !({ recog.precpred(None, 1) }) {
@@ -1268,17 +1278,18 @@ where
                                     recog.base.input.lt(1).cloned();
 
                                 _la = recog.base.input.la(1);
-                                if !(((_la) & !0x3f) == 0
-                                    && ((1usize << _la)
-                                        & ((1usize << EQUALS)
-                                            | (1usize << NOT_EQUALS)
-                                            | (1usize << IN)
-                                            | (1usize << LESS)
-                                            | (1usize << LESS_EQUALS)
-                                            | (1usize << GREATER_EQUALS)
-                                            | (1usize << GREATER)))
-                                        != 0)
-                                {
+                                if {
+                                    !(((_la) & !0x3f) == 0
+                                        && ((1usize << _la)
+                                            & ((1usize << EQUALS)
+                                                | (1usize << NOT_EQUALS)
+                                                | (1usize << IN)
+                                                | (1usize << LESS)
+                                                | (1usize << LESS_EQUALS)
+                                                | (1usize << GREATER_EQUALS)
+                                                | (1usize << GREATER)))
+                                            != 0)
+                                } {
                                     let tmp = recog.err_handler.recover_inline(&mut recog.base)?;
                                     cast_mut::<_, RelationContext>(&mut _localctx).op =
                                         Some(tmp.clone());
@@ -1311,7 +1322,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.unroll_recursion_context(_parentctx);
+        recog.base.unroll_recursion_context(_parentctx)?;
 
         Ok(_localctx)
     }
@@ -1330,13 +1341,15 @@ pub struct CalcContextExt<'input> {
 impl<'input> CELParserContext<'input> for CalcContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for CalcContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_calc(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_calc(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -1460,8 +1473,8 @@ where
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: isize;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 {
                     /*InvokeRule unary*/
@@ -1476,7 +1489,7 @@ where
                 _alt = recog.interpreter.adaptive_predict(5, &mut recog.base)?;
                 while { _alt != 2 && _alt != INVALID_ALT } {
                     if _alt == 1 {
-                        recog.trigger_exit_rule_event();
+                        recog.trigger_exit_rule_event()?;
                         _prevctx = _localctx.clone();
                         {
                             recog.base.set_state(81);
@@ -1491,7 +1504,7 @@ where
                                             tmp.clone(),
                                             _startState,
                                             RULE_calc,
-                                        );
+                                        )?;
                                         _localctx = tmp;
                                         recog.base.set_state(75);
                                         if !({ recog.precpred(None, 2) }) {
@@ -1506,13 +1519,14 @@ where
                                             recog.base.input.lt(1).cloned();
 
                                         _la = recog.base.input.la(1);
-                                        if !(((_la) & !0x3f) == 0
-                                            && ((1usize << _la)
-                                                & ((1usize << STAR)
-                                                    | (1usize << SLASH)
-                                                    | (1usize << PERCENT)))
-                                                != 0)
-                                        {
+                                        if {
+                                            !(((_la) & !0x3f) == 0
+                                                && ((1usize << _la)
+                                                    & ((1usize << STAR)
+                                                        | (1usize << SLASH)
+                                                        | (1usize << PERCENT)))
+                                                    != 0)
+                                        } {
                                             let tmp = recog
                                                 .err_handler
                                                 .recover_inline(&mut recog.base)?;
@@ -1539,7 +1553,7 @@ where
                                             tmp.clone(),
                                             _startState,
                                             RULE_calc,
-                                        );
+                                        )?;
                                         _localctx = tmp;
                                         recog.base.set_state(78);
                                         if !({ recog.precpred(None, 1) }) {
@@ -1554,7 +1568,7 @@ where
                                             recog.base.input.lt(1).cloned();
 
                                         _la = recog.base.input.la(1);
-                                        if !(_la == MINUS || _la == PLUS) {
+                                        if { !(_la == MINUS || _la == PLUS) } {
                                             let tmp = recog
                                                 .err_handler
                                                 .recover_inline(&mut recog.base)?;
@@ -1593,7 +1607,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.unroll_recursion_context(_parentctx);
+        recog.base.unroll_recursion_context(_parentctx)?;
 
         Ok(_localctx)
     }
@@ -1626,16 +1640,14 @@ impl<'input> Deref for UnaryContextAll<'input> {
 }
 impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for UnaryContextAll<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        if !matches!(self, UnaryContextAll::Error(_)) {
-            self.deref().accept(visitor)
-        }
+        self.deref().accept(visitor)
     }
 }
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for UnaryContextAll<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().enter(listener)
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().exit(listener)
     }
 }
@@ -1725,13 +1737,15 @@ antlr4rust::tid! {LogicalNotContextExt<'a>}
 impl<'input> CELParserContext<'input> for LogicalNotContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for LogicalNotContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_LogicalNot(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_LogicalNot(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -1802,13 +1816,15 @@ antlr4rust::tid! {MemberExprContextExt<'a>}
 impl<'input> CELParserContext<'input> for MemberExprContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for MemberExprContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_MemberExpr(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_MemberExpr(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -1894,13 +1910,15 @@ antlr4rust::tid! {NegateContextExt<'a>}
 impl<'input> CELParserContext<'input> for NegateContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for NegateContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Negate(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Negate(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -1967,7 +1985,7 @@ where
             match recog.interpreter.adaptive_predict(8, &mut recog.base)? {
                 1 => {
                     let tmp = MemberExprContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 1);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 1)?;
                     _localctx = tmp;
                     {
                         /*InvokeRule member*/
@@ -1977,7 +1995,7 @@ where
                 }
                 2 => {
                     let tmp = LogicalNotContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 2);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 2)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(88);
@@ -2016,7 +2034,7 @@ where
                             recog.base.set_state(90);
                             recog.err_handler.sync(&mut recog.base)?;
                             _la = recog.base.input.la(1);
-                            if _la != EXCLAM {
+                            if !(_la == EXCLAM) {
                                 break;
                             }
                         }
@@ -2027,7 +2045,7 @@ where
                 }
                 3 => {
                     let tmp = NegateContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 3);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 3)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(94);
@@ -2093,7 +2111,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -2128,16 +2146,14 @@ impl<'input> Deref for MemberContextAll<'input> {
 }
 impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for MemberContextAll<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        if !matches!(self, MemberContextAll::Error(_)) {
-            self.deref().accept(visitor)
-        }
+        self.deref().accept(visitor)
     }
 }
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for MemberContextAll<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().enter(listener)
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().exit(listener)
     }
 }
@@ -2252,13 +2268,15 @@ antlr4rust::tid! {MemberCallContextExt<'a>}
 impl<'input> CELParserContext<'input> for MemberCallContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for MemberCallContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_MemberCall(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_MemberCall(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -2356,13 +2374,15 @@ antlr4rust::tid! {SelectContextExt<'a>}
 impl<'input> CELParserContext<'input> for SelectContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for SelectContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Select(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Select(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -2434,13 +2454,15 @@ antlr4rust::tid! {PrimaryExprContextExt<'a>}
 impl<'input> CELParserContext<'input> for PrimaryExprContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for PrimaryExprContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_PrimaryExpr(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_PrimaryExpr(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -2542,13 +2564,15 @@ antlr4rust::tid! {IndexContextExt<'a>}
 impl<'input> CELParserContext<'input> for IndexContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for IndexContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Index(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Index(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -2620,8 +2644,8 @@ where
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: isize;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 {
                     let mut tmp = PrimaryExprContextExt::new(&**_localctx);
@@ -2641,7 +2665,7 @@ where
                 _alt = recog.interpreter.adaptive_predict(13, &mut recog.base)?;
                 while { _alt != 2 && _alt != INVALID_ALT } {
                     if _alt == 1 {
-                        recog.trigger_exit_rule_event();
+                        recog.trigger_exit_rule_event()?;
                         _prevctx = _localctx.clone();
                         {
                             recog.base.set_state(126);
@@ -2659,7 +2683,7 @@ where
                                             tmp.clone(),
                                             _startState,
                                             RULE_member,
-                                        );
+                                        )?;
                                         _localctx = tmp;
                                         recog.base.set_state(104);
                                         if !({ recog.precpred(None, 3) }) {
@@ -2724,7 +2748,7 @@ where
                                             tmp.clone(),
                                             _startState,
                                             RULE_member,
-                                        );
+                                        )?;
                                         _localctx = tmp;
                                         recog.base.set_state(110);
                                         if !({ recog.precpred(None, 2) }) {
@@ -2821,7 +2845,7 @@ where
                                             tmp.clone(),
                                             _startState,
                                             RULE_member,
-                                        );
+                                        )?;
                                         _localctx = tmp;
                                         recog.base.set_state(118);
                                         if !({ recog.precpred(None, 1) }) {
@@ -2899,7 +2923,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.unroll_recursion_context(_parentctx);
+        recog.base.unroll_recursion_context(_parentctx)?;
 
         Ok(_localctx)
     }
@@ -2940,16 +2964,14 @@ impl<'input> Deref for PrimaryContextAll<'input> {
 }
 impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for PrimaryContextAll<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        if !matches!(self, PrimaryContextAll::Error(_)) {
-            self.deref().accept(visitor)
-        }
+        self.deref().accept(visitor)
     }
 }
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for PrimaryContextAll<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().enter(listener)
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().exit(listener)
     }
 }
@@ -3048,13 +3070,15 @@ antlr4rust::tid! {CreateListContextExt<'a>}
 impl<'input> CELParserContext<'input> for CreateListContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for CreateListContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_CreateList(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_CreateList(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -3137,13 +3161,15 @@ antlr4rust::tid! {IdentContextExt<'a>}
 impl<'input> CELParserContext<'input> for IdentContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for IdentContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Ident(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Ident(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -3241,13 +3267,15 @@ antlr4rust::tid! {CreateStructContextExt<'a>}
 impl<'input> CELParserContext<'input> for CreateStructContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for CreateStructContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_CreateStruct(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_CreateStruct(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -3319,13 +3347,15 @@ antlr4rust::tid! {ConstantLiteralContextExt<'a>}
 impl<'input> CELParserContext<'input> for ConstantLiteralContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for ConstantLiteralContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_ConstantLiteral(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_ConstantLiteral(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -3411,13 +3441,15 @@ antlr4rust::tid! {NestedContextExt<'a>}
 impl<'input> CELParserContext<'input> for NestedContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for NestedContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Nested(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Nested(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -3522,7 +3554,7 @@ pub trait CreateMessageContextAttrs<'input>: CELParserContext<'input> {
     {
         self.get_token(DOT, i)
     }
-    fn fieldInitializerList(&self) -> Option<Rc<FieldInitializerListContextAll<'input>>>
+    fn field_initializer_list(&self) -> Option<Rc<Field_initializer_listContextAll<'input>>>
     where
         Self: Sized,
     {
@@ -3540,7 +3572,7 @@ pub struct CreateMessageContextExt<'input> {
     pub s16: Option<TokenType<'input>>,
     pub ops: Vec<TokenType<'input>>,
     pub op: Option<TokenType<'input>>,
-    pub entries: Option<Rc<FieldInitializerListContextAll<'input>>>,
+    pub entries: Option<Rc<Field_initializer_listContextAll<'input>>>,
     ph: PhantomData<&'input str>,
 }
 
@@ -3549,13 +3581,15 @@ antlr4rust::tid! {CreateMessageContextExt<'a>}
 impl<'input> CELParserContext<'input> for CreateMessageContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for CreateMessageContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_CreateMessage(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_CreateMessage(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -3667,13 +3701,15 @@ antlr4rust::tid! {GlobalCallContextExt<'a>}
 impl<'input> CELParserContext<'input> for GlobalCallContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for GlobalCallContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_GlobalCall(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_GlobalCall(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -3741,7 +3777,7 @@ where
             match recog.interpreter.adaptive_predict(25, &mut recog.base)? {
                 1 => {
                     let tmp = IdentContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 1);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 1)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(132);
@@ -3774,7 +3810,7 @@ where
                 }
                 2 => {
                     let tmp = GlobalCallContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 2);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 2)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(136);
@@ -3858,7 +3894,7 @@ where
                 }
                 3 => {
                     let tmp = NestedContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 3);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 3)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(144);
@@ -3881,7 +3917,7 @@ where
                 }
                 4 => {
                     let tmp = CreateListContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 4);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 4)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(148);
@@ -3947,7 +3983,7 @@ where
                 }
                 5 => {
                     let tmp = CreateStructContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 5);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 5)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(156);
@@ -4013,7 +4049,7 @@ where
                 }
                 6 => {
                     let tmp = CreateMessageContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 6);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 6)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(165);
@@ -4141,9 +4177,9 @@ where
                                 != 0
                         {
                             {
-                                /*InvokeRule fieldInitializerList*/
+                                /*InvokeRule field_initializer_list*/
                                 recog.base.set_state(176);
-                                let tmp = recog.fieldInitializerList()?;
+                                let tmp = recog.field_initializer_list()?;
                                 if let PrimaryContextAll::CreateMessageContext(ctx) =
                                     cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                                 {
@@ -4170,7 +4206,7 @@ where
                 }
                 7 => {
                     let tmp = ConstantLiteralContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 7);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 7)?;
                     _localctx = tmp;
                     {
                         /*InvokeRule literal*/
@@ -4192,7 +4228,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -4212,13 +4248,15 @@ pub struct ExprListContextExt<'input> {
 impl<'input> CELParserContext<'input> for ExprListContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for ExprListContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_exprList(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_exprList(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -4302,8 +4340,8 @@ where
         let mut _localctx: Rc<ExprListContextAll> = _localctx;
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule expr*/
                 recog.base.set_state(186);
@@ -4353,7 +4391,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -4373,13 +4411,15 @@ pub struct ListInitContextExt<'input> {
 impl<'input> CELParserContext<'input> for ListInitContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for ListInitContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_listInit(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_listInit(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -4463,8 +4503,8 @@ where
         let mut _localctx: Rc<ListInitContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: isize;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule optExpr*/
                 recog.base.set_state(194);
@@ -4521,19 +4561,19 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
 }
-//------------------- fieldInitializerList ----------------
-pub type FieldInitializerListContextAll<'input> = FieldInitializerListContext<'input>;
+//------------------- field_initializer_list ----------------
+pub type Field_initializer_listContextAll<'input> = Field_initializer_listContext<'input>;
 
-pub type FieldInitializerListContext<'input> =
-    BaseParserRuleContext<'input, FieldInitializerListContextExt<'input>>;
+pub type Field_initializer_listContext<'input> =
+    BaseParserRuleContext<'input, Field_initializer_listContextExt<'input>>;
 
 #[derive(Clone)]
-pub struct FieldInitializerListContextExt<'input> {
+pub struct Field_initializer_listContextExt<'input> {
     pub optField: Option<Rc<OptFieldContextAll<'input>>>,
     pub fields: Vec<Rc<OptFieldContextAll<'input>>>,
     pub s21: Option<TokenType<'input>>,
@@ -4543,44 +4583,48 @@ pub struct FieldInitializerListContextExt<'input> {
     ph: PhantomData<&'input str>,
 }
 
-impl<'input> CELParserContext<'input> for FieldInitializerListContext<'input> {}
+impl<'input> CELParserContext<'input> for Field_initializer_listContext<'input> {}
 
-impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for FieldInitializerListContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
-        listener.enter_fieldInitializerList(self);
+impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a>
+    for Field_initializer_listContext<'input>
+{
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
+        listener.enter_field_initializer_list(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.exit_fieldInitializerList(self);
-        listener.exit_every_rule(self);
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.exit_field_initializer_list(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
-impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for FieldInitializerListContext<'input> {
+impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for Field_initializer_listContext<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        visitor.visit_fieldInitializerList(self);
+        visitor.visit_field_initializer_list(self);
     }
 }
 
-impl<'input> CustomRuleContext<'input> for FieldInitializerListContextExt<'input> {
+impl<'input> CustomRuleContext<'input> for Field_initializer_listContextExt<'input> {
     type TF = LocalTokenFactory<'input>;
     type Ctx = CELParserContextType;
     fn get_rule_index(&self) -> usize {
-        RULE_fieldInitializerList
+        RULE_field_initializer_list
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_fieldInitializerList }
+    //fn type_rule_index() -> usize where Self: Sized { RULE_field_initializer_list }
 }
-antlr4rust::tid! {FieldInitializerListContextExt<'a>}
+antlr4rust::tid! {Field_initializer_listContextExt<'a>}
 
-impl<'input> FieldInitializerListContextExt<'input> {
+impl<'input> Field_initializer_listContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
         invoking_state: isize,
-    ) -> Rc<FieldInitializerListContextAll<'input>> {
+    ) -> Rc<Field_initializer_listContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
             invoking_state,
-            FieldInitializerListContextExt {
+            Field_initializer_listContextExt {
                 s21: None,
                 cols: Vec::new(),
                 optField: None,
@@ -4593,8 +4637,8 @@ impl<'input> FieldInitializerListContextExt<'input> {
     }
 }
 
-pub trait FieldInitializerListContextAttrs<'input>:
-    CELParserContext<'input> + BorrowMut<FieldInitializerListContextExt<'input>>
+pub trait Field_initializer_listContextAttrs<'input>:
+    CELParserContext<'input> + BorrowMut<Field_initializer_listContextExt<'input>>
 {
     fn optField_all(&self) -> Vec<Rc<OptFieldContextAll<'input>>>
     where
@@ -4652,65 +4696,67 @@ pub trait FieldInitializerListContextAttrs<'input>:
     }
 }
 
-impl<'input> FieldInitializerListContextAttrs<'input> for FieldInitializerListContext<'input> {}
+impl<'input> Field_initializer_listContextAttrs<'input> for Field_initializer_listContext<'input> {}
 
 impl<'input, I, H> CELParser<'input, I, H>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
     H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
-    pub fn fieldInitializerList(
+    pub fn field_initializer_list(
         &mut self,
-    ) -> Result<Rc<FieldInitializerListContextAll<'input>>, ANTLRError> {
+    ) -> Result<Rc<Field_initializer_listContextAll<'input>>, ANTLRError> {
         let mut recog = self;
         let _parentctx = recog.ctx.take();
         let mut _localctx =
-            FieldInitializerListContextExt::new(_parentctx.clone(), recog.base.get_state());
+            Field_initializer_listContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog
             .base
-            .enter_rule(_localctx.clone(), 22, RULE_fieldInitializerList);
-        let mut _localctx: Rc<FieldInitializerListContextAll> = _localctx;
+            .enter_rule(_localctx.clone(), 22, RULE_field_initializer_list);
+        let mut _localctx: Rc<Field_initializer_listContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: isize;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule optField*/
                 recog.base.set_state(202);
                 let tmp = recog.optField()?;
-                cast_mut::<_, FieldInitializerListContext>(&mut _localctx).optField =
+                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).optField =
                     Some(tmp.clone());
 
-                let temp = cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                let temp = cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                     .optField
                     .clone()
                     .unwrap();
-                cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                     .fields
                     .push(temp);
 
                 recog.base.set_state(203);
                 let tmp = recog.base.match_token(COLON, &mut recog.err_handler)?;
-                cast_mut::<_, FieldInitializerListContext>(&mut _localctx).s21 = Some(tmp.clone());
+                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).s21 =
+                    Some(tmp.clone());
 
-                let temp = cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                let temp = cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                     .s21
                     .clone()
                     .unwrap();
-                cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                     .cols
                     .push(temp);
 
                 /*InvokeRule expr*/
                 recog.base.set_state(204);
                 let tmp = recog.expr()?;
-                cast_mut::<_, FieldInitializerListContext>(&mut _localctx).expr = Some(tmp.clone());
+                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).expr =
+                    Some(tmp.clone());
 
-                let temp = cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                let temp = cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                     .expr
                     .clone()
                     .unwrap();
-                cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                     .values
                     .push(temp);
 
@@ -4727,44 +4773,44 @@ where
                                 /*InvokeRule optField*/
                                 recog.base.set_state(206);
                                 let tmp = recog.optField()?;
-                                cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                                     .optField = Some(tmp.clone());
 
                                 let temp =
-                                    cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                                    cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                                         .optField
                                         .clone()
                                         .unwrap();
-                                cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                                     .fields
                                     .push(temp);
 
                                 recog.base.set_state(207);
                                 let tmp = recog.base.match_token(COLON, &mut recog.err_handler)?;
-                                cast_mut::<_, FieldInitializerListContext>(&mut _localctx).s21 =
+                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).s21 =
                                     Some(tmp.clone());
 
                                 let temp =
-                                    cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                                    cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                                         .s21
                                         .clone()
                                         .unwrap();
-                                cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                                     .cols
                                     .push(temp);
 
                                 /*InvokeRule expr*/
                                 recog.base.set_state(208);
                                 let tmp = recog.expr()?;
-                                cast_mut::<_, FieldInitializerListContext>(&mut _localctx).expr =
+                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).expr =
                                     Some(tmp.clone());
 
                                 let temp =
-                                    cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                                    cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                                         .expr
                                         .clone()
                                         .unwrap();
-                                cast_mut::<_, FieldInitializerListContext>(&mut _localctx)
+                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
                                     .values
                                     .push(temp);
                             }
@@ -4786,7 +4832,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -4805,13 +4851,15 @@ pub struct OptFieldContextExt<'input> {
 impl<'input> CELParserContext<'input> for OptFieldContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for OptFieldContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_optField(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_optField(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -4881,8 +4929,8 @@ where
         let mut _localctx: Rc<OptFieldContextAll> = _localctx;
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 recog.base.set_state(216);
                 recog.err_handler.sync(&mut recog.base)?;
@@ -4912,7 +4960,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -4937,13 +4985,15 @@ pub struct MapInitializerListContextExt<'input> {
 impl<'input> CELParserContext<'input> for MapInitializerListContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for MapInitializerListContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_mapInitializerList(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_mapInitializerList(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -5063,8 +5113,8 @@ where
         let mut _localctx: Rc<MapInitializerListContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: isize;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 /*InvokeRule optExpr*/
                 recog.base.set_state(220);
@@ -5174,7 +5224,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -5205,16 +5255,14 @@ impl<'input> Deref for EscapeIdentContextAll<'input> {
 }
 impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for EscapeIdentContextAll<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        if !matches!(self, EscapeIdentContextAll::Error(_)) {
-            self.deref().accept(visitor)
-        }
+        self.deref().accept(visitor)
     }
 }
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for EscapeIdentContextAll<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().enter(listener)
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().exit(listener)
     }
 }
@@ -5291,13 +5339,15 @@ antlr4rust::tid! {EscapedIdentifierContextExt<'a>}
 impl<'input> CELParserContext<'input> for EscapedIdentifierContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for EscapedIdentifierContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_EscapedIdentifier(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_EscapedIdentifier(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -5371,13 +5421,15 @@ antlr4rust::tid! {SimpleIdentifierContextExt<'a>}
 impl<'input> CELParserContext<'input> for SimpleIdentifierContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for SimpleIdentifierContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_SimpleIdentifier(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_SimpleIdentifier(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -5443,7 +5495,7 @@ where
             match recog.base.input.la(1) {
                 IDENTIFIER => {
                     let tmp = SimpleIdentifierContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 1);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 1)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(233);
@@ -5460,7 +5512,7 @@ where
 
                 ESC_IDENTIFIER => {
                     let tmp = EscapedIdentifierContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 2);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 2)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(234);
@@ -5492,7 +5544,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -5512,13 +5564,15 @@ pub struct OptExprContextExt<'input> {
 impl<'input> CELParserContext<'input> for OptExprContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for OptExprContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_optExpr(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_optExpr(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -5589,8 +5643,8 @@ where
         let mut _localctx: Rc<OptExprContextAll> = _localctx;
         let mut _la: isize = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1);
-            recog.base.enter_outer_alt(None, 1);
+            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            recog.base.enter_outer_alt(None, 1)?;
             {
                 recog.base.set_state(238);
                 recog.err_handler.sync(&mut recog.base)?;
@@ -5621,7 +5675,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -5664,16 +5718,14 @@ impl<'input> Deref for LiteralContextAll<'input> {
 }
 impl<'input, 'a> Visitable<dyn CELVisitor<'input> + 'a> for LiteralContextAll<'input> {
     fn accept(&self, visitor: &mut (dyn CELVisitor<'input> + 'a)) {
-        if !matches!(self, LiteralContextAll::Error(_)) {
-            self.deref().accept(visitor)
-        }
+        self.deref().accept(visitor)
     }
 }
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for LiteralContextAll<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().enter(listener)
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         self.deref().exit(listener)
     }
 }
@@ -5749,13 +5801,15 @@ antlr4rust::tid! {BytesContextExt<'a>}
 impl<'input> CELParserContext<'input> for BytesContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for BytesContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Bytes(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Bytes(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -5828,13 +5882,15 @@ antlr4rust::tid! {UintContextExt<'a>}
 impl<'input> CELParserContext<'input> for UintContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for UintContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Uint(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Uint(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -5907,13 +5963,15 @@ antlr4rust::tid! {NullContextExt<'a>}
 impl<'input> CELParserContext<'input> for NullContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for NullContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Null(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Null(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -5986,13 +6044,15 @@ antlr4rust::tid! {BoolFalseContextExt<'a>}
 impl<'input> CELParserContext<'input> for BoolFalseContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for BoolFalseContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_BoolFalse(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_BoolFalse(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -6065,13 +6125,15 @@ antlr4rust::tid! {StringContextExt<'a>}
 impl<'input> CELParserContext<'input> for StringContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for StringContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_String(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_String(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -6153,13 +6215,15 @@ antlr4rust::tid! {DoubleContextExt<'a>}
 impl<'input> CELParserContext<'input> for DoubleContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for DoubleContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Double(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Double(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -6233,13 +6297,15 @@ antlr4rust::tid! {BoolTrueContextExt<'a>}
 impl<'input> CELParserContext<'input> for BoolTrueContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for BoolTrueContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_BoolTrue(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_BoolTrue(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -6321,13 +6387,15 @@ antlr4rust::tid! {IntContextExt<'a>}
 impl<'input> CELParserContext<'input> for IntContext<'input> {}
 
 impl<'input, 'a> Listenable<dyn CELListener<'input> + 'a> for IntContext<'input> {
-    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
-        listener.enter_every_rule(self);
+    fn enter(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
+        listener.enter_every_rule(self)?;
         listener.enter_Int(self);
+        Ok(())
     }
-    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) {
+    fn exit(&self, listener: &mut (dyn CELListener<'input> + 'a)) -> Result<(), ANTLRError> {
         listener.exit_Int(self);
-        listener.exit_every_rule(self);
+        listener.exit_every_rule(self)?;
+        Ok(())
     }
 }
 
@@ -6393,7 +6461,7 @@ where
             match recog.interpreter.adaptive_predict(35, &mut recog.base)? {
                 1 => {
                     let tmp = IntContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 1);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 1)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(243);
@@ -6426,7 +6494,7 @@ where
                 }
                 2 => {
                     let tmp = UintContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 2);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 2)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(246);
@@ -6442,7 +6510,7 @@ where
                 }
                 3 => {
                     let tmp = DoubleContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 3);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 3)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(248);
@@ -6475,7 +6543,7 @@ where
                 }
                 4 => {
                     let tmp = StringContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 4);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 4)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(251);
@@ -6491,7 +6559,7 @@ where
                 }
                 5 => {
                     let tmp = BytesContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 5);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 5)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(252);
@@ -6507,7 +6575,7 @@ where
                 }
                 6 => {
                     let tmp = BoolTrueContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 6);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 6)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(253);
@@ -6523,7 +6591,7 @@ where
                 }
                 7 => {
                     let tmp = BoolFalseContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 7);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 7)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(254);
@@ -6539,7 +6607,7 @@ where
                 }
                 8 => {
                     let tmp = NullContextExt::new(&**_localctx);
-                    recog.base.enter_outer_alt(Some(tmp.clone()), 8);
+                    recog.base.enter_outer_alt(Some(tmp.clone()), 8)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(255);
@@ -6567,7 +6635,7 @@ where
                 recog.err_handler.recover(&mut recog.base, re)?;
             }
         }
-        recog.base.exit_rule();
+        recog.base.exit_rule()?;
 
         Ok(_localctx)
     }
@@ -6586,7 +6654,7 @@ lazy_static! {
     };
 }
 
-const _serializedATN: &str =
+const _serializedATN: &'static str =
     "\x03\u{608b}\u{a72a}\u{8133}\u{b9ed}\u{417c}\u{3be7}\u{7786}\u{5964}\x03\
 	\x27\u{105}\x04\x02\x09\x02\x04\x03\x09\x03\x04\x04\x09\x04\x04\x05\x09\
 	\x05\x04\x06\x09\x06\x04\x07\x09\x07\x04\x08\x09\x08\x04\x09\x09\x09\x04\

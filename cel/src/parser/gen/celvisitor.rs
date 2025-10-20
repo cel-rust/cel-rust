@@ -1,5 +1,5 @@
 #![allow(nonstandard_style)]
-// Generated from /Users/asnaps/src/github.com/clarkmcc/cel-rust/antlr/src/gen/CEL.g4 by ANTLR 4.8
+// Generated from CEL.g4 by ANTLR 4.8
 use super::celparser::*;
 use antlr4rust::tree::{ParseTreeVisitor, ParseTreeVisitorCompat};
 
@@ -199,10 +199,10 @@ pub trait CELVisitor<'input>: ParseTreeVisitor<'input, CELParserContextType> {
     }
 
     /**
-     * Visit a parse tree produced by {@link CELParser#fieldInitializerList}.
+     * Visit a parse tree produced by {@link CELParser#field_initializer_list}.
      * @param ctx the parse tree
      */
-    fn visit_fieldInitializerList(&mut self, ctx: &FieldInitializerListContext<'input>) {
+    fn visit_field_initializer_list(&mut self, ctx: &Field_initializer_listContext<'input>) {
         self.visit_children(ctx)
     }
 
@@ -515,12 +515,12 @@ pub trait CELVisitorCompat<'input>:
     }
 
     /**
-     * Visit a parse tree produced by {@link CELParser#fieldInitializerList}.
+     * Visit a parse tree produced by {@link CELParser#field_initializer_list}.
      * @param ctx the parse tree
      */
-    fn visit_fieldInitializerList(
+    fn visit_field_initializer_list(
         &mut self,
-        ctx: &FieldInitializerListContext<'input>,
+        ctx: &Field_initializer_listContext<'input>,
     ) -> Self::Return {
         self.visit_children(ctx)
     }
@@ -757,8 +757,8 @@ where
         *<Self as ParseTreeVisitorCompat>::temp_result(self) = result;
     }
 
-    fn visit_fieldInitializerList(&mut self, ctx: &FieldInitializerListContext<'input>) {
-        let result = <Self as CELVisitorCompat>::visit_fieldInitializerList(self, ctx);
+    fn visit_field_initializer_list(&mut self, ctx: &Field_initializer_listContext<'input>) {
+        let result = <Self as CELVisitorCompat>::visit_field_initializer_list(self, ctx);
         *<Self as ParseTreeVisitorCompat>::temp_result(self) = result;
     }
 
