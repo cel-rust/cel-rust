@@ -1,4 +1,4 @@
-// Generated from CEL.g4 by ANTLR 4.8
+// Generated from CEL.g4 by ANTLR 4.13.2
 #![allow(dead_code)]
 #![allow(non_snake_case)]
 #![allow(non_upper_case_globals)]
@@ -39,43 +39,44 @@ use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
 
-pub const EQUALS: isize = 1;
-pub const NOT_EQUALS: isize = 2;
-pub const IN: isize = 3;
-pub const LESS: isize = 4;
-pub const LESS_EQUALS: isize = 5;
-pub const GREATER_EQUALS: isize = 6;
-pub const GREATER: isize = 7;
-pub const LOGICAL_AND: isize = 8;
-pub const LOGICAL_OR: isize = 9;
-pub const LBRACKET: isize = 10;
-pub const RPRACKET: isize = 11;
-pub const LBRACE: isize = 12;
-pub const RBRACE: isize = 13;
-pub const LPAREN: isize = 14;
-pub const RPAREN: isize = 15;
-pub const DOT: isize = 16;
-pub const COMMA: isize = 17;
-pub const MINUS: isize = 18;
-pub const EXCLAM: isize = 19;
-pub const QUESTIONMARK: isize = 20;
-pub const COLON: isize = 21;
-pub const PLUS: isize = 22;
-pub const STAR: isize = 23;
-pub const SLASH: isize = 24;
-pub const PERCENT: isize = 25;
-pub const CEL_TRUE: isize = 26;
-pub const CEL_FALSE: isize = 27;
-pub const NUL: isize = 28;
-pub const WHITESPACE: isize = 29;
-pub const COMMENT: isize = 30;
-pub const NUM_FLOAT: isize = 31;
-pub const NUM_INT: isize = 32;
-pub const NUM_UINT: isize = 33;
-pub const STRING: isize = 34;
-pub const BYTES: isize = 35;
-pub const IDENTIFIER: isize = 36;
-pub const ESC_IDENTIFIER: isize = 37;
+pub const CEL_EQUALS: i32 = 1;
+pub const CEL_NOT_EQUALS: i32 = 2;
+pub const CEL_IN: i32 = 3;
+pub const CEL_LESS: i32 = 4;
+pub const CEL_LESS_EQUALS: i32 = 5;
+pub const CEL_GREATER_EQUALS: i32 = 6;
+pub const CEL_GREATER: i32 = 7;
+pub const CEL_LOGICAL_AND: i32 = 8;
+pub const CEL_LOGICAL_OR: i32 = 9;
+pub const CEL_LBRACKET: i32 = 10;
+pub const CEL_RPRACKET: i32 = 11;
+pub const CEL_LBRACE: i32 = 12;
+pub const CEL_RBRACE: i32 = 13;
+pub const CEL_LPAREN: i32 = 14;
+pub const CEL_RPAREN: i32 = 15;
+pub const CEL_DOT: i32 = 16;
+pub const CEL_COMMA: i32 = 17;
+pub const CEL_MINUS: i32 = 18;
+pub const CEL_EXCLAM: i32 = 19;
+pub const CEL_QUESTIONMARK: i32 = 20;
+pub const CEL_COLON: i32 = 21;
+pub const CEL_PLUS: i32 = 22;
+pub const CEL_STAR: i32 = 23;
+pub const CEL_SLASH: i32 = 24;
+pub const CEL_PERCENT: i32 = 25;
+pub const CEL_CEL_TRUE: i32 = 26;
+pub const CEL_CEL_FALSE: i32 = 27;
+pub const CEL_NUL: i32 = 28;
+pub const CEL_WHITESPACE: i32 = 29;
+pub const CEL_COMMENT: i32 = 30;
+pub const CEL_NUM_FLOAT: i32 = 31;
+pub const CEL_NUM_INT: i32 = 32;
+pub const CEL_NUM_UINT: i32 = 33;
+pub const CEL_STRING: i32 = 34;
+pub const CEL_BYTES: i32 = 35;
+pub const CEL_IDENTIFIER: i32 = 36;
+pub const CEL_ESC_IDENTIFIER: i32 = 37;
+pub const CEL_EOF: i32 = EOF;
 pub const RULE_start: usize = 0;
 pub const RULE_expr: usize = 1;
 pub const RULE_conditionalOr: usize = 2;
@@ -209,32 +210,32 @@ pub type CELTreeWalker<'input, 'a> =
     ParseTreeWalker<'input, 'a, CELParserContextType, dyn CELListener<'input> + 'a>;
 
 /// Parser for CEL grammar
-pub struct CELParser<'input, I, H>
+pub struct CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     base: BaseParserType<'input, I>,
     interpreter: Arc<ParserATNSimulator>,
     _shared_context_cache: Box<PredictionContextCache>,
-    pub err_handler: H,
+    pub err_handler: Box<dyn ErrorStrategy<'input, BaseParserType<'input, I>>>,
 }
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
-    pub fn get_serialized_atn() -> &'static str {
-        _serializedATN
-    }
-
-    pub fn set_error_strategy(&mut self, strategy: H) {
+    pub fn set_error_strategy(
+        &mut self,
+        strategy: Box<dyn ErrorStrategy<'input, BaseParserType<'input, I>>>,
+    ) {
         self.err_handler = strategy
     }
 
-    pub fn with_strategy(input: I, strategy: H) -> Self {
-        antlr4rust::recognizer::check_version("0", "4");
+    pub fn with_strategy(
+        input: I,
+        strategy: Box<dyn ErrorStrategy<'input, BaseParserType<'input, I>>>,
+    ) -> Self {
+        antlr4rust::recognizer::check_version("0", "5");
         let interpreter = Arc::new(ParserATNSimulator::new(
             _ATN.clone(),
             _decision_to_DFA.clone(),
@@ -257,7 +258,7 @@ where
 
 type DynStrategy<'input, I> = Box<dyn ErrorStrategy<'input, BaseParserType<'input, I>> + 'input>;
 
-impl<'input, I> CELParser<'input, I, DynStrategy<'input, I>>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
 {
@@ -266,12 +267,12 @@ where
     }
 }
 
-impl<'input, I> CELParser<'input, I, DefaultErrorStrategy<'input, CELParserContextType>>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
 {
     pub fn new(input: I) -> Self {
-        Self::with_strategy(input, DefaultErrorStrategy::new())
+        Self::with_strategy(input, Box::new(DefaultErrorStrategy::new()))
     }
 }
 
@@ -309,10 +310,9 @@ impl<'input> ParserNodeType<'input> for CELParserContextType {
     type Type = dyn CELParserContext<'input> + 'input;
 }
 
-impl<'input, I, H> Deref for CELParser<'input, I, H>
+impl<'input, I> Deref for CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     type Target = BaseParserType<'input, I>;
 
@@ -321,10 +321,9 @@ where
     }
 }
 
-impl<'input, I, H> DerefMut for CELParser<'input, I, H>
+impl<'input, I> DerefMut for CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.base
@@ -363,22 +362,22 @@ impl<'input, I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'i
     }
     fn sempred(
         _localctx: Option<&(dyn CELParserContext<'input> + 'input)>,
-        rule_index: isize,
-        pred_index: isize,
+        rule_index: i32,
+        pred_index: i32,
         recog: &mut BaseParserType<'input, I>,
     ) -> bool {
         match rule_index {
-            4 => CELParser::<'input, I, _>::relation_sempred(
+            4 => CELParser::<'input, I>::relation_sempred(
                 _localctx.and_then(|x| x.downcast_ref()),
                 pred_index,
                 recog,
             ),
-            5 => CELParser::<'input, I, _>::calc_sempred(
+            5 => CELParser::<'input, I>::calc_sempred(
                 _localctx.and_then(|x| x.downcast_ref()),
                 pred_index,
                 recog,
             ),
-            7 => CELParser::<'input, I, _>::member_sempred(
+            7 => CELParser::<'input, I>::member_sempred(
                 _localctx.and_then(|x| x.downcast_ref()),
                 pred_index,
                 recog,
@@ -388,13 +387,13 @@ impl<'input, I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'i
     }
 }
 
-impl<'input, I> CELParser<'input, I, DefaultErrorStrategy<'input, CELParserContextType>>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
 {
     fn relation_sempred(
         _localctx: Option<&RelationContext<'input>>,
-        pred_index: isize,
+        pred_index: i32,
         recog: &mut <Self as Deref>::Target,
     ) -> bool {
         match pred_index {
@@ -404,7 +403,7 @@ where
     }
     fn calc_sempred(
         _localctx: Option<&CalcContext<'input>>,
-        pred_index: isize,
+        pred_index: i32,
         recog: &mut <Self as Deref>::Target,
     ) -> bool {
         match pred_index {
@@ -415,7 +414,7 @@ where
     }
     fn member_sempred(
         _localctx: Option<&MemberContext<'input>>,
-        pred_index: isize,
+        pred_index: i32,
         recog: &mut <Self as Deref>::Target,
     ) -> bool {
         match pred_index {
@@ -471,13 +470,14 @@ antlr4rust::tid! {StartContextExt<'a>}
 impl<'input> StartContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<StartContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
             invoking_state,
             StartContextExt {
                 e: None,
+
                 ph: PhantomData,
             },
         ))
@@ -493,7 +493,7 @@ pub trait StartContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(EOF, 0)
+        self.get_token(CEL_EOF, 0)
     }
     fn expr(&self) -> Option<Rc<ExprContextAll<'input>>>
     where
@@ -505,10 +505,9 @@ pub trait StartContextAttrs<'input>:
 
 impl<'input> StartContextAttrs<'input> for StartContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn start(&mut self) -> Result<Rc<StartContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -526,7 +525,7 @@ where
                 cast_mut::<_, StartContext>(&mut _localctx).e = Some(tmp.clone());
 
                 recog.base.set_state(35);
-                recog.base.match_token(EOF, &mut recog.err_handler)?;
+                recog.base.match_token(CEL_EOF, &mut recog.err_handler)?;
             }
             Ok(())
         })();
@@ -592,7 +591,7 @@ antlr4rust::tid! {ExprContextExt<'a>}
 impl<'input> ExprContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<ExprContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -602,6 +601,7 @@ impl<'input> ExprContextExt<'input> {
                 e: None,
                 e1: None,
                 e2: None,
+
                 ph: PhantomData,
             },
         ))
@@ -629,7 +629,7 @@ pub trait ExprContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(COLON, 0)
+        self.get_token(CEL_COLON, 0)
     }
     /// Retrieves first TerminalNode corresponding to token QUESTIONMARK
     /// Returns `None` if there is no child corresponding to token QUESTIONMARK
@@ -637,7 +637,7 @@ pub trait ExprContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(QUESTIONMARK, 0)
+        self.get_token(CEL_QUESTIONMARK, 0)
     }
     fn expr(&self) -> Option<Rc<ExprContextAll<'input>>>
     where
@@ -649,10 +649,9 @@ pub trait ExprContextAttrs<'input>:
 
 impl<'input> ExprContextAttrs<'input> for ExprContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn expr(&mut self) -> Result<Rc<ExprContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -660,7 +659,7 @@ where
         let mut _localctx = ExprContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog.base.enter_rule(_localctx.clone(), 2, RULE_expr);
         let mut _localctx: Rc<ExprContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
@@ -673,12 +672,12 @@ where
                 recog.base.set_state(43);
                 recog.err_handler.sync(&mut recog.base)?;
                 _la = recog.base.input.la(1);
-                if _la == QUESTIONMARK {
+                if _la == CEL_QUESTIONMARK {
                     {
                         recog.base.set_state(38);
                         let tmp = recog
                             .base
-                            .match_token(QUESTIONMARK, &mut recog.err_handler)?;
+                            .match_token(CEL_QUESTIONMARK, &mut recog.err_handler)?;
                         cast_mut::<_, ExprContext>(&mut _localctx).op = Some(tmp.clone());
 
                         /*InvokeRule conditionalOr*/
@@ -687,7 +686,7 @@ where
                         cast_mut::<_, ExprContext>(&mut _localctx).e1 = Some(tmp.clone());
 
                         recog.base.set_state(40);
-                        recog.base.match_token(COLON, &mut recog.err_handler)?;
+                        recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
 
                         /*InvokeRule expr*/
                         recog.base.set_state(41);
@@ -762,7 +761,7 @@ antlr4rust::tid! {ConditionalOrContextExt<'a>}
 impl<'input> ConditionalOrContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<ConditionalOrContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -773,6 +772,7 @@ impl<'input> ConditionalOrContextExt<'input> {
                 e: None,
                 conditionalAnd: None,
                 e1: Vec::new(),
+
                 ph: PhantomData,
             },
         ))
@@ -807,16 +807,15 @@ pub trait ConditionalOrContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(LOGICAL_OR, i)
+        self.get_token(CEL_LOGICAL_OR, i)
     }
 }
 
 impl<'input> ConditionalOrContextAttrs<'input> for ConditionalOrContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn conditionalOr(&mut self) -> Result<Rc<ConditionalOrContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -827,7 +826,7 @@ where
             .base
             .enter_rule(_localctx.clone(), 4, RULE_conditionalOr);
         let mut _localctx: Rc<ConditionalOrContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
@@ -840,11 +839,13 @@ where
                 recog.base.set_state(50);
                 recog.err_handler.sync(&mut recog.base)?;
                 _la = recog.base.input.la(1);
-                while _la == LOGICAL_OR {
+                while _la == CEL_LOGICAL_OR {
                     {
                         {
                             recog.base.set_state(46);
-                            let tmp = recog.base.match_token(LOGICAL_OR, &mut recog.err_handler)?;
+                            let tmp = recog
+                                .base
+                                .match_token(CEL_LOGICAL_OR, &mut recog.err_handler)?;
                             cast_mut::<_, ConditionalOrContext>(&mut _localctx).s9 =
                                 Some(tmp.clone());
 
@@ -942,7 +943,7 @@ antlr4rust::tid! {ConditionalAndContextExt<'a>}
 impl<'input> ConditionalAndContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<ConditionalAndContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -953,6 +954,7 @@ impl<'input> ConditionalAndContextExt<'input> {
                 e: None,
                 relation: None,
                 e1: Vec::new(),
+
                 ph: PhantomData,
             },
         ))
@@ -987,16 +989,15 @@ pub trait ConditionalAndContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(LOGICAL_AND, i)
+        self.get_token(CEL_LOGICAL_AND, i)
     }
 }
 
 impl<'input> ConditionalAndContextAttrs<'input> for ConditionalAndContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn conditionalAnd(&mut self) -> Result<Rc<ConditionalAndContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -1007,7 +1008,7 @@ where
             .base
             .enter_rule(_localctx.clone(), 6, RULE_conditionalAnd);
         let mut _localctx: Rc<ConditionalAndContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
@@ -1020,13 +1021,13 @@ where
                 recog.base.set_state(58);
                 recog.err_handler.sync(&mut recog.base)?;
                 _la = recog.base.input.la(1);
-                while _la == LOGICAL_AND {
+                while _la == CEL_LOGICAL_AND {
                     {
                         {
                             recog.base.set_state(54);
                             let tmp = recog
                                 .base
-                                .match_token(LOGICAL_AND, &mut recog.err_handler)?;
+                                .match_token(CEL_LOGICAL_AND, &mut recog.err_handler)?;
                             cast_mut::<_, ConditionalAndContext>(&mut _localctx).s8 =
                                 Some(tmp.clone());
 
@@ -1119,13 +1120,14 @@ antlr4rust::tid! {RelationContextExt<'a>}
 impl<'input> RelationContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<RelationContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
             invoking_state,
             RelationContextExt {
                 op: None,
+
                 ph: PhantomData,
             },
         ))
@@ -1159,7 +1161,7 @@ pub trait RelationContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(LESS, 0)
+        self.get_token(CEL_LESS, 0)
     }
     /// Retrieves first TerminalNode corresponding to token LESS_EQUALS
     /// Returns `None` if there is no child corresponding to token LESS_EQUALS
@@ -1167,7 +1169,7 @@ pub trait RelationContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(LESS_EQUALS, 0)
+        self.get_token(CEL_LESS_EQUALS, 0)
     }
     /// Retrieves first TerminalNode corresponding to token GREATER_EQUALS
     /// Returns `None` if there is no child corresponding to token GREATER_EQUALS
@@ -1175,7 +1177,7 @@ pub trait RelationContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(GREATER_EQUALS, 0)
+        self.get_token(CEL_GREATER_EQUALS, 0)
     }
     /// Retrieves first TerminalNode corresponding to token GREATER
     /// Returns `None` if there is no child corresponding to token GREATER
@@ -1183,7 +1185,7 @@ pub trait RelationContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(GREATER, 0)
+        self.get_token(CEL_GREATER, 0)
     }
     /// Retrieves first TerminalNode corresponding to token EQUALS
     /// Returns `None` if there is no child corresponding to token EQUALS
@@ -1191,7 +1193,7 @@ pub trait RelationContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(EQUALS, 0)
+        self.get_token(CEL_EQUALS, 0)
     }
     /// Retrieves first TerminalNode corresponding to token NOT_EQUALS
     /// Returns `None` if there is no child corresponding to token NOT_EQUALS
@@ -1199,7 +1201,7 @@ pub trait RelationContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(NOT_EQUALS, 0)
+        self.get_token(CEL_NOT_EQUALS, 0)
     }
     /// Retrieves first TerminalNode corresponding to token IN
     /// Returns `None` if there is no child corresponding to token IN
@@ -1207,22 +1209,21 @@ pub trait RelationContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(IN, 0)
+        self.get_token(CEL_IN, 0)
     }
 }
 
 impl<'input> RelationContextAttrs<'input> for RelationContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn relation(&mut self) -> Result<Rc<RelationContextAll<'input>>, ANTLRError> {
         self.relation_rec(0)
     }
 
-    fn relation_rec(&mut self, _p: isize) -> Result<Rc<RelationContextAll<'input>>, ANTLRError> {
+    fn relation_rec(&mut self, _p: i32) -> Result<Rc<RelationContextAll<'input>>, ANTLRError> {
         let recog = self;
         let _parentctx = recog.ctx.take();
         let _parentState = recog.base.get_state();
@@ -1233,9 +1234,9 @@ where
         let mut _localctx: Rc<RelationContextAll> = _localctx;
         let mut _prevctx = _localctx.clone();
         let _startState = 8;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            let mut _alt: isize;
+            let mut _alt: i32;
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
@@ -1244,7 +1245,6 @@ where
                     recog.base.set_state(62);
                     recog.calc_rec(0)?;
                 }
-
                 let tmp = recog.input.lt(-1).cloned();
                 recog.ctx.as_ref().unwrap().set_stop(tmp);
                 recog.base.set_state(69);
@@ -1266,7 +1266,10 @@ where
                                 )?;
                                 _localctx = tmp;
                                 recog.base.set_state(64);
-                                if !({ recog.precpred(None, 1) }) {
+                                if !({
+                                    let _localctx = Some(_localctx.clone());
+                                    recog.precpred(None, 1)
+                                }) {
                                     Err(FailedPredicateError::new(
                                         &mut recog.base,
                                         Some("recog.precpred(None, 1)".to_owned()),
@@ -1278,18 +1281,7 @@ where
                                     recog.base.input.lt(1).cloned();
 
                                 _la = recog.base.input.la(1);
-                                if {
-                                    !(((_la) & !0x3f) == 0
-                                        && ((1usize << _la)
-                                            & ((1usize << EQUALS)
-                                                | (1usize << NOT_EQUALS)
-                                                | (1usize << IN)
-                                                | (1usize << LESS)
-                                                | (1usize << LESS_EQUALS)
-                                                | (1usize << GREATER_EQUALS)
-                                                | (1usize << GREATER)))
-                                            != 0)
-                                } {
+                                if { !(((_la) & !0x3f) == 0 && ((1usize << _la) & 254) != 0) } {
                                     let tmp = recog.err_handler.recover_inline(&mut recog.base)?;
                                     cast_mut::<_, RelationContext>(&mut _localctx).op =
                                         Some(tmp.clone());
@@ -1372,13 +1364,14 @@ antlr4rust::tid! {CalcContextExt<'a>}
 impl<'input> CalcContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<CalcContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
             invoking_state,
             CalcContextExt {
                 op: None,
+
                 ph: PhantomData,
             },
         ))
@@ -1412,7 +1405,7 @@ pub trait CalcContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(STAR, 0)
+        self.get_token(CEL_STAR, 0)
     }
     /// Retrieves first TerminalNode corresponding to token SLASH
     /// Returns `None` if there is no child corresponding to token SLASH
@@ -1420,7 +1413,7 @@ pub trait CalcContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(SLASH, 0)
+        self.get_token(CEL_SLASH, 0)
     }
     /// Retrieves first TerminalNode corresponding to token PERCENT
     /// Returns `None` if there is no child corresponding to token PERCENT
@@ -1428,7 +1421,7 @@ pub trait CalcContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(PERCENT, 0)
+        self.get_token(CEL_PERCENT, 0)
     }
     /// Retrieves first TerminalNode corresponding to token PLUS
     /// Returns `None` if there is no child corresponding to token PLUS
@@ -1436,7 +1429,7 @@ pub trait CalcContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(PLUS, 0)
+        self.get_token(CEL_PLUS, 0)
     }
     /// Retrieves first TerminalNode corresponding to token MINUS
     /// Returns `None` if there is no child corresponding to token MINUS
@@ -1444,22 +1437,21 @@ pub trait CalcContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(MINUS, 0)
+        self.get_token(CEL_MINUS, 0)
     }
 }
 
 impl<'input> CalcContextAttrs<'input> for CalcContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn calc(&mut self) -> Result<Rc<CalcContextAll<'input>>, ANTLRError> {
         self.calc_rec(0)
     }
 
-    fn calc_rec(&mut self, _p: isize) -> Result<Rc<CalcContextAll<'input>>, ANTLRError> {
+    fn calc_rec(&mut self, _p: i32) -> Result<Rc<CalcContextAll<'input>>, ANTLRError> {
         let recog = self;
         let _parentctx = recog.ctx.take();
         let _parentState = recog.base.get_state();
@@ -1470,9 +1462,9 @@ where
         let mut _localctx: Rc<CalcContextAll> = _localctx;
         let mut _prevctx = _localctx.clone();
         let _startState = 10;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            let mut _alt: isize;
+            let mut _alt: i32;
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
@@ -1481,7 +1473,6 @@ where
                     recog.base.set_state(73);
                     recog.unary()?;
                 }
-
                 let tmp = recog.input.lt(-1).cloned();
                 recog.ctx.as_ref().unwrap().set_stop(tmp);
                 recog.base.set_state(83);
@@ -1507,7 +1498,10 @@ where
                                         )?;
                                         _localctx = tmp;
                                         recog.base.set_state(75);
-                                        if !({ recog.precpred(None, 2) }) {
+                                        if !({
+                                            let _localctx = Some(_localctx.clone());
+                                            recog.precpred(None, 2)
+                                        }) {
                                             Err(FailedPredicateError::new(
                                                 &mut recog.base,
                                                 Some("recog.precpred(None, 2)".to_owned()),
@@ -1521,11 +1515,7 @@ where
                                         _la = recog.base.input.la(1);
                                         if {
                                             !(((_la) & !0x3f) == 0
-                                                && ((1usize << _la)
-                                                    & ((1usize << STAR)
-                                                        | (1usize << SLASH)
-                                                        | (1usize << PERCENT)))
-                                                    != 0)
+                                                && ((1usize << _la) & 58720256) != 0)
                                         } {
                                             let tmp = recog
                                                 .err_handler
@@ -1556,7 +1546,10 @@ where
                                         )?;
                                         _localctx = tmp;
                                         recog.base.set_state(78);
-                                        if !({ recog.precpred(None, 1) }) {
+                                        if !({
+                                            let _localctx = Some(_localctx.clone());
+                                            recog.precpred(None, 1)
+                                        }) {
                                             Err(FailedPredicateError::new(
                                                 &mut recog.base,
                                                 Some("recog.precpred(None, 1)".to_owned()),
@@ -1568,7 +1561,7 @@ where
                                             recog.base.input.lt(1).cloned();
 
                                         _la = recog.base.input.la(1);
-                                        if { !(_la == MINUS || _la == PLUS) } {
+                                        if { !(_la == CEL_MINUS || _la == CEL_PLUS) } {
                                             let tmp = recog
                                                 .err_handler
                                                 .recover_inline(&mut recog.base)?;
@@ -1678,7 +1671,7 @@ antlr4rust::tid! {UnaryContextExt<'a>}
 impl<'input> UnaryContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<UnaryContextAll<'input>> {
         Rc::new(UnaryContextAll::Error(
             BaseParserRuleContext::new_parser_ctx(
@@ -1719,7 +1712,7 @@ pub trait LogicalNotContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(EXCLAM, i)
+        self.get_token(CEL_EXCLAM, i)
     }
 }
 
@@ -1892,7 +1885,7 @@ pub trait NegateContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(MINUS, i)
+        self.get_token(CEL_MINUS, i)
     }
 }
 
@@ -1966,10 +1959,9 @@ impl<'input> NegateContextExt<'input> {
     }
 }
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn unary(&mut self) -> Result<Rc<UnaryContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -1977,9 +1969,9 @@ where
         let mut _localctx = UnaryContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog.base.enter_rule(_localctx.clone(), 12, RULE_unary);
         let mut _localctx: Rc<UnaryContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            let mut _alt: isize;
+            let mut _alt: i32;
             recog.base.set_state(99);
             recog.err_handler.sync(&mut recog.base)?;
             match recog.interpreter.adaptive_predict(8, &mut recog.base)? {
@@ -2005,8 +1997,9 @@ where
                             {
                                 {
                                     recog.base.set_state(87);
-                                    let tmp =
-                                        recog.base.match_token(EXCLAM, &mut recog.err_handler)?;
+                                    let tmp = recog
+                                        .base
+                                        .match_token(CEL_EXCLAM, &mut recog.err_handler)?;
                                     if let UnaryContextAll::LogicalNotContext(ctx) =
                                         cast_mut::<_, UnaryContextAll>(&mut _localctx)
                                     {
@@ -2034,7 +2027,7 @@ where
                             recog.base.set_state(90);
                             recog.err_handler.sync(&mut recog.base)?;
                             _la = recog.base.input.la(1);
-                            if !(_la == EXCLAM) {
+                            if !(_la == CEL_EXCLAM) {
                                 break;
                             }
                         }
@@ -2055,8 +2048,9 @@ where
                             match _alt {
                                 x if x == 1 => {
                                     recog.base.set_state(93);
-                                    let tmp =
-                                        recog.base.match_token(MINUS, &mut recog.err_handler)?;
+                                    let tmp = recog
+                                        .base
+                                        .match_token(CEL_MINUS, &mut recog.err_handler)?;
                                     if let UnaryContextAll::NegateContext(ctx) =
                                         cast_mut::<_, UnaryContextAll>(&mut _localctx)
                                     {
@@ -2184,7 +2178,7 @@ antlr4rust::tid! {MemberContextExt<'a>}
 impl<'input> MemberContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<MemberContextAll<'input>> {
         Rc::new(MemberContextAll::Error(
             BaseParserRuleContext::new_parser_ctx(
@@ -2218,7 +2212,7 @@ pub trait MemberCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(RPAREN, 0)
+        self.get_token(CEL_RPAREN, 0)
     }
     /// Retrieves first TerminalNode corresponding to token DOT
     /// Returns `None` if there is no child corresponding to token DOT
@@ -2226,7 +2220,7 @@ pub trait MemberCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(DOT, 0)
+        self.get_token(CEL_DOT, 0)
     }
     /// Retrieves first TerminalNode corresponding to token IDENTIFIER
     /// Returns `None` if there is no child corresponding to token IDENTIFIER
@@ -2234,7 +2228,7 @@ pub trait MemberCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(IDENTIFIER, 0)
+        self.get_token(CEL_IDENTIFIER, 0)
     }
     /// Retrieves first TerminalNode corresponding to token LPAREN
     /// Returns `None` if there is no child corresponding to token LPAREN
@@ -2242,7 +2236,7 @@ pub trait MemberCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(LPAREN, 0)
+        self.get_token(CEL_LPAREN, 0)
     }
     fn exprList(&self) -> Option<Rc<ExprListContextAll<'input>>>
     where
@@ -2341,7 +2335,7 @@ pub trait SelectContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(DOT, 0)
+        self.get_token(CEL_DOT, 0)
     }
     fn escapeIdent(&self) -> Option<Rc<EscapeIdentContextAll<'input>>>
     where
@@ -2355,7 +2349,7 @@ pub trait SelectContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(QUESTIONMARK, 0)
+        self.get_token(CEL_QUESTIONMARK, 0)
     }
 }
 
@@ -2523,7 +2517,7 @@ pub trait IndexContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(RPRACKET, 0)
+        self.get_token(CEL_RPRACKET, 0)
     }
     /// Retrieves first TerminalNode corresponding to token LBRACKET
     /// Returns `None` if there is no child corresponding to token LBRACKET
@@ -2531,7 +2525,7 @@ pub trait IndexContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(LBRACKET, 0)
+        self.get_token(CEL_LBRACKET, 0)
     }
     fn expr(&self) -> Option<Rc<ExprContextAll<'input>>>
     where
@@ -2545,7 +2539,7 @@ pub trait IndexContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(QUESTIONMARK, 0)
+        self.get_token(CEL_QUESTIONMARK, 0)
     }
 }
 
@@ -2621,16 +2615,15 @@ impl<'input> IndexContextExt<'input> {
     }
 }
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn member(&mut self) -> Result<Rc<MemberContextAll<'input>>, ANTLRError> {
         self.member_rec(0)
     }
 
-    fn member_rec(&mut self, _p: isize) -> Result<Rc<MemberContextAll<'input>>, ANTLRError> {
+    fn member_rec(&mut self, _p: i32) -> Result<Rc<MemberContextAll<'input>>, ANTLRError> {
         let recog = self;
         let _parentctx = recog.ctx.take();
         let _parentState = recog.base.get_state();
@@ -2641,9 +2634,9 @@ where
         let mut _localctx: Rc<MemberContextAll> = _localctx;
         let mut _prevctx = _localctx.clone();
         let _startState = 14;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            let mut _alt: isize;
+            let mut _alt: i32;
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
@@ -2657,7 +2650,6 @@ where
                     recog.base.set_state(102);
                     recog.primary()?;
                 }
-
                 let tmp = recog.input.lt(-1).cloned();
                 recog.ctx.as_ref().unwrap().set_stop(tmp);
                 recog.base.set_state(128);
@@ -2686,7 +2678,10 @@ where
                                         )?;
                                         _localctx = tmp;
                                         recog.base.set_state(104);
-                                        if !({ recog.precpred(None, 3) }) {
+                                        if !({
+                                            let _localctx = Some(_localctx.clone());
+                                            recog.precpred(None, 3)
+                                        }) {
                                             Err(FailedPredicateError::new(
                                                 &mut recog.base,
                                                 Some("recog.precpred(None, 3)".to_owned()),
@@ -2694,8 +2689,9 @@ where
                                             ))?;
                                         }
                                         recog.base.set_state(105);
-                                        let tmp =
-                                            recog.base.match_token(DOT, &mut recog.err_handler)?;
+                                        let tmp = recog
+                                            .base
+                                            .match_token(CEL_DOT, &mut recog.err_handler)?;
                                         if let MemberContextAll::SelectContext(ctx) =
                                             cast_mut::<_, MemberContextAll>(&mut _localctx)
                                         {
@@ -2707,11 +2703,11 @@ where
                                         recog.base.set_state(107);
                                         recog.err_handler.sync(&mut recog.base)?;
                                         _la = recog.base.input.la(1);
-                                        if _la == QUESTIONMARK {
+                                        if _la == CEL_QUESTIONMARK {
                                             {
                                                 recog.base.set_state(106);
                                                 let tmp = recog.base.match_token(
-                                                    QUESTIONMARK,
+                                                    CEL_QUESTIONMARK,
                                                     &mut recog.err_handler,
                                                 )?;
                                                 if let MemberContextAll::SelectContext(ctx) =
@@ -2751,7 +2747,10 @@ where
                                         )?;
                                         _localctx = tmp;
                                         recog.base.set_state(110);
-                                        if !({ recog.precpred(None, 2) }) {
+                                        if !({
+                                            let _localctx = Some(_localctx.clone());
+                                            recog.precpred(None, 2)
+                                        }) {
                                             Err(FailedPredicateError::new(
                                                 &mut recog.base,
                                                 Some("recog.precpred(None, 2)".to_owned()),
@@ -2759,8 +2758,9 @@ where
                                             ))?;
                                         }
                                         recog.base.set_state(111);
-                                        let tmp =
-                                            recog.base.match_token(DOT, &mut recog.err_handler)?;
+                                        let tmp = recog
+                                            .base
+                                            .match_token(CEL_DOT, &mut recog.err_handler)?;
                                         if let MemberContextAll::MemberCallContext(ctx) =
                                             cast_mut::<_, MemberContextAll>(&mut _localctx)
                                         {
@@ -2772,7 +2772,7 @@ where
                                         recog.base.set_state(112);
                                         let tmp = recog
                                             .base
-                                            .match_token(IDENTIFIER, &mut recog.err_handler)?;
+                                            .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
                                         if let MemberContextAll::MemberCallContext(ctx) =
                                             cast_mut::<_, MemberContextAll>(&mut _localctx)
                                         {
@@ -2784,7 +2784,7 @@ where
                                         recog.base.set_state(113);
                                         let tmp = recog
                                             .base
-                                            .match_token(LPAREN, &mut recog.err_handler)?;
+                                            .match_token(CEL_LPAREN, &mut recog.err_handler)?;
                                         if let MemberContextAll::MemberCallContext(ctx) =
                                             cast_mut::<_, MemberContextAll>(&mut _localctx)
                                         {
@@ -2797,23 +2797,7 @@ where
                                         recog.err_handler.sync(&mut recog.base)?;
                                         _la = recog.base.input.la(1);
                                         if ((_la - 10) & !0x3f) == 0
-                                            && ((1usize << (_la - 10))
-                                                & ((1usize << (LBRACKET - 10))
-                                                    | (1usize << (LBRACE - 10))
-                                                    | (1usize << (LPAREN - 10))
-                                                    | (1usize << (DOT - 10))
-                                                    | (1usize << (MINUS - 10))
-                                                    | (1usize << (EXCLAM - 10))
-                                                    | (1usize << (CEL_TRUE - 10))
-                                                    | (1usize << (CEL_FALSE - 10))
-                                                    | (1usize << (NUL - 10))
-                                                    | (1usize << (NUM_FLOAT - 10))
-                                                    | (1usize << (NUM_INT - 10))
-                                                    | (1usize << (NUM_UINT - 10))
-                                                    | (1usize << (STRING - 10))
-                                                    | (1usize << (BYTES - 10))
-                                                    | (1usize << (IDENTIFIER - 10))))
-                                                != 0
+                                            && ((1usize << (_la - 10)) & 132580181) != 0
                                         {
                                             {
                                                 /*InvokeRule exprList*/
@@ -2830,7 +2814,9 @@ where
                                         }
 
                                         recog.base.set_state(117);
-                                        recog.base.match_token(RPAREN, &mut recog.err_handler)?;
+                                        recog
+                                            .base
+                                            .match_token(CEL_RPAREN, &mut recog.err_handler)?;
                                     }
                                 }
                                 3 => {
@@ -2848,7 +2834,10 @@ where
                                         )?;
                                         _localctx = tmp;
                                         recog.base.set_state(118);
-                                        if !({ recog.precpred(None, 1) }) {
+                                        if !({
+                                            let _localctx = Some(_localctx.clone());
+                                            recog.precpred(None, 1)
+                                        }) {
                                             Err(FailedPredicateError::new(
                                                 &mut recog.base,
                                                 Some("recog.precpred(None, 1)".to_owned()),
@@ -2858,7 +2847,7 @@ where
                                         recog.base.set_state(119);
                                         let tmp = recog
                                             .base
-                                            .match_token(LBRACKET, &mut recog.err_handler)?;
+                                            .match_token(CEL_LBRACKET, &mut recog.err_handler)?;
                                         if let MemberContextAll::IndexContext(ctx) =
                                             cast_mut::<_, MemberContextAll>(&mut _localctx)
                                         {
@@ -2870,11 +2859,11 @@ where
                                         recog.base.set_state(121);
                                         recog.err_handler.sync(&mut recog.base)?;
                                         _la = recog.base.input.la(1);
-                                        if _la == QUESTIONMARK {
+                                        if _la == CEL_QUESTIONMARK {
                                             {
                                                 recog.base.set_state(120);
                                                 let tmp = recog.base.match_token(
-                                                    QUESTIONMARK,
+                                                    CEL_QUESTIONMARK,
                                                     &mut recog.err_handler,
                                                 )?;
                                                 if let MemberContextAll::IndexContext(ctx) =
@@ -2899,7 +2888,9 @@ where
                                         }
 
                                         recog.base.set_state(124);
-                                        recog.base.match_token(RPRACKET, &mut recog.err_handler)?;
+                                        recog
+                                            .base
+                                            .match_token(CEL_RPRACKET, &mut recog.err_handler)?;
                                     }
                                 }
 
@@ -3002,7 +2993,7 @@ antlr4rust::tid! {PrimaryContextExt<'a>}
 impl<'input> PrimaryContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<PrimaryContextAll<'input>> {
         Rc::new(PrimaryContextAll::Error(
             BaseParserRuleContext::new_parser_ctx(
@@ -3030,7 +3021,7 @@ pub trait CreateListContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(RPRACKET, 0)
+        self.get_token(CEL_RPRACKET, 0)
     }
     /// Retrieves first TerminalNode corresponding to token LBRACKET
     /// Returns `None` if there is no child corresponding to token LBRACKET
@@ -3038,7 +3029,7 @@ pub trait CreateListContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(LBRACKET, 0)
+        self.get_token(CEL_LBRACKET, 0)
     }
     /// Retrieves first TerminalNode corresponding to token COMMA
     /// Returns `None` if there is no child corresponding to token COMMA
@@ -3046,7 +3037,7 @@ pub trait CreateListContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(COMMA, 0)
+        self.get_token(CEL_COMMA, 0)
     }
     fn listInit(&self) -> Option<Rc<ListInitContextAll<'input>>>
     where
@@ -3135,7 +3126,7 @@ pub trait IdentContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(IDENTIFIER, 0)
+        self.get_token(CEL_IDENTIFIER, 0)
     }
     /// Retrieves first TerminalNode corresponding to token DOT
     /// Returns `None` if there is no child corresponding to token DOT
@@ -3143,7 +3134,7 @@ pub trait IdentContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(DOT, 0)
+        self.get_token(CEL_DOT, 0)
     }
 }
 
@@ -3227,7 +3218,7 @@ pub trait CreateStructContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(RBRACE, 0)
+        self.get_token(CEL_RBRACE, 0)
     }
     /// Retrieves first TerminalNode corresponding to token LBRACE
     /// Returns `None` if there is no child corresponding to token LBRACE
@@ -3235,7 +3226,7 @@ pub trait CreateStructContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(LBRACE, 0)
+        self.get_token(CEL_LBRACE, 0)
     }
     /// Retrieves first TerminalNode corresponding to token COMMA
     /// Returns `None` if there is no child corresponding to token COMMA
@@ -3243,7 +3234,7 @@ pub trait CreateStructContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(COMMA, 0)
+        self.get_token(CEL_COMMA, 0)
     }
     fn mapInitializerList(&self) -> Option<Rc<MapInitializerListContextAll<'input>>>
     where
@@ -3410,7 +3401,7 @@ pub trait NestedContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(LPAREN, 0)
+        self.get_token(CEL_LPAREN, 0)
     }
     /// Retrieves first TerminalNode corresponding to token RPAREN
     /// Returns `None` if there is no child corresponding to token RPAREN
@@ -3418,7 +3409,7 @@ pub trait NestedContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(RPAREN, 0)
+        self.get_token(CEL_RPAREN, 0)
     }
     fn expr(&self) -> Option<Rc<ExprContextAll<'input>>>
     where
@@ -3506,7 +3497,7 @@ pub trait CreateMessageContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(RBRACE, 0)
+        self.get_token(CEL_RBRACE, 0)
     }
     /// Retrieves all `TerminalNode`s corresponding to token IDENTIFIER in current rule
     fn IDENTIFIER_all(&self) -> Vec<Rc<TerminalNode<'input, CELParserContextType>>>
@@ -3521,7 +3512,7 @@ pub trait CreateMessageContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(IDENTIFIER, i)
+        self.get_token(CEL_IDENTIFIER, i)
     }
     /// Retrieves first TerminalNode corresponding to token LBRACE
     /// Returns `None` if there is no child corresponding to token LBRACE
@@ -3529,7 +3520,7 @@ pub trait CreateMessageContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(LBRACE, 0)
+        self.get_token(CEL_LBRACE, 0)
     }
     /// Retrieves first TerminalNode corresponding to token COMMA
     /// Returns `None` if there is no child corresponding to token COMMA
@@ -3537,7 +3528,7 @@ pub trait CreateMessageContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(COMMA, 0)
+        self.get_token(CEL_COMMA, 0)
     }
     /// Retrieves all `TerminalNode`s corresponding to token DOT in current rule
     fn DOT_all(&self) -> Vec<Rc<TerminalNode<'input, CELParserContextType>>>
@@ -3552,7 +3543,7 @@ pub trait CreateMessageContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(DOT, i)
+        self.get_token(CEL_DOT, i)
     }
     fn field_initializer_list(&self) -> Option<Rc<Field_initializer_listContextAll<'input>>>
     where
@@ -3651,7 +3642,7 @@ pub trait GlobalCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(IDENTIFIER, 0)
+        self.get_token(CEL_IDENTIFIER, 0)
     }
     /// Retrieves first TerminalNode corresponding to token RPAREN
     /// Returns `None` if there is no child corresponding to token RPAREN
@@ -3659,7 +3650,7 @@ pub trait GlobalCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(RPAREN, 0)
+        self.get_token(CEL_RPAREN, 0)
     }
     /// Retrieves first TerminalNode corresponding to token LPAREN
     /// Returns `None` if there is no child corresponding to token LPAREN
@@ -3667,7 +3658,7 @@ pub trait GlobalCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(LPAREN, 0)
+        self.get_token(CEL_LPAREN, 0)
     }
     /// Retrieves first TerminalNode corresponding to token DOT
     /// Returns `None` if there is no child corresponding to token DOT
@@ -3675,7 +3666,7 @@ pub trait GlobalCallContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(DOT, 0)
+        self.get_token(CEL_DOT, 0)
     }
     fn exprList(&self) -> Option<Rc<ExprListContextAll<'input>>>
     where
@@ -3759,10 +3750,9 @@ impl<'input> GlobalCallContextExt<'input> {
     }
 }
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn primary(&mut self) -> Result<Rc<PrimaryContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -3770,7 +3760,7 @@ where
         let mut _localctx = PrimaryContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog.base.enter_rule(_localctx.clone(), 16, RULE_primary);
         let mut _localctx: Rc<PrimaryContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             recog.base.set_state(184);
             recog.err_handler.sync(&mut recog.base)?;
@@ -3783,10 +3773,11 @@ where
                         recog.base.set_state(132);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == DOT {
+                        if _la == CEL_DOT {
                             {
                                 recog.base.set_state(131);
-                                let tmp = recog.base.match_token(DOT, &mut recog.err_handler)?;
+                                let tmp =
+                                    recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
                                 if let PrimaryContextAll::IdentContext(ctx) =
                                     cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                                 {
@@ -3798,7 +3789,9 @@ where
                         }
 
                         recog.base.set_state(134);
-                        let tmp = recog.base.match_token(IDENTIFIER, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
                         if let PrimaryContextAll::IdentContext(ctx) =
                             cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                         {
@@ -3816,10 +3809,11 @@ where
                         recog.base.set_state(136);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == DOT {
+                        if _la == CEL_DOT {
                             {
                                 recog.base.set_state(135);
-                                let tmp = recog.base.match_token(DOT, &mut recog.err_handler)?;
+                                let tmp =
+                                    recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
                                 if let PrimaryContextAll::GlobalCallContext(ctx) =
                                     cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                                 {
@@ -3831,7 +3825,9 @@ where
                         }
 
                         recog.base.set_state(138);
-                        let tmp = recog.base.match_token(IDENTIFIER, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
                         if let PrimaryContextAll::GlobalCallContext(ctx) =
                             cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                         {
@@ -3842,7 +3838,7 @@ where
 
                         {
                             recog.base.set_state(139);
-                            let tmp = recog.base.match_token(LPAREN, &mut recog.err_handler)?;
+                            let tmp = recog.base.match_token(CEL_LPAREN, &mut recog.err_handler)?;
                             if let PrimaryContextAll::GlobalCallContext(ctx) =
                                 cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                             {
@@ -3855,23 +3851,7 @@ where
                             recog.err_handler.sync(&mut recog.base)?;
                             _la = recog.base.input.la(1);
                             if ((_la - 10) & !0x3f) == 0
-                                && ((1usize << (_la - 10))
-                                    & ((1usize << (LBRACKET - 10))
-                                        | (1usize << (LBRACE - 10))
-                                        | (1usize << (LPAREN - 10))
-                                        | (1usize << (DOT - 10))
-                                        | (1usize << (MINUS - 10))
-                                        | (1usize << (EXCLAM - 10))
-                                        | (1usize << (CEL_TRUE - 10))
-                                        | (1usize << (CEL_FALSE - 10))
-                                        | (1usize << (NUL - 10))
-                                        | (1usize << (NUM_FLOAT - 10))
-                                        | (1usize << (NUM_INT - 10))
-                                        | (1usize << (NUM_UINT - 10))
-                                        | (1usize << (STRING - 10))
-                                        | (1usize << (BYTES - 10))
-                                        | (1usize << (IDENTIFIER - 10))))
-                                    != 0
+                                && ((1usize << (_la - 10)) & 132580181) != 0
                             {
                                 {
                                     /*InvokeRule exprList*/
@@ -3888,7 +3868,7 @@ where
                             }
 
                             recog.base.set_state(143);
-                            recog.base.match_token(RPAREN, &mut recog.err_handler)?;
+                            recog.base.match_token(CEL_RPAREN, &mut recog.err_handler)?;
                         }
                     }
                 }
@@ -3898,7 +3878,7 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(144);
-                        recog.base.match_token(LPAREN, &mut recog.err_handler)?;
+                        recog.base.match_token(CEL_LPAREN, &mut recog.err_handler)?;
 
                         /*InvokeRule expr*/
                         recog.base.set_state(145);
@@ -3912,7 +3892,7 @@ where
                         }
 
                         recog.base.set_state(146);
-                        recog.base.match_token(RPAREN, &mut recog.err_handler)?;
+                        recog.base.match_token(CEL_RPAREN, &mut recog.err_handler)?;
                     }
                 }
                 4 => {
@@ -3921,7 +3901,9 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(148);
-                        let tmp = recog.base.match_token(LBRACKET, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_LBRACKET, &mut recog.err_handler)?;
                         if let PrimaryContextAll::CreateListContext(ctx) =
                             cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                         {
@@ -3933,26 +3915,7 @@ where
                         recog.base.set_state(150);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if ((_la - 10) & !0x3f) == 0
-                            && ((1usize << (_la - 10))
-                                & ((1usize << (LBRACKET - 10))
-                                    | (1usize << (LBRACE - 10))
-                                    | (1usize << (LPAREN - 10))
-                                    | (1usize << (DOT - 10))
-                                    | (1usize << (MINUS - 10))
-                                    | (1usize << (EXCLAM - 10))
-                                    | (1usize << (QUESTIONMARK - 10))
-                                    | (1usize << (CEL_TRUE - 10))
-                                    | (1usize << (CEL_FALSE - 10))
-                                    | (1usize << (NUL - 10))
-                                    | (1usize << (NUM_FLOAT - 10))
-                                    | (1usize << (NUM_INT - 10))
-                                    | (1usize << (NUM_UINT - 10))
-                                    | (1usize << (STRING - 10))
-                                    | (1usize << (BYTES - 10))
-                                    | (1usize << (IDENTIFIER - 10))))
-                                != 0
-                        {
+                        if ((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0 {
                             {
                                 /*InvokeRule listInit*/
                                 recog.base.set_state(149);
@@ -3970,15 +3933,17 @@ where
                         recog.base.set_state(153);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == COMMA {
+                        if _la == CEL_COMMA {
                             {
                                 recog.base.set_state(152);
-                                recog.base.match_token(COMMA, &mut recog.err_handler)?;
+                                recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
                             }
                         }
 
                         recog.base.set_state(155);
-                        recog.base.match_token(RPRACKET, &mut recog.err_handler)?;
+                        recog
+                            .base
+                            .match_token(CEL_RPRACKET, &mut recog.err_handler)?;
                     }
                 }
                 5 => {
@@ -3987,7 +3952,7 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(156);
-                        let tmp = recog.base.match_token(LBRACE, &mut recog.err_handler)?;
+                        let tmp = recog.base.match_token(CEL_LBRACE, &mut recog.err_handler)?;
                         if let PrimaryContextAll::CreateStructContext(ctx) =
                             cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                         {
@@ -3999,26 +3964,7 @@ where
                         recog.base.set_state(158);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if ((_la - 10) & !0x3f) == 0
-                            && ((1usize << (_la - 10))
-                                & ((1usize << (LBRACKET - 10))
-                                    | (1usize << (LBRACE - 10))
-                                    | (1usize << (LPAREN - 10))
-                                    | (1usize << (DOT - 10))
-                                    | (1usize << (MINUS - 10))
-                                    | (1usize << (EXCLAM - 10))
-                                    | (1usize << (QUESTIONMARK - 10))
-                                    | (1usize << (CEL_TRUE - 10))
-                                    | (1usize << (CEL_FALSE - 10))
-                                    | (1usize << (NUL - 10))
-                                    | (1usize << (NUM_FLOAT - 10))
-                                    | (1usize << (NUM_INT - 10))
-                                    | (1usize << (NUM_UINT - 10))
-                                    | (1usize << (STRING - 10))
-                                    | (1usize << (BYTES - 10))
-                                    | (1usize << (IDENTIFIER - 10))))
-                                != 0
-                        {
+                        if ((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0 {
                             {
                                 /*InvokeRule mapInitializerList*/
                                 recog.base.set_state(157);
@@ -4036,15 +3982,15 @@ where
                         recog.base.set_state(161);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == COMMA {
+                        if _la == CEL_COMMA {
                             {
                                 recog.base.set_state(160);
-                                recog.base.match_token(COMMA, &mut recog.err_handler)?;
+                                recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
                             }
                         }
 
                         recog.base.set_state(163);
-                        recog.base.match_token(RBRACE, &mut recog.err_handler)?;
+                        recog.base.match_token(CEL_RBRACE, &mut recog.err_handler)?;
                     }
                 }
                 6 => {
@@ -4055,10 +4001,11 @@ where
                         recog.base.set_state(165);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == DOT {
+                        if _la == CEL_DOT {
                             {
                                 recog.base.set_state(164);
-                                let tmp = recog.base.match_token(DOT, &mut recog.err_handler)?;
+                                let tmp =
+                                    recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
                                 if let PrimaryContextAll::CreateMessageContext(ctx) =
                                     cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                                 {
@@ -4070,7 +4017,9 @@ where
                         }
 
                         recog.base.set_state(167);
-                        let tmp = recog.base.match_token(IDENTIFIER, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
                         if let PrimaryContextAll::CreateMessageContext(ctx) =
                             cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                         {
@@ -4096,12 +4045,12 @@ where
                         recog.base.set_state(172);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        while _la == DOT {
+                        while _la == CEL_DOT {
                             {
                                 {
                                     recog.base.set_state(168);
                                     let tmp =
-                                        recog.base.match_token(DOT, &mut recog.err_handler)?;
+                                        recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
                                     if let PrimaryContextAll::CreateMessageContext(ctx) =
                                         cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                                     {
@@ -4127,7 +4076,7 @@ where
                                     recog.base.set_state(169);
                                     let tmp = recog
                                         .base
-                                        .match_token(IDENTIFIER, &mut recog.err_handler)?;
+                                        .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
                                     if let PrimaryContextAll::CreateMessageContext(ctx) =
                                         cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                                     {
@@ -4157,7 +4106,7 @@ where
                             _la = recog.base.input.la(1);
                         }
                         recog.base.set_state(175);
-                        let tmp = recog.base.match_token(LBRACE, &mut recog.err_handler)?;
+                        let tmp = recog.base.match_token(CEL_LBRACE, &mut recog.err_handler)?;
                         if let PrimaryContextAll::CreateMessageContext(ctx) =
                             cast_mut::<_, PrimaryContextAll>(&mut _localctx)
                         {
@@ -4169,13 +4118,7 @@ where
                         recog.base.set_state(177);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if ((_la - 20) & !0x3f) == 0
-                            && ((1usize << (_la - 20))
-                                & ((1usize << (QUESTIONMARK - 20))
-                                    | (1usize << (IDENTIFIER - 20))
-                                    | (1usize << (ESC_IDENTIFIER - 20))))
-                                != 0
-                        {
+                        if ((_la - 20) & !0x3f) == 0 && ((1usize << (_la - 20)) & 196609) != 0 {
                             {
                                 /*InvokeRule field_initializer_list*/
                                 recog.base.set_state(176);
@@ -4193,15 +4136,15 @@ where
                         recog.base.set_state(180);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == COMMA {
+                        if _la == CEL_COMMA {
                             {
                                 recog.base.set_state(179);
-                                recog.base.match_token(COMMA, &mut recog.err_handler)?;
+                                recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
                             }
                         }
 
                         recog.base.set_state(182);
-                        recog.base.match_token(RBRACE, &mut recog.err_handler)?;
+                        recog.base.match_token(CEL_RBRACE, &mut recog.err_handler)?;
                     }
                 }
                 7 => {
@@ -4279,7 +4222,7 @@ antlr4rust::tid! {ExprListContextExt<'a>}
 impl<'input> ExprListContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<ExprListContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -4287,6 +4230,7 @@ impl<'input> ExprListContextExt<'input> {
             ExprListContextExt {
                 expr: None,
                 e: Vec::new(),
+
                 ph: PhantomData,
             },
         ))
@@ -4321,16 +4265,15 @@ pub trait ExprListContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(COMMA, i)
+        self.get_token(CEL_COMMA, i)
     }
 }
 
 impl<'input> ExprListContextAttrs<'input> for ExprListContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn exprList(&mut self) -> Result<Rc<ExprListContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -4338,7 +4281,7 @@ where
         let mut _localctx = ExprListContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog.base.enter_rule(_localctx.clone(), 18, RULE_exprList);
         let mut _localctx: Rc<ExprListContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
@@ -4357,11 +4300,11 @@ where
                 recog.base.set_state(191);
                 recog.err_handler.sync(&mut recog.base)?;
                 _la = recog.base.input.la(1);
-                while _la == COMMA {
+                while _la == CEL_COMMA {
                     {
                         {
                             recog.base.set_state(187);
-                            recog.base.match_token(COMMA, &mut recog.err_handler)?;
+                            recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
                             /*InvokeRule expr*/
                             recog.base.set_state(188);
@@ -4442,7 +4385,7 @@ antlr4rust::tid! {ListInitContextExt<'a>}
 impl<'input> ListInitContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<ListInitContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -4450,6 +4393,7 @@ impl<'input> ListInitContextExt<'input> {
             ListInitContextExt {
                 optExpr: None,
                 elems: Vec::new(),
+
                 ph: PhantomData,
             },
         ))
@@ -4484,16 +4428,15 @@ pub trait ListInitContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(COMMA, i)
+        self.get_token(CEL_COMMA, i)
     }
 }
 
 impl<'input> ListInitContextAttrs<'input> for ListInitContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn listInit(&mut self) -> Result<Rc<ListInitContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -4502,7 +4445,7 @@ where
         recog.base.enter_rule(_localctx.clone(), 20, RULE_listInit);
         let mut _localctx: Rc<ListInitContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
-            let mut _alt: isize;
+            let mut _alt: i32;
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
@@ -4527,7 +4470,7 @@ where
                         {
                             {
                                 recog.base.set_state(195);
-                                recog.base.match_token(COMMA, &mut recog.err_handler)?;
+                                recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
                                 /*InvokeRule optExpr*/
                                 recog.base.set_state(196);
@@ -4619,7 +4562,7 @@ antlr4rust::tid! {Field_initializer_listContextExt<'a>}
 impl<'input> Field_initializer_listContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<Field_initializer_listContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -4631,6 +4574,7 @@ impl<'input> Field_initializer_listContextExt<'input> {
                 expr: None,
                 fields: Vec::new(),
                 values: Vec::new(),
+
                 ph: PhantomData,
             },
         ))
@@ -4665,7 +4609,7 @@ pub trait Field_initializer_listContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(COLON, i)
+        self.get_token(CEL_COLON, i)
     }
     fn expr_all(&self) -> Vec<Rc<ExprContextAll<'input>>>
     where
@@ -4692,16 +4636,15 @@ pub trait Field_initializer_listContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(COMMA, i)
+        self.get_token(CEL_COMMA, i)
     }
 }
 
 impl<'input> Field_initializer_listContextAttrs<'input> for Field_initializer_listContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn field_initializer_list(
         &mut self,
@@ -4715,7 +4658,7 @@ where
             .enter_rule(_localctx.clone(), 22, RULE_field_initializer_list);
         let mut _localctx: Rc<Field_initializer_listContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
-            let mut _alt: isize;
+            let mut _alt: i32;
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
@@ -4734,7 +4677,7 @@ where
                     .push(temp);
 
                 recog.base.set_state(203);
-                let tmp = recog.base.match_token(COLON, &mut recog.err_handler)?;
+                let tmp = recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
                 cast_mut::<_, Field_initializer_listContext>(&mut _localctx).s21 =
                     Some(tmp.clone());
 
@@ -4768,7 +4711,7 @@ where
                         {
                             {
                                 recog.base.set_state(205);
-                                recog.base.match_token(COMMA, &mut recog.err_handler)?;
+                                recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
                                 /*InvokeRule optField*/
                                 recog.base.set_state(206);
@@ -4786,7 +4729,8 @@ where
                                     .push(temp);
 
                                 recog.base.set_state(207);
-                                let tmp = recog.base.match_token(COLON, &mut recog.err_handler)?;
+                                let tmp =
+                                    recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
                                 cast_mut::<_, Field_initializer_listContext>(&mut _localctx).s21 =
                                     Some(tmp.clone());
 
@@ -4882,13 +4826,14 @@ antlr4rust::tid! {OptFieldContextExt<'a>}
 impl<'input> OptFieldContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<OptFieldContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
             invoking_state,
             OptFieldContextExt {
                 opt: None,
+
                 ph: PhantomData,
             },
         ))
@@ -4910,16 +4855,15 @@ pub trait OptFieldContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(QUESTIONMARK, 0)
+        self.get_token(CEL_QUESTIONMARK, 0)
     }
 }
 
 impl<'input> OptFieldContextAttrs<'input> for OptFieldContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn optField(&mut self) -> Result<Rc<OptFieldContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -4927,7 +4871,7 @@ where
         let mut _localctx = OptFieldContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog.base.enter_rule(_localctx.clone(), 24, RULE_optField);
         let mut _localctx: Rc<OptFieldContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
@@ -4935,12 +4879,12 @@ where
                 recog.base.set_state(216);
                 recog.err_handler.sync(&mut recog.base)?;
                 _la = recog.base.input.la(1);
-                if _la == QUESTIONMARK {
+                if _la == CEL_QUESTIONMARK {
                     {
                         recog.base.set_state(215);
                         let tmp = recog
                             .base
-                            .match_token(QUESTIONMARK, &mut recog.err_handler)?;
+                            .match_token(CEL_QUESTIONMARK, &mut recog.err_handler)?;
                         cast_mut::<_, OptFieldContext>(&mut _localctx).opt = Some(tmp.clone());
                     }
                 }
@@ -5016,7 +4960,7 @@ antlr4rust::tid! {MapInitializerListContextExt<'a>}
 impl<'input> MapInitializerListContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<MapInitializerListContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -5028,6 +4972,7 @@ impl<'input> MapInitializerListContextExt<'input> {
                 expr: None,
                 keys: Vec::new(),
                 values: Vec::new(),
+
                 ph: PhantomData,
             },
         ))
@@ -5062,7 +5007,7 @@ pub trait MapInitializerListContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(COLON, i)
+        self.get_token(CEL_COLON, i)
     }
     fn expr_all(&self) -> Vec<Rc<ExprContextAll<'input>>>
     where
@@ -5089,16 +5034,15 @@ pub trait MapInitializerListContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(COMMA, i)
+        self.get_token(CEL_COMMA, i)
     }
 }
 
 impl<'input> MapInitializerListContextAttrs<'input> for MapInitializerListContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn mapInitializerList(
         &mut self,
@@ -5112,7 +5056,7 @@ where
             .enter_rule(_localctx.clone(), 26, RULE_mapInitializerList);
         let mut _localctx: Rc<MapInitializerListContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
-            let mut _alt: isize;
+            let mut _alt: i32;
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
@@ -5131,7 +5075,7 @@ where
                     .push(temp);
 
                 recog.base.set_state(221);
-                let tmp = recog.base.match_token(COLON, &mut recog.err_handler)?;
+                let tmp = recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
                 cast_mut::<_, MapInitializerListContext>(&mut _localctx).s21 = Some(tmp.clone());
 
                 let temp = cast_mut::<_, MapInitializerListContext>(&mut _localctx)
@@ -5163,7 +5107,7 @@ where
                         {
                             {
                                 recog.base.set_state(223);
-                                recog.base.match_token(COMMA, &mut recog.err_handler)?;
+                                recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
                                 /*InvokeRule optExpr*/
                                 recog.base.set_state(224);
@@ -5180,7 +5124,8 @@ where
                                     .push(temp);
 
                                 recog.base.set_state(225);
-                                let tmp = recog.base.match_token(COLON, &mut recog.err_handler)?;
+                                let tmp =
+                                    recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
                                 cast_mut::<_, MapInitializerListContext>(&mut _localctx).s21 =
                                     Some(tmp.clone());
 
@@ -5293,7 +5238,7 @@ antlr4rust::tid! {EscapeIdentContextExt<'a>}
 impl<'input> EscapeIdentContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<EscapeIdentContextAll<'input>> {
         Rc::new(EscapeIdentContextAll::Error(
             BaseParserRuleContext::new_parser_ctx(
@@ -5322,7 +5267,7 @@ pub trait EscapedIdentifierContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(ESC_IDENTIFIER, 0)
+        self.get_token(CEL_ESC_IDENTIFIER, 0)
     }
 }
 
@@ -5404,7 +5349,7 @@ pub trait SimpleIdentifierContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(IDENTIFIER, 0)
+        self.get_token(CEL_IDENTIFIER, 0)
     }
 }
 
@@ -5476,10 +5421,9 @@ impl<'input> SimpleIdentifierContextExt<'input> {
     }
 }
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn escapeIdent(&mut self) -> Result<Rc<EscapeIdentContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -5493,13 +5437,15 @@ where
             recog.base.set_state(235);
             recog.err_handler.sync(&mut recog.base)?;
             match recog.base.input.la(1) {
-                IDENTIFIER => {
+                CEL_IDENTIFIER => {
                     let tmp = SimpleIdentifierContextExt::new(&**_localctx);
                     recog.base.enter_outer_alt(Some(tmp.clone()), 1)?;
                     _localctx = tmp;
                     {
                         recog.base.set_state(233);
-                        let tmp = recog.base.match_token(IDENTIFIER, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
                         if let EscapeIdentContextAll::SimpleIdentifierContext(ctx) =
                             cast_mut::<_, EscapeIdentContextAll>(&mut _localctx)
                         {
@@ -5510,7 +5456,7 @@ where
                     }
                 }
 
-                ESC_IDENTIFIER => {
+                CEL_ESC_IDENTIFIER => {
                     let tmp = EscapedIdentifierContextExt::new(&**_localctx);
                     recog.base.enter_outer_alt(Some(tmp.clone()), 2)?;
                     _localctx = tmp;
@@ -5518,7 +5464,7 @@ where
                         recog.base.set_state(234);
                         let tmp = recog
                             .base
-                            .match_token(ESC_IDENTIFIER, &mut recog.err_handler)?;
+                            .match_token(CEL_ESC_IDENTIFIER, &mut recog.err_handler)?;
                         if let EscapeIdentContextAll::EscapedIdentifierContext(ctx) =
                             cast_mut::<_, EscapeIdentContextAll>(&mut _localctx)
                         {
@@ -5595,7 +5541,7 @@ antlr4rust::tid! {OptExprContextExt<'a>}
 impl<'input> OptExprContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<OptExprContextAll<'input>> {
         Rc::new(BaseParserRuleContext::new_parser_ctx(
             parent,
@@ -5603,6 +5549,7 @@ impl<'input> OptExprContextExt<'input> {
             OptExprContextExt {
                 opt: None,
                 e: None,
+
                 ph: PhantomData,
             },
         ))
@@ -5624,16 +5571,15 @@ pub trait OptExprContextAttrs<'input>:
     where
         Self: Sized,
     {
-        self.get_token(QUESTIONMARK, 0)
+        self.get_token(CEL_QUESTIONMARK, 0)
     }
 }
 
 impl<'input> OptExprContextAttrs<'input> for OptExprContext<'input> {}
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn optExpr(&mut self) -> Result<Rc<OptExprContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -5641,7 +5587,7 @@ where
         let mut _localctx = OptExprContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog.base.enter_rule(_localctx.clone(), 30, RULE_optExpr);
         let mut _localctx: Rc<OptExprContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
@@ -5649,12 +5595,12 @@ where
                 recog.base.set_state(238);
                 recog.err_handler.sync(&mut recog.base)?;
                 _la = recog.base.input.la(1);
-                if _la == QUESTIONMARK {
+                if _la == CEL_QUESTIONMARK {
                     {
                         recog.base.set_state(237);
                         let tmp = recog
                             .base
-                            .match_token(QUESTIONMARK, &mut recog.err_handler)?;
+                            .match_token(CEL_QUESTIONMARK, &mut recog.err_handler)?;
                         cast_mut::<_, OptExprContext>(&mut _localctx).opt = Some(tmp.clone());
                     }
                 }
@@ -5756,7 +5702,7 @@ antlr4rust::tid! {LiteralContextExt<'a>}
 impl<'input> LiteralContextExt<'input> {
     fn new(
         parent: Option<Rc<dyn CELParserContext<'input> + 'input>>,
-        invoking_state: isize,
+        invoking_state: i32,
     ) -> Rc<LiteralContextAll<'input>> {
         Rc::new(LiteralContextAll::Error(
             BaseParserRuleContext::new_parser_ctx(
@@ -5784,7 +5730,7 @@ pub trait BytesContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(BYTES, 0)
+        self.get_token(CEL_BYTES, 0)
     }
 }
 
@@ -5865,7 +5811,7 @@ pub trait UintContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(NUM_UINT, 0)
+        self.get_token(CEL_NUM_UINT, 0)
     }
 }
 
@@ -5946,7 +5892,7 @@ pub trait NullContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(NUL, 0)
+        self.get_token(CEL_NUL, 0)
     }
 }
 
@@ -6027,7 +5973,7 @@ pub trait BoolFalseContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(CEL_FALSE, 0)
+        self.get_token(CEL_CEL_FALSE, 0)
     }
 }
 
@@ -6108,7 +6054,7 @@ pub trait StringContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(STRING, 0)
+        self.get_token(CEL_STRING, 0)
     }
 }
 
@@ -6189,7 +6135,7 @@ pub trait DoubleContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(NUM_FLOAT, 0)
+        self.get_token(CEL_NUM_FLOAT, 0)
     }
     /// Retrieves first TerminalNode corresponding to token MINUS
     /// Returns `None` if there is no child corresponding to token MINUS
@@ -6197,7 +6143,7 @@ pub trait DoubleContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(MINUS, 0)
+        self.get_token(CEL_MINUS, 0)
     }
 }
 
@@ -6280,7 +6226,7 @@ pub trait BoolTrueContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(CEL_TRUE, 0)
+        self.get_token(CEL_CEL_TRUE, 0)
     }
 }
 
@@ -6361,7 +6307,7 @@ pub trait IntContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(NUM_INT, 0)
+        self.get_token(CEL_NUM_INT, 0)
     }
     /// Retrieves first TerminalNode corresponding to token MINUS
     /// Returns `None` if there is no child corresponding to token MINUS
@@ -6369,7 +6315,7 @@ pub trait IntContextAttrs<'input>: CELParserContext<'input> {
     where
         Self: Sized,
     {
-        self.get_token(MINUS, 0)
+        self.get_token(CEL_MINUS, 0)
     }
 }
 
@@ -6443,10 +6389,9 @@ impl<'input> IntContextExt<'input> {
     }
 }
 
-impl<'input, I, H> CELParser<'input, I, H>
+impl<'input, I> CELParser<'input, I>
 where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
-    H: ErrorStrategy<'input, BaseParserType<'input, I>>,
 {
     pub fn literal(&mut self) -> Result<Rc<LiteralContextAll<'input>>, ANTLRError> {
         let mut recog = self;
@@ -6454,7 +6399,7 @@ where
         let mut _localctx = LiteralContextExt::new(_parentctx.clone(), recog.base.get_state());
         recog.base.enter_rule(_localctx.clone(), 32, RULE_literal);
         let mut _localctx: Rc<LiteralContextAll> = _localctx;
-        let mut _la: isize = -1;
+        let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             recog.base.set_state(256);
             recog.err_handler.sync(&mut recog.base)?;
@@ -6467,10 +6412,11 @@ where
                         recog.base.set_state(243);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == MINUS {
+                        if _la == CEL_MINUS {
                             {
                                 recog.base.set_state(242);
-                                let tmp = recog.base.match_token(MINUS, &mut recog.err_handler)?;
+                                let tmp =
+                                    recog.base.match_token(CEL_MINUS, &mut recog.err_handler)?;
                                 if let LiteralContextAll::IntContext(ctx) =
                                     cast_mut::<_, LiteralContextAll>(&mut _localctx)
                                 {
@@ -6482,7 +6428,9 @@ where
                         }
 
                         recog.base.set_state(245);
-                        let tmp = recog.base.match_token(NUM_INT, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_NUM_INT, &mut recog.err_handler)?;
                         if let LiteralContextAll::IntContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6498,7 +6446,9 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(246);
-                        let tmp = recog.base.match_token(NUM_UINT, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_NUM_UINT, &mut recog.err_handler)?;
                         if let LiteralContextAll::UintContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6516,10 +6466,11 @@ where
                         recog.base.set_state(248);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if _la == MINUS {
+                        if _la == CEL_MINUS {
                             {
                                 recog.base.set_state(247);
-                                let tmp = recog.base.match_token(MINUS, &mut recog.err_handler)?;
+                                let tmp =
+                                    recog.base.match_token(CEL_MINUS, &mut recog.err_handler)?;
                                 if let LiteralContextAll::DoubleContext(ctx) =
                                     cast_mut::<_, LiteralContextAll>(&mut _localctx)
                                 {
@@ -6531,7 +6482,9 @@ where
                         }
 
                         recog.base.set_state(250);
-                        let tmp = recog.base.match_token(NUM_FLOAT, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_NUM_FLOAT, &mut recog.err_handler)?;
                         if let LiteralContextAll::DoubleContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6547,7 +6500,7 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(251);
-                        let tmp = recog.base.match_token(STRING, &mut recog.err_handler)?;
+                        let tmp = recog.base.match_token(CEL_STRING, &mut recog.err_handler)?;
                         if let LiteralContextAll::StringContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6563,7 +6516,7 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(252);
-                        let tmp = recog.base.match_token(BYTES, &mut recog.err_handler)?;
+                        let tmp = recog.base.match_token(CEL_BYTES, &mut recog.err_handler)?;
                         if let LiteralContextAll::BytesContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6579,7 +6532,9 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(253);
-                        let tmp = recog.base.match_token(CEL_TRUE, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_CEL_TRUE, &mut recog.err_handler)?;
                         if let LiteralContextAll::BoolTrueContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6595,7 +6550,9 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(254);
-                        let tmp = recog.base.match_token(CEL_FALSE, &mut recog.err_handler)?;
+                        let tmp = recog
+                            .base
+                            .match_token(CEL_CEL_FALSE, &mut recog.err_handler)?;
                         if let LiteralContextAll::BoolFalseContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6611,7 +6568,7 @@ where
                     _localctx = tmp;
                     {
                         recog.base.set_state(255);
-                        let tmp = recog.base.match_token(NUL, &mut recog.err_handler)?;
+                        let tmp = recog.base.match_token(CEL_NUL, &mut recog.err_handler)?;
                         if let LiteralContextAll::NullContext(ctx) =
                             cast_mut::<_, LiteralContextAll>(&mut _localctx)
                         {
@@ -6640,162 +6597,111 @@ where
         Ok(_localctx)
     }
 }
-
 lazy_static! {
     static ref _ATN: Arc<ATN> =
-        Arc::new(ATNDeserializer::new(None).deserialize(_serializedATN.chars()));
+        Arc::new(ATNDeserializer::new(None).deserialize(&mut _serializedATN.iter()));
     static ref _decision_to_DFA: Arc<Vec<antlr4rust::RwLock<DFA>>> = {
         let mut dfa = Vec::new();
-        let size = _ATN.decision_to_state.len();
+        let size = _ATN.decision_to_state.len() as i32;
         for i in 0..size {
-            dfa.push(DFA::new(_ATN.clone(), _ATN.get_decision_state(i), i as isize).into())
+            dfa.push(DFA::new(_ATN.clone(), _ATN.get_decision_state(i), i).into())
         }
         Arc::new(dfa)
     };
+    static ref _serializedATN: Vec<i32> = vec![
+        4, 1, 37, 259, 2, 0, 7, 0, 2, 1, 7, 1, 2, 2, 7, 2, 2, 3, 7, 3, 2, 4, 7, 4, 2, 5, 7, 5, 2,
+        6, 7, 6, 2, 7, 7, 7, 2, 8, 7, 8, 2, 9, 7, 9, 2, 10, 7, 10, 2, 11, 7, 11, 2, 12, 7, 12, 2,
+        13, 7, 13, 2, 14, 7, 14, 2, 15, 7, 15, 2, 16, 7, 16, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1,
+        1, 1, 1, 1, 1, 3, 1, 44, 8, 1, 1, 2, 1, 2, 1, 2, 5, 2, 49, 8, 2, 10, 2, 12, 2, 52, 9, 2, 1,
+        3, 1, 3, 1, 3, 5, 3, 57, 8, 3, 10, 3, 12, 3, 60, 9, 3, 1, 4, 1, 4, 1, 4, 1, 4, 1, 4, 1, 4,
+        5, 4, 68, 8, 4, 10, 4, 12, 4, 71, 9, 4, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1, 5, 1,
+        5, 5, 5, 82, 8, 5, 10, 5, 12, 5, 85, 9, 5, 1, 6, 1, 6, 4, 6, 89, 8, 6, 11, 6, 12, 6, 90, 1,
+        6, 1, 6, 4, 6, 95, 8, 6, 11, 6, 12, 6, 96, 1, 6, 3, 6, 100, 8, 6, 1, 7, 1, 7, 1, 7, 1, 7,
+        1, 7, 1, 7, 3, 7, 108, 8, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 1, 7, 3, 7, 116, 8, 7, 1, 7, 1,
+        7, 1, 7, 1, 7, 3, 7, 122, 8, 7, 1, 7, 1, 7, 1, 7, 5, 7, 127, 8, 7, 10, 7, 12, 7, 130, 9, 7,
+        1, 8, 3, 8, 133, 8, 8, 1, 8, 1, 8, 3, 8, 137, 8, 8, 1, 8, 1, 8, 1, 8, 3, 8, 142, 8, 8, 1,
+        8, 1, 8, 1, 8, 1, 8, 1, 8, 1, 8, 1, 8, 3, 8, 151, 8, 8, 1, 8, 3, 8, 154, 8, 8, 1, 8, 1, 8,
+        1, 8, 3, 8, 159, 8, 8, 1, 8, 3, 8, 162, 8, 8, 1, 8, 1, 8, 3, 8, 166, 8, 8, 1, 8, 1, 8, 1,
+        8, 5, 8, 171, 8, 8, 10, 8, 12, 8, 174, 9, 8, 1, 8, 1, 8, 3, 8, 178, 8, 8, 1, 8, 3, 8, 181,
+        8, 8, 1, 8, 1, 8, 3, 8, 185, 8, 8, 1, 9, 1, 9, 1, 9, 5, 9, 190, 8, 9, 10, 9, 12, 9, 193, 9,
+        9, 1, 10, 1, 10, 1, 10, 5, 10, 198, 8, 10, 10, 10, 12, 10, 201, 9, 10, 1, 11, 1, 11, 1, 11,
+        1, 11, 1, 11, 1, 11, 1, 11, 1, 11, 5, 11, 211, 8, 11, 10, 11, 12, 11, 214, 9, 11, 1, 12, 3,
+        12, 217, 8, 12, 1, 12, 1, 12, 1, 13, 1, 13, 1, 13, 1, 13, 1, 13, 1, 13, 1, 13, 1, 13, 5,
+        13, 229, 8, 13, 10, 13, 12, 13, 232, 9, 13, 1, 14, 1, 14, 3, 14, 236, 8, 14, 1, 15, 3, 15,
+        239, 8, 15, 1, 15, 1, 15, 1, 16, 3, 16, 244, 8, 16, 1, 16, 1, 16, 1, 16, 3, 16, 249, 8, 16,
+        1, 16, 1, 16, 1, 16, 1, 16, 1, 16, 1, 16, 3, 16, 257, 8, 16, 1, 16, 0, 3, 8, 10, 14, 17, 0,
+        2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30, 32, 0, 3, 1, 0, 1, 7, 1, 0, 23, 25,
+        2, 0, 18, 18, 22, 22, 290, 0, 34, 1, 0, 0, 0, 2, 37, 1, 0, 0, 0, 4, 45, 1, 0, 0, 0, 6, 53,
+        1, 0, 0, 0, 8, 61, 1, 0, 0, 0, 10, 72, 1, 0, 0, 0, 12, 99, 1, 0, 0, 0, 14, 101, 1, 0, 0, 0,
+        16, 184, 1, 0, 0, 0, 18, 186, 1, 0, 0, 0, 20, 194, 1, 0, 0, 0, 22, 202, 1, 0, 0, 0, 24,
+        216, 1, 0, 0, 0, 26, 220, 1, 0, 0, 0, 28, 235, 1, 0, 0, 0, 30, 238, 1, 0, 0, 0, 32, 256, 1,
+        0, 0, 0, 34, 35, 3, 2, 1, 0, 35, 36, 5, 0, 0, 1, 36, 1, 1, 0, 0, 0, 37, 43, 3, 4, 2, 0, 38,
+        39, 5, 20, 0, 0, 39, 40, 3, 4, 2, 0, 40, 41, 5, 21, 0, 0, 41, 42, 3, 2, 1, 0, 42, 44, 1, 0,
+        0, 0, 43, 38, 1, 0, 0, 0, 43, 44, 1, 0, 0, 0, 44, 3, 1, 0, 0, 0, 45, 50, 3, 6, 3, 0, 46,
+        47, 5, 9, 0, 0, 47, 49, 3, 6, 3, 0, 48, 46, 1, 0, 0, 0, 49, 52, 1, 0, 0, 0, 50, 48, 1, 0,
+        0, 0, 50, 51, 1, 0, 0, 0, 51, 5, 1, 0, 0, 0, 52, 50, 1, 0, 0, 0, 53, 58, 3, 8, 4, 0, 54,
+        55, 5, 8, 0, 0, 55, 57, 3, 8, 4, 0, 56, 54, 1, 0, 0, 0, 57, 60, 1, 0, 0, 0, 58, 56, 1, 0,
+        0, 0, 58, 59, 1, 0, 0, 0, 59, 7, 1, 0, 0, 0, 60, 58, 1, 0, 0, 0, 61, 62, 6, 4, -1, 0, 62,
+        63, 3, 10, 5, 0, 63, 69, 1, 0, 0, 0, 64, 65, 10, 1, 0, 0, 65, 66, 7, 0, 0, 0, 66, 68, 3, 8,
+        4, 2, 67, 64, 1, 0, 0, 0, 68, 71, 1, 0, 0, 0, 69, 67, 1, 0, 0, 0, 69, 70, 1, 0, 0, 0, 70,
+        9, 1, 0, 0, 0, 71, 69, 1, 0, 0, 0, 72, 73, 6, 5, -1, 0, 73, 74, 3, 12, 6, 0, 74, 83, 1, 0,
+        0, 0, 75, 76, 10, 2, 0, 0, 76, 77, 7, 1, 0, 0, 77, 82, 3, 10, 5, 3, 78, 79, 10, 1, 0, 0,
+        79, 80, 7, 2, 0, 0, 80, 82, 3, 10, 5, 2, 81, 75, 1, 0, 0, 0, 81, 78, 1, 0, 0, 0, 82, 85, 1,
+        0, 0, 0, 83, 81, 1, 0, 0, 0, 83, 84, 1, 0, 0, 0, 84, 11, 1, 0, 0, 0, 85, 83, 1, 0, 0, 0,
+        86, 100, 3, 14, 7, 0, 87, 89, 5, 19, 0, 0, 88, 87, 1, 0, 0, 0, 89, 90, 1, 0, 0, 0, 90, 88,
+        1, 0, 0, 0, 90, 91, 1, 0, 0, 0, 91, 92, 1, 0, 0, 0, 92, 100, 3, 14, 7, 0, 93, 95, 5, 18, 0,
+        0, 94, 93, 1, 0, 0, 0, 95, 96, 1, 0, 0, 0, 96, 94, 1, 0, 0, 0, 96, 97, 1, 0, 0, 0, 97, 98,
+        1, 0, 0, 0, 98, 100, 3, 14, 7, 0, 99, 86, 1, 0, 0, 0, 99, 88, 1, 0, 0, 0, 99, 94, 1, 0, 0,
+        0, 100, 13, 1, 0, 0, 0, 101, 102, 6, 7, -1, 0, 102, 103, 3, 16, 8, 0, 103, 128, 1, 0, 0, 0,
+        104, 105, 10, 3, 0, 0, 105, 107, 5, 16, 0, 0, 106, 108, 5, 20, 0, 0, 107, 106, 1, 0, 0, 0,
+        107, 108, 1, 0, 0, 0, 108, 109, 1, 0, 0, 0, 109, 127, 3, 28, 14, 0, 110, 111, 10, 2, 0, 0,
+        111, 112, 5, 16, 0, 0, 112, 113, 5, 36, 0, 0, 113, 115, 5, 14, 0, 0, 114, 116, 3, 18, 9, 0,
+        115, 114, 1, 0, 0, 0, 115, 116, 1, 0, 0, 0, 116, 117, 1, 0, 0, 0, 117, 127, 5, 15, 0, 0,
+        118, 119, 10, 1, 0, 0, 119, 121, 5, 10, 0, 0, 120, 122, 5, 20, 0, 0, 121, 120, 1, 0, 0, 0,
+        121, 122, 1, 0, 0, 0, 122, 123, 1, 0, 0, 0, 123, 124, 3, 2, 1, 0, 124, 125, 5, 11, 0, 0,
+        125, 127, 1, 0, 0, 0, 126, 104, 1, 0, 0, 0, 126, 110, 1, 0, 0, 0, 126, 118, 1, 0, 0, 0,
+        127, 130, 1, 0, 0, 0, 128, 126, 1, 0, 0, 0, 128, 129, 1, 0, 0, 0, 129, 15, 1, 0, 0, 0, 130,
+        128, 1, 0, 0, 0, 131, 133, 5, 16, 0, 0, 132, 131, 1, 0, 0, 0, 132, 133, 1, 0, 0, 0, 133,
+        134, 1, 0, 0, 0, 134, 185, 5, 36, 0, 0, 135, 137, 5, 16, 0, 0, 136, 135, 1, 0, 0, 0, 136,
+        137, 1, 0, 0, 0, 137, 138, 1, 0, 0, 0, 138, 139, 5, 36, 0, 0, 139, 141, 5, 14, 0, 0, 140,
+        142, 3, 18, 9, 0, 141, 140, 1, 0, 0, 0, 141, 142, 1, 0, 0, 0, 142, 143, 1, 0, 0, 0, 143,
+        185, 5, 15, 0, 0, 144, 145, 5, 14, 0, 0, 145, 146, 3, 2, 1, 0, 146, 147, 5, 15, 0, 0, 147,
+        185, 1, 0, 0, 0, 148, 150, 5, 10, 0, 0, 149, 151, 3, 20, 10, 0, 150, 149, 1, 0, 0, 0, 150,
+        151, 1, 0, 0, 0, 151, 153, 1, 0, 0, 0, 152, 154, 5, 17, 0, 0, 153, 152, 1, 0, 0, 0, 153,
+        154, 1, 0, 0, 0, 154, 155, 1, 0, 0, 0, 155, 185, 5, 11, 0, 0, 156, 158, 5, 12, 0, 0, 157,
+        159, 3, 26, 13, 0, 158, 157, 1, 0, 0, 0, 158, 159, 1, 0, 0, 0, 159, 161, 1, 0, 0, 0, 160,
+        162, 5, 17, 0, 0, 161, 160, 1, 0, 0, 0, 161, 162, 1, 0, 0, 0, 162, 163, 1, 0, 0, 0, 163,
+        185, 5, 13, 0, 0, 164, 166, 5, 16, 0, 0, 165, 164, 1, 0, 0, 0, 165, 166, 1, 0, 0, 0, 166,
+        167, 1, 0, 0, 0, 167, 172, 5, 36, 0, 0, 168, 169, 5, 16, 0, 0, 169, 171, 5, 36, 0, 0, 170,
+        168, 1, 0, 0, 0, 171, 174, 1, 0, 0, 0, 172, 170, 1, 0, 0, 0, 172, 173, 1, 0, 0, 0, 173,
+        175, 1, 0, 0, 0, 174, 172, 1, 0, 0, 0, 175, 177, 5, 12, 0, 0, 176, 178, 3, 22, 11, 0, 177,
+        176, 1, 0, 0, 0, 177, 178, 1, 0, 0, 0, 178, 180, 1, 0, 0, 0, 179, 181, 5, 17, 0, 0, 180,
+        179, 1, 0, 0, 0, 180, 181, 1, 0, 0, 0, 181, 182, 1, 0, 0, 0, 182, 185, 5, 13, 0, 0, 183,
+        185, 3, 32, 16, 0, 184, 132, 1, 0, 0, 0, 184, 136, 1, 0, 0, 0, 184, 144, 1, 0, 0, 0, 184,
+        148, 1, 0, 0, 0, 184, 156, 1, 0, 0, 0, 184, 165, 1, 0, 0, 0, 184, 183, 1, 0, 0, 0, 185, 17,
+        1, 0, 0, 0, 186, 191, 3, 2, 1, 0, 187, 188, 5, 17, 0, 0, 188, 190, 3, 2, 1, 0, 189, 187, 1,
+        0, 0, 0, 190, 193, 1, 0, 0, 0, 191, 189, 1, 0, 0, 0, 191, 192, 1, 0, 0, 0, 192, 19, 1, 0,
+        0, 0, 193, 191, 1, 0, 0, 0, 194, 199, 3, 30, 15, 0, 195, 196, 5, 17, 0, 0, 196, 198, 3, 30,
+        15, 0, 197, 195, 1, 0, 0, 0, 198, 201, 1, 0, 0, 0, 199, 197, 1, 0, 0, 0, 199, 200, 1, 0, 0,
+        0, 200, 21, 1, 0, 0, 0, 201, 199, 1, 0, 0, 0, 202, 203, 3, 24, 12, 0, 203, 204, 5, 21, 0,
+        0, 204, 212, 3, 2, 1, 0, 205, 206, 5, 17, 0, 0, 206, 207, 3, 24, 12, 0, 207, 208, 5, 21, 0,
+        0, 208, 209, 3, 2, 1, 0, 209, 211, 1, 0, 0, 0, 210, 205, 1, 0, 0, 0, 211, 214, 1, 0, 0, 0,
+        212, 210, 1, 0, 0, 0, 212, 213, 1, 0, 0, 0, 213, 23, 1, 0, 0, 0, 214, 212, 1, 0, 0, 0, 215,
+        217, 5, 20, 0, 0, 216, 215, 1, 0, 0, 0, 216, 217, 1, 0, 0, 0, 217, 218, 1, 0, 0, 0, 218,
+        219, 3, 28, 14, 0, 219, 25, 1, 0, 0, 0, 220, 221, 3, 30, 15, 0, 221, 222, 5, 21, 0, 0, 222,
+        230, 3, 2, 1, 0, 223, 224, 5, 17, 0, 0, 224, 225, 3, 30, 15, 0, 225, 226, 5, 21, 0, 0, 226,
+        227, 3, 2, 1, 0, 227, 229, 1, 0, 0, 0, 228, 223, 1, 0, 0, 0, 229, 232, 1, 0, 0, 0, 230,
+        228, 1, 0, 0, 0, 230, 231, 1, 0, 0, 0, 231, 27, 1, 0, 0, 0, 232, 230, 1, 0, 0, 0, 233, 236,
+        5, 36, 0, 0, 234, 236, 5, 37, 0, 0, 235, 233, 1, 0, 0, 0, 235, 234, 1, 0, 0, 0, 236, 29, 1,
+        0, 0, 0, 237, 239, 5, 20, 0, 0, 238, 237, 1, 0, 0, 0, 238, 239, 1, 0, 0, 0, 239, 240, 1, 0,
+        0, 0, 240, 241, 3, 2, 1, 0, 241, 31, 1, 0, 0, 0, 242, 244, 5, 18, 0, 0, 243, 242, 1, 0, 0,
+        0, 243, 244, 1, 0, 0, 0, 244, 245, 1, 0, 0, 0, 245, 257, 5, 32, 0, 0, 246, 257, 5, 33, 0,
+        0, 247, 249, 5, 18, 0, 0, 248, 247, 1, 0, 0, 0, 248, 249, 1, 0, 0, 0, 249, 250, 1, 0, 0, 0,
+        250, 257, 5, 31, 0, 0, 251, 257, 5, 34, 0, 0, 252, 257, 5, 35, 0, 0, 253, 257, 5, 26, 0, 0,
+        254, 257, 5, 27, 0, 0, 255, 257, 5, 28, 0, 0, 256, 243, 1, 0, 0, 0, 256, 246, 1, 0, 0, 0,
+        256, 248, 1, 0, 0, 0, 256, 251, 1, 0, 0, 0, 256, 252, 1, 0, 0, 0, 256, 253, 1, 0, 0, 0,
+        256, 254, 1, 0, 0, 0, 256, 255, 1, 0, 0, 0, 257, 33, 1, 0, 0, 0, 36, 43, 50, 58, 69, 81,
+        83, 90, 96, 99, 107, 115, 121, 126, 128, 132, 136, 141, 150, 153, 158, 161, 165, 172, 177,
+        180, 184, 191, 199, 212, 216, 230, 235, 238, 243, 248, 256
+    ];
 }
-
-const _serializedATN: &'static str =
-    "\x03\u{608b}\u{a72a}\u{8133}\u{b9ed}\u{417c}\u{3be7}\u{7786}\u{5964}\x03\
-	\x27\u{105}\x04\x02\x09\x02\x04\x03\x09\x03\x04\x04\x09\x04\x04\x05\x09\
-	\x05\x04\x06\x09\x06\x04\x07\x09\x07\x04\x08\x09\x08\x04\x09\x09\x09\x04\
-	\x0a\x09\x0a\x04\x0b\x09\x0b\x04\x0c\x09\x0c\x04\x0d\x09\x0d\x04\x0e\x09\
-	\x0e\x04\x0f\x09\x0f\x04\x10\x09\x10\x04\x11\x09\x11\x04\x12\x09\x12\x03\
-	\x02\x03\x02\x03\x02\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x03\x05\
-	\x03\x2e\x0a\x03\x03\x04\x03\x04\x03\x04\x07\x04\x33\x0a\x04\x0c\x04\x0e\
-	\x04\x36\x0b\x04\x03\x05\x03\x05\x03\x05\x07\x05\x3b\x0a\x05\x0c\x05\x0e\
-	\x05\x3e\x0b\x05\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x03\x06\x07\x06\
-	\x46\x0a\x06\x0c\x06\x0e\x06\x49\x0b\x06\x03\x07\x03\x07\x03\x07\x03\x07\
-	\x03\x07\x03\x07\x03\x07\x03\x07\x03\x07\x07\x07\x54\x0a\x07\x0c\x07\x0e\
-	\x07\x57\x0b\x07\x03\x08\x03\x08\x06\x08\x5b\x0a\x08\x0d\x08\x0e\x08\x5c\
-	\x03\x08\x03\x08\x06\x08\x61\x0a\x08\x0d\x08\x0e\x08\x62\x03\x08\x05\x08\
-	\x66\x0a\x08\x03\x09\x03\x09\x03\x09\x03\x09\x03\x09\x03\x09\x05\x09\x6e\
-	\x0a\x09\x03\x09\x03\x09\x03\x09\x03\x09\x03\x09\x03\x09\x05\x09\x76\x0a\
-	\x09\x03\x09\x03\x09\x03\x09\x03\x09\x05\x09\x7c\x0a\x09\x03\x09\x03\x09\
-	\x03\x09\x07\x09\u{81}\x0a\x09\x0c\x09\x0e\x09\u{84}\x0b\x09\x03\x0a\x05\
-	\x0a\u{87}\x0a\x0a\x03\x0a\x03\x0a\x05\x0a\u{8b}\x0a\x0a\x03\x0a\x03\x0a\
-	\x03\x0a\x05\x0a\u{90}\x0a\x0a\x03\x0a\x03\x0a\x03\x0a\x03\x0a\x03\x0a\x03\
-	\x0a\x03\x0a\x05\x0a\u{99}\x0a\x0a\x03\x0a\x05\x0a\u{9c}\x0a\x0a\x03\x0a\
-	\x03\x0a\x03\x0a\x05\x0a\u{a1}\x0a\x0a\x03\x0a\x05\x0a\u{a4}\x0a\x0a\x03\
-	\x0a\x03\x0a\x05\x0a\u{a8}\x0a\x0a\x03\x0a\x03\x0a\x03\x0a\x07\x0a\u{ad}\
-	\x0a\x0a\x0c\x0a\x0e\x0a\u{b0}\x0b\x0a\x03\x0a\x03\x0a\x05\x0a\u{b4}\x0a\
-	\x0a\x03\x0a\x05\x0a\u{b7}\x0a\x0a\x03\x0a\x03\x0a\x05\x0a\u{bb}\x0a\x0a\
-	\x03\x0b\x03\x0b\x03\x0b\x07\x0b\u{c0}\x0a\x0b\x0c\x0b\x0e\x0b\u{c3}\x0b\
-	\x0b\x03\x0c\x03\x0c\x03\x0c\x07\x0c\u{c8}\x0a\x0c\x0c\x0c\x0e\x0c\u{cb}\
-	\x0b\x0c\x03\x0d\x03\x0d\x03\x0d\x03\x0d\x03\x0d\x03\x0d\x03\x0d\x03\x0d\
-	\x07\x0d\u{d5}\x0a\x0d\x0c\x0d\x0e\x0d\u{d8}\x0b\x0d\x03\x0e\x05\x0e\u{db}\
-	\x0a\x0e\x03\x0e\x03\x0e\x03\x0f\x03\x0f\x03\x0f\x03\x0f\x03\x0f\x03\x0f\
-	\x03\x0f\x03\x0f\x07\x0f\u{e7}\x0a\x0f\x0c\x0f\x0e\x0f\u{ea}\x0b\x0f\x03\
-	\x10\x03\x10\x05\x10\u{ee}\x0a\x10\x03\x11\x05\x11\u{f1}\x0a\x11\x03\x11\
-	\x03\x11\x03\x12\x05\x12\u{f6}\x0a\x12\x03\x12\x03\x12\x03\x12\x05\x12\u{fb}\
-	\x0a\x12\x03\x12\x03\x12\x03\x12\x03\x12\x03\x12\x03\x12\x05\x12\u{103}\
-	\x0a\x12\x03\x12\x02\x05\x0a\x0c\x10\x13\x02\x04\x06\x08\x0a\x0c\x0e\x10\
-	\x12\x14\x16\x18\x1a\x1c\x1e\x20\x22\x02\x05\x03\x02\x03\x09\x03\x02\x19\
-	\x1b\x04\x02\x14\x14\x18\x18\x02\u{124}\x02\x24\x03\x02\x02\x02\x04\x27\
-	\x03\x02\x02\x02\x06\x2f\x03\x02\x02\x02\x08\x37\x03\x02\x02\x02\x0a\x3f\
-	\x03\x02\x02\x02\x0c\x4a\x03\x02\x02\x02\x0e\x65\x03\x02\x02\x02\x10\x67\
-	\x03\x02\x02\x02\x12\u{ba}\x03\x02\x02\x02\x14\u{bc}\x03\x02\x02\x02\x16\
-	\u{c4}\x03\x02\x02\x02\x18\u{cc}\x03\x02\x02\x02\x1a\u{da}\x03\x02\x02\x02\
-	\x1c\u{de}\x03\x02\x02\x02\x1e\u{ed}\x03\x02\x02\x02\x20\u{f0}\x03\x02\x02\
-	\x02\x22\u{102}\x03\x02\x02\x02\x24\x25\x05\x04\x03\x02\x25\x26\x07\x02\
-	\x02\x03\x26\x03\x03\x02\x02\x02\x27\x2d\x05\x06\x04\x02\x28\x29\x07\x16\
-	\x02\x02\x29\x2a\x05\x06\x04\x02\x2a\x2b\x07\x17\x02\x02\x2b\x2c\x05\x04\
-	\x03\x02\x2c\x2e\x03\x02\x02\x02\x2d\x28\x03\x02\x02\x02\x2d\x2e\x03\x02\
-	\x02\x02\x2e\x05\x03\x02\x02\x02\x2f\x34\x05\x08\x05\x02\x30\x31\x07\x0b\
-	\x02\x02\x31\x33\x05\x08\x05\x02\x32\x30\x03\x02\x02\x02\x33\x36\x03\x02\
-	\x02\x02\x34\x32\x03\x02\x02\x02\x34\x35\x03\x02\x02\x02\x35\x07\x03\x02\
-	\x02\x02\x36\x34\x03\x02\x02\x02\x37\x3c\x05\x0a\x06\x02\x38\x39\x07\x0a\
-	\x02\x02\x39\x3b\x05\x0a\x06\x02\x3a\x38\x03\x02\x02\x02\x3b\x3e\x03\x02\
-	\x02\x02\x3c\x3a\x03\x02\x02\x02\x3c\x3d\x03\x02\x02\x02\x3d\x09\x03\x02\
-	\x02\x02\x3e\x3c\x03\x02\x02\x02\x3f\x40\x08\x06\x01\x02\x40\x41\x05\x0c\
-	\x07\x02\x41\x47\x03\x02\x02\x02\x42\x43\x0c\x03\x02\x02\x43\x44\x09\x02\
-	\x02\x02\x44\x46\x05\x0a\x06\x04\x45\x42\x03\x02\x02\x02\x46\x49\x03\x02\
-	\x02\x02\x47\x45\x03\x02\x02\x02\x47\x48\x03\x02\x02\x02\x48\x0b\x03\x02\
-	\x02\x02\x49\x47\x03\x02\x02\x02\x4a\x4b\x08\x07\x01\x02\x4b\x4c\x05\x0e\
-	\x08\x02\x4c\x55\x03\x02\x02\x02\x4d\x4e\x0c\x04\x02\x02\x4e\x4f\x09\x03\
-	\x02\x02\x4f\x54\x05\x0c\x07\x05\x50\x51\x0c\x03\x02\x02\x51\x52\x09\x04\
-	\x02\x02\x52\x54\x05\x0c\x07\x04\x53\x4d\x03\x02\x02\x02\x53\x50\x03\x02\
-	\x02\x02\x54\x57\x03\x02\x02\x02\x55\x53\x03\x02\x02\x02\x55\x56\x03\x02\
-	\x02\x02\x56\x0d\x03\x02\x02\x02\x57\x55\x03\x02\x02\x02\x58\x66\x05\x10\
-	\x09\x02\x59\x5b\x07\x15\x02\x02\x5a\x59\x03\x02\x02\x02\x5b\x5c\x03\x02\
-	\x02\x02\x5c\x5a\x03\x02\x02\x02\x5c\x5d\x03\x02\x02\x02\x5d\x5e\x03\x02\
-	\x02\x02\x5e\x66\x05\x10\x09\x02\x5f\x61\x07\x14\x02\x02\x60\x5f\x03\x02\
-	\x02\x02\x61\x62\x03\x02\x02\x02\x62\x60\x03\x02\x02\x02\x62\x63\x03\x02\
-	\x02\x02\x63\x64\x03\x02\x02\x02\x64\x66\x05\x10\x09\x02\x65\x58\x03\x02\
-	\x02\x02\x65\x5a\x03\x02\x02\x02\x65\x60\x03\x02\x02\x02\x66\x0f\x03\x02\
-	\x02\x02\x67\x68\x08\x09\x01\x02\x68\x69\x05\x12\x0a\x02\x69\u{82}\x03\x02\
-	\x02\x02\x6a\x6b\x0c\x05\x02\x02\x6b\x6d\x07\x12\x02\x02\x6c\x6e\x07\x16\
-	\x02\x02\x6d\x6c\x03\x02\x02\x02\x6d\x6e\x03\x02\x02\x02\x6e\x6f\x03\x02\
-	\x02\x02\x6f\u{81}\x05\x1e\x10\x02\x70\x71\x0c\x04\x02\x02\x71\x72\x07\x12\
-	\x02\x02\x72\x73\x07\x26\x02\x02\x73\x75\x07\x10\x02\x02\x74\x76\x05\x14\
-	\x0b\x02\x75\x74\x03\x02\x02\x02\x75\x76\x03\x02\x02\x02\x76\x77\x03\x02\
-	\x02\x02\x77\u{81}\x07\x11\x02\x02\x78\x79\x0c\x03\x02\x02\x79\x7b\x07\x0c\
-	\x02\x02\x7a\x7c\x07\x16\x02\x02\x7b\x7a\x03\x02\x02\x02\x7b\x7c\x03\x02\
-	\x02\x02\x7c\x7d\x03\x02\x02\x02\x7d\x7e\x05\x04\x03\x02\x7e\x7f\x07\x0d\
-	\x02\x02\x7f\u{81}\x03\x02\x02\x02\u{80}\x6a\x03\x02\x02\x02\u{80}\x70\x03\
-	\x02\x02\x02\u{80}\x78\x03\x02\x02\x02\u{81}\u{84}\x03\x02\x02\x02\u{82}\
-	\u{80}\x03\x02\x02\x02\u{82}\u{83}\x03\x02\x02\x02\u{83}\x11\x03\x02\x02\
-	\x02\u{84}\u{82}\x03\x02\x02\x02\u{85}\u{87}\x07\x12\x02\x02\u{86}\u{85}\
-	\x03\x02\x02\x02\u{86}\u{87}\x03\x02\x02\x02\u{87}\u{88}\x03\x02\x02\x02\
-	\u{88}\u{bb}\x07\x26\x02\x02\u{89}\u{8b}\x07\x12\x02\x02\u{8a}\u{89}\x03\
-	\x02\x02\x02\u{8a}\u{8b}\x03\x02\x02\x02\u{8b}\u{8c}\x03\x02\x02\x02\u{8c}\
-	\u{8d}\x07\x26\x02\x02\u{8d}\u{8f}\x07\x10\x02\x02\u{8e}\u{90}\x05\x14\x0b\
-	\x02\u{8f}\u{8e}\x03\x02\x02\x02\u{8f}\u{90}\x03\x02\x02\x02\u{90}\u{91}\
-	\x03\x02\x02\x02\u{91}\u{bb}\x07\x11\x02\x02\u{92}\u{93}\x07\x10\x02\x02\
-	\u{93}\u{94}\x05\x04\x03\x02\u{94}\u{95}\x07\x11\x02\x02\u{95}\u{bb}\x03\
-	\x02\x02\x02\u{96}\u{98}\x07\x0c\x02\x02\u{97}\u{99}\x05\x16\x0c\x02\u{98}\
-	\u{97}\x03\x02\x02\x02\u{98}\u{99}\x03\x02\x02\x02\u{99}\u{9b}\x03\x02\x02\
-	\x02\u{9a}\u{9c}\x07\x13\x02\x02\u{9b}\u{9a}\x03\x02\x02\x02\u{9b}\u{9c}\
-	\x03\x02\x02\x02\u{9c}\u{9d}\x03\x02\x02\x02\u{9d}\u{bb}\x07\x0d\x02\x02\
-	\u{9e}\u{a0}\x07\x0e\x02\x02\u{9f}\u{a1}\x05\x1c\x0f\x02\u{a0}\u{9f}\x03\
-	\x02\x02\x02\u{a0}\u{a1}\x03\x02\x02\x02\u{a1}\u{a3}\x03\x02\x02\x02\u{a2}\
-	\u{a4}\x07\x13\x02\x02\u{a3}\u{a2}\x03\x02\x02\x02\u{a3}\u{a4}\x03\x02\x02\
-	\x02\u{a4}\u{a5}\x03\x02\x02\x02\u{a5}\u{bb}\x07\x0f\x02\x02\u{a6}\u{a8}\
-	\x07\x12\x02\x02\u{a7}\u{a6}\x03\x02\x02\x02\u{a7}\u{a8}\x03\x02\x02\x02\
-	\u{a8}\u{a9}\x03\x02\x02\x02\u{a9}\u{ae}\x07\x26\x02\x02\u{aa}\u{ab}\x07\
-	\x12\x02\x02\u{ab}\u{ad}\x07\x26\x02\x02\u{ac}\u{aa}\x03\x02\x02\x02\u{ad}\
-	\u{b0}\x03\x02\x02\x02\u{ae}\u{ac}\x03\x02\x02\x02\u{ae}\u{af}\x03\x02\x02\
-	\x02\u{af}\u{b1}\x03\x02\x02\x02\u{b0}\u{ae}\x03\x02\x02\x02\u{b1}\u{b3}\
-	\x07\x0e\x02\x02\u{b2}\u{b4}\x05\x18\x0d\x02\u{b3}\u{b2}\x03\x02\x02\x02\
-	\u{b3}\u{b4}\x03\x02\x02\x02\u{b4}\u{b6}\x03\x02\x02\x02\u{b5}\u{b7}\x07\
-	\x13\x02\x02\u{b6}\u{b5}\x03\x02\x02\x02\u{b6}\u{b7}\x03\x02\x02\x02\u{b7}\
-	\u{b8}\x03\x02\x02\x02\u{b8}\u{bb}\x07\x0f\x02\x02\u{b9}\u{bb}\x05\x22\x12\
-	\x02\u{ba}\u{86}\x03\x02\x02\x02\u{ba}\u{8a}\x03\x02\x02\x02\u{ba}\u{92}\
-	\x03\x02\x02\x02\u{ba}\u{96}\x03\x02\x02\x02\u{ba}\u{9e}\x03\x02\x02\x02\
-	\u{ba}\u{a7}\x03\x02\x02\x02\u{ba}\u{b9}\x03\x02\x02\x02\u{bb}\x13\x03\x02\
-	\x02\x02\u{bc}\u{c1}\x05\x04\x03\x02\u{bd}\u{be}\x07\x13\x02\x02\u{be}\u{c0}\
-	\x05\x04\x03\x02\u{bf}\u{bd}\x03\x02\x02\x02\u{c0}\u{c3}\x03\x02\x02\x02\
-	\u{c1}\u{bf}\x03\x02\x02\x02\u{c1}\u{c2}\x03\x02\x02\x02\u{c2}\x15\x03\x02\
-	\x02\x02\u{c3}\u{c1}\x03\x02\x02\x02\u{c4}\u{c9}\x05\x20\x11\x02\u{c5}\u{c6}\
-	\x07\x13\x02\x02\u{c6}\u{c8}\x05\x20\x11\x02\u{c7}\u{c5}\x03\x02\x02\x02\
-	\u{c8}\u{cb}\x03\x02\x02\x02\u{c9}\u{c7}\x03\x02\x02\x02\u{c9}\u{ca}\x03\
-	\x02\x02\x02\u{ca}\x17\x03\x02\x02\x02\u{cb}\u{c9}\x03\x02\x02\x02\u{cc}\
-	\u{cd}\x05\x1a\x0e\x02\u{cd}\u{ce}\x07\x17\x02\x02\u{ce}\u{d6}\x05\x04\x03\
-	\x02\u{cf}\u{d0}\x07\x13\x02\x02\u{d0}\u{d1}\x05\x1a\x0e\x02\u{d1}\u{d2}\
-	\x07\x17\x02\x02\u{d2}\u{d3}\x05\x04\x03\x02\u{d3}\u{d5}\x03\x02\x02\x02\
-	\u{d4}\u{cf}\x03\x02\x02\x02\u{d5}\u{d8}\x03\x02\x02\x02\u{d6}\u{d4}\x03\
-	\x02\x02\x02\u{d6}\u{d7}\x03\x02\x02\x02\u{d7}\x19\x03\x02\x02\x02\u{d8}\
-	\u{d6}\x03\x02\x02\x02\u{d9}\u{db}\x07\x16\x02\x02\u{da}\u{d9}\x03\x02\x02\
-	\x02\u{da}\u{db}\x03\x02\x02\x02\u{db}\u{dc}\x03\x02\x02\x02\u{dc}\u{dd}\
-	\x05\x1e\x10\x02\u{dd}\x1b\x03\x02\x02\x02\u{de}\u{df}\x05\x20\x11\x02\u{df}\
-	\u{e0}\x07\x17\x02\x02\u{e0}\u{e8}\x05\x04\x03\x02\u{e1}\u{e2}\x07\x13\x02\
-	\x02\u{e2}\u{e3}\x05\x20\x11\x02\u{e3}\u{e4}\x07\x17\x02\x02\u{e4}\u{e5}\
-	\x05\x04\x03\x02\u{e5}\u{e7}\x03\x02\x02\x02\u{e6}\u{e1}\x03\x02\x02\x02\
-	\u{e7}\u{ea}\x03\x02\x02\x02\u{e8}\u{e6}\x03\x02\x02\x02\u{e8}\u{e9}\x03\
-	\x02\x02\x02\u{e9}\x1d\x03\x02\x02\x02\u{ea}\u{e8}\x03\x02\x02\x02\u{eb}\
-	\u{ee}\x07\x26\x02\x02\u{ec}\u{ee}\x07\x27\x02\x02\u{ed}\u{eb}\x03\x02\x02\
-	\x02\u{ed}\u{ec}\x03\x02\x02\x02\u{ee}\x1f\x03\x02\x02\x02\u{ef}\u{f1}\x07\
-	\x16\x02\x02\u{f0}\u{ef}\x03\x02\x02\x02\u{f0}\u{f1}\x03\x02\x02\x02\u{f1}\
-	\u{f2}\x03\x02\x02\x02\u{f2}\u{f3}\x05\x04\x03\x02\u{f3}\x21\x03\x02\x02\
-	\x02\u{f4}\u{f6}\x07\x14\x02\x02\u{f5}\u{f4}\x03\x02\x02\x02\u{f5}\u{f6}\
-	\x03\x02\x02\x02\u{f6}\u{f7}\x03\x02\x02\x02\u{f7}\u{103}\x07\x22\x02\x02\
-	\u{f8}\u{103}\x07\x23\x02\x02\u{f9}\u{fb}\x07\x14\x02\x02\u{fa}\u{f9}\x03\
-	\x02\x02\x02\u{fa}\u{fb}\x03\x02\x02\x02\u{fb}\u{fc}\x03\x02\x02\x02\u{fc}\
-	\u{103}\x07\x21\x02\x02\u{fd}\u{103}\x07\x24\x02\x02\u{fe}\u{103}\x07\x25\
-	\x02\x02\u{ff}\u{103}\x07\x1c\x02\x02\u{100}\u{103}\x07\x1d\x02\x02\u{101}\
-	\u{103}\x07\x1e\x02\x02\u{102}\u{f5}\x03\x02\x02\x02\u{102}\u{f8}\x03\x02\
-	\x02\x02\u{102}\u{fa}\x03\x02\x02\x02\u{102}\u{fd}\x03\x02\x02\x02\u{102}\
-	\u{fe}\x03\x02\x02\x02\u{102}\u{ff}\x03\x02\x02\x02\u{102}\u{100}\x03\x02\
-	\x02\x02\u{102}\u{101}\x03\x02\x02\x02\u{103}\x23\x03\x02\x02\x02\x26\x2d\
-	\x34\x3c\x47\x53\x55\x5c\x62\x65\x6d\x75\x7b\u{80}\u{82}\u{86}\u{8a}\u{8f}\
-	\u{98}\u{9b}\u{a0}\u{a3}\u{a7}\u{ae}\u{b3}\u{b6}\u{ba}\u{c1}\u{c9}\u{d6}\
-	\u{da}\u{e8}\u{ed}\u{f0}\u{f5}\u{fa}\u{102}";
