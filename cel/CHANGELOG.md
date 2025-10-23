@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.6](https://github.com/cel-rust/cel-rust/compare/v0.11.5...v0.11.6) - 2025-10-23
+
+### Added
+
+- *(recursion)* Threshold operates on language constructs
+
+### Fixed
+
+- avoid panic'ing on somehow bad parser input ([#215](https://github.com/cel-rust/cel-rust/pull/215))
+- regenerated parser
+- better contract to max_recursion_depth
+- new antlr4rust
+
+### Other
+
+- Bump README CEL version to 0.11.6
+- updated to latest antlr4rust and generated code
+- added notes on generating the parser
+- updated antlr4rust dependency
+- wip
+
 ## [0.11.5](https://github.com/cel-rust/cel-rust/compare/cel-v0.11.4...cel-v0.11.5) - 2025-10-15
 
 ### Fixed
