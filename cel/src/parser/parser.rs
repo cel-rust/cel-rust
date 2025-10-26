@@ -188,7 +188,6 @@ impl Parser {
     }
 
     pub fn parse(mut self, source: &str) -> Result<IdedExpr, ParseErrors> {
-        let source = source.trim();
         let parse_errors = Rc::new(RefCell::new(Vec::<ParseError>::new()));
         let stream = InputStream::new(source);
         let mut lexer = gen::CELLexer::new(stream);
@@ -1150,6 +1149,18 @@ mod tests {
                 expr
             );
         }
+    }
+
+    #[test]
+    fn test_comments() {
+        let expression = r#"
+        // This is a comment
+        this.is.not()
+
+        // We don't care!
+
+        "#;
+        assert!(Parser::new().parse(expression).is_ok());
     }
 
     #[test]
