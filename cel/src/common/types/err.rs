@@ -15,7 +15,7 @@ pub struct Err {
 }
 
 impl Err {
-    pub fn maybe_no_such_overload(val: Box<dyn Val>) -> Box<dyn Val> {
+    pub fn maybe_no_such_overload(val: &dyn Val) -> Box<dyn Val> {
         if val.get_type() == types::UNKNOWN_TYPE || val.get_type() == types::ERROR_TYPE {
             val
         } else {
