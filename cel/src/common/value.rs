@@ -4,7 +4,7 @@ use crate::common::types::Type;
 use std::any::Any;
 use std::fmt::Debug;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Debug)]
 pub enum CelVal {
     Unspecified,
     Error(types::Err),
@@ -15,7 +15,7 @@ pub enum CelVal {
     Double(types::Double),
     Duration(types::Duration),
     Int(types::Int),
-    List(Box<dyn Lister>),
+    List(Box<dyn Lister>), 
     Map,
     Null,
     String(types::String),
@@ -37,6 +37,9 @@ pub trait Val: Any + Debug {
     fn as_indexer(&self) -> Option<&dyn Indexer> {
         None
     }
+    
+    fn eq(&self, other: &dyn Val) -> bool { false }
+    
 }
 
 impl dyn Val {

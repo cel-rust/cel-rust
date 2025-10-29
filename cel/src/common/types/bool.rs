@@ -32,6 +32,10 @@ impl Val for Bool {
     fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
+    
+    fn eq(&self, other: &dyn Val) -> bool {
+        other.downcast_ref::<Self>().map_or(false, |a| self.0 == a.0)
+    }
 }
 
 impl From<Bool> for bool {

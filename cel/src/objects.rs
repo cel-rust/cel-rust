@@ -19,6 +19,7 @@ use crate::ExecutionError::NoSuchOverload;
 use chrono::TimeZone;
 use nom::combinator::{cond, map, value};
 use paste::{expr, item};
+use crate::common::traits::Indexer;
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -537,64 +538,19 @@ impl Value {
                         }
                         operators::NOT_EQUALS => {
                             return Ok(CelVal::Boolean(
-                                Value::resolve_val(&call.args[0], ctx)?
-                                    .ne(&Value::resolve_val(&call.args[1], ctx)?).into(),
+                                (!Value::resolve_val(&call.args[0], ctx)?
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?)).into(),
                             ))
                         }
                         operators::INDEX => {
                             let value = Value::resolve_val(&call.args[0], ctx)?;
-                            let idx = Value::resolve_val(&call.args[1], ctx)?;
-                            if let Some(indexer) = value.as_indexer() {
-
+                            return match value.as_indexer() {
+                                Some(indexer) => {
+                                    let idx = Value::resolve_val(&call.args[1], ctx)?;
+                                    Ok(indexer.get(&idx).into())
+                                }
+                                None => Err(NoSuchOverload),
                             }
-                            return match (value, idx) {
-                                (CelVal::List(items), CelVal::Int(idx)) => {
-                                    if *idx >= 0 && (*idx as usize) < items.len() {
-                                        items[*idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::List(items), Value::UInt(idx)) => {
-                                    if (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::String(_), Value::Int(idx)) => {
-                                    Err(ExecutionError::NoSuchKey(idx.to_string().into()))
-                                }
-                                (Value::Map(map), Value::String(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::Bool(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::Int(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::UInt(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(_), index) => {
-                                    Err(ExecutionError::UnsupportedMapIndex(index))
-                                }
-                                (Value::List(_), index) => {
-                                    Err(ExecutionError::UnsupportedListIndex(index))
-                                }
-                                (value, index) => {
-                                    Err(ExecutionError::UnsupportedIndex(value, index))
-                                }
-                            };
                         }
                         // OPT_SELECT, OPT_INDEX:
                         // END OF SPECIAL CASES

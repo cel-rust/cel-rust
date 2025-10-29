@@ -1,5 +1,7 @@
+use std::any::Any;
+use std::fmt::Debug;
 use crate::common::types;
-use crate::common::value::Val;
+use crate::common::value::{CelVal, Val};
 
 /// ADDER_TYPE types provide a '+' operator overload.
 pub const ADDER_TYPE: u16 = 1;
@@ -56,11 +58,11 @@ pub trait Adder {
 }
 
 pub trait Indexer {
-    fn get(&self, idx: Box<dyn Val>) -> Box<dyn Val> {
+    fn get(&self, idx: &dyn Val) -> CelVal {
         types::Err::maybe_no_such_overload(idx)
     }
 }
 
-pub trait Lister {
-    fn as_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>>;
+pub trait Lister: Debug + Any {
+    fn as_indexer(&self) -> &dyn Indexer;
 }
