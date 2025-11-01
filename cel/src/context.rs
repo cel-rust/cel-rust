@@ -9,7 +9,7 @@ use std::collections::HashMap;
 ///
 /// The context can be either a parent context, or a child context. A
 /// parent context is created by default and contains all of the built-in
-/// functions. A child context can be created by calling `.clone()`. The
+/// functions. A child context can be created by calling `.new_inner_scope()`. The
 /// child context has it's own variables (which can be added to), but it
 /// will also reference the parent context. This allows for variables to
 /// be overridden within the child context while still being able to
@@ -19,7 +19,7 @@ use std::collections::HashMap;
 /// So why is this important? Well some CEL-macros such as the `.map` macro
 /// declare intermediate user-specified identifiers that should only be
 /// available within the macro, and should not override variables in the
-/// parent context. The `.map` macro can clone the parent context, add the
+/// parent context. The `.map` macro can create a child context from the parent, add the
 /// intermediate identifier to the child context, and then evaluate the
 /// map expression.
 ///
