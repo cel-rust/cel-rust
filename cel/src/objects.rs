@@ -2,6 +2,7 @@ use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
+use std::any::Any;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -170,6 +171,28 @@ impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct OpaqueValue {
+    pub runtime_type_name: String,
+    pub value: Arc<dyn Any + Send + Sync>,
+}
+
+#[cfg(feature = "arbitrary")]
+impl<'a> arbitrary::Arbitrary<'a> for OpaqueValue {
+    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
+        Err(arbitrary::Error::NotEnoughData)
+    }
+}
+
+impl OpaqueValue {
+    pub fn new<S: Into<String>>(runtime_type_name: S, value: Arc<dyn Any + Send + Sync>) -> Self {
+        Self {
+            runtime_type_name: runtime_type_name.into(),
+            value,
+        }
+    }
+}
+
 pub trait TryIntoValue {
     type Error: std::error::Error + 'static + Send + Sync;
     fn try_into_value(self) -> Result<Value, Self::Error>;
@@ -204,6 +227,7 @@ pub enum Value {
     Bool(bool),
     #[cfg(feature = "chrono")]
     Duration(chrono::Duration),
+    Opaque(OpaqueValue),
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
     Null,
@@ -237,6 +261,7 @@ pub enum ValueType {
     Bool,
     Duration,
     Timestamp,
+    Opaque,
     Null,
 }
 
@@ -252,6 +277,7 @@ impl Display for ValueType {
             ValueType::String => write!(f, "string"),
             ValueType::Bytes => write!(f, "bytes"),
             ValueType::Bool => write!(f, "bool"),
+            ValueType::Opaque => write!(f, "opaque"),
             ValueType::Duration => write!(f, "duration"),
             ValueType::Timestamp => write!(f, "timestamp"),
             ValueType::Null => write!(f, "null"),
@@ -271,6 +297,7 @@ impl Value {
             Value::String(_) => ValueType::String,
             Value::Bytes(_) => ValueType::Bytes,
             Value::Bool(_) => ValueType::Bool,
+            Value::Opaque(_) => ValueType::Opaque,
             #[cfg(feature = "chrono")]
             Value::Duration(_) => ValueType::Duration,
             #[cfg(feature = "chrono")]
@@ -1041,8 +1068,10 @@ fn checked_op(
 
 #[cfg(test)]
 mod tests {
+    use crate::objects::OpaqueValue;
     use crate::{objects::Key, Context, ExecutionError, Program, Value};
     use std::collections::HashMap;
+    use std::ops::Deref;
     use std::sync::Arc;
 
     #[test]
@@ -1321,6 +1350,21 @@ mod tests {
                 Value::Int(1),
                 Value::Int(2)
             ])))
+        );
+    }
+
+    #[test]
+    fn test_opaque_values() {
+        struct MyStruct {
+            field: String,
+        }
+        let value = Arc::new(MyStruct {
+            field: String::from("value"),
+        });
+        let opaque = OpaqueValue::new("my_struct", value.clone());
+        assert_eq!(
+            value.deref().field,
+            opaque.value.downcast_ref::<MyStruct>().unwrap().field
         );
     }
 }
