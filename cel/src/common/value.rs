@@ -22,7 +22,7 @@ pub enum CelVal {
     Timestamp(types::Timestamp),
     Type,
     UInt(types::UInt),
-    Unknown,
+    Unknown(Box<dyn Val>),
 }
 
 pub trait Val: Any + Debug {
