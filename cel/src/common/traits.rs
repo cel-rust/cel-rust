@@ -53,8 +53,9 @@ pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
     fn add(&self, rhs: Box<dyn Val>) -> Box<dyn Val> {
-        types::Err::maybe_no_such_overload(rhs)
+        types::Err::maybe_no_such_overload(rhs.as_ref())
     }
+    // 1 + b
 }
 
 pub trait Indexer {
