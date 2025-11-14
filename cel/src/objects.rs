@@ -1068,10 +1068,8 @@ fn checked_op(
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::OpaqueValue;
     use crate::{objects::Key, Context, ExecutionError, Program, Value};
     use std::collections::HashMap;
-    use std::ops::Deref;
     use std::sync::Arc;
 
     #[test]
@@ -1353,18 +1351,67 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_opaque_values() {
+    mod opaque {
+        use crate::objects::OpaqueValue;
+        use crate::{Context, ExecutionError, FunctionContext, Program, Value};
+        use std::ops::Deref;
+        use std::sync::Arc;
+
         struct MyStruct {
             field: String,
         }
-        let value = Arc::new(MyStruct {
-            field: String::from("value"),
-        });
-        let opaque = OpaqueValue::new("my_struct", value.clone());
-        assert_eq!(
-            value.deref().field,
-            opaque.value.downcast_ref::<MyStruct>().unwrap().field
-        );
+
+        #[test]
+        fn test_opaque_values() {
+            let value = Arc::new(MyStruct {
+                field: String::from("value"),
+            });
+            let opaque = OpaqueValue::new("my_struct", value.clone());
+            assert_eq!(
+                value.deref().field,
+                opaque.value.downcast_ref::<MyStruct>().unwrap().field
+            );
+        }
+
+        #[test]
+        fn test_opaque_fn() {
+            pub fn my_fn(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
+                if let Some(Value::Opaque(opaque)) = &ftx.this {
+                    if &opaque.runtime_type_name == "my_struct" {
+                        Ok(opaque
+                            .value
+                            .downcast_ref::<MyStruct>()
+                            .unwrap()
+                            .field
+                            .clone()
+                            .into())
+                    } else {
+                        Err(ExecutionError::UnexpectedType {
+                            got: opaque.runtime_type_name.clone(),
+                            want: "my_struct".to_string(),
+                        })
+                    }
+                } else {
+                    Err(ExecutionError::UnexpectedType {
+                        got: format!("{:?}", ftx.this),
+                        want: "Value::Opaque".to_string(),
+                    })
+                }
+            }
+
+            let value = Arc::new(MyStruct {
+                field: String::from("value"),
+            });
+            let opaque = OpaqueValue::new("my_struct", value.clone());
+
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("mine", Value::Opaque(opaque.clone()));
+            ctx.add_function("myFn", my_fn);
+            let prog = Program::compile("mine.myFn()").unwrap();
+            assert_eq!(
+                Ok(Value::String(Arc::new("value".into()))),
+                prog.execute(&ctx)
+            );
+        }
     }
 }
