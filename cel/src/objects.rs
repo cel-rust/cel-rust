@@ -6,7 +6,7 @@ use std::any::Any;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -171,10 +171,34 @@ impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     }
 }
 
-#[derive(Debug, Clone)]
+pub trait ValueHolder: Any + Send + Sync {
+    fn eq(&self, other: &dyn Any) -> bool;
+
+    fn as_debug(&self) -> &dyn Debug;
+
+    fn as_any(&self) -> &dyn Any;
+}
+
+#[derive(Clone)]
 pub struct OpaqueValue {
     pub runtime_type_name: String,
-    pub value: Arc<dyn Any + Send + Sync>,
+    pub value: Arc<dyn ValueHolder>,
+}
+
+impl PartialEq for OpaqueValue {
+    fn eq(&self, other: &Self) -> bool {
+        if self.runtime_type_name == other.runtime_type_name {
+            self.value.eq(other.value.as_any())
+        } else {
+            false
+        }
+    }
+}
+
+impl Debug for OpaqueValue {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Opaque({:?})", self.value.as_debug())
+    }
 }
 
 #[cfg(feature = "arbitrary")]
@@ -185,7 +209,10 @@ impl<'a> arbitrary::Arbitrary<'a> for OpaqueValue {
 }
 
 impl OpaqueValue {
-    pub fn new<S: Into<String>>(runtime_type_name: S, value: Arc<dyn Any + Send + Sync>) -> Self {
+    pub fn new<S: Into<String>>(
+        runtime_type_name: S,
+        value: Arc<dyn ValueHolder + Send + Sync>,
+    ) -> Self {
         Self {
             runtime_type_name: runtime_type_name.into(),
             value,
@@ -352,6 +379,7 @@ impl PartialEq for Value {
             (Value::UInt(a), Value::Float(b)) => (*a as f64) == *b,
             (Value::Float(a), Value::Int(b)) => *a == (*b as f64),
             (Value::Float(a), Value::UInt(b)) => *a == (*b as f64),
+            (Value::Opaque(a), Value::Opaque(b)) => a.eq(b),
             (_, _) => false,
         }
     }
@@ -1352,13 +1380,34 @@ mod tests {
     }
 
     mod opaque {
-        use crate::objects::OpaqueValue;
+        use crate::objects::{OpaqueValue, ValueHolder};
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
+        use std::any::Any;
+        use std::fmt::Debug;
         use std::ops::Deref;
         use std::sync::Arc;
 
+        #[derive(Debug)]
         struct MyStruct {
             field: String,
+        }
+
+        impl ValueHolder for MyStruct {
+            fn eq(&self, other: &dyn Any) -> bool {
+                if let Some(other) = other.downcast_ref::<MyStruct>() {
+                    self.field.eq(&other.field)
+                } else {
+                    false
+                }
+            }
+
+            fn as_debug(&self) -> &dyn Debug {
+                self
+            }
+
+            fn as_any(&self) -> &dyn Any {
+                self
+            }
         }
 
         #[test]
@@ -1369,7 +1418,12 @@ mod tests {
             let opaque = OpaqueValue::new("my_struct", value.clone());
             assert_eq!(
                 value.deref().field,
-                opaque.value.downcast_ref::<MyStruct>().unwrap().field
+                opaque
+                    .value
+                    .as_any()
+                    .downcast_ref::<MyStruct>()
+                    .unwrap()
+                    .field
             );
         }
 
@@ -1378,13 +1432,8 @@ mod tests {
             pub fn my_fn(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
                 if let Some(Value::Opaque(opaque)) = &ftx.this {
                     if &opaque.runtime_type_name == "my_struct" {
-                        Ok(opaque
-                            .value
-                            .downcast_ref::<MyStruct>()
-                            .unwrap()
-                            .field
-                            .clone()
-                            .into())
+                        let o = opaque.value.deref() as &dyn Any;
+                        Ok(o.downcast_ref::<MyStruct>().unwrap().field.clone().into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
                             got: opaque.runtime_type_name.clone(),
@@ -1411,6 +1460,36 @@ mod tests {
             assert_eq!(
                 Ok(Value::String(Arc::new("value".into()))),
                 prog.execute(&ctx)
+            );
+        }
+
+        #[test]
+        fn opaque_eq() {
+            let value_1 = Arc::new(MyStruct {
+                field: String::from("1"),
+            });
+            let value_2 = Arc::new(MyStruct {
+                field: String::from("2"),
+            });
+            let opaque_1 = OpaqueValue::new("my_struct", value_1.clone());
+            let opaque_1b = OpaqueValue::new("my_struct", value_1);
+            let opaque_2 = OpaqueValue::new("my_struct", value_2);
+
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("v1", Value::Opaque(opaque_1));
+            ctx.add_variable_from_value("v1b", Value::Opaque(opaque_1b));
+            ctx.add_variable_from_value("v2", Value::Opaque(opaque_2));
+            assert_eq!(
+                Program::compile("v2 == v1").unwrap().execute(&ctx),
+                Ok(false.into())
+            );
+            assert_eq!(
+                Program::compile("v1 == v1b").unwrap().execute(&ctx),
+                Ok(true.into())
+            );
+            assert_eq!(
+                Program::compile("v2 == v2").unwrap().execute(&ctx),
+                Ok(true.into())
             );
         }
     }
