@@ -175,8 +175,13 @@ pub trait ValueHolder: Any + Send + Sync {
     fn eq(&self, other: &dyn Any) -> bool;
 
     fn as_debug(&self) -> &dyn Debug;
+}
 
-    fn as_any(&self) -> &dyn Any;
+impl dyn ValueHolder {
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        let any: &dyn Any = self;
+        any.downcast_ref()
+    }
 }
 
 #[derive(Clone)]
@@ -188,7 +193,7 @@ pub struct OpaqueValue {
 impl PartialEq for OpaqueValue {
     fn eq(&self, other: &Self) -> bool {
         if self.runtime_type_name == other.runtime_type_name {
-            self.value.eq(other.value.as_any())
+            self.value.eq(other.value.deref() as &dyn Any)
         } else {
             false
         }
@@ -1404,10 +1409,6 @@ mod tests {
             fn as_debug(&self) -> &dyn Debug {
                 self
             }
-
-            fn as_any(&self) -> &dyn Any {
-                self
-            }
         }
 
         #[test]
@@ -1418,12 +1419,7 @@ mod tests {
             let opaque = OpaqueValue::new("my_struct", value.clone());
             assert_eq!(
                 value.deref().field,
-                opaque
-                    .value
-                    .as_any()
-                    .downcast_ref::<MyStruct>()
-                    .unwrap()
-                    .field
+                opaque.value.downcast_ref::<MyStruct>().unwrap().field
             );
         }
 
@@ -1432,8 +1428,13 @@ mod tests {
             pub fn my_fn(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
                 if let Some(Value::Opaque(opaque)) = &ftx.this {
                     if &opaque.runtime_type_name == "my_struct" {
-                        let o = opaque.value.deref() as &dyn Any;
-                        Ok(o.downcast_ref::<MyStruct>().unwrap().field.clone().into())
+                        Ok(opaque
+                            .value
+                            .downcast_ref::<MyStruct>()
+                            .unwrap()
+                            .field
+                            .clone()
+                            .into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
                             got: opaque.runtime_type_name.clone(),
