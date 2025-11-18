@@ -37,5 +37,4 @@ default = ["regex", "chrono"]
 json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
 chrono = ["dep:chrono"]
-arbitrary = ["dep:arbitrary", "chrono?/arbitrary", "chrono?/std"]
 dhat-heap = [ ] # if you are doing heap profiling
