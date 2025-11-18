@@ -171,57 +171,22 @@ impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     }
 }
 
-pub trait ValueHolder: Any + Send + Sync {
-    fn eq(&self, other: &dyn Any) -> bool;
+pub trait OpaqueValue: Any + Send + Sync {
+    fn runtime_type_name(&self) -> &str;
 
-    fn as_debug(&self) -> &dyn Debug;
+    fn eq(&self, _other: &dyn OpaqueValue) -> bool {
+        false
+    }
+
+    fn as_debug(&self) -> Option<&dyn Debug> {
+        None
+    }
 }
 
-impl dyn ValueHolder {
+impl dyn OpaqueValue {
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         let any: &dyn Any = self;
         any.downcast_ref()
-    }
-}
-
-#[derive(Clone)]
-pub struct OpaqueValue {
-    pub runtime_type_name: String,
-    pub value: Arc<dyn ValueHolder>,
-}
-
-impl PartialEq for OpaqueValue {
-    fn eq(&self, other: &Self) -> bool {
-        if self.runtime_type_name == other.runtime_type_name {
-            self.value.eq(other.value.deref() as &dyn Any)
-        } else {
-            false
-        }
-    }
-}
-
-impl Debug for OpaqueValue {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Opaque({:?})", self.value.as_debug())
-    }
-}
-
-#[cfg(feature = "arbitrary")]
-impl<'a> arbitrary::Arbitrary<'a> for OpaqueValue {
-    fn arbitrary(_u: &mut arbitrary::Unstructured<'a>) -> arbitrary::Result<Self> {
-        Err(arbitrary::Error::NotEnoughData)
-    }
-}
-
-impl OpaqueValue {
-    pub fn new<S: Into<String>>(
-        runtime_type_name: S,
-        value: Arc<dyn ValueHolder + Send + Sync>,
-    ) -> Self {
-        Self {
-            runtime_type_name: runtime_type_name.into(),
-            value,
-        }
     }
 }
 
@@ -243,7 +208,7 @@ impl TryIntoValue for Value {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Value {
     List(Arc<Vec<Value>>),
     Map(Map),
@@ -259,10 +224,34 @@ pub enum Value {
     Bool(bool),
     #[cfg(feature = "chrono")]
     Duration(chrono::Duration),
-    Opaque(OpaqueValue),
+    Opaque(Arc<dyn OpaqueValue>),
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
     Null,
+}
+
+impl Debug for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::List(l) => write!(f, "List({:?})", l),
+            Value::Map(m) => write!(f, "Map({:?})", m),
+            Value::Function(name, func) => write!(f, "Function({:?}, {:?})", name, func),
+            Value::Int(i) => write!(f, "Int({:?})", i),
+            Value::UInt(u) => write!(f, "UInt({:?})", u),
+            Value::Float(d) => write!(f, "Float({:?})", d),
+            Value::String(s) => write!(f, "String({:?})", s),
+            Value::Bytes(b) => write!(f, "Bytes({:?})", b),
+            Value::Bool(b) => write!(f, "Bool({:?})", b),
+            Value::Duration(d) => write!(f, "Duration({:?})", d),
+            Value::Opaque(o) => write!(
+                f,
+                "Opaque({:?})",
+                o.as_debug().unwrap_or(&"opaque".to_string() as &dyn Debug)
+            ),
+            Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
+            Value::Null => write!(f, "Null"),
+        }
+    }
 }
 
 impl From<CelVal> for Value {
@@ -384,7 +373,7 @@ impl PartialEq for Value {
             (Value::UInt(a), Value::Float(b)) => (*a as f64) == *b,
             (Value::Float(a), Value::Int(b)) => *a == (*b as f64),
             (Value::Float(a), Value::UInt(b)) => *a == (*b as f64),
-            (Value::Opaque(a), Value::Opaque(b)) => a.eq(b),
+            (Value::Opaque(a), Value::Opaque(b)) => a.eq(b.deref()),
             (_, _) => false,
         }
     }
@@ -1385,9 +1374,8 @@ mod tests {
     }
 
     mod opaque {
-        use crate::objects::{OpaqueValue, ValueHolder};
+        use crate::objects::OpaqueValue;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
-        use std::any::Any;
         use std::fmt::Debug;
         use std::ops::Deref;
         use std::sync::Arc;
@@ -1397,39 +1385,32 @@ mod tests {
             field: String,
         }
 
-        impl ValueHolder for MyStruct {
-            fn eq(&self, other: &dyn Any) -> bool {
-                if let Some(other) = other.downcast_ref::<MyStruct>() {
-                    self.field.eq(&other.field)
-                } else {
-                    false
+        impl OpaqueValue for MyStruct {
+            fn runtime_type_name(&self) -> &str {
+                "my_struct"
+            }
+
+            fn eq(&self, other: &dyn OpaqueValue) -> bool {
+                if self.runtime_type_name() == other.runtime_type_name() {
+                    if let Some(other) = other.downcast_ref::<MyStruct>() {
+                        return self.field.eq(&other.field);
+                    }
                 }
+                false
             }
 
-            fn as_debug(&self) -> &dyn Debug {
-                self
+            fn as_debug(&self) -> Option<&dyn Debug> {
+                Some(self)
             }
-        }
-
-        #[test]
-        fn test_opaque_values() {
-            let value = Arc::new(MyStruct {
-                field: String::from("value"),
-            });
-            let opaque = OpaqueValue::new("my_struct", value.clone());
-            assert_eq!(
-                value.deref().field,
-                opaque.value.downcast_ref::<MyStruct>().unwrap().field
-            );
         }
 
         #[test]
         fn test_opaque_fn() {
             pub fn my_fn(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
                 if let Some(Value::Opaque(opaque)) = &ftx.this {
-                    if &opaque.runtime_type_name == "my_struct" {
+                    if opaque.runtime_type_name() == "my_struct" {
                         Ok(opaque
-                            .value
+                            .deref()
                             .downcast_ref::<MyStruct>()
                             .unwrap()
                             .field
@@ -1437,7 +1418,7 @@ mod tests {
                             .into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
-                            got: opaque.runtime_type_name.clone(),
+                            got: opaque.runtime_type_name().to_string(),
                             want: "my_struct".to_string(),
                         })
                     }
@@ -1452,10 +1433,9 @@ mod tests {
             let value = Arc::new(MyStruct {
                 field: String::from("value"),
             });
-            let opaque = OpaqueValue::new("my_struct", value.clone());
 
             let mut ctx = Context::default();
-            ctx.add_variable_from_value("mine", Value::Opaque(opaque.clone()));
+            ctx.add_variable_from_value("mine", Value::Opaque(value.clone()));
             ctx.add_function("myFn", my_fn);
             let prog = Program::compile("mine.myFn()").unwrap();
             assert_eq!(
@@ -1472,14 +1452,11 @@ mod tests {
             let value_2 = Arc::new(MyStruct {
                 field: String::from("2"),
             });
-            let opaque_1 = OpaqueValue::new("my_struct", value_1.clone());
-            let opaque_1b = OpaqueValue::new("my_struct", value_1);
-            let opaque_2 = OpaqueValue::new("my_struct", value_2);
 
             let mut ctx = Context::default();
-            ctx.add_variable_from_value("v1", Value::Opaque(opaque_1));
-            ctx.add_variable_from_value("v1b", Value::Opaque(opaque_1b));
-            ctx.add_variable_from_value("v2", Value::Opaque(opaque_2));
+            ctx.add_variable_from_value("v1", Value::Opaque(value_1.clone()));
+            ctx.add_variable_from_value("v1b", Value::Opaque(value_1));
+            ctx.add_variable_from_value("v2", Value::Opaque(value_2));
             assert_eq!(
                 Program::compile("v2 == v1").unwrap().execute(&ctx),
                 Ok(false.into())
@@ -1491,6 +1468,18 @@ mod tests {
             assert_eq!(
                 Program::compile("v2 == v2").unwrap().execute(&ctx),
                 Ok(true.into())
+            );
+        }
+
+        #[test]
+        fn test_value_holder_dbg() {
+            let opaque = Arc::new(MyStruct {
+                field: "not so opaque".to_string(),
+            });
+            let opaque = Value::Opaque(opaque);
+            assert_eq!(
+                "Opaque(MyStruct { field: \"not so opaque\" })",
+                format!("{:?}", opaque)
             );
         }
     }
