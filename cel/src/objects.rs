@@ -181,6 +181,11 @@ pub trait OpaqueValue: Any + Send + Sync {
     fn as_debug(&self) -> Option<&dyn Debug> {
         None
     }
+
+    #[cfg(feature = "json")]
+    fn json(&self) -> Option<serde_json::Value> {
+        None
+    }
 }
 
 impl dyn OpaqueValue {
@@ -1378,11 +1383,12 @@ mod tests {
     mod opaque {
         use crate::objects::OpaqueValue;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
+        use serde::Serialize;
         use std::fmt::Debug;
         use std::ops::Deref;
         use std::sync::Arc;
 
-        #[derive(Debug)]
+        #[derive(Debug, Serialize)]
         struct MyStruct {
             field: String,
         }
@@ -1403,6 +1409,11 @@ mod tests {
 
             fn as_debug(&self) -> Option<&dyn Debug> {
                 Some(self)
+            }
+
+            #[cfg(feature = "json")]
+            fn json(&self) -> Option<serde_json::Value> {
+                Some(serde_json::to_value(self).unwrap())
             }
         }
 
@@ -1482,6 +1493,24 @@ mod tests {
             assert_eq!(
                 "Opaque(MyStruct { field: \"not so opaque\" })",
                 format!("{:?}", opaque)
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "json")]
+        fn test_json() {
+            let value = Arc::new(MyStruct {
+                field: String::from("value"),
+            });
+            let cel_value = Value::Opaque(value);
+            let mut map = serde_json::Map::new();
+            map.insert(
+                "field".to_string(),
+                serde_json::Value::String("value".to_string()),
+            );
+            assert_eq!(
+                cel_value.json().expect("Must convert"),
+                serde_json::Value::Object(map)
             );
         }
     }
