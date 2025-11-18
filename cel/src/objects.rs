@@ -45,7 +45,6 @@ static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock
 });
 
 #[derive(Debug, PartialEq, Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub struct Map {
     pub map: Arc<HashMap<Key, Value>>,
 }
@@ -73,7 +72,6 @@ impl Map {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Ord, Clone, PartialOrd)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Key {
     Int(i64),
     Uint(u64),
@@ -191,7 +189,6 @@ impl TryIntoValue for Value {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Value {
     List(Arc<Vec<Value>>),
     Map(Map),

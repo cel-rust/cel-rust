@@ -10,10 +10,10 @@ cargo-fuzz = true
 [dependencies]
 arbitrary = { version = "1.4.1", features = ["derive"] }
 libfuzzer-sys = "0.4"
+chrono = "0.4.41"
 
 [dependencies.cel]
 path = "../cel"
-features = ["arbitrary"]
 
 [[bin]]
 name = "value_binop"
