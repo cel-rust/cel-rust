@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.7](https://github.com/cel-rust/cel-rust/compare/v0.11.6...v0.11.7) - 2025-11-18
+
+### Added
+
+- *(parser)* Proper support for comments
+
+### Fixed
+
+- remove dep
+- *(arbitrary)* no more arbitratry in the main crate
+- *(arbitrary)* less pervasive usage
+
+### Other
+
+- Fix Context docstring to reference new_inner_scope instead of clone ([#221](https://github.com/cel-rust/cel-rust/pull/221))
+
 ## [0.11.6](https://github.com/cel-rust/cel-rust/compare/v0.11.5...v0.11.6) - 2025-10-23
 
 ### Added
