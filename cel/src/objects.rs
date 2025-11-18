@@ -224,9 +224,9 @@ pub enum Value {
     Bool(bool),
     #[cfg(feature = "chrono")]
     Duration(chrono::Duration),
-    Opaque(Arc<dyn OpaqueValue>),
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
+    Opaque(Arc<dyn OpaqueValue>),
     Null,
 }
 
@@ -242,13 +242,15 @@ impl Debug for Value {
             Value::String(s) => write!(f, "String({:?})", s),
             Value::Bytes(b) => write!(f, "Bytes({:?})", b),
             Value::Bool(b) => write!(f, "Bool({:?})", b),
+            #[cfg(feature = "chrono")]
             Value::Duration(d) => write!(f, "Duration({:?})", d),
+            #[cfg(feature = "chrono")]
+            Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Opaque(o) => write!(
                 f,
                 "Opaque({:?})",
                 o.as_debug().unwrap_or(&"opaque".to_string() as &dyn Debug)
             ),
-            Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Null => write!(f, "Null"),
         }
     }
