@@ -191,7 +191,6 @@ impl TryIntoValue for Value {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Value {
     List(Arc<Vec<Value>>),
     Map(Map),
