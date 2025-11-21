@@ -171,10 +171,10 @@ impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     }
 }
 
-pub trait OpaqueValue: Any + Send + Sync {
+pub trait Opaque: Any + Send + Sync {
     fn runtime_type_name(&self) -> &str;
 
-    fn eq(&self, _other: &dyn OpaqueValue) -> bool {
+    fn eq(&self, _other: &dyn Opaque) -> bool {
         false
     }
 
@@ -188,7 +188,7 @@ pub trait OpaqueValue: Any + Send + Sync {
     }
 }
 
-impl dyn OpaqueValue {
+impl dyn Opaque {
     pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
         let any: &dyn Any = self;
         any.downcast_ref()
@@ -231,7 +231,7 @@ pub enum Value {
     Duration(chrono::Duration),
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
-    Opaque(Arc<dyn OpaqueValue>),
+    Opaque(Arc<dyn Opaque>),
     Null,
 }
 
@@ -1381,7 +1381,7 @@ mod tests {
     }
 
     mod opaque {
-        use crate::objects::OpaqueValue;
+        use crate::objects::Opaque;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
         use std::fmt::Debug;
@@ -1393,12 +1393,12 @@ mod tests {
             field: String,
         }
 
-        impl OpaqueValue for MyStruct {
+        impl Opaque for MyStruct {
             fn runtime_type_name(&self) -> &str {
                 "my_struct"
             }
 
-            fn eq(&self, other: &dyn OpaqueValue) -> bool {
+            fn eq(&self, other: &dyn Opaque) -> bool {
                 if self.runtime_type_name() == other.runtime_type_name() {
                     if let Some(other) = other.downcast_ref::<MyStruct>() {
                         return self.field.eq(&other.field);
