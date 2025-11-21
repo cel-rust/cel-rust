@@ -171,16 +171,41 @@ impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     }
 }
 
-pub trait Opaque: Any + Send + Sync {
+pub trait OpaqueEq {
+    fn opaque_eq(&self, other: &dyn Opaque) -> bool;
+}
+
+impl<T> OpaqueEq for T
+where
+    T: Eq + PartialEq + Any + Opaque,
+{
+    fn opaque_eq(&self, other: &dyn Opaque) -> bool {
+        if self.runtime_type_name() != other.runtime_type_name() {
+            return false;
+        }
+        if let Some(other) = other.downcast_ref::<T>() {
+            self.eq(other)
+        } else {
+            false
+        }
+    }
+}
+
+pub trait AsDebug {
+    fn as_debug(&self) -> &dyn Debug;
+}
+
+impl<T> AsDebug for T
+where
+    T: Debug,
+{
+    fn as_debug(&self) -> &dyn Debug {
+        self
+    }
+}
+
+pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
     fn runtime_type_name(&self) -> &str;
-
-    fn eq(&self, _other: &dyn Opaque) -> bool {
-        false
-    }
-
-    fn as_debug(&self) -> Option<&dyn Debug> {
-        None
-    }
 
     #[cfg(feature = "json")]
     fn json(&self) -> Option<serde_json::Value> {
@@ -251,11 +276,7 @@ impl Debug for Value {
             Value::Duration(d) => write!(f, "Duration({:?})", d),
             #[cfg(feature = "chrono")]
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
-            Value::Opaque(o) => write!(
-                f,
-                "Opaque({:?})",
-                o.as_debug().unwrap_or(&"opaque".to_string() as &dyn Debug)
-            ),
+            Value::Opaque(o) => write!(f, "Opaque<{}>({:?})", o.runtime_type_name(), o.as_debug()),
             Value::Null => write!(f, "Null"),
         }
     }
@@ -380,7 +401,7 @@ impl PartialEq for Value {
             (Value::UInt(a), Value::Float(b)) => (*a as f64) == *b,
             (Value::Float(a), Value::Int(b)) => *a == (*b as f64),
             (Value::Float(a), Value::UInt(b)) => *a == (*b as f64),
-            (Value::Opaque(a), Value::Opaque(b)) => a.eq(b.deref()),
+            (Value::Opaque(a), Value::Opaque(b)) => a.opaque_eq(b.deref()),
             (_, _) => false,
         }
     }
@@ -1388,7 +1409,7 @@ mod tests {
         use std::ops::Deref;
         use std::sync::Arc;
 
-        #[derive(Debug, Serialize)]
+        #[derive(Debug, Eq, PartialEq, Serialize)]
         struct MyStruct {
             field: String,
         }
@@ -1396,19 +1417,6 @@ mod tests {
         impl Opaque for MyStruct {
             fn runtime_type_name(&self) -> &str {
                 "my_struct"
-            }
-
-            fn eq(&self, other: &dyn Opaque) -> bool {
-                if self.runtime_type_name() == other.runtime_type_name() {
-                    if let Some(other) = other.downcast_ref::<MyStruct>() {
-                        return self.field.eq(&other.field);
-                    }
-                }
-                false
-            }
-
-            fn as_debug(&self) -> Option<&dyn Debug> {
-                Some(self)
             }
 
             #[cfg(feature = "json")]
@@ -1491,7 +1499,7 @@ mod tests {
             });
             let opaque = Value::Opaque(opaque);
             assert_eq!(
-                "Opaque(MyStruct { field: \"not so opaque\" })",
+                "Opaque<my_struct>(MyStruct { field: \"not so opaque\" })",
                 format!("{:?}", opaque)
             );
         }
