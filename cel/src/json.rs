@@ -61,6 +61,7 @@ impl Value {
                 v.num_nanoseconds()
                     .ok_or(ConvertToJsonError::DurationOverflow(v))?,
             )),
+            Value::Opaque(ref opaque) => (**opaque).json().unwrap_or(serde_json::Value::Null),
             _ => return Err(ConvertToJsonError::Value(self)),
         })
     }
