@@ -171,7 +171,21 @@ impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     }
 }
 
+/// Equality helper for [`Opaque`] values.
+///
+/// Implementors define how two values of the same runtime type compare for
+/// equality when stored as [`Value::Opaque`].
+///
+/// You normally don't implement this trait manually. It is automatically
+/// provided for any `T: Eq + PartialEq + Any + Opaque` (see the blanket impl
+/// below). The runtime will first ensure the two values have the same
+/// [`Opaque::runtime_type_name`], and only then attempt a downcast and call
+/// `Eq::eq`.
 pub trait OpaqueEq {
+    /// Compare with another [`Opaque`] erased value.
+    ///
+    /// Implementations should return `false` if `other` does not have the same
+    /// runtime type, or if it cannot be downcast to the concrete type of `self`.
     fn opaque_eq(&self, other: &dyn Opaque) -> bool;
 }
 
@@ -191,7 +205,12 @@ where
     }
 }
 
+/// Helper trait to obtain a `&dyn Debug` view.
+///
+/// This is auto-implemented for any `T: Debug` and is used by the runtime to
+/// format [`Opaque`] values without knowing their concrete type.
 pub trait AsDebug {
+    /// Returns `self` as a `&dyn Debug` trait object.
     fn as_debug(&self) -> &dyn Debug;
 }
 
@@ -204,9 +223,54 @@ where
     }
 }
 
+/// Trait for user-defined opaque values stored inside [`Value::Opaque`].
+///
+/// Implement this trait for types that should participate in CEL evaluation as
+/// opaque/user-defined values. An opaque value:
+/// - must report a stable runtime type name via [`runtime_type_name`];
+/// - participates in equality via the blanket [`OpaqueEq`] implementation;
+/// - can be formatted via [`AsDebug`];
+/// - must be thread-safe (`Send + Sync`).
+///
+/// When the `json` feature is enabled you may optionally provide a JSON
+/// representation for diagnostics, logging or interop. Returning `None` keeps the
+/// value non-serializable for JSON.
+///
+/// Example
+/// ```rust
+/// use std::fmt::{Debug, Formatter, Result as FmtResult};
+/// use std::sync::Arc;
+/// use cel::objects::{Opaque, Value};
+///
+/// #[derive(Eq, PartialEq)]
+/// struct MyId(u64);
+///
+/// impl Debug for MyId {
+///     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult { write!(f, "MyId({})", self.0) }
+/// }
+///
+/// impl Opaque for MyId {
+///     fn runtime_type_name(&self) -> &str { "example.MyId" }
+/// }
+///
+/// // Values of `MyId` can now be wrapped in `Value::Opaque` and compared.
+/// let a = Value::Opaque(Arc::new(MyId(7)));
+/// let b = Value::Opaque(Arc::new(MyId(7)));
+/// assert_eq!(a, b);
+/// ```
 pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
+    /// Returns a stable, fully-qualified type name for this value's runtime type.
+    ///
+    /// This name is used to check type compatibility before attempting downcasts
+    /// during equality checks and other operations. It should be stable across
+    /// versions and unique within your application or library (e.g., a package
+    /// qualified name like `my.pkg.Type`).
     fn runtime_type_name(&self) -> &str;
 
+    /// Optional JSON representation (requires the `json` feature).
+    ///
+    /// The default implementation returns `None`, indicating that the value
+    /// cannot be represented as JSON.
     #[cfg(feature = "json")]
     fn json(&self) -> Option<serde_json::Value> {
         None
