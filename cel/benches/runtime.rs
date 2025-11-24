@@ -1,9 +1,11 @@
 use cel::context::{Context, VariableResolver};
 use cel::{Program, Value};
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
+use criterion::{criterion_group, BenchmarkId, Criterion};
+use pprof::criterion::Output;
 use std::collections::HashMap;
+use std::hint::black_box;
 
-const EXPRESSIONS: [(&str, &str); 34] = [
+const EXPRESSIONS: [(&str, &str); 35] = [
     ("ternary_1", "(false || true) ? 1 : 2"),
     ("ternary_2", "(true ? false : true) ? 1 : 2"),
     ("or_1", "false || true"),
@@ -38,6 +40,7 @@ const EXPRESSIONS: [(&str, &str); 34] = [
     ("variable resolver", "banana"),
     ("variable hashmap", "apple"),
     ("stress", "true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true"),
+    ("regex", "'abc'.matches('^[a-z]*$')"),
 ];
 
 struct Resolver;
@@ -61,7 +64,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mut execution_group = c.benchmark_group("execute");
     for (name, expr) in black_box(&EXPRESSIONS) {
         execution_group.bench_function(BenchmarkId::from_parameter(name), |b| {
-            let program = Program::compile(expr).expect("Parsing failed");
+            // let program = Program::compile(expr).expect("Parsing failed");
+            let program = Program::compile(expr).expect("Parsing failed").optimized();
+            // eprintln!("{program:#?}");
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             ctx.add_variable_from_value("apple", true);
@@ -83,7 +88,7 @@ pub fn criterion_benchmark_parsing(c: &mut Criterion) {
 
 pub fn map_macro_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("map list");
-    let sizes = vec![1, 10, 100, 1000, 10000, 100000];
+    let sizes = vec![1, 10, 100, 1000, 10000];
 
     for size in sizes {
         group.bench_function(format!("map_{size}").as_str(), |b| {
@@ -99,7 +104,7 @@ pub fn map_macro_benchmark(c: &mut Criterion) {
 
 criterion_group! {
     name = benches;
-    config = Criterion::default();
+    config = Criterion::default().with_profiler(pprof::criterion::PProfProfiler::new(100, Output::Protobuf));
     targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark
 }
 

@@ -787,6 +787,7 @@ impl Value {
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
         match &expr.expr {
             Expr::Literal(val) => Ok(val.clone().into()),
+            Expr::Inline(val) => Ok(val.clone()),
             Expr::Call(call) => {
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
                     let cond = Value::resolve(&call.args[0], ctx)?;

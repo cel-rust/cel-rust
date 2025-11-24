@@ -24,6 +24,7 @@ thiserror = "1.0"
 paste = "1.0"
 
 [dev-dependencies]
+pprof = { version = "0.15", features = ["protobuf", "protobuf-codec", "criterion"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 serde_bytes = "0.11.14"
 dhat = { version = "0.3.3" }
