@@ -33,6 +33,8 @@ pub use ser::SerializationError;
 
 #[cfg(feature = "json")]
 mod json;
+mod optimize;
+
 #[cfg(feature = "json")]
 pub use json::ConvertToJsonError;
 
@@ -166,6 +168,12 @@ impl Program {
         parser
             .parse(source)
             .map(|expression| Program { expression })
+    }
+
+    pub fn optimized(self) -> Program {
+        Program {
+            expression: crate::optimize::optimize(self.expression),
+        }
     }
 
     pub fn execute(&self, context: &Context) -> ResolveResult {

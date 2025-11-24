@@ -1,7 +1,7 @@
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
-use crate::{functions, ExecutionError};
+use crate::{functions, optimize, ExecutionError};
 use std::collections::HashMap;
 
 /// Context is a collection of variables and functions that can be used
@@ -165,6 +165,10 @@ impl Default for Context<'_> {
 
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
+        ctx.add_function(
+            "precompiled_matches",
+            optimize::PrecompileRegex::precompiled_matches,
+        );
 
         #[cfg(feature = "chrono")]
         {
