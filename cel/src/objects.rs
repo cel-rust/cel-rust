@@ -2,10 +2,11 @@ use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
+use std::any::Any;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::ops;
 use std::ops::Deref;
 use std::sync::Arc;
@@ -170,6 +171,119 @@ impl<K: Into<Key>, V: Into<Value>> From<HashMap<K, V>> for Map {
     }
 }
 
+/// Equality helper for [`Opaque`] values.
+///
+/// Implementors define how two values of the same runtime type compare for
+/// equality when stored as [`Value::Opaque`].
+///
+/// You normally don't implement this trait manually. It is automatically
+/// provided for any `T: Eq + PartialEq + Any + Opaque` (see the blanket impl
+/// below). The runtime will first ensure the two values have the same
+/// [`Opaque::runtime_type_name`], and only then attempt a downcast and call
+/// `Eq::eq`.
+pub trait OpaqueEq {
+    /// Compare with another [`Opaque`] erased value.
+    ///
+    /// Implementations should return `false` if `other` does not have the same
+    /// runtime type, or if it cannot be downcast to the concrete type of `self`.
+    fn opaque_eq(&self, other: &dyn Opaque) -> bool;
+}
+
+impl<T> OpaqueEq for T
+where
+    T: Eq + PartialEq + Any + Opaque,
+{
+    fn opaque_eq(&self, other: &dyn Opaque) -> bool {
+        if self.runtime_type_name() != other.runtime_type_name() {
+            return false;
+        }
+        if let Some(other) = other.downcast_ref::<T>() {
+            self.eq(other)
+        } else {
+            false
+        }
+    }
+}
+
+/// Helper trait to obtain a `&dyn Debug` view.
+///
+/// This is auto-implemented for any `T: Debug` and is used by the runtime to
+/// format [`Opaque`] values without knowing their concrete type.
+pub trait AsDebug {
+    /// Returns `self` as a `&dyn Debug` trait object.
+    fn as_debug(&self) -> &dyn Debug;
+}
+
+impl<T> AsDebug for T
+where
+    T: Debug,
+{
+    fn as_debug(&self) -> &dyn Debug {
+        self
+    }
+}
+
+/// Trait for user-defined opaque values stored inside [`Value::Opaque`].
+///
+/// Implement this trait for types that should participate in CEL evaluation as
+/// opaque/user-defined values. An opaque value:
+/// - must report a stable runtime type name via [`runtime_type_name`];
+/// - participates in equality via the blanket [`OpaqueEq`] implementation;
+/// - can be formatted via [`AsDebug`];
+/// - must be thread-safe (`Send + Sync`).
+///
+/// When the `json` feature is enabled you may optionally provide a JSON
+/// representation for diagnostics, logging or interop. Returning `None` keeps the
+/// value non-serializable for JSON.
+///
+/// Example
+/// ```rust
+/// use std::fmt::{Debug, Formatter, Result as FmtResult};
+/// use std::sync::Arc;
+/// use cel::objects::{Opaque, Value};
+///
+/// #[derive(Eq, PartialEq)]
+/// struct MyId(u64);
+///
+/// impl Debug for MyId {
+///     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult { write!(f, "MyId({})", self.0) }
+/// }
+///
+/// impl Opaque for MyId {
+///     fn runtime_type_name(&self) -> &str { "example.MyId" }
+/// }
+///
+/// // Values of `MyId` can now be wrapped in `Value::Opaque` and compared.
+/// let a = Value::Opaque(Arc::new(MyId(7)));
+/// let b = Value::Opaque(Arc::new(MyId(7)));
+/// assert_eq!(a, b);
+/// ```
+pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
+    /// Returns a stable, fully-qualified type name for this value's runtime type.
+    ///
+    /// This name is used to check type compatibility before attempting downcasts
+    /// during equality checks and other operations. It should be stable across
+    /// versions and unique within your application or library (e.g., a package
+    /// qualified name like `my.pkg.Type`).
+    fn runtime_type_name(&self) -> &str;
+
+    /// Optional JSON representation (requires the `json` feature).
+    ///
+    /// The default implementation returns `None`, indicating that the value
+    /// cannot be represented as JSON.
+    #[cfg(feature = "json")]
+    fn json(&self) -> Option<serde_json::Value> {
+        None
+    }
+}
+
+impl dyn Opaque {
+    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
+        let any: &dyn Any = self;
+        any.downcast_ref()
+    }
+}
+
 pub trait TryIntoValue {
     type Error: std::error::Error + 'static + Send + Sync;
     fn try_into_value(self) -> Result<Value, Self::Error>;
@@ -188,7 +302,7 @@ impl TryIntoValue for Value {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub enum Value {
     List(Arc<Vec<Value>>),
     Map(Map),
@@ -206,7 +320,30 @@ pub enum Value {
     Duration(chrono::Duration),
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
+    Opaque(Arc<dyn Opaque>),
     Null,
+}
+
+impl Debug for Value {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Value::List(l) => write!(f, "List({:?})", l),
+            Value::Map(m) => write!(f, "Map({:?})", m),
+            Value::Function(name, func) => write!(f, "Function({:?}, {:?})", name, func),
+            Value::Int(i) => write!(f, "Int({:?})", i),
+            Value::UInt(u) => write!(f, "UInt({:?})", u),
+            Value::Float(d) => write!(f, "Float({:?})", d),
+            Value::String(s) => write!(f, "String({:?})", s),
+            Value::Bytes(b) => write!(f, "Bytes({:?})", b),
+            Value::Bool(b) => write!(f, "Bool({:?})", b),
+            #[cfg(feature = "chrono")]
+            Value::Duration(d) => write!(f, "Duration({:?})", d),
+            #[cfg(feature = "chrono")]
+            Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
+            Value::Opaque(o) => write!(f, "Opaque<{}>({:?})", o.runtime_type_name(), o.as_debug()),
+            Value::Null => write!(f, "Null"),
+        }
+    }
 }
 
 impl From<CelVal> for Value {
@@ -237,6 +374,7 @@ pub enum ValueType {
     Bool,
     Duration,
     Timestamp,
+    Opaque,
     Null,
 }
 
@@ -252,6 +390,7 @@ impl Display for ValueType {
             ValueType::String => write!(f, "string"),
             ValueType::Bytes => write!(f, "bytes"),
             ValueType::Bool => write!(f, "bool"),
+            ValueType::Opaque => write!(f, "opaque"),
             ValueType::Duration => write!(f, "duration"),
             ValueType::Timestamp => write!(f, "timestamp"),
             ValueType::Null => write!(f, "null"),
@@ -271,6 +410,7 @@ impl Value {
             Value::String(_) => ValueType::String,
             Value::Bytes(_) => ValueType::Bytes,
             Value::Bool(_) => ValueType::Bool,
+            Value::Opaque(_) => ValueType::Opaque,
             #[cfg(feature = "chrono")]
             Value::Duration(_) => ValueType::Duration,
             #[cfg(feature = "chrono")]
@@ -325,6 +465,7 @@ impl PartialEq for Value {
             (Value::UInt(a), Value::Float(b)) => (*a as f64) == *b,
             (Value::Float(a), Value::Int(b)) => *a == (*b as f64),
             (Value::Float(a), Value::UInt(b)) => *a == (*b as f64),
+            (Value::Opaque(a), Value::Opaque(b)) => a.opaque_eq(b.deref()),
             (_, _) => false,
         }
     }
@@ -1322,5 +1463,127 @@ mod tests {
                 Value::Int(2)
             ])))
         );
+    }
+
+    mod opaque {
+        use crate::objects::Opaque;
+        use crate::{Context, ExecutionError, FunctionContext, Program, Value};
+        use serde::Serialize;
+        use std::fmt::Debug;
+        use std::ops::Deref;
+        use std::sync::Arc;
+
+        #[derive(Debug, Eq, PartialEq, Serialize)]
+        struct MyStruct {
+            field: String,
+        }
+
+        impl Opaque for MyStruct {
+            fn runtime_type_name(&self) -> &str {
+                "my_struct"
+            }
+
+            #[cfg(feature = "json")]
+            fn json(&self) -> Option<serde_json::Value> {
+                Some(serde_json::to_value(self).unwrap())
+            }
+        }
+
+        #[test]
+        fn test_opaque_fn() {
+            pub fn my_fn(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
+                if let Some(Value::Opaque(opaque)) = &ftx.this {
+                    if opaque.runtime_type_name() == "my_struct" {
+                        Ok(opaque
+                            .deref()
+                            .downcast_ref::<MyStruct>()
+                            .unwrap()
+                            .field
+                            .clone()
+                            .into())
+                    } else {
+                        Err(ExecutionError::UnexpectedType {
+                            got: opaque.runtime_type_name().to_string(),
+                            want: "my_struct".to_string(),
+                        })
+                    }
+                } else {
+                    Err(ExecutionError::UnexpectedType {
+                        got: format!("{:?}", ftx.this),
+                        want: "Value::Opaque".to_string(),
+                    })
+                }
+            }
+
+            let value = Arc::new(MyStruct {
+                field: String::from("value"),
+            });
+
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("mine", Value::Opaque(value.clone()));
+            ctx.add_function("myFn", my_fn);
+            let prog = Program::compile("mine.myFn()").unwrap();
+            assert_eq!(
+                Ok(Value::String(Arc::new("value".into()))),
+                prog.execute(&ctx)
+            );
+        }
+
+        #[test]
+        fn opaque_eq() {
+            let value_1 = Arc::new(MyStruct {
+                field: String::from("1"),
+            });
+            let value_2 = Arc::new(MyStruct {
+                field: String::from("2"),
+            });
+
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("v1", Value::Opaque(value_1.clone()));
+            ctx.add_variable_from_value("v1b", Value::Opaque(value_1));
+            ctx.add_variable_from_value("v2", Value::Opaque(value_2));
+            assert_eq!(
+                Program::compile("v2 == v1").unwrap().execute(&ctx),
+                Ok(false.into())
+            );
+            assert_eq!(
+                Program::compile("v1 == v1b").unwrap().execute(&ctx),
+                Ok(true.into())
+            );
+            assert_eq!(
+                Program::compile("v2 == v2").unwrap().execute(&ctx),
+                Ok(true.into())
+            );
+        }
+
+        #[test]
+        fn test_value_holder_dbg() {
+            let opaque = Arc::new(MyStruct {
+                field: "not so opaque".to_string(),
+            });
+            let opaque = Value::Opaque(opaque);
+            assert_eq!(
+                "Opaque<my_struct>(MyStruct { field: \"not so opaque\" })",
+                format!("{:?}", opaque)
+            );
+        }
+
+        #[test]
+        #[cfg(feature = "json")]
+        fn test_json() {
+            let value = Arc::new(MyStruct {
+                field: String::from("value"),
+            });
+            let cel_value = Value::Opaque(value);
+            let mut map = serde_json::Map::new();
+            map.insert(
+                "field".to_string(),
+                serde_json::Value::String("value".to_string()),
+            );
+            assert_eq!(
+                cel_value.json().expect("Must convert"),
+                serde_json::Value::Object(map)
+            );
+        }
     }
 }
