@@ -1,5 +1,6 @@
 use crate::common::ast::Expr;
 use crate::macros::{impl_conversions, impl_handler};
+use crate::objects::Opaque;
 use crate::resolvers::{AllArguments, Argument};
 use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
 use std::collections::HashMap;
@@ -12,7 +13,8 @@ impl_conversions!(
     Arc<String> => Value::String,
     Arc<Vec<u8>> => Value::Bytes,
     bool => Value::Bool,
-    Arc<Vec<Value>> => Value::List
+    Arc<Vec<Value>> => Value::List,
+    Arc<dyn Opaque> => Value::Opaque
 );
 
 #[cfg(feature = "chrono")]
@@ -325,4 +327,10 @@ pub type Function = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + S
 
 pub trait IntoFunction<T> {
     fn into_function(self) -> Function;
+}
+
+impl IntoFunction<Function> for Function {
+    fn into_function(self) -> Function {
+        self
+    }
 }
