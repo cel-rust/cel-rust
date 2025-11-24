@@ -1,5 +1,4 @@
-use crate::magic::{Function, FunctionRegistry};
-pub use crate::magic::{IntoFunction, IntoResolveResult};
+use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
 use crate::{functions, ExecutionError};

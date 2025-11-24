@@ -40,6 +40,8 @@ use magic::FromContext;
 
 pub mod extractors {
     pub use crate::magic::{Arguments, Identifier, This};
+
+    pub use crate::magic::{IntoFunction, IntoResolveResult};
 }
 
 #[derive(Error, Clone, Debug, PartialEq)]
