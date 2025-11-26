@@ -34,6 +34,7 @@ pub use ser::SerializationError;
 #[cfg(feature = "json")]
 mod json;
 mod optimize;
+pub use optimize::Optimizer;
 
 #[cfg(feature = "json")]
 pub use json::ConvertToJsonError;
@@ -172,7 +173,12 @@ impl Program {
 
     pub fn optimized(self) -> Program {
         Program {
-            expression: crate::optimize::optimize(self.expression),
+            expression: crate::optimize::Optimize::new().optimize(self.expression),
+        }
+    }
+    pub fn optimized_with<T: Optimizer + 'static>(self, t: T) -> Program {
+        Program {
+            expression: crate::optimize::Optimize::new_with_optimizer(t).optimize(self.expression),
         }
     }
 
