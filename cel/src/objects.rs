@@ -787,11 +787,13 @@ impl Value {
                     }
                 }
                 if call.args.len() == 1 {
-                    let expr = Value::resolve(&call.args[0], ctx)?;
                     match call.func_name.as_str() {
-                        operators::LOGICAL_NOT => return Ok(Value::Bool(!expr.to_bool()?)),
+                        operators::LOGICAL_NOT => {
+                            let expr = Value::resolve(&call.args[0], ctx)?;
+                            return Ok(Value::Bool(!expr.to_bool()?));
+                        }
                         operators::NEGATE => {
-                            return match expr {
+                            return match Value::resolve(&call.args[0], ctx)? {
                                 Value::Int(i) => Ok(Value::Int(-i)),
                                 Value::Float(f) => Ok(Value::Float(-f)),
                                 value => {
@@ -800,7 +802,7 @@ impl Value {
                             }
                         }
                         operators::NOT_STRICTLY_FALSE => {
-                            return match expr {
+                            return match Value::resolve(&call.args[0], ctx)? {
                                 Value::Bool(b) => Ok(Value::Bool(b)),
                                 _ => Ok(Value::Bool(true)),
                             }
