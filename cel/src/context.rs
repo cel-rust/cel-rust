@@ -1,7 +1,7 @@
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
-use crate::{functions, optimize, ExecutionError};
+use crate::{functions, ExecutionError};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -194,10 +194,6 @@ impl Default for Context<'_> {
 
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
-        ctx.add_function(
-            "precompiled_matches",
-            optimize::PrecompileRegex::precompiled_matches,
-        );
 
         #[cfg(feature = "chrono")]
         {
