@@ -71,8 +71,8 @@ impl IntoResolveResult for Result<Value, ExecutionError> {
 /// be used as arguments to functions. This trait is core to the 'magic function
 /// parameter' system. Every argument to a function that can be registered to
 /// the CEL context must implement this type.
-pub(crate) trait FromContext<'a, 'context> {
-    fn from_context(ctx: &'a mut FunctionContext<'context>) -> Result<Self, ExecutionError>
+pub(crate) trait FromContext<'a, 'context, 'call> {
+    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
     where
         Self: Sized;
 }
@@ -129,11 +129,11 @@ pub(crate) trait FromContext<'a, 'context> {
 /// ```
 pub struct This<T>(pub T);
 
-impl<'a, 'context, T> FromContext<'a, 'context> for This<T>
+impl<'a, 'context, 'call, T> FromContext<'a, 'context, 'call> for This<T>
 where
     T: FromValue,
 {
-    fn from_context(ctx: &'a mut FunctionContext<'context>) -> Result<Self, ExecutionError>
+    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
     where
         Self: Sized,
     {
@@ -178,8 +178,8 @@ where
 #[derive(Clone)]
 pub struct Identifier(pub Arc<String>);
 
-impl<'a, 'context> FromContext<'a, 'context> for Identifier {
-    fn from_context(ctx: &'a mut FunctionContext<'context>) -> Result<Self, ExecutionError>
+impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Identifier {
+    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
     where
         Self: Sized,
     {
@@ -231,7 +231,7 @@ impl From<Identifier> for String {
 #[derive(Clone)]
 pub struct Arguments(pub Arc<Vec<Value>>);
 
-impl<'a> FromContext<'a, '_> for Arguments {
+impl<'a> FromContext<'a, '_, '_> for Arguments {
     fn from_context(ctx: &'a mut FunctionContext) -> Result<Self, ExecutionError>
     where
         Self: Sized,
@@ -243,8 +243,8 @@ impl<'a> FromContext<'a, '_> for Arguments {
     }
 }
 
-impl<'a, 'context> FromContext<'a, 'context> for Value {
-    fn from_context(ctx: &'a mut FunctionContext<'context>) -> Result<Self, ExecutionError>
+impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Value {
+    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
     where
         Self: Sized,
     {
@@ -252,8 +252,8 @@ impl<'a, 'context> FromContext<'a, 'context> for Value {
     }
 }
 
-impl<'a, 'context> FromContext<'a, 'context> for Expression {
-    fn from_context(ctx: &'a mut FunctionContext<'context>) -> Result<Self, ExecutionError>
+impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Expression {
+    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
     where
         Self: Sized,
     {

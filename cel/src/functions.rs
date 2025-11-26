@@ -16,20 +16,20 @@ type Result<T> = std::result::Result<T, ExecutionError>;
 /// a method), the program context ([`Context`]) which gives functions access
 /// to variables, and the arguments to the function call.
 #[derive(Clone)]
-pub struct FunctionContext<'context> {
-    pub name: Arc<String>,
+pub struct FunctionContext<'context, 'call: 'context> {
+    pub name: &'call str,
     pub this: Option<Value>,
     pub ptx: &'context Context<'context>,
-    pub args: Vec<Expression>,
+    pub args: &'call [Expression],
     pub arg_idx: usize,
 }
 
-impl<'context> FunctionContext<'context> {
+impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     pub fn new(
-        name: Arc<String>,
+        name: &'call str,
         this: Option<Value>,
         ptx: &'context Context<'context>,
-        args: Vec<Expression>,
+        args: &'call [Expression],
     ) -> Self {
         Self {
             name,
@@ -50,7 +50,7 @@ impl<'context> FunctionContext<'context> {
 
     /// Returns an execution error for the currently execution function.
     pub fn error<M: ToString>(&self, message: M) -> ExecutionError {
-        ExecutionError::function_error(self.name.as_str(), message)
+        ExecutionError::function_error(self.name, message)
     }
 }
 
