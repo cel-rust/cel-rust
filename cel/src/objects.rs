@@ -815,20 +815,15 @@ impl Value {
                 })?;
                 match &call.target {
                     None => {
-                        let mut ctx = FunctionContext::new(
-                            call.func_name.clone().into(),
-                            None,
-                            ctx,
-                            call.args.clone(),
-                        );
+                        let mut ctx = FunctionContext::new(&call.func_name, None, ctx, &call.args);
                         (func)(&mut ctx)
                     }
                     Some(target) => {
                         let mut ctx = FunctionContext::new(
-                            call.func_name.clone().into(),
+                            &call.func_name,
                             Some(Value::resolve(target, ctx)?),
                             ctx,
-                            call.args.clone(),
+                            &call.args,
                         );
                         (func)(&mut ctx)
                     }

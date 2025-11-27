@@ -47,8 +47,8 @@ macro_rules! impl_conversions {
                 }
             }
 
-            impl<'a, 'context> FromContext<'a, 'context> for $target_type {
-                fn from_context(ctx: &'a mut FunctionContext<'context>) -> Result<Self, ExecutionError>
+            impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for $target_type {
+                fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
                 where
                     Self: Sized,
                 {
@@ -66,7 +66,7 @@ macro_rules! impl_handler {
             impl<F, $($t,)* R> IntoFunction<($($t,)*)> for F
             where
                 F: Fn($($t,)*) -> R + Send + Sync + 'static,
-                $($t: for<'a, 'context> $crate::FromContext<'a, 'context>,)*
+                $($t: for<'a, 'context, 'call> $crate::FromContext<'a, 'context, 'call>,)*
                 R: IntoResolveResult,
             {
                 fn into_function(self) -> Function {
@@ -82,7 +82,7 @@ macro_rules! impl_handler {
             impl<F, $($t,)* R> IntoFunction<(WithFunctionContext, $($t,)*)> for F
             where
                 F: Fn(&FunctionContext, $($t,)*) -> R + Send + Sync + 'static,
-                $($t: for<'a, 'context> $crate::FromContext<'a, 'context>,)*
+                $($t: for<'a, 'context, 'call> $crate::FromContext<'a, 'context, 'call>,)*
                 R: IntoResolveResult,
             {
                 fn into_function(self) -> Function {
