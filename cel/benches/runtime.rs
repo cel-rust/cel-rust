@@ -1,9 +1,9 @@
-use cel::context::Context;
-use cel::Program;
+use cel::context::{Context, VariableResolver};
+use cel::{Program, Value};
 use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use std::collections::HashMap;
 
-const EXPRESSIONS: [(&str, &str); 34] = [
+const EXPRESSIONS: [(&str, &str); 36] = [
     ("ternary_1", "(1 || 2) ? 1 : 2"),
     ("ternary_2", "(1 ? 2 : 3) ? 1 : 2"),
     ("or_1", "1 || 2"),
@@ -37,8 +37,22 @@ const EXPRESSIONS: [(&str, &str); 34] = [
     ("max float", "max(-1.0, 0.0, 1.0)"),
     ("duration", "duration('1s')"),
     ("timestamp", "timestamp('2023-05-28T00:00:00Z')"), // ("complex", "Account{user_id: 123}.user_id == 123"),
-    ("stress", "true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true")
+    ("variable resolver", "banana"),
+    ("variable hashmap", "apple"),
+    ("stress", "true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true"),
 ];
+
+struct Resolver;
+
+impl VariableResolver for Resolver {
+    fn resolve(&self, expr: &str) -> Option<Value> {
+        const V: Value = Value::Bool(false);
+        match expr {
+            "banana" => Some(V),
+            _ => None,
+        }
+    }
+}
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     // https://gist.github.com/rhnvrm/db4567fcd87b2cb8e997999e1366d406
@@ -48,6 +62,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let program = Program::compile(expr).expect("Parsing failed");
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
+            ctx.add_variable_from_value("apple", true);
+            ctx.set_variable_resolver(std::sync::Arc::new(Resolver));
             b.iter(|| program.execute(&ctx))
         });
     }

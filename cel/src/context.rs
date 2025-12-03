@@ -3,6 +3,7 @@ use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
 use crate::{functions, ExecutionError};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.
@@ -33,10 +34,12 @@ pub enum Context<'a> {
     Root {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Value>,
+        resolver: Option<Arc<dyn VariableResolver>>,
     },
     Child {
         parent: &'a Context<'a>,
         variables: BTreeMap<String, Value>,
+        resolver: Option<Arc<dyn VariableResolver>>,
     },
 }
 
@@ -76,20 +79,45 @@ impl Context<'_> {
         }
     }
 
+    pub fn set_variable_resolver(&mut self, r: Arc<dyn VariableResolver>) {
+        match self {
+            Context::Root { resolver, .. } => {
+                *resolver = Some(r);
+            }
+            Context::Child { resolver, .. } => {
+                *resolver = Some(r);
+            }
+        }
+    }
+
     pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
     where
         S: AsRef<str>,
     {
         let name = name.as_ref();
         match self {
-            Context::Child { variables, parent } => variables
-                .get(name)
-                .cloned()
-                .or_else(|| parent.get_variable(name).ok())
+            Context::Child {
+                variables,
+                parent,
+                resolver,
+            } => resolver
+                .as_deref()
+                .and_then(|r| r.resolve(name))
+                .or_else(|| {
+                    variables
+                        .get(name)
+                        .cloned()
+                        .or_else(|| parent.get_variable(name).ok())
+                })
                 .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
-            Context::Root { variables, .. } => variables
-                .get(name)
-                .cloned()
+            Context::Root {
+                variables,
+                resolver,
+                ..
+            } => resolver
+                .as_deref()
+                .and_then(|r| r.resolve(name))
+                .or_else(|| variables.get(name).cloned())
                 .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
         }
     }
@@ -122,6 +150,7 @@ impl Context<'_> {
         Context::Child {
             parent: self,
             variables: Default::default(),
+            resolver: None,
         }
     }
 
@@ -140,6 +169,7 @@ impl Context<'_> {
         Context::Root {
             variables: Default::default(),
             functions: Default::default(),
+            resolver: None,
         }
     }
 }
@@ -149,6 +179,7 @@ impl Default for Context<'_> {
         let mut ctx = Context::Root {
             variables: Default::default(),
             functions: Default::default(),
+            resolver: None,
         };
 
         ctx.add_function("contains", functions::contains);
@@ -184,4 +215,8 @@ impl Default for Context<'_> {
 
         ctx
     }
+}
+
+pub trait VariableResolver: Send + Sync {
+    fn resolve(&self, expr: &str) -> Option<Value>;
 }
