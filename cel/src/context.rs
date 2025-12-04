@@ -2,7 +2,7 @@ use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
 use crate::{functions, ExecutionError};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.
@@ -32,11 +32,11 @@ use std::collections::HashMap;
 pub enum Context<'a> {
     Root {
         functions: FunctionRegistry,
-        variables: HashMap<String, Value>,
+        variables: BTreeMap<String, Value>,
     },
     Child {
         parent: &'a Context<'a>,
-        variables: HashMap<String, Value>,
+        variables: BTreeMap<String, Value>,
     },
 }
 
