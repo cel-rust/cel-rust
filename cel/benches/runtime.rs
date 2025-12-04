@@ -47,7 +47,11 @@ struct Resolver;
 impl VariableResolver for Resolver {
     fn resolve(&self, expr: &str) -> Option<Value> {
         const V: Value = Value::Bool(false);
+        const NOT_V: Value = Value::Bool(true);
         match expr {
+            "fruit" => Some(NOT_V),
+            "carrot" => Some(NOT_V),
+            "orange" => Some(NOT_V),
             "banana" => Some(V),
             _ => None,
         }

@@ -34,16 +34,16 @@ pub enum Context<'a> {
     Root {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Value>,
-        resolver: Option<Arc<dyn VariableResolver>>,
+        resolver: Option<&'a dyn VariableResolver>,
     },
     Child {
         parent: &'a Context<'a>,
         variables: BTreeMap<String, Value>,
-        resolver: Option<Arc<dyn VariableResolver>>,
+        resolver: Option<&'a dyn VariableResolver>,
     },
 }
 
-impl Context<'_> {
+impl<'a> Context<'a> {
     pub fn add_variable<S, V>(
         &mut self,
         name: S,
@@ -79,7 +79,7 @@ impl Context<'_> {
         }
     }
 
-    pub fn set_variable_resolver(&mut self, r: Arc<dyn VariableResolver>) {
+    pub fn set_variable_resolver(&mut self, r: &'a dyn VariableResolver) {
         match self {
             Context::Root { resolver, .. } => {
                 *resolver = Some(r);
@@ -101,7 +101,6 @@ impl Context<'_> {
                 parent,
                 resolver,
             } => resolver
-                .as_deref()
                 .and_then(|r| r.resolve(name))
                 .or_else(|| {
                     variables
@@ -115,7 +114,6 @@ impl Context<'_> {
                 resolver,
                 ..
             } => resolver
-                .as_deref()
                 .and_then(|r| r.resolve(name))
                 .or_else(|| variables.get(name).cloned())
                 .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
@@ -217,6 +215,45 @@ impl Default for Context<'_> {
     }
 }
 
+/// VariableResolver implements a custom resolver for variables that is consulted before looking at
+/// variables added to the context. This allows dynamic variables, or avoiding HashMap lookup/creation.
+///
+///
+/// # Example
+/// ```
+/// struct ValueContext {
+///     request: Value,
+///     response: Value,
+/// }
+///
+/// impl VariableResolver for ValueContext {
+///     fn resolve(&self, variable: &str) -> Option<Value> {
+///         match variable {
+///             "request" => Some(self.request.clone()),
+///             "response" => Some(self.response.clone()),
+///             _ => None,
+///         }
+///     }
+/// }
+/// ```
 pub trait VariableResolver: Send + Sync {
-    fn resolve(&self, expr: &str) -> Option<Value>;
+    fn resolve(&self, variable: &str) -> Option<Value>;
+}
+
+impl<T: VariableResolver> VariableResolver for Box<T> {
+    fn resolve(&self, variable: &str) -> Option<Value> {
+        (**self).resolve(variable)
+    }
+}
+
+impl<T: VariableResolver> VariableResolver for Arc<T> {
+    fn resolve(&self, variable: &str) -> Option<Value> {
+        (**self).resolve(variable)
+    }
+}
+
+impl<T: VariableResolver> VariableResolver for &T {
+    fn resolve(&self, variable: &str) -> Option<Value> {
+        (**self).resolve(variable)
+    }
 }
