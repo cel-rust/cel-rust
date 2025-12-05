@@ -3,7 +3,7 @@ use crate::macros::{impl_conversions, impl_handler};
 use crate::objects::Opaque;
 use crate::resolvers::{AllArguments, Argument};
 use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 impl_conversions!(
@@ -305,7 +305,7 @@ impl_handler!(C1, C2, C3, C4, C5, C6, C7, C8, C9);
 
 #[derive(Default)]
 pub struct FunctionRegistry {
-    functions: HashMap<String, Function>,
+    functions: BTreeMap<String, Function>,
 }
 
 impl FunctionRegistry {
