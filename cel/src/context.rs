@@ -3,6 +3,7 @@ use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
 use crate::{functions, ExecutionError};
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.
@@ -33,14 +34,16 @@ pub enum Context<'a> {
     Root {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Value>,
+        resolver: Option<&'a dyn VariableResolver>,
     },
     Child {
         parent: &'a Context<'a>,
         variables: BTreeMap<String, Value>,
+        resolver: Option<&'a dyn VariableResolver>,
     },
 }
 
-impl Context<'_> {
+impl<'a> Context<'a> {
     pub fn add_variable<S, V>(
         &mut self,
         name: S,
@@ -76,20 +79,43 @@ impl Context<'_> {
         }
     }
 
+    pub fn set_variable_resolver(&mut self, r: &'a dyn VariableResolver) {
+        match self {
+            Context::Root { resolver, .. } => {
+                *resolver = Some(r);
+            }
+            Context::Child { resolver, .. } => {
+                *resolver = Some(r);
+            }
+        }
+    }
+
     pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
     where
         S: AsRef<str>,
     {
         let name = name.as_ref();
         match self {
-            Context::Child { variables, parent } => variables
-                .get(name)
-                .cloned()
-                .or_else(|| parent.get_variable(name).ok())
+            Context::Child {
+                variables,
+                parent,
+                resolver,
+            } => resolver
+                .and_then(|r| r.resolve(name))
+                .or_else(|| {
+                    variables
+                        .get(name)
+                        .cloned()
+                        .or_else(|| parent.get_variable(name).ok())
+                })
                 .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
-            Context::Root { variables, .. } => variables
-                .get(name)
-                .cloned()
+            Context::Root {
+                variables,
+                resolver,
+                ..
+            } => resolver
+                .and_then(|r| r.resolve(name))
+                .or_else(|| variables.get(name).cloned())
                 .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
         }
     }
@@ -122,6 +148,7 @@ impl Context<'_> {
         Context::Child {
             parent: self,
             variables: Default::default(),
+            resolver: None,
         }
     }
 
@@ -140,6 +167,7 @@ impl Context<'_> {
         Context::Root {
             variables: Default::default(),
             functions: Default::default(),
+            resolver: None,
         }
     }
 }
@@ -149,6 +177,7 @@ impl Default for Context<'_> {
         let mut ctx = Context::Root {
             variables: Default::default(),
             functions: Default::default(),
+            resolver: None,
         };
 
         ctx.add_function("contains", functions::contains);
@@ -183,5 +212,48 @@ impl Default for Context<'_> {
         }
 
         ctx
+    }
+}
+
+/// VariableResolver implements a custom resolver for variables that is consulted before looking at
+/// variables added to the context. This allows dynamic variables, or avoiding HashMap lookup/creation.
+///
+///
+/// # Example
+/// ```
+/// struct ValueContext {
+///     request: cel::Value,
+///     response: cel::Value,
+/// }
+///
+/// impl cel::context::VariableResolver for ValueContext {
+///     fn resolve(&self, variable: &str) -> Option<cel::Value> {
+///         match variable {
+///             "request" => Some(self.request.clone()),
+///             "response" => Some(self.response.clone()),
+///             _ => None,
+///         }
+///     }
+/// }
+/// ```
+pub trait VariableResolver: Send + Sync {
+    fn resolve(&self, variable: &str) -> Option<Value>;
+}
+
+impl<T: VariableResolver> VariableResolver for Box<T> {
+    fn resolve(&self, variable: &str) -> Option<Value> {
+        (**self).resolve(variable)
+    }
+}
+
+impl<T: VariableResolver> VariableResolver for Arc<T> {
+    fn resolve(&self, variable: &str) -> Option<Value> {
+        (**self).resolve(variable)
+    }
+}
+
+impl<T: VariableResolver> VariableResolver for &T {
+    fn resolve(&self, variable: &str) -> Option<Value> {
+        (**self).resolve(variable)
     }
 }
