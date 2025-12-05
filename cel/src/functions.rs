@@ -1,6 +1,6 @@
 use crate::context::Context;
 use crate::magic::{Arguments, This};
-use crate::objects::Value;
+use crate::objects::{OptionalValue, Value};
 use crate::parser::Expression;
 use crate::resolvers::Resolver;
 use crate::ExecutionError;
@@ -221,6 +221,13 @@ pub fn int(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
         Value::UInt(v) => Value::Int(v.try_into().map_err(|_| ftx.error("integer overflow"))?),
         v => return Err(ftx.error(format!("cannot convert {v:?} to int"))),
     })
+}
+
+pub fn optional_none(ftx: &FunctionContext) -> Result<Value> {
+    if ftx.this.is_some() || !ftx.args.is_empty() {
+        return Err(ftx.error("unsupported function"));
+    }
+    Ok(Value::Opaque(Arc::new(OptionalValue::none())))
 }
 
 /// Returns true if a string starts with another string.
