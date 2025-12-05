@@ -284,6 +284,23 @@ impl dyn Opaque {
     }
 }
 
+#[derive(Debug, Eq, PartialEq)]
+pub struct OptionalValue {
+    value: Option<Value>,
+}
+
+impl OptionalValue {
+    pub fn none() -> Self {
+        OptionalValue { value: None }
+    }
+}
+
+impl Opaque for OptionalValue {
+    fn runtime_type_name(&self) -> &str {
+        "optional_type"
+    }
+}
+
 pub trait TryIntoValue {
     type Error: std::error::Error + 'static + Send + Sync;
     fn try_into_value(self) -> Result<Value, Self::Error>;
@@ -810,22 +827,44 @@ impl Value {
                         _ => (),
                     }
                 }
-                let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
-                    ExecutionError::UndeclaredReference(call.func_name.clone().into())
-                })?;
                 match &call.target {
                     None => {
+                        let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
+                            ExecutionError::UndeclaredReference(call.func_name.clone().into())
+                        })?;
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, &call.args);
                         (func)(&mut ctx)
                     }
                     Some(target) => {
-                        let mut ctx = FunctionContext::new(
-                            &call.func_name,
-                            Some(Value::resolve(target, ctx)?),
-                            ctx,
-                            &call.args,
-                        );
-                        (func)(&mut ctx)
+                        let qualified_func = match &target.expr {
+                            Expr::Ident(prefix) => {
+                                let qualified_name = format!("{prefix}.{}", &call.func_name);
+                                ctx.get_function(&qualified_name)
+                            }
+                            _ => None,
+                        };
+                        match qualified_func {
+                            None => {
+                                let func =
+                                    ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
+                                        ExecutionError::UndeclaredReference(
+                                            call.func_name.clone().into(),
+                                        )
+                                    })?;
+                                let mut ctx = FunctionContext::new(
+                                    &call.func_name,
+                                    Some(Value::resolve(target, ctx)?),
+                                    ctx,
+                                    &call.args,
+                                );
+                                (func)(&mut ctx)
+                            }
+                            Some(func) => {
+                                let mut ctx =
+                                    FunctionContext::new(&call.func_name, None, ctx, &call.args);
+                                (func)(&mut ctx)
+                            }
+                        }
                     }
                 }
             }
@@ -1463,7 +1502,7 @@ mod tests {
     }
 
     mod opaque {
-        use crate::objects::Opaque;
+        use crate::objects::{Opaque, OptionalValue};
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
         use std::fmt::Debug;
@@ -1580,6 +1619,15 @@ mod tests {
             assert_eq!(
                 cel_value.json().expect("Must convert"),
                 serde_json::Value::Object(map)
+            );
+        }
+
+        #[test]
+        fn test_optional() {
+            let p = Program::compile("optional.none()").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Opaque(Arc::new(OptionalValue::none())))
             );
         }
     }
