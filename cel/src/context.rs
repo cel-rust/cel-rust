@@ -222,12 +222,12 @@ impl Default for Context<'_> {
 /// # Example
 /// ```
 /// struct ValueContext {
-///     request: Value,
-///     response: Value,
+///     request: cel::Value,
+///     response: cel::Value,
 /// }
 ///
-/// impl VariableResolver for ValueContext {
-///     fn resolve(&self, variable: &str) -> Option<Value> {
+/// impl cel::context::VariableResolver for ValueContext {
+///     fn resolve(&self, variable: &str) -> Option<cel::Value> {
 ///         match variable {
 ///             "request" => Some(self.request.clone()),
 ///             "response" => Some(self.response.clone()),

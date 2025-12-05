@@ -67,7 +67,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             ctx.add_variable_from_value("apple", true);
-            ctx.set_variable_resolver(std::sync::Arc::new(Resolver));
+            ctx.set_variable_resolver(&Resolver);
             b.iter(|| program.execute(&ctx))
         });
     }
