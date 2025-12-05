@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0](https://github.com/cel-rust/cel-rust/compare/v0.11.6...v0.12.0) - 2025-12-05
+
+### Added
+
+- *(opaque)* docs
+- *(opaque)* PR comments addressed
+- *(Opaque)* json support
+- *(Opaque)* No indirection, straight holds trait OpaqueValue
+- *(opaque)* no need for as_any
+- *(opaque)* Equality of opaques
+- *(opaque)* wire function example
+- *(opaque)* Adds support for `OpaqueValue`s
+- *(parser)* Proper support for comments
+
+### Fixed
+
+- fixup test
+- *(opaque)* Refactor OpaqueValue to simply Opaque
+- account for feature chrono in Debug
+- remove dep
+- *(arbitrary)* no more arbitratry in the main crate
+- *(arbitrary)* less pervasive usage
+
+### Other
+
+- Documentation and pass reference
+- Add new way to resolve variables
+- default to BTree's instead of HashMap ([#231](https://github.com/cel-rust/cel-rust/pull/231))
+- avoid cloning function args and name ([#228](https://github.com/cel-rust/cel-rust/pull/228))
+- avoid double resolving single-arg func calls ([#227](https://github.com/cel-rust/cel-rust/pull/227))
+- move
+- minor tweaks to make usage more ergonomic
+- Fix Context docstring to reference new_inner_scope instead of clone ([#221](https://github.com/cel-rust/cel-rust/pull/221))
+
 ## [0.11.6](https://github.com/cel-rust/cel-rust/compare/v0.11.5...v0.11.6) - 2025-10-23
 
 ### Added
