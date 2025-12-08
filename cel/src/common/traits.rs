@@ -1,3 +1,8 @@
+use std::any::Any;
+use std::fmt::Debug;
+use crate::common::types;
+use crate::common::value::{CelVal, Val};
+
 /// ADDER_TYPE types provide a '+' operator overload.
 pub const ADDER_TYPE: u16 = 1;
 
@@ -45,3 +50,19 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 
 /// FOLDABLE_TYPE types support comprehensions v2 macros which iterate over (key, value) pairs.
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
+
+pub trait Adder {
+    fn add(&self, rhs: Box<dyn Val>) -> Box<dyn Val> {
+        types::Err::maybe_no_such_overload(rhs)
+    }
+}
+
+pub trait Indexer {
+    fn get(&self, idx: &dyn Val) -> CelVal {
+        types::Err::maybe_no_such_overload(idx)
+    }
+}
+
+pub trait Lister: Debug + Any {
+    fn as_indexer(&self) -> &dyn Indexer;
+}

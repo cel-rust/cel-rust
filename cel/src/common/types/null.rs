@@ -2,6 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
+#[derive(Clone, Debug)]
 pub struct Null;
 
 impl Val for Null {
@@ -9,7 +10,7 @@ impl Val for Null {
         super::NULL_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
+    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
         Box::new(None::<()>)
     }
 }

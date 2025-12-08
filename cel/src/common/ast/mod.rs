@@ -1,10 +1,12 @@
-use crate::common::value::CelVal;
+use crate::common::types;
+use crate::common::value::{CelVal, Val};
+use std::clone;
 use std::collections::BTreeMap;
 
 pub mod operators;
 
 pub struct Ast {
-    pub expr: IdedExpr,
+    pub(crate) expr: IdedExpr,
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -26,7 +28,7 @@ pub enum Expr {
     List(ListExpr),
 
     /// LiteralKind represents a primitive scalar literal.
-    Literal(CelVal),
+    Literal(LiteralValue),
 
     /// MapKind represents a map literal expression.
     Map(MapExpr),
@@ -36,6 +38,31 @@ pub enum Expr {
 
     /// StructKind represents a struct literal expression.
     Struct(StructExpr),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum LiteralValue {
+    Boolean(bool),
+    Bytes(Vec<u8>),
+    Double(f64),
+    Int(i64),
+    Null,
+    String(String),
+    UInt(u64),
+}
+
+impl LiteralValue {
+    pub fn to_value(&self) -> CelVal {
+        match &self {
+            LiteralValue::Boolean(b) => CelVal::Boolean(types::Bool::from(*b)),
+            LiteralValue::Bytes(b) => CelVal::Bytes(types::Bytes::from(b.clone())),
+            LiteralValue::Double(f) => CelVal::Double(types::Double::from(*f)),
+            LiteralValue::Int(i) => CelVal::Int(types::Int::from(*i)),
+            LiteralValue::Null => CelVal::Null,
+            LiteralValue::String(s) => CelVal::String(types::String::from(s.clone())),
+            LiteralValue::UInt(ui) => CelVal::UInt(types::UInt::from(*ui)),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
