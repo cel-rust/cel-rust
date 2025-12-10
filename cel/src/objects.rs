@@ -1706,6 +1706,22 @@ mod tests {
             assert_eq!(p.execute(&Context::default()), Ok(Value::Bool(true)));
             let p = Program::compile("optional.none().hasValue()").expect("Must compile");
             assert_eq!(p.execute(&Context::default()), Ok(Value::Bool(false)));
+
+            let p = Program::compile("optional.of(1).or(optional.of(2))").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))
+            );
+            let p = Program::compile("optional.none().or(optional.of(2))").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(2)))))
+            );
+            let p = Program::compile("optional.none().or(optional.none())").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+            );
         }
     }
 }

@@ -258,6 +258,17 @@ pub fn optional_has_value(This(this): This<Value>) -> Result<bool> {
     Ok(<&OptionalValue>::try_from(&this)?.value().is_some())
 }
 
+pub fn optional_or_optional(This(this): This<Value>, other: Value) -> Result<Value> {
+    let this_opt: &OptionalValue = (&this).try_into()?;
+    match this_opt.value() {
+        Some(_) => Ok(this),
+        None => {
+            let _: &OptionalValue = (&other).try_into()?;
+            Ok(other)
+        }
+    }
+}
+
 /// Returns true if a string starts with another string.
 ///
 /// # Example
