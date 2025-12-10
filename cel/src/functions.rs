@@ -254,6 +254,10 @@ pub fn optional_value(This(this): This<Value>) -> Result<Value> {
         .ok_or_else(|| ExecutionError::function_error("value", "optional.none() dereference"))
 }
 
+pub fn optional_has_value(This(this): This<Value>) -> Result<bool> {
+    Ok(<&OptionalValue>::try_from(&this)?.value().is_some())
+}
+
 /// Returns true if a string starts with another string.
 ///
 /// # Example

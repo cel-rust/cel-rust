@@ -1701,6 +1701,11 @@ mod tests {
                     message: "optional.none() dereference".to_string()
                 })
             );
+
+            let p = Program::compile("optional.of(1).hasValue()").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Bool(true)));
+            let p = Program::compile("optional.none().hasValue()").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Bool(false)));
         }
     }
 }
