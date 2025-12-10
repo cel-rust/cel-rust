@@ -439,6 +439,23 @@ impl Value {
         }
     }
 
+    pub fn is_zero(&self) -> bool {
+        match self {
+            Value::List(v) => v.is_empty(),
+            Value::Map(v) => v.map.is_empty(),
+            Value::Int(0) => true,
+            Value::UInt(0) => true,
+            Value::Float(f) => *f == 0.0,
+            Value::String(v) => v.is_empty(),
+            Value::Bytes(v) => v.is_empty(),
+            Value::Bool(false) => true,
+            #[cfg(feature = "chrono")]
+            Value::Duration(v) => v.is_zero(),
+            Value::Null => true,
+            _ => false,
+        }
+    }
+
     pub fn error_expected_type(&self, expected: ValueType) -> ExecutionError {
         ExecutionError::UnexpectedType {
             got: self.type_of().to_string(),
@@ -1634,6 +1651,18 @@ mod tests {
             );
 
             let p = Program::compile("optional.of(1)").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))
+            );
+
+            let p = Program::compile("optional.ofNonZeroValue(0)").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+            );
+
+            let p = Program::compile("optional.ofNonZeroValue(1)").expect("Must compile");
             assert_eq!(
                 p.execute(&Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))

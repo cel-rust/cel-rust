@@ -237,6 +237,17 @@ pub fn optional_of(ftx: &FunctionContext, value: Value) -> Result<Value> {
     Ok(Value::Opaque(Arc::new(OptionalValue::of(value))))
 }
 
+pub fn optional_of_non_zero_value(ftx: &FunctionContext, value: Value) -> Result<Value> {
+    if ftx.this.is_some() {
+        return Err(ftx.error("unsupported function"));
+    }
+    if value.is_zero() {
+        Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+    } else {
+        Ok(Value::Opaque(Arc::new(OptionalValue::of(value))))
+    }
+}
+
 /// Returns true if a string starts with another string.
 ///
 /// # Example
