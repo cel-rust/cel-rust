@@ -247,6 +247,12 @@ pub fn optional_of_non_zero_value(ftx: &FunctionContext, value: Value) -> Result
         Ok(Value::Opaque(Arc::new(OptionalValue::of(value))))
     }
 }
+pub fn optional_value(This(this): This<Value>) -> Result<Value> {
+    <&OptionalValue>::try_from(&this)?
+        .value()
+        .cloned()
+        .ok_or_else(|| ExecutionError::function_error("value", "optional.none() dereference"))
+}
 
 /// Returns true if a string starts with another string.
 ///

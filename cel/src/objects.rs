@@ -296,11 +296,34 @@ impl OptionalValue {
     pub fn none() -> Self {
         OptionalValue { value: None }
     }
+    pub fn value(&self) -> Option<&Value> {
+        self.value.as_ref()
+    }
 }
 
 impl Opaque for OptionalValue {
     fn runtime_type_name(&self) -> &str {
         "optional_type"
+    }
+}
+
+impl<'a> TryFrom<&'a Value> for &'a OptionalValue {
+    type Error = ExecutionError;
+
+    fn try_from(value: &'a Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Opaque(opaque) if opaque.runtime_type_name() == "optional_type" => opaque
+                .downcast_ref::<OptionalValue>()
+                .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast")),
+            Value::Opaque(opaque) => Err(ExecutionError::UnexpectedType {
+                got: opaque.runtime_type_name().to_string(),
+                want: "optional_type".to_string(),
+            }),
+            v => Err(ExecutionError::UnexpectedType {
+                got: v.type_of().to_string(),
+                want: "optional_type".to_string(),
+            }),
+        }
     }
 }
 
@@ -1666,6 +1689,17 @@ mod tests {
             assert_eq!(
                 p.execute(&Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))
+            );
+
+            let p = Program::compile("optional.of(1).value()").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(1)));
+            let p = Program::compile("optional.none().value()").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Err(ExecutionError::FunctionError {
+                    function: "value".to_string(),
+                    message: "optional.none() dereference".to_string()
+                })
             );
         }
     }
