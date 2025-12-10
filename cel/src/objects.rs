@@ -1722,6 +1722,11 @@ mod tests {
                 p.execute(&Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none())))
             );
+
+            let p = Program::compile("optional.of(1).orValue(5)").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(1)));
+            let p = Program::compile("optional.none().orValue(5)").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(5)));
         }
     }
 }

@@ -269,6 +269,14 @@ pub fn optional_or_optional(This(this): This<Value>, other: Value) -> Result<Val
     }
 }
 
+pub fn optional_or_value(This(this): This<Value>, other: Value) -> Result<Value> {
+    let this_opt: &OptionalValue = (&this).try_into()?;
+    match this_opt.value() {
+        Some(v) => Ok(v.clone()),
+        None => Ok(other),
+    }
+}
+
 /// Returns true if a string starts with another string.
 ///
 /// # Example
