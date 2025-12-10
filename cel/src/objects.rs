@@ -290,6 +290,9 @@ pub struct OptionalValue {
 }
 
 impl OptionalValue {
+    pub fn of(value: Value) -> Self {
+        OptionalValue { value: Some(value) }
+    }
     pub fn none() -> Self {
         OptionalValue { value: None }
     }
@@ -1628,6 +1631,12 @@ mod tests {
             assert_eq!(
                 p.execute(&Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+            );
+
+            let p = Program::compile("optional.of(1)").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))
             );
         }
     }

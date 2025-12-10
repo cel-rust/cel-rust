@@ -192,6 +192,7 @@ impl Default for Context<'_> {
         ctx.add_function("int", functions::int);
         ctx.add_function("uint", functions::uint);
         ctx.add_function("optional.none", functions::optional_none);
+        ctx.add_function("optional.of", functions::optional_of);
 
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
