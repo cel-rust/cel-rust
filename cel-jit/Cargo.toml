@@ -1,0 +1,36 @@
+[package]
+name = "cel-jit"
+version = "0.1.0"
+edition = "2021"
+description = "JIT compilation backend for CEL (Common Expression Language)"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/cel-rust/cel-rust"
+
+[dependencies]
+cel = { path = "../cel", default-features = false }
+cranelift-codegen = "0.115"
+cranelift-frontend = "0.115"
+cranelift-module = "0.115"
+cranelift-jit = "0.115"
+cranelift-native = "0.115"
+target-lexicon = "0.12"
+thiserror = "1.0"
+
+# Optional dependencies for features
+regex = { version = "1.10", optional = true }
+chrono = { version = "0.4", default-features = false, features = ["alloc"], optional = true }
+serde_json = { version = "1.0", optional = true }
+base64 = { version = "0.22", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "comparison"
+harness = false
+
+[features]
+default = ["regex", "chrono"]
+regex = ["dep:regex", "cel/regex"]
+chrono = ["dep:chrono", "cel/chrono"]
+json = ["dep:serde_json", "dep:base64", "cel/json"]
