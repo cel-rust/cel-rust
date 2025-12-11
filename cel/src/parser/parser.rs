@@ -103,6 +103,7 @@ pub struct Parser {
     helper: ParserHelper,
     errors: Vec<ParseError>,
     max_recursion_depth: u16,
+    enable_optional_syntax: bool,
 }
 
 impl Parser {
@@ -114,11 +115,17 @@ impl Parser {
             helper: ParserHelper::default(),
             errors: Vec::default(),
             max_recursion_depth: 96,
+            enable_optional_syntax: false,
         }
     }
 
     pub fn max_recursion_depth(mut self, max: u16) -> Self {
         self.max_recursion_depth = if max == u16::MAX { max } else { max + 1 };
+        self
+    }
+
+    pub fn enable_optional_syntax(mut self, enable: bool) -> Self {
+        self.enable_optional_syntax = enable;
         self
     }
 
@@ -1118,6 +1125,7 @@ mod tests {
     use crate::IdedExpr;
     use std::iter;
 
+    #[derive(Default)]
     struct TestInfo {
         // I contains the input expression to be parsed.
         i: &'static str,
@@ -1133,8 +1141,8 @@ mod tests {
         // M contains the expected adorned debug output of the macro calls map
         // m: String,
 
-        // Opts contains the list of options to be configured with the parser before parsing the expression.
-        // Opts []Option
+        // Options to be configured with the parser before parsing the expression.
+        enable_optional_syntax: bool,
     }
 
     #[test]
@@ -1218,56 +1226,67 @@ mod tests {
                 i: r#""A""#,
                 p: r#""A"^#1:*expr.Constant_StringValue#"#,
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: r#"true"#,
                 p: r#"true^#1:*expr.Constant_BoolValue#"#,
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: r#"false"#,
                 p: r#"false^#1:*expr.Constant_BoolValue#"#,
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "0",
                 p: "0^#1:*expr.Constant_Int64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "42",
                 p: "42^#1:*expr.Constant_Int64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "0xF",
                 p: "15^#1:*expr.Constant_Int64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "0u",
                 p: "0u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "23u",
                 p: "23u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "24u",
                 p: "24u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "0xFu",
                 p: "15u^#1:*expr.Constant_Uint64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "-1",
                 p: "-1^#1:*expr.Constant_Int64Value#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "4--4",
@@ -1276,6 +1295,7 @@ mod tests {
     -4^#3:*expr.Constant_Int64Value#
 )^#2:*expr.Expr_CallExpr#"#,
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "4--4.1",
@@ -1284,16 +1304,19 @@ mod tests {
     -4.1^#3:*expr.Constant_DoubleValue#
 )^#2:*expr.Expr_CallExpr#"#,
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: r#"b"abc""#,
                 p: r#"b"abc"^#1:*expr.Constant_BytesValue#"#,
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "23.39",
                 p: "23.39^#1:*expr.Constant_DoubleValue#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "!a",
@@ -1301,16 +1324,19 @@ mod tests {
     a^#2:*expr.Expr_IdentExpr#
 )^#1:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "null",
                 p: "null^#1:*expr.Constant_NullValue#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a",
                 p: "a^#1:*expr.Expr_IdentExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a?b:c",
@@ -1320,6 +1346,7 @@ mod tests {
     c^#4:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a || b",
@@ -1328,6 +1355,7 @@ mod tests {
     b^#2:*expr.Expr_IdentExpr#
 )^#3:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a || b || c || d || e || f ",
@@ -1348,6 +1376,7 @@ mod tests {
     )^#11:*expr.Expr_CallExpr#
 )^#7:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a && b",
@@ -1356,6 +1385,7 @@ mod tests {
     b^#2:*expr.Expr_IdentExpr#
 )^#3:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a && b && c && d && e && f && g",
@@ -1379,6 +1409,7 @@ mod tests {
     )^#13:*expr.Expr_CallExpr#
 )^#9:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a && b && c && d || e && f && g && h",
@@ -1405,6 +1436,7 @@ mod tests {
     )^#12:*expr.Expr_CallExpr#
 )^#15:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a + b",
@@ -1413,6 +1445,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a - b",
@@ -1421,6 +1454,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a * b",
@@ -1429,6 +1463,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a / b",
@@ -1437,6 +1472,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a % b",
@@ -1445,6 +1481,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a in b",
@@ -1453,6 +1490,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a == b",
@@ -1461,6 +1499,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a != b",
@@ -1469,6 +1508,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a > b",
@@ -1477,6 +1517,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a >= b",
@@ -1485,6 +1526,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a < b",
@@ -1493,6 +1535,7 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a <= b",
@@ -1501,16 +1544,19 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a.b",
                 p: "a^#1:*expr.Expr_IdentExpr#.b^#2:*expr.Expr_SelectExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a.b.c",
                 p: "a^#1:*expr.Expr_IdentExpr#.b^#2:*expr.Expr_SelectExpr#.c^#3:*expr.Expr_SelectExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a[b]",
@@ -1519,21 +1565,25 @@ mod tests {
     b^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "(a)",
                 p: "a^#1:*expr.Expr_IdentExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "((a))",
                 p: "a^#1:*expr.Expr_IdentExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a()",
                 p: "a()^#1:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a(b)",
@@ -1541,6 +1591,7 @@ mod tests {
     b^#2:*expr.Expr_IdentExpr#
 )^#1:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a(b, c)",
@@ -1549,11 +1600,13 @@ mod tests {
     c^#3:*expr.Expr_IdentExpr#
 )^#1:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a.b()",
                 p: "a^#1:*expr.Expr_IdentExpr#.b()^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "a.b(c)",
@@ -1561,11 +1614,13 @@ mod tests {
     c^#3:*expr.Expr_IdentExpr#
 )^#2:*expr.Expr_CallExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "foo{ }",
                 p: "foo{}^#1:*expr.Expr_StructExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "foo{ a:b }",
@@ -1573,6 +1628,7 @@ mod tests {
     a:b^#3:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "foo{ a:b, c:d }",
@@ -1581,11 +1637,13 @@ mod tests {
     c:d^#5:*expr.Expr_IdentExpr#^#4:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "{}",
                 p: "{}^#1:*expr.Expr_StructExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "{a: b, c: d}",
@@ -1594,11 +1652,13 @@ mod tests {
     c^#6:*expr.Expr_IdentExpr#:d^#7:*expr.Expr_IdentExpr#^#5:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "[]",
                 p: "[]^#1:*expr.Expr_ListExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "[a]",
@@ -1606,6 +1666,7 @@ mod tests {
     a^#2:*expr.Expr_IdentExpr#
 ]^#1:*expr.Expr_ListExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "[a, b, c]",
@@ -1615,11 +1676,13 @@ mod tests {
     c^#4:*expr.Expr_IdentExpr#
 ]^#1:*expr.Expr_ListExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "has(m.f)",
                 p: "m^#2:*expr.Expr_IdentExpr#.f~test-only~^#4:*expr.Expr_SelectExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "m.exists(v, f)",
@@ -1646,6 +1709,7 @@ _||_(
 // Result
 @result^#11:*expr.Expr_IdentExpr#)^#12:*expr.Expr_ComprehensionExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "m.all(v, f)",
@@ -1670,6 +1734,7 @@ _&&_(
 // Result
 @result^#10:*expr.Expr_IdentExpr#)^#11:*expr.Expr_ComprehensionExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "m.existsOne(v, f)",
@@ -1699,6 +1764,7 @@ _==_(
     1^#13:*expr.Constant_Int64Value#
 )^#14:*expr.Expr_CallExpr#)^#15:*expr.Expr_ComprehensionExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "m.map(v, f)",
@@ -1723,6 +1789,7 @@ _+_(
 // Result
 @result^#10:*expr.Expr_IdentExpr#)^#11:*expr.Expr_ComprehensionExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "m.map(v, p, f)",
@@ -1751,6 +1818,7 @@ _?_:_(
 // Result
 @result^#13:*expr.Expr_IdentExpr#)^#14:*expr.Expr_ComprehensionExpr#",
                 e: "",
+                ..Default::default()
             },
             TestInfo {
                 i: "m.filter(v, p)",
@@ -1779,6 +1847,7 @@ _?_:_(
 // Result
 @result^#12:*expr.Expr_IdentExpr#)^#13:*expr.Expr_ComprehensionExpr#",
                 e: "",
+                ..Default::default()
             },
             // Parse error tests
             TestInfo {
@@ -1787,6 +1856,7 @@ _?_:_(
                 e: "ERROR: <input>:1:1: invalid int literal
 | 0xFFFFFFFFFFFFFFFFF
 | ^",
+                ..Default::default()
             },
             TestInfo {
                 i: "0xFFFFFFFFFFFFFFFFFu",
@@ -1794,6 +1864,7 @@ _?_:_(
                 e: "ERROR: <input>:1:1: invalid uint literal
 | 0xFFFFFFFFFFFFFFFFFu
 | ^",
+                ..Default::default()
             },
             TestInfo {
                 i: "1.99e90000009",
@@ -1801,6 +1872,7 @@ _?_:_(
                 e: "ERROR: <input>:1:1: invalid double literal
 | 1.99e90000009
 | ^",
+                ..Default::default()
             },
             TestInfo {
                 i: "{",
@@ -1808,6 +1880,7 @@ _?_:_(
                 e: "ERROR: <input>:1:2: Syntax error: mismatched input '<EOF>' expecting {'[', '{', '}', '(', '.', ',', '-', '!', '?', 'true', 'false', 'null', NUM_FLOAT, NUM_INT, NUM_UINT, STRING, BYTES, IDENTIFIER}
 | {
 | .^",
+                ..Default::default()
             },
             TestInfo {
                 i: "*@a | b",
@@ -1823,7 +1896,8 @@ ERROR: <input>:1:5: Syntax error: token recognition error at: '| '
 | ....^
 ERROR: <input>:1:7: Syntax error: extraneous input 'b' expecting <EOF>
 | *@a | b
-| ......^", 
+| ......^",
+                ..Default::default()
             },
             TestInfo {
                 i: "a | b",
@@ -1834,6 +1908,7 @@ ERROR: <input>:1:7: Syntax error: extraneous input 'b' expecting <EOF>
 ERROR: <input>:1:5: Syntax error: extraneous input 'b' expecting <EOF>
 | a | b
 | ....^",
+                ..Default::default()
             },
             TestInfo {
                 i: "a.?b && a[?b]",
@@ -1844,16 +1919,18 @@ ERROR: <input>:1:5: Syntax error: extraneous input 'b' expecting <EOF>
 ERROR: <input>:1:10: unsupported syntax '[?'
 | a.?b && a[?b]
 | .........^",
+                enable_optional_syntax: false,
             },
             TestInfo {
-                i: "a.?b && a[?b]",
+                i: "[?a, ?b]",
                 p: "",
-                e: "ERROR: <input>:1:2: unsupported syntax '.?'
-| a.?b && a[?b]
+                e: "ERROR: <input>:1:2: unsupported syntax '?'
+| [?a, ?b]
 | .^
-ERROR: <input>:1:10: unsupported syntax '[?'
-| a.?b && a[?b]
-| .........^",
+ERROR: <input>:1:6: unsupported syntax '?'
+| [?a, ?b]
+| .....^",
+                enable_optional_syntax: false,
             },
             TestInfo {
                 i: "Msg{?field: value} && {?'key': value}",
@@ -1864,13 +1941,15 @@ ERROR: <input>:1:10: unsupported syntax '[?'
 ERROR: <input>:1:24: unsupported syntax '?'
 | Msg{?field: value} && {?'key': value}
 | .......................^",
+                enable_optional_syntax: false,
             },
-            TestInfo 	{
+            TestInfo {
                 i: "has(m)",
                 p: "",
                 e: "ERROR: <input>:1:5: invalid argument to has() macro
 | has(m)
-| ....^"
+| ....^",
+                ..Default::default()
             },
             TestInfo {
                 i: "1.all(2, 3)",
@@ -1878,11 +1957,12 @@ ERROR: <input>:1:24: unsupported syntax '?'
                 e: "ERROR: <input>:1:7: argument must be a simple name
 | 1.all(2, 3)
 | ......^",
+                ..Default::default()
             },
         ];
 
         for test_case in test_cases {
-            let parser = Parser::new();
+            let parser = Parser::new().enable_optional_syntax(test_case.enable_optional_syntax);
             let result = parser.parse(test_case.i);
             if !test_case.p.is_empty() {
                 assert_eq!(
