@@ -725,11 +725,19 @@ impl gen::CELVisitorCompat<'_> for Parser {
             let operand = self.visit(member.as_ref());
             let field = id.get_text();
             if let Some(_opt) = &ctx.opt {
-                return self.report_error::<ParseError, _>(
-                    op.as_ref(),
-                    None,
-                    "unsupported syntax '.?'",
-                );
+                return if self.enable_optional_syntax {
+                    let field_literal = self
+                        .helper
+                        .next_expr(op.as_ref(), Expr::Literal(CelVal::String(field.clone())));
+                    let op_id = self.helper.next_id(op.as_ref());
+                    self.global_call_or_macro(
+                        op_id,
+                        operators::OPT_SELECT.to_string(),
+                        vec![operand, field_literal],
+                    )
+                } else {
+                    self.report_error::<ParseError, _>(op.as_ref(), None, "unsupported syntax '.?'")
+                };
             }
             self.helper.next_expr(
                 op.as_ref(),
@@ -762,11 +770,19 @@ impl gen::CELVisitorCompat<'_> for Parser {
                     let op_id = self.helper.next_id(op);
                     let index = self.visit(index.as_ref());
                     if let Some(_opt) = &ctx.opt {
-                        return self.report_error::<ParseError, _>(
-                            op.as_ref(),
-                            None,
-                            "unsupported syntax '[?'",
-                        );
+                        return if self.enable_optional_syntax {
+                            self.global_call_or_macro(
+                                op_id,
+                                operators::OPT_INDEX.to_string(),
+                                vec![target, index],
+                            )
+                        } else {
+                            self.report_error::<ParseError, _>(
+                                op.as_ref(),
+                                None,
+                                "unsupported syntax '[?'",
+                            )
+                        };
                     }
                     self.global_call_or_macro(
                         op_id,
@@ -1921,6 +1937,24 @@ ERROR: <input>:1:10: unsupported syntax '[?'
 | .........^",
                 enable_optional_syntax: false,
             },
+            TestInfo {
+            i: "a.?b[?0] && a[?c]",
+            p: r#"_&&_(
+    _[?_](
+        _?._(
+            a^#1:*expr.Expr_IdentExpr#,
+            "b"^#2:*expr.Constant_StringValue#
+        )^#3:*expr.Expr_CallExpr#,
+        0^#5:*expr.Constant_Int64Value#
+    )^#4:*expr.Expr_CallExpr#,
+    _[?_](
+        a^#6:*expr.Expr_IdentExpr#,
+        c^#8:*expr.Expr_IdentExpr#
+    )^#7:*expr.Expr_CallExpr#
+)^#9:*expr.Expr_CallExpr#"#,
+            e: "",
+            enable_optional_syntax: true,
+        },
             TestInfo {
                 i: "[?a, ?b]",
                 p: "",
