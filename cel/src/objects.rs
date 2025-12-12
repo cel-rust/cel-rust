@@ -812,26 +812,40 @@ impl Value {
                                 (Value::String(_), Value::Int(idx)) => {
                                     Err(ExecutionError::NoSuchKey(idx.to_string().into()))
                                 }
-                                (Value::Map(map), Value::String(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::Bool(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::Int(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
-                                (Value::Map(map), Value::UInt(property)) => map
-                                    .get(&property.into())
-                                    .cloned()
-                                    .unwrap_or(Value::Null)
-                                    .into(),
+                                (Value::Map(map), Value::String(property)) => {
+                                    let key: Key = (&**property).into();
+                                    map.get(&key)
+                                        .cloned()
+                                        .ok_or_else(|| ExecutionError::NoSuchKey(property.into()))?
+                                        .into()
+                                }
+                                (Value::Map(map), Value::Bool(property)) => {
+                                    let key: Key = property.into();
+                                    map.get(&key)
+                                        .cloned()
+                                        .ok_or_else(|| {
+                                            ExecutionError::NoSuchKey(property.to_string().into())
+                                        })?
+                                        .into()
+                                }
+                                (Value::Map(map), Value::Int(property)) => {
+                                    let key: Key = property.into();
+                                    map.get(&key)
+                                        .cloned()
+                                        .ok_or_else(|| {
+                                            ExecutionError::NoSuchKey(property.to_string().into())
+                                        })?
+                                        .into()
+                                }
+                                (Value::Map(map), Value::UInt(property)) => {
+                                    let key: Key = property.into();
+                                    map.get(&key)
+                                        .cloned()
+                                        .ok_or_else(|| {
+                                            ExecutionError::NoSuchKey(property.to_string().into())
+                                        })?
+                                        .into()
+                                }
                                 (Value::Map(_), index) => {
                                     Err(ExecutionError::UnsupportedMapIndex(index))
                                 }
@@ -1566,6 +1580,19 @@ mod tests {
                 Value::Int(2)
             ])))
         );
+    }
+
+    #[test]
+    fn test_index_missing_map_key() {
+        let mut ctx = Context::default();
+        let mut map = HashMap::new();
+        map.insert("a".to_string(), Value::Int(1));
+        ctx.add_variable_from_value("mymap", map);
+
+        let p = Program::compile(r#"mymap["missing"]"#).expect("Must compile");
+        let result = p.execute(&ctx);
+
+        assert!(result.is_err(), "Should error on missing map key");
     }
 
     mod opaque {
