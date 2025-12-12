@@ -335,25 +335,30 @@ impl Parser {
         entries
     }
 
-    fn list_initializer_list(&mut self, ctx: &ListInitContextAll) -> Vec<IdedExpr> {
+    fn list_initializer_list(&mut self, ctx: &ListInitContextAll) -> (Vec<IdedExpr>, Vec<usize>) {
         let mut list = Vec::default();
-        for e in &ctx.elems {
+        let mut optionals = Vec::default();
+        for (i, e) in ctx.elems.iter().enumerate() {
             match &e.e {
-                None => return Vec::default(),
+                None => return (Vec::default(), Vec::default()),
                 Some(exp) => {
                     if let Some(opt) = &e.opt {
-                        self.report_error::<ParseError, _>(
-                            opt.as_ref(),
-                            None,
-                            "unsupported syntax '?'",
-                        );
-                        continue;
+                        if self.enable_optional_syntax {
+                            optionals.push(i);
+                        } else {
+                            self.report_error::<ParseError, _>(
+                                opt.as_ref(),
+                                None,
+                                "unsupported syntax '?'",
+                            );
+                            continue;
+                        }
                     }
                     list.push(self.visit(exp.as_ref()));
                 }
             }
         }
-        list
+        (list, optionals)
     }
 
     fn report_error<E: Error + Send + Sync + 'static, S: Into<String>>(
@@ -858,13 +863,13 @@ impl gen::CELVisitorCompat<'_> for Parser {
 
     fn visit_CreateList(&mut self, ctx: &CreateListContext<'_>) -> Self::Return {
         let list_id = self.helper.next_id_for_token(ctx.op.as_deref());
-        let elements = match &ctx.elems {
-            None => Vec::default(),
+        let (elements, optionals) = match &ctx.elems {
+            None => (Vec::default(), Vec::default()),
             Some(elements) => self.list_initializer_list(elements.deref()),
         };
         IdedExpr {
             id: list_id,
-            expr: Expr::List(ListExpr { elements }),
+            expr: Expr::List(ListExpr::new_with_optionals(elements, optionals)),
         }
     }
 
@@ -1972,6 +1977,26 @@ ERROR: <input>:1:10: unsupported syntax '[?'
             p: r#"{
     ?"key"^#3:*expr.Constant_StringValue#:value^#4:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#"#,
+            e: "",
+            enable_optional_syntax: true,
+        },
+        TestInfo {
+            i: "[?a, ?b]",
+            p: r#"[
+    a^#2:*expr.Expr_IdentExpr#,
+    b^#3:*expr.Expr_IdentExpr#
+]^#1:*expr.Expr_ListExpr#"#,
+            e: "",
+            enable_optional_syntax: true,
+        },
+        TestInfo {
+            i: "[?a[?b]]",
+            p: r#"[
+    _[?_](
+        a^#2:*expr.Expr_IdentExpr#,
+        b^#4:*expr.Expr_IdentExpr#
+    )^#3:*expr.Expr_CallExpr#
+]^#1:*expr.Expr_ListExpr#"#,
             e: "",
             enable_optional_syntax: true,
         },

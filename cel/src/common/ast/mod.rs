@@ -84,6 +84,20 @@ pub struct MapExpr {
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ListExpr {
     pub elements: Vec<IdedExpr>,
+    pub optional_indices: Vec<usize>,
+}
+
+impl ListExpr {
+    pub fn new(elements: Vec<IdedExpr>) -> Self {
+        Self::new_with_optionals(elements, Vec::default())
+    }
+
+    pub fn new_with_optionals(elements: Vec<IdedExpr>, optional_indices: Vec<usize>) -> Self {
+        Self {
+            elements,
+            optional_indices,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq)]
