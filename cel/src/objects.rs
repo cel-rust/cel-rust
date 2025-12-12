@@ -983,22 +983,49 @@ impl Value {
                 let list = list_expr
                     .elements
                     .iter()
-                    .map(|i| Value::resolve(i, ctx))
-                    .collect::<Result<Vec<_>, _>>()?;
+                    .enumerate()
+                    .map(|(idx, element)| {
+                        Value::resolve(element, ctx).map(|value| {
+                            if list_expr.optional_indices.contains(&idx) {
+                                if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
+                                    opt_val.value().cloned()
+                                } else {
+                                    Some(value)
+                                }
+                            } else {
+                                Some(value)
+                            }
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()?
+                    .into_iter()
+                    .flatten()
+                    .collect::<Vec<_>>();
                 Value::List(list.into()).into()
             }
             Expr::Map(map_expr) => {
                 let mut map = HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
-                    let (k, v) = match &entry.expr {
+                    let (k, v, is_optional) = match &entry.expr {
                         EntryExpr::StructField(_) => panic!("WAT?"),
-                        EntryExpr::MapEntry(e) => (&e.key, &e.value),
+                        EntryExpr::MapEntry(e) => (&e.key, &e.value, e.optional),
                     };
                     let key = Value::resolve(k, ctx)?
                         .try_into()
                         .map_err(ExecutionError::UnsupportedKeyType)?;
                     let value = Value::resolve(v, ctx)?;
-                    map.insert(key, value);
+
+                    if is_optional {
+                        if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
+                            if let Some(inner) = opt_val.value() {
+                                map.insert(key, inner.clone());
+                            }
+                        } else {
+                            map.insert(key, value);
+                        }
+                    } else {
+                        map.insert(key, value);
+                    }
                 }
                 Ok(Value::Map(Map {
                     map: Arc::from(map),
@@ -1607,7 +1634,7 @@ mod tests {
     }
 
     mod opaque {
-        use crate::objects::{Opaque, OptionalValue};
+        use crate::objects::{Map, Opaque, OptionalValue};
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
         use std::collections::HashMap;
@@ -1873,6 +1900,123 @@ mod tests {
             let p =
                 Program::compile("optional.of([1, 2, 3])[?1].orValue(99)").expect("Must compile");
             assert_eq!(p.execute(&Context::default()), Ok(Value::Int(2)));
+
+            let p = Program::compile("[1, 2, ?optional.of(3), 4]").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::List(Arc::new(vec![
+                    Value::Int(1),
+                    Value::Int(2),
+                    Value::Int(3),
+                    Value::Int(4)
+                ])))
+            );
+
+            let p = Program::compile("[1, 2, ?optional.none(), 4]").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::List(Arc::new(vec![
+                    Value::Int(1),
+                    Value::Int(2),
+                    Value::Int(4)
+                ])))
+            );
+
+            let p = Program::compile("[?optional.of(1), ?optional.none(), ?optional.of(3)]")
+                .expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::List(Arc::new(vec![Value::Int(1), Value::Int(3)])))
+            );
+
+            let p = Program::compile(r#"[1, ?mymap[?"missing"], 3]"#).expect("Must compile");
+            assert_eq!(
+                p.execute(&map_ctx),
+                Ok(Value::List(Arc::new(vec![Value::Int(1), Value::Int(3)])))
+            );
+
+            let p = Program::compile(r#"[1, ?mymap[?"a"], 3]"#).expect("Must compile");
+            assert_eq!(
+                p.execute(&map_ctx),
+                Ok(Value::List(Arc::new(vec![
+                    Value::Int(1),
+                    Value::Int(1),
+                    Value::Int(3)
+                ])))
+            );
+
+            let p = Program::compile("[?optional.none(), ?optional.none()]").expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::List(Arc::new(vec![])))
+            );
+
+            let p = Program::compile(r#"{"a": 1, "b": 2, ?"c": optional.of(3)}"#)
+                .expect("Must compile");
+            let mut expected_map = HashMap::new();
+            expected_map.insert("a".into(), Value::Int(1));
+            expected_map.insert("b".into(), Value::Int(2));
+            expected_map.insert("c".into(), Value::Int(3));
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Map(Map {
+                    map: Arc::from(expected_map)
+                }))
+            );
+
+            let p = Program::compile(r#"{"a": 1, "b": 2, ?"c": optional.none()}"#)
+                .expect("Must compile");
+            let mut expected_map = HashMap::new();
+            expected_map.insert("a".into(), Value::Int(1));
+            expected_map.insert("b".into(), Value::Int(2));
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Map(Map {
+                    map: Arc::from(expected_map)
+                }))
+            );
+
+            let p = Program::compile(r#"{"a": 1, ?"b": optional.none(), ?"c": optional.of(3)}"#)
+                .expect("Must compile");
+            let mut expected_map = HashMap::new();
+            expected_map.insert("a".into(), Value::Int(1));
+            expected_map.insert("c".into(), Value::Int(3));
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Map(Map {
+                    map: Arc::from(expected_map)
+                }))
+            );
+
+            let p = Program::compile(r#"{"a": 1, ?"b": mymap[?"missing"]}"#).expect("Must compile");
+            let mut expected_map = HashMap::new();
+            expected_map.insert("a".into(), Value::Int(1));
+            assert_eq!(
+                p.execute(&map_ctx),
+                Ok(Value::Map(Map {
+                    map: Arc::from(expected_map)
+                }))
+            );
+
+            let p = Program::compile(r#"{"x": 10, ?"y": mymap[?"a"]}"#).expect("Must compile");
+            let mut expected_map = HashMap::new();
+            expected_map.insert("x".into(), Value::Int(10));
+            expected_map.insert("y".into(), Value::Int(1));
+            assert_eq!(
+                p.execute(&map_ctx),
+                Ok(Value::Map(Map {
+                    map: Arc::from(expected_map)
+                }))
+            );
+
+            let p = Program::compile(r#"{?"a": optional.none(), ?"b": optional.none()}"#)
+                .expect("Must compile");
+            assert_eq!(
+                p.execute(&Context::default()),
+                Ok(Value::Map(Map {
+                    map: Arc::from(HashMap::new())
+                }))
+            );
         }
     }
 }
