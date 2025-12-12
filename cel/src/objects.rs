@@ -843,6 +843,30 @@ impl Value {
                                 }
                             };
                         }
+                        operators::OPT_SELECT => {
+                            let operand = Value::resolve(&call.args[0], ctx)?;
+                            let field_literal = Value::resolve(&call.args[1], ctx)?;
+                            let field = match field_literal {
+                                Value::String(s) => s,
+                                _ => {
+                                    return Err(ExecutionError::function_error(
+                                        "_?._",
+                                        "field must be string",
+                                    ))
+                                }
+                            };
+                            if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
+                                return match opt_val.value() {
+                                    Some(inner) => Ok(Value::Opaque(Arc::new(OptionalValue::of(
+                                        inner.clone().member(&field)?,
+                                    )))),
+                                    None => Ok(operand),
+                                };
+                            }
+                            return Ok(Value::Opaque(Arc::new(OptionalValue::of(
+                                operand.member(&field)?,
+                            ))));
+                        }
                         _ => (),
                     }
                 }
@@ -1548,6 +1572,7 @@ mod tests {
         use crate::objects::{Opaque, OptionalValue};
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
+        use std::collections::HashMap;
         use std::fmt::Debug;
         use std::ops::Deref;
         use std::sync::Arc;
@@ -1727,6 +1752,45 @@ mod tests {
             assert_eq!(p.execute(&Context::default()), Ok(Value::Int(1)));
             let p = Program::compile("optional.none().orValue(5)").expect("Must compile");
             assert_eq!(p.execute(&Context::default()), Ok(Value::Int(5)));
+
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("msg", HashMap::from([("field", "value")]));
+
+            let p = Program::compile("msg.?field").expect("Must compile");
+            assert_eq!(
+                p.execute(&ctx),
+                Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::String(
+                    Arc::new("value".to_string())
+                )))))
+            );
+
+            let p = Program::compile("optional.of(msg).?field").expect("Must compile");
+            assert_eq!(
+                p.execute(&ctx),
+                Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::String(
+                    Arc::new("value".to_string())
+                )))))
+            );
+
+            let p = Program::compile("optional.none().?field").expect("Must compile");
+            assert_eq!(
+                p.execute(&ctx),
+                Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+            );
+
+            let p = Program::compile("optional.of(msg).?field.orValue('default')")
+                .expect("Must compile");
+            assert_eq!(
+                p.execute(&ctx),
+                Ok(Value::String(Arc::new("value".to_string())))
+            );
+
+            let p = Program::compile("optional.none().?field.orValue('default')")
+                .expect("Must compile");
+            assert_eq!(
+                p.execute(&ctx),
+                Ok(Value::String(Arc::new("default".to_string())))
+            );
         }
     }
 }
