@@ -791,10 +791,22 @@ impl Value {
                             }
                             .into();
                         }
-                        operators::INDEX => {
-                            let value = Value::resolve(&call.args[0], ctx)?;
+                        operators::INDEX | operators::OPT_INDEX => {
+                            let mut value = Value::resolve(&call.args[0], ctx)?;
                             let idx = Value::resolve(&call.args[1], ctx)?;
-                            return match (value, idx) {
+                            let mut is_optional = call.func_name == operators::OPT_INDEX;
+
+                            if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
+                                is_optional = true;
+                                value = match opt_val.value() {
+                                    Some(inner) => inner.clone(),
+                                    None => {
+                                        return Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+                                    }
+                                };
+                            }
+
+                            let result = match (value, idx) {
                                 (Value::List(items), Value::Int(idx)) => {
                                     if idx >= 0 && (idx as usize) < items.len() {
                                         items[idx as usize].clone().into()
@@ -816,35 +828,25 @@ impl Value {
                                     let key: Key = (&**property).into();
                                     map.get(&key)
                                         .cloned()
-                                        .ok_or_else(|| ExecutionError::NoSuchKey(property.into()))?
-                                        .into()
+                                        .ok_or_else(|| ExecutionError::NoSuchKey(property))
                                 }
                                 (Value::Map(map), Value::Bool(property)) => {
                                     let key: Key = property.into();
-                                    map.get(&key)
-                                        .cloned()
-                                        .ok_or_else(|| {
-                                            ExecutionError::NoSuchKey(property.to_string().into())
-                                        })?
-                                        .into()
+                                    map.get(&key).cloned().ok_or_else(|| {
+                                        ExecutionError::NoSuchKey(property.to_string().into())
+                                    })
                                 }
                                 (Value::Map(map), Value::Int(property)) => {
                                     let key: Key = property.into();
-                                    map.get(&key)
-                                        .cloned()
-                                        .ok_or_else(|| {
-                                            ExecutionError::NoSuchKey(property.to_string().into())
-                                        })?
-                                        .into()
+                                    map.get(&key).cloned().ok_or_else(|| {
+                                        ExecutionError::NoSuchKey(property.to_string().into())
+                                    })
                                 }
                                 (Value::Map(map), Value::UInt(property)) => {
                                     let key: Key = property.into();
-                                    map.get(&key)
-                                        .cloned()
-                                        .ok_or_else(|| {
-                                            ExecutionError::NoSuchKey(property.to_string().into())
-                                        })?
-                                        .into()
+                                    map.get(&key).cloned().ok_or_else(|| {
+                                        ExecutionError::NoSuchKey(property.to_string().into())
+                                    })
                                 }
                                 (Value::Map(_), index) => {
                                     Err(ExecutionError::UnsupportedMapIndex(index))
@@ -855,6 +857,15 @@ impl Value {
                                 (value, index) => {
                                     Err(ExecutionError::UnsupportedIndex(value, index))
                                 }
+                            };
+
+                            return if is_optional {
+                                Ok(match result {
+                                    Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
+                                    Err(_) => Value::Opaque(Arc::new(OptionalValue::none())),
+                                })
+                            } else {
+                                result
                             };
                         }
                         operators::OPT_SELECT => {
@@ -1818,6 +1829,50 @@ mod tests {
                 p.execute(&ctx),
                 Ok(Value::String(Arc::new("default".to_string())))
             );
+
+            let mut map_ctx = Context::default();
+            let mut map = HashMap::new();
+            map.insert("a".to_string(), Value::Int(1));
+            map_ctx.add_variable_from_value("mymap", map);
+
+            let p = Program::compile(r#"mymap[?"missing"].orValue(99)"#).expect("Must compile");
+            assert_eq!(p.execute(&map_ctx), Ok(Value::Int(99)));
+
+            let p = Program::compile(r#"mymap[?"missing"].hasValue()"#).expect("Must compile");
+            assert_eq!(p.execute(&map_ctx), Ok(Value::Bool(false)));
+
+            let p = Program::compile(r#"mymap[?"a"].orValue(99)"#).expect("Must compile");
+            assert_eq!(p.execute(&map_ctx), Ok(Value::Int(1)));
+
+            let p = Program::compile(r#"mymap[?"a"].hasValue()"#).expect("Must compile");
+            assert_eq!(p.execute(&map_ctx), Ok(Value::Bool(true)));
+
+            let mut list_ctx = Context::default();
+            list_ctx.add_variable_from_value(
+                "mylist",
+                vec![Value::Int(1), Value::Int(2), Value::Int(3)],
+            );
+
+            let p = Program::compile("mylist[?10].orValue(99)").expect("Must compile");
+            assert_eq!(p.execute(&list_ctx), Ok(Value::Int(99)));
+
+            let p = Program::compile("mylist[?1].orValue(99)").expect("Must compile");
+            assert_eq!(p.execute(&list_ctx), Ok(Value::Int(2)));
+
+            let p =
+                Program::compile("optional.of([1, 2, 3])[1].orValue(99)").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(2)));
+
+            let p =
+                Program::compile("optional.of([1, 2, 3])[4].orValue(99)").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(99)));
+
+            let p = Program::compile("optional.none()[1].orValue(99)").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(99)));
+
+            let p =
+                Program::compile("optional.of([1, 2, 3])[?1].orValue(99)").expect("Must compile");
+            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(2)));
         }
     }
 }
