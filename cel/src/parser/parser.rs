@@ -271,20 +271,24 @@ impl Parser {
                 Some(ident) => {
                     let field_name = ident.get_text().to_string();
                     let value = self.visit(ctx.values[i].as_ref());
-                    if let Some(opt) = &field.opt {
-                        self.report_error::<ParseError, _>(
-                            opt.as_ref(),
-                            None,
-                            "unsupported syntax '?'",
-                        );
-                        continue;
-                    }
+                    let is_optional = match (&field.opt, self.enable_optional_syntax) {
+                        (Some(opt), false) => {
+                            self.report_error::<ParseError, _>(
+                                opt.as_ref(),
+                                None,
+                                "unsupported syntax '?'",
+                            );
+                            continue;
+                        }
+                        (Some(_), true) => true,
+                        (None, _) => false,
+                    };
                     fields.push(IdedEntryExpr {
                         id,
                         expr: EntryExpr::StructField(StructFieldExpr {
                             field: field_name,
                             value,
-                            optional: false,
+                            optional: is_optional,
                         }),
                     });
                 }
@@ -306,17 +310,25 @@ impl Parser {
             }
             let id = self.helper.next_id(col);
             let key = self.visit(keys[i].as_ref());
-            if let Some(opt) = &keys[i].opt {
-                self.report_error::<ParseError, _>(opt.as_ref(), None, "unsupported syntax '?'");
-                continue;
-            }
+            let is_optional = match (keys[i].opt.as_ref(), self.enable_optional_syntax) {
+                (Some(opt), false) => {
+                    self.report_error::<ParseError, _>(
+                        opt.as_ref(),
+                        None,
+                        "unsupported syntax '?'",
+                    );
+                    continue;
+                }
+                (Some(_), true) => true,
+                (None, _) => false,
+            };
             let value = self.visit(vals[i].as_ref());
             entries.push(IdedEntryExpr {
                 id,
                 expr: EntryExpr::MapEntry(MapEntryExpr {
                     key,
                     value,
-                    optional: false,
+                    optional: is_optional,
                 }),
             })
         }
@@ -1955,6 +1967,14 @@ ERROR: <input>:1:10: unsupported syntax '[?'
             e: "",
             enable_optional_syntax: true,
         },
+        TestInfo {
+            i: "{?'key': value}",
+            p: r#"{
+    ?"key"^#3:*expr.Constant_StringValue#:value^#4:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
+}^#1:*expr.Expr_StructExpr#"#,
+            e: "",
+            enable_optional_syntax: true,
+        },
             TestInfo {
                 i: "[?a, ?b]",
                 p: "",
@@ -1965,6 +1985,14 @@ ERROR: <input>:1:6: unsupported syntax '?'
 | [?a, ?b]
 | .....^",
                 enable_optional_syntax: false,
+            },
+            TestInfo {
+                i: "Msg{?field: value}",
+                p: r#"Msg{
+    ?field:value^#3:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
+}^#1:*expr.Expr_StructExpr#"#,
+                e: "",
+                enable_optional_syntax: true,
             },
             TestInfo {
                 i: "Msg{?field: value} && {?'key': value}",
@@ -2124,6 +2152,9 @@ ERROR: <input>:1:24: unsupported syntax '?'
                         match &entry.expr {
                             EntryExpr::StructField(_) => panic!("WAT?!"),
                             EntryExpr::MapEntry(e) => {
+                                if e.optional {
+                                    self.push("?");
+                                }
                                 self.buffer(&e.key);
                                 self.push(":");
                                 self.buffer(&e.value);
@@ -2160,6 +2191,9 @@ ERROR: <input>:1:24: unsupported syntax '?'
                     for (i, entry) in s.entries.iter().enumerate() {
                         match &entry.expr {
                             EntryExpr::StructField(field) => {
+                                if field.optional {
+                                    self.push("?");
+                                }
                                 self.push(&field.field);
                                 self.push(":");
                                 self.buffer(&field.value);
