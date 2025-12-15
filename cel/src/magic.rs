@@ -29,6 +29,18 @@ impl From<i32> for Value {
     }
 }
 
+impl From<u32> for Value {
+    fn from(value: u32) -> Self {
+        Value::UInt(value as u64)
+    }
+}
+
+impl From<f32> for Value {
+    fn from(value: f32) -> Self {
+        Value::Float(value as f64)
+    }
+}
+
 /// Describes any type that can be converted from a [`Value`] into itself.
 /// This is commonly used to convert from [`Value`] into primitive types,
 /// e.g. from `Value::Bool(true) -> true`. This trait is auto-implemented
