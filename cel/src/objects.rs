@@ -111,9 +111,21 @@ impl From<i64> for Key {
     }
 }
 
+impl From<i32> for Key {
+    fn from(v: i32) -> Self {
+        Key::Int(v as i64)
+    }
+}
+
 impl From<u64> for Key {
     fn from(v: u64) -> Self {
         Key::Uint(v)
+    }
+}
+
+impl From<u32> for Key {
+    fn from(v: u32) -> Self {
+        Key::Uint(v as u64)
     }
 }
 
