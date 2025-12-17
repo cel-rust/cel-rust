@@ -227,7 +227,7 @@ fn map_macro_expander(
     let func = args.pop().unwrap();
     let v = extract_ident(args.remove(0), helper)?;
 
-    let init = helper.next_expr(Expr::List(ListExpr { elements: vec![] }));
+    let init = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
     let result_binding = "@result".to_string();
     let condition = helper.next_expr(Expr::Literal(Boolean(true)));
 
@@ -235,9 +235,7 @@ fn map_macro_expander(
 
     let args = vec![
         helper.next_expr(Expr::Ident(result_binding.clone())),
-        helper.next_expr(Expr::List(ListExpr {
-            elements: vec![func],
-        })),
+        helper.next_expr(Expr::List(ListExpr::new(vec![func]))),
     ];
     let step = helper.next_expr(Expr::Call(CallExpr {
         func_name: operators::ADD.to_string(),
@@ -289,15 +287,13 @@ fn filter_macro_expander(
     let v = extract_ident(var.clone(), helper)?;
     let filter = args.pop().unwrap();
 
-    let init = helper.next_expr(Expr::List(ListExpr { elements: vec![] }));
+    let init = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
     let result_binding = "@result".to_string();
     let condition = helper.next_expr(Expr::Literal(Boolean(true)));
 
     let args = vec![
         helper.next_expr(Expr::Ident(result_binding.clone())),
-        helper.next_expr(Expr::List(ListExpr {
-            elements: vec![var],
-        })),
+        helper.next_expr(Expr::List(ListExpr::new(vec![var]))),
     ];
     let step = helper.next_expr(Expr::Call(CallExpr {
         func_name: operators::ADD.to_string(),

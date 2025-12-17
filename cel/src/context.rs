@@ -191,6 +191,16 @@ impl Default for Context<'_> {
         ctx.add_function("double", functions::double);
         ctx.add_function("int", functions::int);
         ctx.add_function("uint", functions::uint);
+        ctx.add_function("optional.none", functions::optional_none);
+        ctx.add_function("optional.of", functions::optional_of);
+        ctx.add_function(
+            "optional.ofNonZeroValue",
+            functions::optional_of_non_zero_value,
+        );
+        ctx.add_function("value", functions::optional_value);
+        ctx.add_function("hasValue", functions::optional_has_value);
+        ctx.add_function("or", functions::optional_or_optional);
+        ctx.add_function("orValue", functions::optional_or_value);
 
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);

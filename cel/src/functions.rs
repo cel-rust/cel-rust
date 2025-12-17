@@ -1,6 +1,6 @@
 use crate::context::Context;
 use crate::magic::{Arguments, This};
-use crate::objects::Value;
+use crate::objects::{OptionalValue, Value};
 use crate::parser::Expression;
 use crate::resolvers::Resolver;
 use crate::ExecutionError;
@@ -221,6 +221,60 @@ pub fn int(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
         Value::UInt(v) => Value::Int(v.try_into().map_err(|_| ftx.error("integer overflow"))?),
         v => return Err(ftx.error(format!("cannot convert {v:?} to int"))),
     })
+}
+
+pub fn optional_none(ftx: &FunctionContext) -> Result<Value> {
+    if ftx.this.is_some() || !ftx.args.is_empty() {
+        return Err(ftx.error("unsupported function"));
+    }
+    Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+}
+
+pub fn optional_of(ftx: &FunctionContext, value: Value) -> Result<Value> {
+    if ftx.this.is_some() {
+        return Err(ftx.error("unsupported function"));
+    }
+    Ok(Value::Opaque(Arc::new(OptionalValue::of(value))))
+}
+
+pub fn optional_of_non_zero_value(ftx: &FunctionContext, value: Value) -> Result<Value> {
+    if ftx.this.is_some() {
+        return Err(ftx.error("unsupported function"));
+    }
+    if value.is_zero() {
+        Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+    } else {
+        Ok(Value::Opaque(Arc::new(OptionalValue::of(value))))
+    }
+}
+pub fn optional_value(This(this): This<Value>) -> Result<Value> {
+    <&OptionalValue>::try_from(&this)?
+        .value()
+        .cloned()
+        .ok_or_else(|| ExecutionError::function_error("value", "optional.none() dereference"))
+}
+
+pub fn optional_has_value(This(this): This<Value>) -> Result<bool> {
+    Ok(<&OptionalValue>::try_from(&this)?.value().is_some())
+}
+
+pub fn optional_or_optional(This(this): This<Value>, other: Value) -> Result<Value> {
+    let this_opt: &OptionalValue = (&this).try_into()?;
+    match this_opt.value() {
+        Some(_) => Ok(this),
+        None => {
+            let _: &OptionalValue = (&other).try_into()?;
+            Ok(other)
+        }
+    }
+}
+
+pub fn optional_or_value(This(this): This<Value>, other: Value) -> Result<Value> {
+    let this_opt: &OptionalValue = (&this).try_into()?;
+    match this_opt.value() {
+        Some(v) => Ok(v.clone()),
+        None => Ok(other),
+    }
 }
 
 /// Returns true if a string starts with another string.
