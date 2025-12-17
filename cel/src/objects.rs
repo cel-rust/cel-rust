@@ -1635,6 +1635,7 @@ mod tests {
 
     mod opaque {
         use crate::objects::{Map, Opaque, OptionalValue};
+        use crate::parser::Parser;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
         use std::collections::HashMap;
@@ -1757,103 +1758,170 @@ mod tests {
 
         #[test]
         fn test_optional() {
-            let p = Program::compile("optional.none()").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none()")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none())))
             );
 
-            let p = Program::compile("optional.of(1)").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(1)")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))
             );
 
-            let p = Program::compile("optional.ofNonZeroValue(0)").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.ofNonZeroValue(0)")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none())))
             );
 
-            let p = Program::compile("optional.ofNonZeroValue(1)").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.ofNonZeroValue(1)")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))
             );
 
-            let p = Program::compile("optional.of(1).value()").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(1)));
-            let p = Program::compile("optional.none().value()").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).value()")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Int(1))
+            );
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none().value()")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
                 Err(ExecutionError::FunctionError {
                     function: "value".to_string(),
                     message: "optional.none() dereference".to_string()
                 })
             );
 
-            let p = Program::compile("optional.of(1).hasValue()").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Bool(true)));
-            let p = Program::compile("optional.none().hasValue()").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Bool(false)));
-
-            let p = Program::compile("optional.of(1).or(optional.of(2))").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).hasValue()")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Bool(true))
+            );
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none().hasValue()")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Bool(false))
+            );
+
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).or(optional.of(2))")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(1)))))
             );
-            let p = Program::compile("optional.none().or(optional.of(2))").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none().or(optional.of(2))")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::Int(2)))))
             );
-            let p = Program::compile("optional.none().or(optional.none())").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none().or(optional.none())")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none())))
             );
 
-            let p = Program::compile("optional.of(1).orValue(5)").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(1)));
-            let p = Program::compile("optional.none().orValue(5)").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(5)));
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).orValue(5)")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Int(1))
+            );
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none().orValue(5)")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Int(5))
+            );
 
             let mut ctx = Context::default();
             ctx.add_variable_from_value("msg", HashMap::from([("field", "value")]));
 
-            let p = Program::compile("msg.?field").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("msg.?field")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&ctx),
+                Value::resolve(&expr, &ctx),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::String(
                     Arc::new("value".to_string())
                 )))))
             );
 
-            let p = Program::compile("optional.of(msg).?field").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(msg).?field")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&ctx),
+                Value::resolve(&expr, &ctx),
                 Ok(Value::Opaque(Arc::new(OptionalValue::of(Value::String(
                     Arc::new("value".to_string())
                 )))))
             );
 
-            let p = Program::compile("optional.none().?field").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none().?field")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&ctx),
+                Value::resolve(&expr, &ctx),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none())))
             );
 
-            let p = Program::compile("optional.of(msg).?field.orValue('default')")
-                .expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(msg).?field.orValue('default')")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&ctx),
+                Value::resolve(&expr, &ctx),
                 Ok(Value::String(Arc::new("value".to_string())))
             );
 
-            let p = Program::compile("optional.none().?field.orValue('default')")
-                .expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none().?field.orValue('default')")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&ctx),
+                Value::resolve(&expr, &ctx),
                 Ok(Value::String(Arc::new("default".to_string())))
             );
 
@@ -1862,17 +1930,29 @@ mod tests {
             map.insert("a".to_string(), Value::Int(1));
             map_ctx.add_variable_from_value("mymap", map);
 
-            let p = Program::compile(r#"mymap[?"missing"].orValue(99)"#).expect("Must compile");
-            assert_eq!(p.execute(&map_ctx), Ok(Value::Int(99)));
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"missing"].orValue(99)"#)
+                .expect("Must parse");
+            assert_eq!(Value::resolve(&expr, &map_ctx), Ok(Value::Int(99)));
 
-            let p = Program::compile(r#"mymap[?"missing"].hasValue()"#).expect("Must compile");
-            assert_eq!(p.execute(&map_ctx), Ok(Value::Bool(false)));
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"missing"].hasValue()"#)
+                .expect("Must parse");
+            assert_eq!(Value::resolve(&expr, &map_ctx), Ok(Value::Bool(false)));
 
-            let p = Program::compile(r#"mymap[?"a"].orValue(99)"#).expect("Must compile");
-            assert_eq!(p.execute(&map_ctx), Ok(Value::Int(1)));
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"a"].orValue(99)"#)
+                .expect("Must parse");
+            assert_eq!(Value::resolve(&expr, &map_ctx), Ok(Value::Int(1)));
 
-            let p = Program::compile(r#"mymap[?"a"].hasValue()"#).expect("Must compile");
-            assert_eq!(p.execute(&map_ctx), Ok(Value::Bool(true)));
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"a"].hasValue()"#)
+                .expect("Must parse");
+            assert_eq!(Value::resolve(&expr, &map_ctx), Ok(Value::Bool(true)));
 
             let mut list_ctx = Context::default();
             list_ctx.add_variable_from_value(
@@ -1880,30 +1960,60 @@ mod tests {
                 vec![Value::Int(1), Value::Int(2), Value::Int(3)],
             );
 
-            let p = Program::compile("mylist[?10].orValue(99)").expect("Must compile");
-            assert_eq!(p.execute(&list_ctx), Ok(Value::Int(99)));
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("mylist[?10].orValue(99)")
+                .expect("Must parse");
+            assert_eq!(Value::resolve(&expr, &list_ctx), Ok(Value::Int(99)));
 
-            let p = Program::compile("mylist[?1].orValue(99)").expect("Must compile");
-            assert_eq!(p.execute(&list_ctx), Ok(Value::Int(2)));
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("mylist[?1].orValue(99)")
+                .expect("Must parse");
+            assert_eq!(Value::resolve(&expr, &list_ctx), Ok(Value::Int(2)));
 
-            let p =
-                Program::compile("optional.of([1, 2, 3])[1].orValue(99)").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(2)));
-
-            let p =
-                Program::compile("optional.of([1, 2, 3])[4].orValue(99)").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(99)));
-
-            let p = Program::compile("optional.none()[1].orValue(99)").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(99)));
-
-            let p =
-                Program::compile("optional.of([1, 2, 3])[?1].orValue(99)").expect("Must compile");
-            assert_eq!(p.execute(&Context::default()), Ok(Value::Int(2)));
-
-            let p = Program::compile("[1, 2, ?optional.of(3), 4]").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of([1, 2, 3])[1].orValue(99)")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Int(2))
+            );
+
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of([1, 2, 3])[4].orValue(99)")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Int(99))
+            );
+
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.none()[1].orValue(99)")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Int(99))
+            );
+
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of([1, 2, 3])[?1].orValue(99)")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::Int(2))
+            );
+
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("[1, 2, ?optional.of(3), 4]")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::List(Arc::new(vec![
                     Value::Int(1),
                     Value::Int(2),
@@ -1912,9 +2022,12 @@ mod tests {
                 ])))
             );
 
-            let p = Program::compile("[1, 2, ?optional.none(), 4]").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("[1, 2, ?optional.none(), 4]")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::List(Arc::new(vec![
                     Value::Int(1),
                     Value::Int(2),
@@ -1922,22 +2035,30 @@ mod tests {
                 ])))
             );
 
-            let p = Program::compile("[?optional.of(1), ?optional.none(), ?optional.of(3)]")
-                .expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("[?optional.of(1), ?optional.none(), ?optional.of(3)]")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::List(Arc::new(vec![Value::Int(1), Value::Int(3)])))
             );
 
-            let p = Program::compile(r#"[1, ?mymap[?"missing"], 3]"#).expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"[1, ?mymap[?"missing"], 3]"#)
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&map_ctx),
+                Value::resolve(&expr, &map_ctx),
                 Ok(Value::List(Arc::new(vec![Value::Int(1), Value::Int(3)])))
             );
 
-            let p = Program::compile(r#"[1, ?mymap[?"a"], 3]"#).expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"[1, ?mymap[?"a"], 3]"#)
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&map_ctx),
+                Value::resolve(&expr, &map_ctx),
                 Ok(Value::List(Arc::new(vec![
                     Value::Int(1),
                     Value::Int(1),
@@ -1945,74 +2066,91 @@ mod tests {
                 ])))
             );
 
-            let p = Program::compile("[?optional.none(), ?optional.none()]").expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("[?optional.none(), ?optional.none()]")
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::List(Arc::new(vec![])))
             );
 
-            let p = Program::compile(r#"{"a": 1, "b": 2, ?"c": optional.of(3)}"#)
-                .expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, "b": 2, ?"c": optional.of(3)}"#)
+                .expect("Must parse");
             let mut expected_map = HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             expected_map.insert("b".into(), Value::Int(2));
             expected_map.insert("c".into(), Value::Int(3));
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Map(Map {
                     map: Arc::from(expected_map)
                 }))
             );
 
-            let p = Program::compile(r#"{"a": 1, "b": 2, ?"c": optional.none()}"#)
-                .expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, "b": 2, ?"c": optional.none()}"#)
+                .expect("Must parse");
             let mut expected_map = HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             expected_map.insert("b".into(), Value::Int(2));
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Map(Map {
                     map: Arc::from(expected_map)
                 }))
             );
 
-            let p = Program::compile(r#"{"a": 1, ?"b": optional.none(), ?"c": optional.of(3)}"#)
-                .expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, ?"b": optional.none(), ?"c": optional.of(3)}"#)
+                .expect("Must parse");
             let mut expected_map = HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             expected_map.insert("c".into(), Value::Int(3));
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Map(Map {
                     map: Arc::from(expected_map)
                 }))
             );
 
-            let p = Program::compile(r#"{"a": 1, ?"b": mymap[?"missing"]}"#).expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, ?"b": mymap[?"missing"]}"#)
+                .expect("Must parse");
             let mut expected_map = HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             assert_eq!(
-                p.execute(&map_ctx),
+                Value::resolve(&expr, &map_ctx),
                 Ok(Value::Map(Map {
                     map: Arc::from(expected_map)
                 }))
             );
 
-            let p = Program::compile(r#"{"x": 10, ?"y": mymap[?"a"]}"#).expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"{"x": 10, ?"y": mymap[?"a"]}"#)
+                .expect("Must parse");
             let mut expected_map = HashMap::new();
             expected_map.insert("x".into(), Value::Int(10));
             expected_map.insert("y".into(), Value::Int(1));
             assert_eq!(
-                p.execute(&map_ctx),
+                Value::resolve(&expr, &map_ctx),
                 Ok(Value::Map(Map {
                     map: Arc::from(expected_map)
                 }))
             );
 
-            let p = Program::compile(r#"{?"a": optional.none(), ?"b": optional.none()}"#)
-                .expect("Must compile");
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"{?"a": optional.none(), ?"b": optional.none()}"#)
+                .expect("Must parse");
             assert_eq!(
-                p.execute(&Context::default()),
+                Value::resolve(&expr, &Context::default()),
                 Ok(Value::Map(Map {
                     map: Arc::from(HashMap::new())
                 }))
