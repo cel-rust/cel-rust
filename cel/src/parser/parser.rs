@@ -760,7 +760,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 op.as_ref(),
                 Expr::Select(SelectExpr {
                     operand: Box::new(operand),
-                    field,
+                    field: Arc::new(field),
                     test: false,
                 }),
             )
