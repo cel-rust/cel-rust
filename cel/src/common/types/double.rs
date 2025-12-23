@@ -2,6 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
+#[derive(Clone, Debug)]
 pub struct Double(f64);
 
 impl Val for Double {
@@ -11,6 +12,10 @@ impl Val for Double {
 
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Double(self.0))
     }
 }
 

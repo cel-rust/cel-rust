@@ -1,7 +1,9 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
+use crate::common::{traits, types};
 use std::any::Any;
 
+#[derive(Clone, Debug)]
 pub struct Int(i64);
 
 impl Val for Int {
@@ -11,6 +13,25 @@ impl Val for Int {
 
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
+    }
+
+    fn as_adder(&self) -> Option<&dyn traits::Adder> {
+        Some(self as &dyn traits::Adder)
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Int(self.0))
+    }
+}
+
+impl traits::Adder for Int {
+    fn add(&self, other: Box<dyn Val>) -> Box<dyn Val> {
+        if let Some(i) = (other.as_ref() as &dyn Any).downcast_ref::<Int>() {
+            let t: types::Int = (self.0 + i.0).into();
+            Box::new(t)
+        } else {
+            types::Err::maybe_no_such_overload(other)
+        }
     }
 }
 

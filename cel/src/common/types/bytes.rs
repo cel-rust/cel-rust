@@ -2,6 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
 
+#[derive(Clone, Debug)]
 pub struct Bytes(Vec<u8>);
 
 impl Val for Bytes {
@@ -11,6 +12,10 @@ impl Val for Bytes {
 
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Bytes(self.0.clone()))
     }
 }
 
