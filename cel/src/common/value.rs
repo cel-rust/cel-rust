@@ -29,6 +29,8 @@ pub trait Val {
     fn get_type(&self) -> Type<'_>;
 
     fn into_inner(self) -> Box<dyn Any>;
+
+    fn clone_as_boxed(&self) -> Box<dyn Val>;
 }
 
 impl Val for CelVal {
@@ -74,5 +76,40 @@ impl Val for CelVal {
             CelVal::UInt(u) => Box::new(u),
             CelVal::Unknown => todo!(),
         }
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(self.clone())
+    }
+}
+
+impl ToOwned for dyn Val {
+    type Owned = Box<dyn Val>;
+
+    fn to_owned(&self) -> Self::Owned {
+        self.clone_as_boxed()
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::common::types;
+    use crate::common::value::Val;
+    use std::borrow::Cow;
+
+    fn test(val: &dyn Val) -> bool {
+        val.get_type() == types::STRING_TYPE
+    }
+
+    #[test]
+    fn test_cow() {
+        let s1 = types::String::new("cel");
+        let s2 = types::String::new("cel");
+        let b: Box<dyn Val> = Box::new(s1);
+        let cow: Cow<dyn Val> = Cow::Owned(b);
+        let borrowed: Cow<dyn Val> = Cow::Borrowed(&s2);
+        assert!(test(borrowed.as_ref()));
+        assert!(test(cow.as_ref()));
+        assert!(test(borrowed.to_owned().as_ref()));
     }
 }

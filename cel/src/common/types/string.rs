@@ -13,6 +13,10 @@ impl Val for String {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(String(self.0.clone()))
+    }
 }
 
 impl From<StdString> for String {
@@ -24,5 +28,11 @@ impl From<StdString> for String {
 impl From<String> for StdString {
     fn from(v: String) -> Self {
         v.0
+    }
+}
+
+impl String {
+    pub fn new(str: &str) -> Self {
+        Self(str.into())
     }
 }

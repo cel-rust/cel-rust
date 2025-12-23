@@ -17,6 +17,13 @@ impl Val for Optional {
             Some(v) => Box::new(Some(v)),
         }
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        match &self.0 {
+            None => Box::new(Optional(None)),
+            Some(val) => val.clone_as_boxed(),
+        }
+    }
 }
 
 impl From<Option<Box<dyn Val>>> for Optional {

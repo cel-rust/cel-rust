@@ -13,6 +13,10 @@ impl Val for Bool {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(self.clone())
+    }
 }
 
 impl From<Bool> for bool {

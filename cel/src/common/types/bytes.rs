@@ -12,6 +12,10 @@ impl Val for Bytes {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Bytes(self.0.clone()))
+    }
 }
 
 impl From<Vec<u8>> for Bytes {
