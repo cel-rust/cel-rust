@@ -13,6 +13,10 @@ impl Val for Duration {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Duration(self.0))
+    }
 }
 
 impl From<StdDuration> for Duration {

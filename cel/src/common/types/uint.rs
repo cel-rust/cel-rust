@@ -12,6 +12,10 @@ impl Val for UInt {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(UInt(self.0))
+    }
 }
 
 impl From<UInt> for u64 {

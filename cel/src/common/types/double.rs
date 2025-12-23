@@ -12,6 +12,10 @@ impl Val for Double {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(self.0)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Double(self.0))
+    }
 }
 
 impl From<Double> for f64 {

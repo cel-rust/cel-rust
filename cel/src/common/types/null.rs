@@ -12,4 +12,8 @@ impl Val for Null {
     fn into_inner(self) -> Box<dyn Any> {
         Box::new(None::<()>)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Null)
+    }
 }
