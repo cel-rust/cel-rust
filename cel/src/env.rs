@@ -102,7 +102,7 @@ mod tests {
         let b: Box<dyn Val> = Box::new(int);
         let val: &dyn Val = b.as_ref();
         if let Some(adder) = val.as_adder() {
-            println!("{:?}", adder.add(Box::new(int)));
+            println!("{:?}", adder.add(val));
         }
 
         //let total = val.as_trait::<traits::Adder>().unwrap().add(&int);
