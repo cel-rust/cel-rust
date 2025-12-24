@@ -38,7 +38,7 @@ pub trait Val: Any + Debug {
         None
     }
 
-    fn eq(&self, other: &dyn Val) -> bool { false }
+    fn eq(&self, _other: &dyn Val) -> bool { false }
 
 
     fn clone_as_boxed(&self) -> Box<dyn Val>;

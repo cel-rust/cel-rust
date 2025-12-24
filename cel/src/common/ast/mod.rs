@@ -1,6 +1,5 @@
 use crate::common::types;
-use crate::common::value::{CelVal, Val};
-use std::clone;
+use crate::common::value::CelVal;
 use std::collections::BTreeMap;
 
 pub mod operators;
