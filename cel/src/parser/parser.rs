@@ -1,8 +1,8 @@
+use crate::common::ast;
 use crate::common::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, LiteralValue,
     MapEntryExpr, MapExpr, SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
-use crate::common::ast;
 use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType,
     CalcContext, CalcContextAttrs, ConditionalAndContext, ConditionalOrContext,
@@ -742,9 +742,10 @@ impl gen::CELVisitorCompat<'_> for Parser {
             let field = id.get_text();
             if let Some(_opt) = &ctx.opt {
                 return if self.enable_optional_syntax {
-                    let field_literal = self
-                        .helper
-                        .next_expr(op.as_ref(), Expr::Literal(LiteralValue::String(field.clone())));
+                    let field_literal = self.helper.next_expr(
+                        op.as_ref(),
+                        Expr::Literal(LiteralValue::String(field.clone())),
+                    );
                     let op_id = self.helper.next_id(op.as_ref());
                     self.global_call_or_macro(
                         op_id,
@@ -1045,7 +1046,9 @@ impl gen::CELVisitorCompat<'_> for Parser {
 
     fn visit_Null(&mut self, ctx: &NullContext<'_>) -> Self::Return {
         match ctx.tok.as_deref() {
-            Some(token) => self.helper.next_expr(token, Expr::Literal(LiteralValue::Null)),
+            Some(token) => self
+                .helper
+                .next_expr(token, Expr::Literal(LiteralValue::Null)),
             None => self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete null!"),
         }
     }

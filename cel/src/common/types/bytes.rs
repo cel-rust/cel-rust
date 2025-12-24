@@ -34,7 +34,9 @@ impl Val for Bytes {
     }
 
     fn eq(&self, other: &dyn Val) -> bool {
-        other.downcast_ref::<Self>().map_or(false, |a| self.0.eq(&a.0))
+        other
+            .downcast_ref::<Self>()
+            .map_or(false, |a| self.0.eq(&a.0))
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

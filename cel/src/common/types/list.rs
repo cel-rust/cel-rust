@@ -1,10 +1,10 @@
+use crate::common::traits::{Adder, Indexer};
+use crate::common::types::Type;
+use crate::common::value::Val;
+use crate::common::{traits, types};
 use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
-use crate::common::traits::{Adder, Indexer};
-use crate::common::{traits, types};
-use crate::common::types::Type;
-use crate::common::value::Val;
 
 #[derive(Debug)]
 pub struct DefaultList(Vec<Box<dyn Val>>);
@@ -37,7 +37,7 @@ impl Val for DefaultList {
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         let mut vec = Vec::with_capacity(self.0.len());
         for i in self.0.iter().map(|i| i.clone_as_boxed()) {
-           vec.push(i);
+            vec.push(i);
         }
         Box::new(DefaultList(vec))
     }

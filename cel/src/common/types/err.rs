@@ -44,7 +44,7 @@ impl Val for Err {
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
-       Box::new(self.clone())
+        Box::new(self.clone())
     }
 }
 
