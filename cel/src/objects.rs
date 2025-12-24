@@ -14,13 +14,13 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
+use crate::common::traits::Indexer;
 use crate::common::types;
 use crate::ExecutionError::NoSuchOverload;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 use nom::combinator::{cond, map, value};
 use paste::{expr, item};
-use crate::common::traits::Indexer;
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -759,13 +759,15 @@ impl Value {
                         operators::EQUALS => {
                             return Ok(CelVal::Boolean(
                                 Value::resolve_val(&call.args[0], ctx)?
-                                    .eq(&Value::resolve_val(&call.args[1], ctx)?).into(),
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?)
+                                    .into(),
                             ))
                         }
                         operators::NOT_EQUALS => {
                             return Ok(CelVal::Boolean(
                                 (!Value::resolve_val(&call.args[0], ctx)?
-                                    .eq(&Value::resolve_val(&call.args[1], ctx)?)).into(),
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?))
+                                .into(),
                             ))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
