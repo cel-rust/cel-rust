@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::ops::Deref;
 use crate::common::traits::{Adder, Indexer};
 use crate::common::{traits, types};
@@ -32,10 +33,18 @@ impl Val for DefaultList {
     fn as_indexer(&self) -> Option<&dyn Indexer> {
         Some(self as &dyn traits::Indexer)
     }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        let mut vec = Vec::with_capacity(self.0.len());
+        for i in self.0.iter().map(|i| i.clone_as_boxed()) {
+           vec.push(i);
+        }
+        Box::new(DefaultList(vec))
+    }
 }
 
 impl Indexer for DefaultList {
-    fn get(&self, idx: Box<dyn Val>) -> Box<dyn Val> {
+    fn get<'a>(&self, idx: &'a dyn Val) -> Cow<'a, dyn Val> {
         todo!()
     }
 }
