@@ -1,8 +1,8 @@
+use crate::common::types;
+use crate::common::value::Val;
 use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::Debug;
-use crate::common::types;
-use crate::common::value::{CelVal, Val};
 
 /// ADDER_TYPE types provide a '+' operator overload.
 pub const ADDER_TYPE: u16 = 1;
