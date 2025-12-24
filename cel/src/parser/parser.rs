@@ -1,9 +1,8 @@
-use crate::common::ast;
 use crate::common::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, LiteralValue,
     MapEntryExpr, MapExpr, SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
-use crate::common::value::CelVal;
+use crate::common::ast;
 use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType,
     CalcContext, CalcContextAttrs, ConditionalAndContext, ConditionalOrContext,
@@ -745,7 +744,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 return if self.enable_optional_syntax {
                     let field_literal = self
                         .helper
-                        .next_expr(op.as_ref(), Expr::Literal(CelVal::String(field.clone())));
+                        .next_expr(op.as_ref(), Expr::Literal(LiteralValue::String(field.clone())));
                     let op_id = self.helper.next_id(op.as_ref());
                     self.global_call_or_macro(
                         op_id,
@@ -2169,7 +2168,6 @@ ERROR: <input>:1:24: unsupported syntax '?'
                     LiteralValue::Null => {
                         &format!("null^#{}:{}#", expr.id, "*expr.Constant_NullValue")
                     }
-                    t => &format!("WUT? {t:?}"),
                 },
                 Expr::Map(map) => {
                     self.push("{");
