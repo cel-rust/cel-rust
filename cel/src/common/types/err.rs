@@ -2,6 +2,7 @@ use crate::common::types;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::any::Any;
+use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
@@ -15,11 +16,12 @@ pub struct Err {
 }
 
 impl Err {
-    pub fn maybe_no_such_overload(val: &dyn Val) -> Box<dyn Val> {
+    pub fn maybe_no_such_overload(val: &dyn Val) -> Cow<dyn Val> {
         if val.get_type() == types::UNKNOWN_TYPE || val.get_type() == types::ERROR_TYPE {
-            val
+            Cow::Borrowed(val)
         } else {
-            Box::new(Self::no_such_overload())
+            let err: Box<dyn Val> = Box::new(Self::no_such_overload());
+            Cow::Owned(err)
         }
     }
 
@@ -42,7 +44,7 @@ impl Val for Err {
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
-        todo!()
+       Box::new(self.clone())
     }
 }
 
