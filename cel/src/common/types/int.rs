@@ -41,7 +41,7 @@ impl traits::Adder for Int {
             let t: types::Int = (self.0 + i.0).into();
             Box::new(t)
         } else {
-            types::Err::maybe_no_such_overload(other)
+            types::Err::maybe_no_such_overload(other.as_ref()).clone_as_boxed()
         }
     }
 }
