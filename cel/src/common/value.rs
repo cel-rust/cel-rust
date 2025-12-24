@@ -69,7 +69,7 @@ impl Val for CelVal {
             CelVal::Timestamp(_) => types::TIMESTAMP_TYPE,
             CelVal::Type => types::TYPE_TYPE,
             CelVal::UInt(_) => types::UINT_TYPE,
-            CelVal::Unknown => types::UNKNOWN_TYPE,
+            CelVal::Unknown(_) => types::UNKNOWN_TYPE,
         }
     }
 
@@ -91,12 +91,12 @@ impl Val for CelVal {
             CelVal::Timestamp(t) => Box::new(t),
             CelVal::Type => todo!(),
             CelVal::UInt(u) => Box::new(u),
-            CelVal::Unknown => todo!(),
+            CelVal::Unknown(_) => todo!(),
         }
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(self.clone())
+        todo!("Maybe CelVal should not impl. Val?")
     }
 }
 
@@ -174,7 +174,7 @@ impl CelVal {
                 let u: types::UInt = u.into();
                 Box::new(u)
             }
-            CelVal::Unknown => todo!(),
+            CelVal::Unknown(_) => todo!(),
         }
     }
 }
