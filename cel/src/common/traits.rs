@@ -1,4 +1,5 @@
 use std::any::Any;
+use std::borrow::Cow;
 use std::fmt::Debug;
 use crate::common::types;
 use crate::common::value::{CelVal, Val};
@@ -59,7 +60,7 @@ pub trait Adder {
 }
 
 pub trait Indexer {
-    fn get(&self, idx: &dyn Val) -> CelVal {
+    fn get<'a>(&self, idx: &'a dyn Val) -> Cow<'a, dyn Val> {
         types::Err::maybe_no_such_overload(idx)
     }
 }
