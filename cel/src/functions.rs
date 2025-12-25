@@ -410,28 +410,36 @@ pub mod time {
         Ok((this.weekday().num_days_from_sunday() as i32).into())
     }
 
-    pub fn timestamp_hours(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.hour() as i32).into())
+    pub fn timestamp_hours(This(this): This<Value>) -> Result<Value> {
+        Ok(match this {
+            Value::Timestamp(ts) => (ts.hour() as i32).into(),
+            Value::Duration(d) => ((d.num_hours() % 24) as i32).into(),
+            _ => return Err(ExecutionError::function_error("getHours", "expected timestamp or duration")),
+        })
     }
 
-    pub fn timestamp_minutes(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.minute() as i32).into())
+    pub fn timestamp_minutes(This(this): This<Value>) -> Result<Value> {
+        Ok(match this {
+            Value::Timestamp(ts) => (ts.minute() as i32).into(),
+            Value::Duration(d) => ((d.num_minutes() % 60) as i32).into(),
+            _ => return Err(ExecutionError::function_error("getMinutes", "expected timestamp or duration")),
+        })
     }
 
-    pub fn timestamp_seconds(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.second() as i32).into())
+    pub fn timestamp_seconds(This(this): This<Value>) -> Result<Value> {
+        Ok(match this {
+            Value::Timestamp(ts) => (ts.second() as i32).into(),
+            Value::Duration(d) => ((d.num_seconds() % 60) as i32).into(),
+            _ => return Err(ExecutionError::function_error("getSeconds", "expected timestamp or duration")),
+        })
     }
 
-    pub fn timestamp_millis(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.timestamp_subsec_millis() as i32).into())
+    pub fn timestamp_millis(This(this): This<Value>) -> Result<Value> {
+        Ok(match this {
+            Value::Timestamp(ts) => (ts.timestamp_subsec_millis() as i32).into(),
+            Value::Duration(d) => ((d.num_milliseconds() % 1000) as i32).into(),
+            _ => return Err(ExecutionError::function_error("getMilliseconds", "expected timestamp or duration")),
+        })
     }
 }
 
@@ -766,6 +774,34 @@ mod tests {
             (
                 "duration addition",
                 "duration('1h') + duration('1m') == duration('1h1m')",
+            ),
+            (
+                "duration getHours",
+                "duration('2h30m45s').getHours() == 2",
+            ),
+            (
+                "duration getMinutes",
+                "duration('2h30m45s').getMinutes() == 30",
+            ),
+            (
+                "duration getSeconds",
+                "duration('2h30m45s').getSeconds() == 45",
+            ),
+            (
+                "duration getMilliseconds",
+                "duration('1s500ms').getMilliseconds() == 500",
+            ),
+            (
+                "duration getHours overflow",
+                "duration('25h').getHours() == 1",
+            ),
+            (
+                "duration getMinutes overflow",
+                "duration('90m').getMinutes() == 30",
+            ),
+            (
+                "duration getSeconds overflow",
+                "duration('90s').getSeconds() == 30",
             ),
         ]
         .iter()
