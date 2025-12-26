@@ -12,7 +12,7 @@ impl Val for Optional {
         OPTIONAL_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         match self.0 {
             None => Box::new(None::<()>),
             Some(v) => Box::new(Some(v)),

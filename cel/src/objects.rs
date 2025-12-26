@@ -1,9 +1,10 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::common::value::{CelVal, Val};
 use crate::context::Context;
-use crate::functions::{matches, FunctionContext};
+use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
 use std::any::Any;
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -14,13 +15,11 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
-use crate::common::traits::Indexer;
 use crate::common::types;
+use crate::common::types::{Bool, Double, Int, Type, UInt};
 use crate::ExecutionError::NoSuchOverload;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
-use nom::combinator::{cond, map, value};
-use paste::{expr, item};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -699,13 +698,40 @@ impl Value {
     }
 
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
-        Self::resolve_val(expr, ctx).map(|v| v.into())
+        let v = Self::resolve_val(expr, ctx)?;
+        match v.get_type() {
+            types::BOOL_TYPE => Ok(Value::Bool(
+                v.downcast_ref::<Bool>().unwrap().inner().clone(),
+            )),
+            types::INT_TYPE => Ok(Value::Int(v.downcast_ref::<Int>().unwrap().inner().clone())),
+            types::UINT_TYPE => Ok(Value::UInt(
+                v.downcast_ref::<UInt>().unwrap().inner().clone(),
+            )),
+            types::DOUBLE_TYPE => Ok(Value::Float(
+                v.downcast_ref::<Double>().unwrap().inner().clone(),
+            )),
+            types::STRING_TYPE => Ok(Value::String(Arc::new(
+                v.downcast_ref::<types::String>()
+                    .unwrap()
+                    .inner()
+                    .to_string(),
+            ))),
+            // add missing mappings here!
+            // collections recurse here tho...
+            _ => Err(ExecutionError::UnexpectedType {
+                got: v.get_type().name().to_string(),
+                want: "(BOOL|INT|UINT|STRING...)".to_string(),
+            }),
+        }
     }
 
     #[inline(always)]
-    pub fn resolve_val(expr: &Expression, ctx: &Context) -> Result<CelVal, ExecutionError> {
+    pub fn resolve_val<'a, 'b: 'a>(
+        expr: &'b Expression,
+        ctx: &'a Context,
+    ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match &expr.expr {
-            Expr::Literal(val) => Ok(val.to_value()),
+            Expr::Literal(val) => Ok(val),
             Expr::Call(call) => {
                 // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {

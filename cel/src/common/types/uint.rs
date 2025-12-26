@@ -6,6 +6,16 @@ use std::ops::Deref;
 #[derive(Clone, Debug, PartialEq)]
 pub struct UInt(u64);
 
+impl UInt {
+    pub fn into_inner(self) -> u64 {
+        self.0
+    }
+
+    pub fn inner(&self) -> &u64 {
+        &self.0
+    }
+}
+
 impl Deref for UInt {
     type Target = u64;
 
@@ -19,7 +29,7 @@ impl Val for UInt {
         super::UINT_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 

@@ -11,7 +11,7 @@ impl Bytes {
         self.0
     }
 
-    pub fn as_slice(&self) -> &[u8] {
+    pub fn inner(&self) -> &[u8] {
         &self.0
     }
 }
@@ -20,7 +20,7 @@ impl Deref for Bytes {
     type Target = [u8];
 
     fn deref(&self) -> &Self::Target {
-        self.as_slice()
+        self.inner()
     }
 }
 
@@ -29,7 +29,7 @@ impl Val for Bytes {
         super::BYTES_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 
