@@ -6,6 +6,16 @@ use std::ops::Deref;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Double(f64);
 
+impl Double {
+    pub fn into_inner(self) -> f64 {
+        self.0
+    }
+
+    pub fn inner(&self) -> &f64 {
+        &self.0
+    }
+}
+
 impl Deref for Double {
     type Target = f64;
 
@@ -19,7 +29,7 @@ impl Val for Double {
         super::DOUBLE_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 

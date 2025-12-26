@@ -28,7 +28,7 @@ pub enum CelVal {
 pub trait Val: Any + Debug {
     fn get_type(&self) -> Type<'_>;
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any>;
+    fn into_any(self: Box<Self>) -> Box<dyn Any>;
 
     fn as_adder(&self) -> Option<&dyn Adder> {
         None
@@ -74,7 +74,7 @@ impl Val for CelVal {
         }
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         match *self {
             CelVal::Unspecified => todo!(),
             CelVal::Error(_err) => todo!(),

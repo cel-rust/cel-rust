@@ -39,7 +39,7 @@ impl Val for Err {
         types::ERROR_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         self
     }
 

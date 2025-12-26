@@ -9,11 +9,21 @@ use std::ops::Deref;
 #[derive(Debug)]
 pub struct DefaultList(Vec<Box<dyn Val>>);
 
+impl DefaultList {
+    pub fn into_inner(self) -> Vec<Box<dyn Val>> {
+        self.0
+    }
+
+    pub fn inner(&self) -> &[Box<dyn Val>] {
+        &self.0
+    }
+}
+
 impl Deref for DefaultList {
     type Target = [Box<dyn Val>];
 
     fn deref(&self) -> &Self::Target {
-        self.0.deref()
+        self.inner()
     }
 }
 
@@ -22,7 +32,7 @@ impl Val for DefaultList {
         types::LIST_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         todo!()
     }
 

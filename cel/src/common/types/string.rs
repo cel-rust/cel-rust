@@ -13,16 +13,16 @@ impl String {
         self.0
     }
 
-    pub fn as_str(&self) -> &str {
+    pub fn inner(&self) -> &str {
         &self.0
     }
 }
 
 impl Deref for String {
-    type Target = std::string::String;
+    type Target = str;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.inner()
     }
 }
 
@@ -31,7 +31,7 @@ impl Val for String {
         super::STRING_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 
