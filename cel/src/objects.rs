@@ -795,10 +795,11 @@ impl Value {
                             };
 
                             return if is_optional {
-                                Ok(match result {
-                                    Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
-                                    Err(_) => Value::Opaque(Arc::new(OptionalValue::none())),
-                                })
+                                // Ok(match result {
+                                //     Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
+                                //     Err(_) => Value::Opaque(Arc::new(OptionalValue::none())),
+                                // })
+                                todo!("impl opt!")
                             } else {
                                 result
                             };
@@ -815,17 +816,18 @@ impl Value {
                                     ))
                                 }
                             };
-                            if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
-                                return match opt_val.value() {
-                                    Some(inner) => Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                                        inner.clone().member(&field)?,
-                                    )))),
-                                    None => Ok(operand),
-                                };
-                            }
-                            return Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                                operand.member(&field)?,
-                            ))));
+                            todo!("impl opt!")
+                            // if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
+                            //     return match opt_val.value() {
+                            //         Some(inner) => Ok(Value::Opaque(Arc::new(OptionalValue::of(
+                            //             inner.clone().member(&field)?,
+                            //         )))),
+                            //         None => Ok(operand),
+                            //     };
+                            // }
+                            // return Ok(Value::Opaque(Arc::new(OptionalValue::of(
+                            //    operand.member(&field)?,
+                            // ))));
                         }
                         // END OF SPECIAL CASES
 
