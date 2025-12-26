@@ -49,7 +49,7 @@ impl Val for DefaultList {
 }
 
 impl Indexer for DefaultList {
-    fn get<'a>(&self, _idx: &'a dyn Val) -> Cow<'a, dyn Val> {
+    fn get<'a>(&'a self, _idx: &dyn Val) -> Cow<'a, dyn Val> {
         todo!()
     }
 }
