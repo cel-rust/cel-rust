@@ -6,12 +6,22 @@ use std::time::SystemTime;
 #[derive(Clone, Debug, PartialEq)]
 pub struct Timestamp(SystemTime);
 
+impl Timestamp {
+    pub fn into_inner(self) -> SystemTime {
+        self.0
+    }
+
+    pub fn inner(&self) -> &SystemTime {
+        &self.0
+    }
+}
+
 impl Val for Timestamp {
     fn get_type(&self) -> Type<'_> {
         super::TIMESTAMP_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 

@@ -10,7 +10,7 @@ impl Val for Null {
         super::NULL_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         Box::new(None::<()>)
     }
 

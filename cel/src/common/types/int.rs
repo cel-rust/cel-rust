@@ -8,7 +8,15 @@ use std::ops::Deref;
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Int(i64);
 
-impl Int {}
+impl Int {
+    pub fn into_inner(self) -> i64 {
+        self.0
+    }
+
+    pub fn inner(&self) -> &i64 {
+        &self.0
+    }
+}
 
 impl Deref for Int {
     type Target = i64;
@@ -23,7 +31,7 @@ impl Val for Int {
         super::INT_TYPE
     }
 
-    fn into_inner(self: Box<Self>) -> Box<dyn Any> {
+    fn into_any(self: Box<Self>) -> Box<dyn Any> {
         Box::new(self.0)
     }
 
