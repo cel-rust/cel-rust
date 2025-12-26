@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 
 use crate::common::types;
-use crate::common::types::{Bool, Double, Int, UInt};
+use crate::common::types::*;
 use crate::ExecutionError::NoSuchOverload;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -789,21 +789,20 @@ impl Value {
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
         let v = Self::resolve_val(expr, ctx)?;
         match v.get_type() {
-            types::BOOL_TYPE => Ok(Value::Bool(
-                v.downcast_ref::<Bool>().unwrap().inner().clone(),
+            BOOL_TYPE => Ok(Value::Bool(
+                v.downcast_ref::<CelBool>().unwrap().inner().clone(),
             )),
-            types::INT_TYPE => Ok(Value::Int(v.downcast_ref::<Int>().unwrap().inner().clone())),
-            types::UINT_TYPE => Ok(Value::UInt(
-                v.downcast_ref::<UInt>().unwrap().inner().clone(),
+            INT_TYPE => Ok(Value::Int(
+                v.downcast_ref::<CelInt>().unwrap().inner().clone(),
             )),
-            types::DOUBLE_TYPE => Ok(Value::Float(
-                v.downcast_ref::<Double>().unwrap().inner().clone(),
+            UINT_TYPE => Ok(Value::UInt(
+                v.downcast_ref::<CelUInt>().unwrap().inner().clone(),
             )),
-            types::STRING_TYPE => Ok(Value::String(Arc::new(
-                v.downcast_ref::<types::String>()
-                    .unwrap()
-                    .inner()
-                    .to_string(),
+            DOUBLE_TYPE => Ok(Value::Float(
+                v.downcast_ref::<CelDouble>().unwrap().inner().clone(),
+            )),
+            STRING_TYPE => Ok(Value::String(Arc::new(
+                v.downcast_ref::<CelString>().unwrap().inner().to_string(),
             ))),
             // add missing mappings here!
             // collections recurse here tho...

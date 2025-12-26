@@ -7,21 +7,21 @@ use std::fmt::Debug;
 #[derive(Debug)]
 pub enum CelVal {
     Unspecified,
-    Error(types::Err),
+    Error(types::CelErr),
     Dyn,
     Any,
-    Boolean(types::Bool),
-    Bytes(types::Bytes),
-    Double(types::Double),
-    Duration(types::Duration),
-    Int(types::Int),
+    Boolean(types::CelBool),
+    Bytes(types::CelBytes),
+    Double(types::CelDouble),
+    Duration(types::CelDuration),
+    Int(types::CelInt),
     List(Box<dyn Lister>),
     Map,
     Null,
-    String(types::String),
-    Timestamp(types::Timestamp),
+    String(types::CelString),
+    Timestamp(types::CelTimestamp),
     Type,
-    UInt(types::UInt),
+    UInt(types::CelUInt),
     Unknown(Box<dyn Val>),
 }
 
@@ -69,8 +69,8 @@ mod test {
 
     #[test]
     fn test_cow() {
-        let s1 = types::String::new("cel");
-        let s2 = types::String::new("cel");
+        let s1 = types::CelString::new("cel");
+        let s2 = types::CelString::new("cel");
         let b: Box<dyn Val> = Box::new(s1);
         let cow: Cow<dyn Val> = Cow::Owned(b);
         let borrowed: Cow<dyn Val> = Cow::Borrowed(&s2);
@@ -88,39 +88,39 @@ impl CelVal {
             CelVal::Dyn => todo!(),
             CelVal::Any => todo!(),
             CelVal::Boolean(b) => {
-                let b: types::Bool = b.into();
+                let b: types::CelBool = b.into();
                 Box::new(b)
             }
             CelVal::Bytes(bytes) => {
-                let bytes: types::Bytes = bytes.into();
+                let bytes: types::CelBytes = bytes.into();
                 Box::new(bytes)
             }
             CelVal::Double(d) => {
-                let d: types::Double = d.into();
+                let d: types::CelDouble = d.into();
                 Box::new(d)
             }
             CelVal::Duration(d) => {
-                let d: types::Duration = d.into();
+                let d: types::CelDuration = d.into();
                 Box::new(d)
             }
             CelVal::Int(i) => {
-                let i: types::Int = i.into();
+                let i: types::CelInt = i.into();
                 Box::new(i)
             }
             CelVal::List(_) => todo!(),
             CelVal::Map => todo!(),
-            CelVal::Null => Box::new(types::Null),
+            CelVal::Null => Box::new(types::CelNull),
             CelVal::String(s) => {
-                let s: types::String = s.into();
+                let s: types::CelString = s.into();
                 Box::new(s)
             }
             CelVal::Timestamp(t) => {
-                let t: types::Timestamp = t.into();
+                let t: types::CelTimestamp = t.into();
                 Box::new(t)
             }
             CelVal::Type => todo!(),
             CelVal::UInt(u) => {
-                let u: types::UInt = u.into();
+                let u: types::CelUInt = u.into();
                 Box::new(u)
             }
             CelVal::Unknown(_) => todo!(),
