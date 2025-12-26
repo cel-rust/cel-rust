@@ -59,8 +59,8 @@ pub trait Adder {
 }
 
 pub trait Indexer {
-    fn get<'a>(&self, idx: &'a dyn Val) -> Cow<'a, dyn Val> {
-        types::CelErr::maybe_no_such_overload(idx)
+    fn get<'a>(&'a self, _idx: &dyn Val) -> Cow<'a, dyn Val> {
+        Cow::<dyn Val>::Owned(Box::new(types::CelErr::no_such_overload()))
     }
 }
 

@@ -1028,18 +1028,20 @@ impl gen::CELVisitorCompat<'_> for Parser {
 
     fn visit_BoolTrue(&mut self, ctx: &BoolTrueContext<'_>) -> Self::Return {
         match ctx.tok.as_deref() {
-            Some(tok) => self
-                .helper
-                .next_expr(tok, Expr::Literal(LiteralValue::Boolean(true))),
+            Some(tok) => self.helper.next_expr(
+                tok,
+                Expr::Literal(LiteralValue::Boolean(Box::new(true.into()))),
+            ),
             None => self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete bool!"),
         }
     }
 
     fn visit_BoolFalse(&mut self, ctx: &BoolFalseContext<'_>) -> Self::Return {
         match ctx.tok.as_deref() {
-            Some(token) => self
-                .helper
-                .next_expr(token, Expr::Literal(LiteralValue::Boolean(false))),
+            Some(token) => self.helper.next_expr(
+                token,
+                Expr::Literal(LiteralValue::Boolean(Box::new(false.into()))),
+            ),
             None => self.report_error::<ParseError, _>(&ctx.start(), None, "Incomplete bool!"),
         }
     }
@@ -2151,7 +2153,7 @@ ERROR: <input>:1:24: unsupported syntax '?'
                         &format!("\"{s}\"^#{}:{}#", expr.id, "*expr.Constant_StringValue")
                     }
                     LiteralValue::Boolean(b) => {
-                        &format!("{b}^#{}:{}#", expr.id, "*expr.Constant_BoolValue")
+                        &format!("{}^#{}:{}#", expr.id, b.inner(), "*expr.Constant_BoolValue")
                     }
                     LiteralValue::Int(i) => {
                         &format!("{i}^#{}:{}#", expr.id, "*expr.Constant_Int64Value")

@@ -1,6 +1,6 @@
-use std::borrow::Cow;
 use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelNull, CelString, CelUInt};
 use crate::common::value::{CelVal, Val};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 pub mod operators;
@@ -42,7 +42,7 @@ pub enum Expr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LiteralValue {
-    Boolean(bool),
+    Boolean(Box<CelBool>),
     Bytes(Vec<u8>),
     Double(f64),
     Int(i64),
@@ -52,10 +52,10 @@ pub enum LiteralValue {
 }
 
 impl LiteralValue {
-    pub fn to_val(&self) -> Cow<dyn Val> {
+    pub fn to_val<'a>(&'a self) -> Cow<'a, dyn Val> {
         // todo refactor to return Cow::Borrowed
         let v: Box<dyn Val> = match &self {
-            LiteralValue::Boolean(b) => Box::new(CelBool::from(*b)),
+            LiteralValue::Boolean(b) => return Cow::Borrowed(b.as_ref()),
             LiteralValue::Bytes(b) => Box::new(CelBytes::from(b.clone())),
             LiteralValue::Double(f) => Box::new(CelDouble::from(*f)),
             LiteralValue::Int(i) => Box::new(CelInt::from(*i)),
