@@ -1,6 +1,5 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -19,10 +18,6 @@ impl Timestamp {
 impl Val for Timestamp {
     fn get_type(&self) -> Type<'_> {
         super::TIMESTAMP_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(self.0)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

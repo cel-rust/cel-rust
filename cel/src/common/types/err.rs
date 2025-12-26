@@ -1,7 +1,6 @@
 use crate::common::types;
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::borrow::Cow;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
@@ -37,10 +36,6 @@ impl Err {
 impl Val for Err {
     fn get_type(&self) -> Type<'_> {
         types::ERROR_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        self
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

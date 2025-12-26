@@ -1,6 +1,5 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::ops::Deref;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -27,10 +26,6 @@ impl Deref for Bool {
 impl Val for Bool {
     fn get_type(&self) -> Type<'_> {
         super::BOOL_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(self.0)
     }
 
     fn eq(&self, other: &dyn Val) -> bool {
@@ -74,14 +69,5 @@ mod tests {
         let value = Bool(true);
         assert_eq!(value.get_type(), types::BOOL_TYPE);
         assert_eq!(value.get_type().kind, Kind::Boolean);
-    }
-
-    #[test]
-    fn test_into_inner() {
-        let value: Box<dyn Val> = Box::new(Bool(true));
-        let inner = value.into_any();
-        let option = inner.downcast::<bool>();
-        let b = option.unwrap();
-        assert!(*b);
     }
 }

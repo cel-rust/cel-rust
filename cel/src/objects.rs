@@ -16,7 +16,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 
 use crate::common::types;
-use crate::common::types::{Bool, Double, Int, Type, UInt};
+use crate::common::types::{Bool, Double, Int, UInt};
 use crate::ExecutionError::NoSuchOverload;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
