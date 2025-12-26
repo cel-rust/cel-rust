@@ -789,7 +789,7 @@ impl Value {
                             let result = match value.as_indexer() {
                                 Some(indexer) => {
                                     let idx = Value::resolve_val(&call.args[1], ctx)?;
-                                    Ok(indexer.get(&idx).into())
+                                    Ok(indexer.get(idx.as_ref()))
                                 }
                                 None => Err(NoSuchOverload),
                             };
