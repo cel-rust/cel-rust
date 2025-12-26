@@ -98,7 +98,7 @@ mod tests {
         // let t = v.add(v.as_ref());
         //assert_eq!(32i64, t.deref().downcast_ref::<i64>().unwrap().clone());
 
-        let int: types::Int = 16.into();
+        let int: types::CelInt = 16.into();
         let b: Box<dyn Val> = Box::new(int);
         let val: &dyn Val = b.as_ref();
         if let Some(adder) = val.as_adder() {

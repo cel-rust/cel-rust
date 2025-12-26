@@ -1,6 +1,6 @@
-use crate::common::types::Type;
+use crate::common::traits;
+use crate::common::types::{CelErr, Type};
 use crate::common::value::Val;
-use crate::common::{traits, types};
 use std::borrow::Cow;
 use std::ops::Deref;
 
@@ -42,11 +42,11 @@ impl Val for Int {
 impl traits::Adder for Int {
     fn add<'a>(&self, other: &'a dyn Val) -> Cow<'a, dyn Val> {
         if let Some(i) = other.downcast_ref::<Int>() {
-            let t: types::Int = (self.0 + i.0).into();
+            let t: Self = (self.0 + i.0).into();
             let b: Box<dyn Val> = Box::new(t);
             Cow::Owned(b)
         } else {
-            types::Err::maybe_no_such_overload(other)
+            CelErr::maybe_no_such_overload(other)
         }
     }
 }
