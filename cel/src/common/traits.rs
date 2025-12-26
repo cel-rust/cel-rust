@@ -54,13 +54,13 @@ pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
     fn add<'a>(&self, rhs: &'a dyn Val) -> Cow<'a, dyn Val> {
-        types::Err::maybe_no_such_overload(rhs)
+        types::CelErr::maybe_no_such_overload(rhs)
     }
 }
 
 pub trait Indexer {
     fn get<'a>(&self, idx: &'a dyn Val) -> Cow<'a, dyn Val> {
-        types::Err::maybe_no_such_overload(idx)
+        types::CelErr::maybe_no_such_overload(idx)
     }
 }
 

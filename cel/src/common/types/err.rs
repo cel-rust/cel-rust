@@ -24,8 +24,8 @@ impl Err {
         }
     }
 
-    pub fn no_such_overload() -> Err {
-        types::Err {
+    pub fn no_such_overload() -> Self {
+        Self {
             msg: "no such overload".to_string(),
             src: None,
             val: None,
