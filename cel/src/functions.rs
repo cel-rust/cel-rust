@@ -414,7 +414,12 @@ pub mod time {
         Ok(match this {
             Value::Timestamp(ts) => (ts.hour() as i32).into(),
             Value::Duration(d) => (d.num_hours() as i32).into(),
-            _ => return Err(ExecutionError::function_error("getHours", "expected timestamp or duration")),
+            _ => {
+                return Err(ExecutionError::function_error(
+                    "getHours",
+                    "expected timestamp or duration",
+                ))
+            }
         })
     }
 
@@ -422,7 +427,12 @@ pub mod time {
         Ok(match this {
             Value::Timestamp(ts) => (ts.minute() as i32).into(),
             Value::Duration(d) => (d.num_minutes() as i32).into(),
-            _ => return Err(ExecutionError::function_error("getMinutes", "expected timestamp or duration")),
+            _ => {
+                return Err(ExecutionError::function_error(
+                    "getMinutes",
+                    "expected timestamp or duration",
+                ))
+            }
         })
     }
 
@@ -430,7 +440,12 @@ pub mod time {
         Ok(match this {
             Value::Timestamp(ts) => (ts.second() as i32).into(),
             Value::Duration(d) => (d.num_seconds() as i32).into(),
-            _ => return Err(ExecutionError::function_error("getSeconds", "expected timestamp or duration")),
+            _ => {
+                return Err(ExecutionError::function_error(
+                    "getSeconds",
+                    "expected timestamp or duration",
+                ))
+            }
         })
     }
 
@@ -438,7 +453,12 @@ pub mod time {
         Ok(match this {
             Value::Timestamp(ts) => (ts.timestamp_subsec_millis() as i32).into(),
             Value::Duration(d) => (d.num_milliseconds() as i32).into(),
-            _ => return Err(ExecutionError::function_error("getMilliseconds", "expected timestamp or duration")),
+            _ => {
+                return Err(ExecutionError::function_error(
+                    "getMilliseconds",
+                    "expected timestamp or duration",
+                ))
+            }
         })
     }
 }
@@ -775,10 +795,7 @@ mod tests {
                 "duration addition",
                 "duration('1h') + duration('1m') == duration('1h1m')",
             ),
-            (
-                "duration getHours",
-                "duration('2h30m45s').getHours() == 2",
-            ),
+            ("duration getHours", "duration('2h30m45s').getHours() == 2"),
             (
                 "duration getMinutes",
                 "duration('2h30m45s').getMinutes() == 150",
