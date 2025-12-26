@@ -52,16 +52,18 @@ pub enum LiteralValue {
 }
 
 impl LiteralValue {
-    pub fn to_value(&self) -> CelVal {
-        match &self {
-            LiteralValue::Boolean(b) => CelVal::Boolean(types::Bool::from(*b)),
-            LiteralValue::Bytes(b) => CelVal::Bytes(types::Bytes::from(b.clone())),
-            LiteralValue::Double(f) => CelVal::Double(types::Double::from(*f)),
-            LiteralValue::Int(i) => CelVal::Int(types::Int::from(*i)),
-            LiteralValue::Null => CelVal::Null,
-            LiteralValue::String(s) => CelVal::String(types::String::from(s.clone())),
-            LiteralValue::UInt(ui) => CelVal::UInt(types::UInt::from(*ui)),
-        }
+    pub fn to_val(&self) -> Cow<dyn Val> {
+        // todo refactor to return Cow::Borrowed
+        let v: Box<dyn Val> = match &self {
+            LiteralValue::Boolean(b) => Box::new(CelBool::from(*b)),
+            LiteralValue::Bytes(b) => Box::new(CelBytes::from(b.clone())),
+            LiteralValue::Double(f) => Box::new(CelDouble::from(*f)),
+            LiteralValue::Int(i) => Box::new(CelInt::from(*i)),
+            LiteralValue::Null => Box::new(CelNull),
+            LiteralValue::String(s) => Box::new(CelString::from(s.clone())),
+            LiteralValue::UInt(ui) => Box::new(CelUInt::from(*ui)),
+        };
+        Cow::Owned(v)
     }
 }
 
