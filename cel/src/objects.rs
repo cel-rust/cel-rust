@@ -819,7 +819,7 @@ impl Value {
         ctx: &'a Context,
     ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match &expr.expr {
-            Expr::Literal(val) => Ok(val),
+            Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
                 // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
