@@ -15,6 +15,7 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
+use crate::common::traits::Adder;
 use crate::common::types;
 use crate::common::types::*;
 use crate::ExecutionError::NoSuchOverload;
@@ -725,9 +726,9 @@ impl Value {
     }
 
     #[inline(always)]
-    pub fn resolve_val<'a, 'b: 'a>(
-        expr: &'b Expression,
-        ctx: &'a Context,
+    pub fn resolve_val<'a: 'b, 'b>(
+        expr: &'a Expression,
+        ctx: &'b Context,
     ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match &expr.expr {
             Expr::Literal(literal) => Ok(literal.to_val()),
@@ -745,16 +746,15 @@ impl Value {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
                             let left = Value::resolve_val(&call.args[0], ctx)?;
-                            return
-                                if try_bool(left.as_ref())? {
-                                    Ok(left)
+                            return if try_bool(left.as_ref())? {
+                                Ok(left)
+                            } else {
+                                let right = Value::resolve_val(&call.args[1], ctx)?;
+                                if right.get_type() == BOOL_TYPE {
+                                    Ok(right)
                                 } else {
-                                    let right = Value::resolve_val(&call.args[1], ctx)?;
-                                    if right.get_type() == BOOL_TYPE {
-                                        Ok(right)
-                                    } else {
-                                        Err(NoSuchOverload)
-                                    }
+                                    Err(NoSuchOverload)
+                                }
                             };
                         }
                         operators::LOGICAL_AND => {
@@ -771,17 +771,22 @@ impl Value {
                             };
                         }
                         operators::EQUALS => {
-                            return Ok(Cow::<dyn Val>::Owned(
-                                Box::new(CelBool::from(
-                                    Value::resolve_val(&call.args[0], ctx)?
-                                        .eq(Value::resolve_val(&call.args[1], ctx)?.as_ref())
-                                ))))
+                            return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                                Value::resolve_val(&call.args[0], ctx)?.eq(Value::resolve_val(
+                                    &call.args[1],
+                                    ctx,
+                                )?
+                                .as_ref()),
+                            ))))
                         }
                         operators::NOT_EQUALS => {
-                            return Ok(Cow::<dyn Val>::Owned(
-                                Box::new(CelBool::from((!Value::resolve_val(&call.args[0], ctx)?
-                                    .eq(Value::resolve_val(&call.args[1], ctx)?.as_ref())
-                            )))))
+                            return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                                (!Value::resolve_val(&call.args[0], ctx)?.eq(Value::resolve_val(
+                                    &call.args[1],
+                                    ctx,
+                                )?
+                                .as_ref())),
+                            ))))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
@@ -789,7 +794,7 @@ impl Value {
                             let result = match value.as_indexer() {
                                 Some(indexer) => {
                                     let idx = Value::resolve_val(&call.args[1], ctx)?;
-                                    Ok(indexer.get(idx.as_ref()))
+                                    Ok(indexer.get(idx.as_ref()).into_owned())
                                 }
                                 None => Err(NoSuchOverload),
                             };
@@ -801,7 +806,7 @@ impl Value {
                                 // })
                                 todo!("impl opt!")
                             } else {
-                                result
+                                result.map(Cow::Owned)
                             };
                         }
                         operators::OPT_SELECT => {
@@ -833,9 +838,16 @@ impl Value {
 
                         // all below is NOT special in the interpreter
                         operators::ADD => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                + Value::resolve(&call.args[1], ctx)?
+                            return Ok(Cow::Owned(
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .as_ref()
+                                    .as_adder()
+                                    .ok_or(NoSuchOverload)?
+                                    .add(Value::resolve_val(&call.args[1], ctx)?.as_ref())
+                                    .into_owned(),
+                            ))
                         }
+                        /*
                         operators::SUBSTRACT => {
                             return Value::resolve(&call.args[0], ctx)?
                                 - Value::resolve(&call.args[1], ctx)?
@@ -911,9 +923,11 @@ impl Value {
                                 }
                             }
                         }
+                         */
                         _ => (),
                     }
                 }
+                /*
                 if call.args.len() == 1 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_NOT => {
@@ -978,7 +992,10 @@ impl Value {
                         }
                     }
                 }
+                 */
+                todo!("Work harder")
             }
+            /*
             Expr::Ident(name) => ctx.get_variable(name),
             Expr::Select(select) => {
                 let left = Value::resolve(select.operand.deref(), ctx)?;
@@ -1084,6 +1101,8 @@ impl Value {
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
+             */
+            _ => todo!("Fix the other Expr"),
         }
     }
 
@@ -1127,7 +1146,9 @@ impl Value {
 }
 
 fn try_bool(val: &dyn Val) -> Result<bool, ExecutionError> {
-    val.downcast_ref::<CelBool>().map(|b| *b.inner()).ok_or(NoSuchOverload)
+    val.downcast_ref::<CelBool>()
+        .map(|b| *b.inner())
+        .ok_or(NoSuchOverload)
 }
 
 impl ops::Add<Value> for Value {
