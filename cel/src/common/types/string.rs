@@ -1,7 +1,6 @@
 use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::ops::Deref;
 use std::string::String as StdString;
 
@@ -29,10 +28,6 @@ impl Deref for String {
 impl Val for String {
     fn get_type(&self) -> Type<'_> {
         super::STRING_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(self.0)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

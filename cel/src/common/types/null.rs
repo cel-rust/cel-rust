@@ -1,6 +1,5 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 
 #[derive(Clone, Debug)]
 pub struct Null;
@@ -8,10 +7,6 @@ pub struct Null;
 impl Val for Null {
     fn get_type(&self) -> Type<'_> {
         super::NULL_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(None::<()>)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

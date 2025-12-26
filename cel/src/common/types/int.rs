@@ -1,7 +1,6 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::common::{traits, types};
-use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
 
@@ -29,10 +28,6 @@ impl Deref for Int {
 impl Val for Int {
     fn get_type(&self) -> Type<'_> {
         super::INT_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(self.0)
     }
 
     fn as_adder(&self) -> Option<&dyn traits::Adder> {

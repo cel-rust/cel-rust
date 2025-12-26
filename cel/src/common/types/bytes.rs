@@ -1,6 +1,5 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::ops::Deref;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -27,10 +26,6 @@ impl Deref for Bytes {
 impl Val for Bytes {
     fn get_type(&self) -> Type<'_> {
         super::BYTES_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(self.0)
     }
 
     fn eq(&self, other: &dyn Val) -> bool {

@@ -1,6 +1,5 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::time::Duration as StdDuration;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -19,10 +18,6 @@ impl Duration {
 impl Val for Duration {
     fn get_type(&self) -> Type<'_> {
         super::DURATION_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        Box::new(self.0)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

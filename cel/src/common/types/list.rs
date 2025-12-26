@@ -2,7 +2,6 @@ use crate::common::traits::{Adder, Indexer};
 use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::common::{traits, types};
-use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
 
@@ -30,10 +29,6 @@ impl Deref for DefaultList {
 impl Val for DefaultList {
     fn get_type(&self) -> Type<'_> {
         types::LIST_TYPE
-    }
-
-    fn into_any(self: Box<Self>) -> Box<dyn Any> {
-        todo!()
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {
