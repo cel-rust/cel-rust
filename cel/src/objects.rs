@@ -880,14 +880,17 @@ impl Value {
                         operators::INDEX | operators::OPT_INDEX => {
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
                             let value = Value::resolve_val(&call.args[0], ctx)?;
-                            let result = match value.as_indexer() {
-                                Some(indexer) => {
-                                    let idx = Value::resolve_val(&call.args[1], ctx)?;
-                                    Ok(indexer.get(idx.as_ref()).into_owned())
-                                }
-                                None => Err(NoSuchOverload),
+                            let result = match value {
+                                Cow::Borrowed(val) => Ok(val
+                                    .as_indexer()
+                                    .ok_or(NoSuchOverload)?
+                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref())),
+                                Cow::Owned(mut val) => Ok(Cow::Owned(
+                                    val.into_indexer()
+                                        .ok_or(NoSuchOverload)?
+                                        .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref()),
+                                )),
                             };
-
                             return if is_optional {
                                 // Ok(match result {
                                 //     Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
@@ -895,7 +898,7 @@ impl Value {
                                 // })
                                 todo!("impl opt!")
                             } else {
-                                result.map(Cow::Owned)
+                                result
                             };
                         }
                         operators::OPT_SELECT => {
