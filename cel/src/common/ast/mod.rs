@@ -1,5 +1,5 @@
 use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelNull, CelString, CelUInt};
-use crate::common::value::{CelVal, Val};
+use crate::common::value::Val;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
