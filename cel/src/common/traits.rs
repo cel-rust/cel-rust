@@ -62,6 +62,10 @@ pub trait Indexer {
     fn get<'a>(&'a self, _idx: &dyn Val) -> Cow<'a, dyn Val> {
         Cow::<dyn Val>::Owned(Box::new(types::CelErr::no_such_overload()))
     }
+
+    fn steal(self: Box<Self>, _idx: &dyn Val) -> Box<dyn Val> {
+        todo!("implement Steal")
+    }
 }
 
 pub trait Lister: Debug + Any {
