@@ -1,7 +1,7 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 
+#[derive(Debug)]
 pub struct Optional(Option<Box<dyn Val>>);
 
 const OPTIONAL_TYPE: Type = Type::new_opaque_type("optional_type");
@@ -11,10 +11,10 @@ impl Val for Optional {
         OPTIONAL_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
-        match self.0 {
-            None => Box::new(None::<()>),
-            Some(v) => Box::new(Some(v)),
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        match &self.0 {
+            None => Box::new(Optional(None)),
+            Some(val) => val.clone_as_boxed(),
         }
     }
 }

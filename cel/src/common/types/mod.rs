@@ -4,22 +4,26 @@ mod bool;
 mod bytes;
 mod double;
 mod duration;
+mod err;
 mod int;
+mod list;
 mod null;
 mod optional;
 mod string;
 mod timestamp;
 mod uint;
 
-pub use bool::Bool;
-pub use bytes::Bytes;
-pub use double::Double;
-pub use duration::Duration;
-pub use int::Int;
-pub use null::Null;
-pub use string::String;
-pub use timestamp::Timestamp;
-pub use uint::UInt;
+pub use bool::Bool as CelBool;
+pub use bytes::Bytes as CelBytes;
+pub use double::Double as CelDouble;
+pub use duration::Duration as CelDuration;
+pub use err::Err as CelErr;
+pub use int::Int as CelInt;
+pub use list::DefaultList as CelList;
+pub use null::Null as CelNull;
+pub use string::String as CelString;
+pub use timestamp::Timestamp as CelTimestamp;
+pub use uint::UInt as CelUInt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Kind {

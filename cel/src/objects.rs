@@ -1,8 +1,10 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::value::{CelVal, Val};
 use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
 use std::any::Any;
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -13,7 +15,10 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
-use crate::common::value::CelVal;
+use crate::common::traits::Adder;
+use crate::common::types;
+use crate::common::types::*;
+use crate::ExecutionError::NoSuchOverload;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 
@@ -404,12 +409,12 @@ impl Debug for Value {
 impl From<CelVal> for Value {
     fn from(val: CelVal) -> Self {
         match val {
-            CelVal::String(s) => Value::String(Arc::new(s)),
-            CelVal::Boolean(b) => Value::Bool(b),
-            CelVal::Int(i) => Value::Int(i),
-            CelVal::UInt(u) => Value::UInt(u),
-            CelVal::Double(d) => Value::Float(d),
-            CelVal::Bytes(bytes) => Value::Bytes(Arc::new(bytes)),
+            CelVal::String(s) => Value::String(Arc::new(s.into_inner())),
+            CelVal::Boolean(b) => Value::Bool(*b),
+            CelVal::Int(i) => Value::Int(*i),
+            CelVal::UInt(u) => Value::UInt(*u),
+            CelVal::Double(d) => Value::Float(*d),
+            CelVal::Bytes(bytes) => Value::Bytes(Arc::new(bytes.into_inner())),
             CelVal::Null => Value::Null,
             v => unimplemented!("{v:?}"),
         }
@@ -677,25 +682,153 @@ impl Value {
         Ok(Value::List(res.into()))
     }
 
-    #[inline(always)]
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
+        let v = Self::resolve_val(expr, ctx)?;
+        match v.get_type() {
+            BOOL_TYPE => Ok(Value::Bool(
+                v.downcast_ref::<CelBool>().unwrap().inner().clone(),
+            )),
+            INT_TYPE => Ok(Value::Int(
+                v.downcast_ref::<CelInt>().unwrap().inner().clone(),
+            )),
+            UINT_TYPE => Ok(Value::UInt(
+                v.downcast_ref::<CelUInt>().unwrap().inner().clone(),
+            )),
+            DOUBLE_TYPE => Ok(Value::Float(
+                v.downcast_ref::<CelDouble>().unwrap().inner().clone(),
+            )),
+            STRING_TYPE => Ok(Value::String(Arc::new(
+                v.downcast_ref::<CelString>().unwrap().inner().to_string(),
+            ))),
+            // add missing mappings here!
+            // collections recurse here tho...
+            _ => Err(ExecutionError::UnexpectedType {
+                got: v.get_type().name().to_string(),
+                want: "(BOOL|INT|UINT|STRING...)".to_string(),
+            }),
+        }
+    }
+
+    #[inline(always)]
+    pub fn resolve_val<'a: 'b, 'b>(
+        expr: &'a Expression,
+        ctx: &'b Context,
+    ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match &expr.expr {
-            Expr::Literal(val) => Ok(val.clone().into()),
+            Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
+                // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
-                    let cond = Value::resolve(&call.args[0], ctx)?;
-                    return if cond.to_bool()? {
-                        Value::resolve(&call.args[1], ctx)
+                    let cond = Value::resolve_val(&call.args[0], ctx)?;
+                    return if try_bool(cond.as_ref())? {
+                        Value::resolve_val(&call.args[1], ctx)
                     } else {
-                        Value::resolve(&call.args[2], ctx)
+                        Value::resolve_val(&call.args[2], ctx)
                     };
                 }
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
-                        operators::ADD => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                + Value::resolve(&call.args[1], ctx)?
+                        operators::LOGICAL_OR => {
+                            let left = Value::resolve_val(&call.args[0], ctx)?;
+                            return if try_bool(left.as_ref())? {
+                                Ok(left)
+                            } else {
+                                let right = Value::resolve_val(&call.args[1], ctx)?;
+                                if right.get_type() == BOOL_TYPE {
+                                    Ok(right)
+                                } else {
+                                    Err(NoSuchOverload)
+                                }
+                            };
                         }
+                        operators::LOGICAL_AND => {
+                            let left = Value::resolve_val(&call.args[0], ctx)?;
+                            return if !try_bool(left.as_ref())? {
+                                Ok(left)
+                            } else {
+                                let right = Value::resolve_val(&call.args[1], ctx)?;
+                                if right.get_type() == BOOL_TYPE {
+                                    Ok(right)
+                                } else {
+                                    Err(NoSuchOverload)
+                                }
+                            };
+                        }
+                        operators::EQUALS => {
+                            return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?),
+                            ))))
+                        }
+                        operators::NOT_EQUALS => {
+                            return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .ne(&Value::resolve_val(&call.args[1], ctx)?),
+                            ))))
+                        }
+                        operators::INDEX | operators::OPT_INDEX => {
+                            let mut is_optional = call.func_name == operators::OPT_INDEX;
+                            let value = Value::resolve_val(&call.args[0], ctx)?;
+                            let result = match value {
+                                Cow::Borrowed(val) => Ok(val
+                                    .as_indexer()
+                                    .ok_or(NoSuchOverload)?
+                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()))?,
+                                Cow::Owned(mut val) => Ok(Cow::Owned(
+                                    val.into_indexer()
+                                        .ok_or(NoSuchOverload)?
+                                        .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref())?,
+                                )),
+                            };
+                            return if is_optional {
+                                // Ok(match result {
+                                //     Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
+                                //     Err(_) => Value::Opaque(Arc::new(OptionalValue::none())),
+                                // })
+                                todo!("impl opt!")
+                            } else {
+                                result
+                            };
+                        }
+                        operators::OPT_SELECT => {
+                            let operand = Value::resolve(&call.args[0], ctx)?;
+                            let field_literal = Value::resolve(&call.args[1], ctx)?;
+                            let field = match field_literal {
+                                Value::String(s) => s,
+                                _ => {
+                                    return Err(ExecutionError::function_error(
+                                        "_?._",
+                                        "field must be string",
+                                    ))
+                                }
+                            };
+                            todo!("impl opt!")
+                            // if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
+                            //     return match opt_val.value() {
+                            //         Some(inner) => Ok(Value::Opaque(Arc::new(OptionalValue::of(
+                            //             inner.clone().member(&field)?,
+                            //         )))),
+                            //         None => Ok(operand),
+                            //     };
+                            // }
+                            // return Ok(Value::Opaque(Arc::new(OptionalValue::of(
+                            //    operand.member(&field)?,
+                            // ))));
+                        }
+                        // END OF SPECIAL CASES
+
+                        // all below is NOT special in the interpreter
+                        operators::ADD => {
+                            return Ok(Cow::Owned(
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .as_ref()
+                                    .as_adder()
+                                    .ok_or(NoSuchOverload)?
+                                    .add(Value::resolve_val(&call.args[1], ctx)?.as_ref())
+                                    .into_owned(),
+                            ))
+                        }
+                        /*
                         operators::SUBSTRACT => {
                             return Value::resolve(&call.args[0], ctx)?
                                 - Value::resolve(&call.args[1], ctx)?
@@ -711,20 +844,6 @@ impl Value {
                         operators::MODULO => {
                             return Value::resolve(&call.args[0], ctx)?
                                 % Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .eq(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
-                        }
-                        operators::NOT_EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .ne(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
                         }
                         operators::LESS => {
                             let left = Value::resolve(&call.args[0], ctx)?;
@@ -785,128 +904,11 @@ impl Value {
                                 }
                             }
                         }
-                        operators::LOGICAL_OR => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            return if left.to_bool()? {
-                                left.into()
-                            } else {
-                                Value::resolve(&call.args[1], ctx)
-                            };
-                        }
-                        operators::LOGICAL_AND => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            return if !left.to_bool()? {
-                                Value::Bool(false)
-                            } else {
-                                let right = Value::resolve(&call.args[1], ctx)?;
-                                Value::Bool(right.to_bool()?)
-                            }
-                            .into();
-                        }
-                        operators::INDEX | operators::OPT_INDEX => {
-                            let mut value = Value::resolve(&call.args[0], ctx)?;
-                            let idx = Value::resolve(&call.args[1], ctx)?;
-                            let mut is_optional = call.func_name == operators::OPT_INDEX;
-
-                            if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                                is_optional = true;
-                                value = match opt_val.value() {
-                                    Some(inner) => inner.clone(),
-                                    None => {
-                                        return Ok(Value::Opaque(Arc::new(OptionalValue::none())))
-                                    }
-                                };
-                            }
-
-                            let result = match (value, idx) {
-                                (Value::List(items), Value::Int(idx)) => {
-                                    if idx >= 0 && (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::List(items), Value::UInt(idx)) => {
-                                    if (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::String(_), Value::Int(idx)) => {
-                                    Err(ExecutionError::NoSuchKey(idx.to_string().into()))
-                                }
-                                (Value::Map(map), Value::String(property)) => {
-                                    let key: Key = (&**property).into();
-                                    map.get(&key)
-                                        .cloned()
-                                        .ok_or_else(|| ExecutionError::NoSuchKey(property))
-                                }
-                                (Value::Map(map), Value::Bool(property)) => {
-                                    let key: Key = property.into();
-                                    map.get(&key).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(map), Value::Int(property)) => {
-                                    let key: Key = property.into();
-                                    map.get(&key).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(map), Value::UInt(property)) => {
-                                    let key: Key = property.into();
-                                    map.get(&key).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(_), index) => {
-                                    Err(ExecutionError::UnsupportedMapIndex(index))
-                                }
-                                (Value::List(_), index) => {
-                                    Err(ExecutionError::UnsupportedListIndex(index))
-                                }
-                                (value, index) => {
-                                    Err(ExecutionError::UnsupportedIndex(value, index))
-                                }
-                            };
-
-                            return if is_optional {
-                                Ok(match result {
-                                    Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
-                                    Err(_) => Value::Opaque(Arc::new(OptionalValue::none())),
-                                })
-                            } else {
-                                result
-                            };
-                        }
-                        operators::OPT_SELECT => {
-                            let operand = Value::resolve(&call.args[0], ctx)?;
-                            let field_literal = Value::resolve(&call.args[1], ctx)?;
-                            let field = match field_literal {
-                                Value::String(s) => s,
-                                _ => {
-                                    return Err(ExecutionError::function_error(
-                                        "_?._",
-                                        "field must be string",
-                                    ))
-                                }
-                            };
-                            if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
-                                return match opt_val.value() {
-                                    Some(inner) => Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                                        inner.clone().member(&field)?,
-                                    )))),
-                                    None => Ok(operand),
-                                };
-                            }
-                            return Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                                operand.member(&field)?,
-                            ))));
-                        }
+                         */
                         _ => (),
                     }
                 }
+                /*
                 if call.args.len() == 1 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_NOT => {
@@ -971,7 +973,10 @@ impl Value {
                         }
                     }
                 }
+                 */
+                todo!("Work harder")
             }
+            /*
             Expr::Ident(name) => ctx.get_variable(name),
             Expr::Select(select) => {
                 let left = Value::resolve(select.operand.deref(), ctx)?;
@@ -991,13 +996,15 @@ impl Value {
                     left.member(&select.field)
                 }
             }
+            */
             Expr::List(list_expr) => {
                 let list = list_expr
                     .elements
                     .iter()
                     .enumerate()
                     .map(|(idx, element)| {
-                        Value::resolve(element, ctx).map(|value| {
+                        Value::resolve_val(element, ctx).map(|value| {
+                            /*
                             if list_expr.optional_indices.contains(&idx) {
                                 if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
                                     opt_val.value().cloned()
@@ -1006,15 +1013,17 @@ impl Value {
                                 }
                             } else {
                                 Some(value)
-                            }
+                            }*/
+                            let b = value.into_owned();
+                            b
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
-                    .flatten()
                     .collect::<Vec<_>>();
-                Value::List(list.into()).into()
+                Ok(Cow::<dyn Val>::Owned(Box::new(CelList::new(list))))
             }
+            /*
             Expr::Map(map_expr) => {
                 let mut map = HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
@@ -1073,10 +1082,12 @@ impl Value {
                     }
                     t => todo!("Support {t:?}"),
                 }
-                Value::resolve(&comprehension.result, &ctx)
+                Value::resolve_val(&comprehension.result, &ctx)
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
+             */
+            _ => todo!("Fix the other Expr"),
         }
     }
 
@@ -1117,6 +1128,12 @@ impl Value {
             _ => Err(ExecutionError::NoSuchOverload),
         }
     }
+}
+
+fn try_bool(val: &dyn Val) -> Result<bool, ExecutionError> {
+    val.downcast_ref::<CelBool>()
+        .map(|b| *b.inner())
+        .ok_or(NoSuchOverload)
 }
 
 impl ops::Add<Value> for Value {

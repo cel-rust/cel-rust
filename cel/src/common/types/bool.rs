@@ -1,17 +1,41 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
+use std::ops::Deref;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Bool(bool);
+
+impl Bool {
+    pub fn into_inner(self) -> bool {
+        self.0
+    }
+
+    pub fn inner(&self) -> &bool {
+        &self.0
+    }
+}
+
+impl Deref for Bool {
+    type Target = bool;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 
 impl Val for Bool {
     fn get_type(&self) -> Type<'_> {
         super::BOOL_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
-        Box::new(self.0)
+    fn equals(&self, other: &dyn Val) -> bool {
+        other
+            .downcast_ref::<Self>()
+            .map_or(false, |a| self.0 == a.0)
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(self.clone())
     }
 }
 
@@ -45,14 +69,5 @@ mod tests {
         let value = Bool(true);
         assert_eq!(value.get_type(), types::BOOL_TYPE);
         assert_eq!(value.get_type().kind, Kind::Boolean);
-    }
-
-    #[test]
-    fn test_into_inner() {
-        let value = Bool(true);
-        let inner = value.into_inner();
-        let option = inner.downcast::<bool>();
-        let b = option.unwrap();
-        assert!(*b);
     }
 }

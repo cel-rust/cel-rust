@@ -1,17 +1,27 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::time::SystemTime;
 
+#[derive(Clone, Debug, PartialEq)]
 pub struct Timestamp(SystemTime);
+
+impl Timestamp {
+    pub fn into_inner(self) -> SystemTime {
+        self.0
+    }
+
+    pub fn inner(&self) -> &SystemTime {
+        &self.0
+    }
+}
 
 impl Val for Timestamp {
     fn get_type(&self) -> Type<'_> {
         super::TIMESTAMP_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
-        Box::new(self.0)
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Timestamp(self.0))
     }
 }
 

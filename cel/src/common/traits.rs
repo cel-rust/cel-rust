@@ -1,3 +1,11 @@
+use crate::common::types;
+use crate::common::value::Val;
+use crate::ExecutionError;
+use crate::ExecutionError::NoSuchOverload;
+use std::any::Any;
+use std::borrow::Cow;
+use std::fmt::Debug;
+
 /// ADDER_TYPE types provide a '+' operator overload.
 pub const ADDER_TYPE: u16 = 1;
 
@@ -45,3 +53,23 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 
 /// FOLDABLE_TYPE types support comprehensions v2 macros which iterate over (key, value) pairs.
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
+
+pub trait Adder {
+    fn add<'a>(&self, rhs: &'a dyn Val) -> Cow<'a, dyn Val> {
+        types::CelErr::maybe_no_such_overload(rhs)
+    }
+}
+
+pub trait Indexer {
+    fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        Err(NoSuchOverload)
+    }
+
+    fn steal(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
+        Err(NoSuchOverload)
+    }
+}
+
+pub trait Lister: Debug + Any {
+    fn as_indexer(&self) -> &dyn Indexer;
+}
