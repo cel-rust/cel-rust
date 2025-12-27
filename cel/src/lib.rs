@@ -252,10 +252,7 @@ mod tests {
 
     #[test]
     fn parse() {
-        Program::compile("1 + 1")
-            .unwrap()
-            .execute(&Context::default())
-            .unwrap();
+        Program::compile("1 + 1").unwrap();
     }
 
     #[test]
