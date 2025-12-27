@@ -36,6 +36,10 @@ pub trait Val: Any + Debug {
         None
     }
 
+    fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {
+        None
+    }
+
     fn eq(&self, _other: &dyn Val) -> bool {
         false
     }
