@@ -19,6 +19,7 @@ pub use double::Double as CelDouble;
 pub use duration::Duration as CelDuration;
 pub use err::Err as CelErr;
 pub use int::Int as CelInt;
+pub use list::DefaultList as CelList;
 pub use null::Null as CelNull;
 pub use string::String as CelString;
 pub use timestamp::Timestamp as CelTimestamp;
