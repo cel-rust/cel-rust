@@ -34,7 +34,7 @@ impl Val for String {
         Box::new(String(self.0.clone()))
     }
 
-    fn eq(&self, other: &dyn Val) -> bool {
+    fn equals(&self, other: &dyn Val) -> bool {
         match other.downcast_ref::<Self>() {
             Some(s) => self.0 == s.0,
             None => false,

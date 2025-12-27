@@ -105,6 +105,7 @@ pub mod tests {
     use crate::common::types::{CelInt, CelString};
     use crate::common::value::Val;
     use crate::ExecutionError::{IndexOutOfBounds, UnexpectedType};
+    use std::borrow::Cow;
 
     #[test]
     fn list_has_indexer() {
@@ -153,10 +154,8 @@ pub mod tests {
         let val: Box<dyn Val> = Box::new(val.clone());
         let list = DefaultList(vec![val]);
         let idx: CelInt = 0.into();
-        assert!(Indexer::get(&list, &idx)
-            .unwrap()
-            .into_owned()
-            .eq(&Into::<CelString>::into("cel")));
+        let expected = Cow::<dyn Val>::Owned(Box::new(Into::<CelString>::into("cel")));
+        assert_eq!(Indexer::get(&list, &idx), Ok(expected));
     }
 
     #[test]
@@ -165,8 +164,7 @@ pub mod tests {
         let val: Box<dyn Val> = Box::new(val.clone());
         let list = DefaultList(vec![val]);
         let idx: CelInt = 0.into();
-        assert!(Indexer::steal(list.into(), &idx)
-            .unwrap()
-            .eq(&Into::<CelString>::into("cel")));
+        let expected: Box<dyn Val> = Box::new(Into::<CelString>::into("cel"));
+        assert_eq!(Indexer::steal(list.into(), &idx), Ok(expected));
     }
 }

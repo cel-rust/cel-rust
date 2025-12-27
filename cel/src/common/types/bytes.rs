@@ -28,7 +28,7 @@ impl Val for Bytes {
         super::BYTES_TYPE
     }
 
-    fn eq(&self, other: &dyn Val) -> bool {
+    fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
             .map_or(false, |a| self.0.eq(&a.0))

@@ -40,7 +40,7 @@ pub trait Val: Any + Debug {
         None
     }
 
-    fn eq(&self, _other: &dyn Val) -> bool {
+    fn equals(&self, _other: &dyn Val) -> bool {
         false
     }
 
@@ -58,6 +58,12 @@ impl ToOwned for dyn Val {
 
     fn to_owned(&self) -> Self::Owned {
         self.clone_as_boxed()
+    }
+}
+
+impl PartialEq for dyn Val {
+    fn eq(&self, other: &Self) -> bool {
+        self.equals(other)
     }
 }
 
