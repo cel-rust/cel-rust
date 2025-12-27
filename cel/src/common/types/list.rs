@@ -9,6 +9,10 @@ use std::ops::Deref;
 pub struct DefaultList(Vec<Box<dyn Val>>);
 
 impl DefaultList {
+    pub fn new(items: Vec<Box<dyn Val>>) -> Self {
+        Self(items)
+    }
+
     pub fn into_inner(self) -> Vec<Box<dyn Val>> {
         self.0
     }
