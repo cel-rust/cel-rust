@@ -624,6 +624,22 @@ impl From<Vec<u8>> for Value {
     }
 }
 
+#[cfg(feature = "bytes")]
+// Convert Bytes to Value
+impl From<::bytes::Bytes> for Value {
+    fn from(v: ::bytes::Bytes) -> Self {
+        Value::Bytes(v.to_vec().into())
+    }
+}
+
+#[cfg(feature = "bytes")]
+// Convert &Bytes to Value
+impl From<&::bytes::Bytes> for Value {
+    fn from(v: &::bytes::Bytes) -> Self {
+        Value::Bytes(v.to_vec().into())
+    }
+}
+
 // Convert String to Value
 impl From<String> for Value {
     fn from(v: String) -> Self {
