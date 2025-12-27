@@ -1018,13 +1018,15 @@ impl Value {
                     left.member(&select.field)
                 }
             }
+            */
             Expr::List(list_expr) => {
                 let list = list_expr
                     .elements
                     .iter()
                     .enumerate()
                     .map(|(idx, element)| {
-                        Value::resolve(element, ctx).map(|value| {
+                        Value::resolve_val(element, ctx).map(|value| {
+                            /*
                             if list_expr.optional_indices.contains(&idx) {
                                 if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
                                     opt_val.value().cloned()
@@ -1033,15 +1035,17 @@ impl Value {
                                 }
                             } else {
                                 Some(value)
-                            }
+                            }*/
+                            let b = value.into_owned();
+                            b
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
-                    .flatten()
                     .collect::<Vec<_>>();
-                Value::List(list.into()).into()
+                Ok(Cow::<dyn Val>::Owned(Box::new(CelList::new(list))))
             }
+            /*
             Expr::Map(map_expr) => {
                 let mut map = HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
