@@ -861,20 +861,14 @@ impl Value {
                         }
                         operators::EQUALS => {
                             return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
-                                Value::resolve_val(&call.args[0], ctx)?.eq(Value::resolve_val(
-                                    &call.args[1],
-                                    ctx,
-                                )?
-                                .as_ref()),
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?),
                             ))))
                         }
                         operators::NOT_EQUALS => {
                             return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
-                                (!Value::resolve_val(&call.args[0], ctx)?.eq(Value::resolve_val(
-                                    &call.args[1],
-                                    ctx,
-                                )?
-                                .as_ref())),
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .ne(&Value::resolve_val(&call.args[1], ctx)?),
                             ))))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
