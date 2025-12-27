@@ -795,11 +795,11 @@ impl Value {
                                 Cow::Borrowed(val) => Ok(val
                                     .as_indexer()
                                     .ok_or(NoSuchOverload)?
-                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref())),
+                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()))?,
                                 Cow::Owned(mut val) => Ok(Cow::Owned(
                                     val.into_indexer()
                                         .ok_or(NoSuchOverload)?
-                                        .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref()),
+                                        .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref())?,
                                 )),
                             };
                             return if is_optional {

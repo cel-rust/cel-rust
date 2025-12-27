@@ -2,6 +2,8 @@ use crate::common::traits::{Adder, Indexer};
 use crate::common::types::{CelErr, CelInt, CelUInt, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
+use crate::ExecutionError;
+use crate::ExecutionError::NoSuchOverload;
 use std::borrow::Cow;
 use std::ops::Deref;
 
@@ -57,32 +59,62 @@ impl Val for DefaultList {
 }
 
 impl Indexer for DefaultList {
-    fn get<'a>(&'a self, idx: &dyn Val) -> Cow<'a, dyn Val> {
+    fn get<'a>(&'a self, idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match idx.get_type() {
             types::INT_TYPE => {
-                let idx: i64 = idx.downcast_ref::<CelInt>().unwrap().inner().clone();
-                Cow::Borrowed(self.0.get(idx as usize).unwrap().as_ref())
+                let idx: i64 = idx
+                    .downcast_ref::<CelInt>()
+                    .expect("We need an Indexer!")
+                    .inner()
+                    .clone();
+                Ok(Cow::Borrowed(
+                    self.0
+                        .get(idx as usize)
+                        .ok_or(ExecutionError::IndexOutOfBounds(idx.into()))?
+                        .as_ref(),
+                ))
             }
             types::UINT_TYPE => {
-                let idx: u64 = idx.downcast_ref::<CelUInt>().unwrap().inner().clone();
-                Cow::Borrowed(self.0.get(idx as usize).unwrap().as_ref())
+                let idx: u64 = idx
+                    .downcast_ref::<CelUInt>()
+                    .expect("We need an Indexer!")
+                    .inner()
+                    .clone();
+                Ok(Cow::Borrowed(
+                    self.0
+                        .get(idx as usize)
+                        .ok_or(ExecutionError::IndexOutOfBounds(idx.into()))?
+                        .as_ref(),
+                ))
             }
-            _ => Cow::<dyn Val>::Owned(Box::new(CelErr::no_such_overload())),
+            _ => Err(ExecutionError::UnexpectedType {
+                got: idx.get_type().runtime_type_name.to_string(),
+                want: "(INT|UINT)".to_string(),
+            }),
         }
     }
 
-    fn steal(self: Box<Self>, idx: &dyn Val) -> Box<dyn Val> {
+    fn steal(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
         let mut list = self;
         match idx.get_type() {
             types::INT_TYPE => {
                 let idx: i64 = idx.downcast_ref::<CelInt>().unwrap().inner().clone();
-                list.0.remove(idx as usize)
+                if idx < 0 || idx as usize >= list.0.len() {
+                    return Err(ExecutionError::IndexOutOfBounds(idx.into()));
+                }
+                Ok(list.0.remove(idx as usize))
             }
             types::UINT_TYPE => {
                 let idx: u64 = idx.downcast_ref::<CelUInt>().unwrap().inner().clone();
-                list.0.swap_remove(idx as usize)
+                if idx as usize >= list.0.len() {
+                    return Err(ExecutionError::IndexOutOfBounds(idx.into()));
+                }
+                Ok(list.0.swap_remove(idx as usize))
             }
-            _ => Box::new(CelErr::no_such_overload()),
+            _ => Err(ExecutionError::UnexpectedType {
+                got: idx.get_type().runtime_type_name.to_string(),
+                want: "(INT|UINT)".to_string(),
+            }),
         }
     }
 }
