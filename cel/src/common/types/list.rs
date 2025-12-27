@@ -76,7 +76,7 @@ impl Indexer for DefaultList {
             }
             types::UINT_TYPE => {
                 let idx: u64 = idx.downcast_ref::<CelUInt>().unwrap().inner().clone();
-                list.0.remove(idx as usize)
+                list.0.swap_remove(idx as usize)
             }
             _ => Box::new(CelErr::no_such_overload()),
         }
