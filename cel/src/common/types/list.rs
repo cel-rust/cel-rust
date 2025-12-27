@@ -1,9 +1,8 @@
 use crate::common::traits::{Adder, Indexer};
-use crate::common::types::{CelErr, CelInt, CelUInt, Type};
+use crate::common::types;
+use crate::common::types::{CelInt, CelUInt, Type};
 use crate::common::value::Val;
-use crate::common::{traits, types};
 use crate::ExecutionError;
-use crate::ExecutionError::NoSuchOverload;
 use std::borrow::Cow;
 use std::ops::Deref;
 
@@ -74,22 +73,9 @@ impl Indexer for DefaultList {
                         .as_ref(),
                 ))
             }
-            types::UINT_TYPE => {
-                let idx: u64 = idx
-                    .downcast_ref::<CelUInt>()
-                    .expect("We need an Indexer!")
-                    .inner()
-                    .clone();
-                Ok(Cow::Borrowed(
-                    self.0
-                        .get(idx as usize)
-                        .ok_or(ExecutionError::IndexOutOfBounds(idx.into()))?
-                        .as_ref(),
-                ))
-            }
             _ => Err(ExecutionError::UnexpectedType {
                 got: idx.get_type().runtime_type_name.to_string(),
-                want: "(INT|UINT)".to_string(),
+                want: format!("{}", types::INT_TYPE.runtime_type_name),
             }),
         }
     }
@@ -104,17 +90,83 @@ impl Indexer for DefaultList {
                 }
                 Ok(list.0.remove(idx as usize))
             }
-            types::UINT_TYPE => {
-                let idx: u64 = idx.downcast_ref::<CelUInt>().unwrap().inner().clone();
-                if idx as usize >= list.0.len() {
-                    return Err(ExecutionError::IndexOutOfBounds(idx.into()));
-                }
-                Ok(list.0.swap_remove(idx as usize))
-            }
             _ => Err(ExecutionError::UnexpectedType {
                 got: idx.get_type().runtime_type_name.to_string(),
-                want: "(INT|UINT)".to_string(),
+                want: format!("{}", types::INT_TYPE.runtime_type_name),
             }),
         }
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use crate::common::traits::Indexer;
+    use crate::common::types::list::DefaultList;
+    use crate::common::types::{CelInt, CelString};
+    use crate::common::value::Val;
+    use crate::ExecutionError::{IndexOutOfBounds, UnexpectedType};
+
+    #[test]
+    fn list_has_indexer() {
+        let list = Box::new(DefaultList(vec![]));
+        assert!(list.as_indexer().is_some());
+        assert!(list.into_indexer().is_some());
+    }
+
+    #[test]
+    fn errs_out_of_index() {
+        let list = DefaultList(vec![]);
+        let idx: CelInt = 1.into();
+        assert_eq!(
+            Indexer::get(&list, &idx).err(),
+            Some(IndexOutOfBounds(1.into()))
+        );
+        assert_eq!(
+            Indexer::steal(list.into(), &idx).err(),
+            Some(IndexOutOfBounds(1.into()))
+        );
+    }
+
+    #[test]
+    fn errs_unexpected_type() {
+        let list = DefaultList(vec![]);
+        let idx: CelString = "foo".into();
+        assert_eq!(
+            Indexer::get(&list, &idx).err(),
+            Some(UnexpectedType {
+                got: "string".to_string(),
+                want: "int".to_string(),
+            })
+        );
+        assert_eq!(
+            Indexer::steal(list.into(), &idx).err(),
+            Some(UnexpectedType {
+                got: "string".to_string(),
+                want: "int".to_string(),
+            })
+        );
+    }
+
+    #[test]
+    fn get() {
+        let val: CelString = "cel".into();
+        let val: Box<dyn Val> = Box::new(val.clone());
+        let list = DefaultList(vec![val]);
+        let idx: CelInt = 0.into();
+        assert!(Indexer::get(&list, &idx)
+            .unwrap()
+            .into_owned()
+            .eq(&Into::<CelString>::into("cel")));
+    }
+
+    #[test]
+    fn steal() {
+        let val: CelString = "cel".into();
+        let val: Box<dyn Val> = Box::new(val.clone());
+        let list = DefaultList(vec![val]);
+        let idx: CelInt = 0.into();
+        assert!(Indexer::steal(list.into(), &idx)
+            .unwrap()
+            .eq(&Into::<CelString>::into("cel")));
     }
 }

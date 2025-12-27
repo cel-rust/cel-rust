@@ -33,6 +33,13 @@ impl Val for String {
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(String(self.0.clone()))
     }
+
+    fn eq(&self, other: &dyn Val) -> bool {
+        match other.downcast_ref::<Self>() {
+            Some(s) => self.0 == s.0,
+            None => false,
+        }
+    }
 }
 
 impl From<StdString> for String {
@@ -44,6 +51,12 @@ impl From<StdString> for String {
 impl From<String> for StdString {
     fn from(v: String) -> Self {
         v.0
+    }
+}
+
+impl From<&str> for String {
+    fn from(value: &str) -> Self {
+        Self(StdString::from(value))
     }
 }
 
