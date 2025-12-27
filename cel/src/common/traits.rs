@@ -1,5 +1,7 @@
 use crate::common::types;
 use crate::common::value::Val;
+use crate::ExecutionError;
+use crate::ExecutionError::NoSuchOverload;
 use std::any::Any;
 use std::borrow::Cow;
 use std::fmt::Debug;
@@ -59,12 +61,12 @@ pub trait Adder {
 }
 
 pub trait Indexer {
-    fn get<'a>(&'a self, _idx: &dyn Val) -> Cow<'a, dyn Val> {
-        Cow::<dyn Val>::Owned(Box::new(types::CelErr::no_such_overload()))
+    fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        Err(NoSuchOverload)
     }
 
-    fn steal(self: Box<Self>, _idx: &dyn Val) -> Box<dyn Val> {
-        Box::new(types::CelErr::no_such_overload())
+    fn steal(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
+        Err(NoSuchOverload)
     }
 }
 
