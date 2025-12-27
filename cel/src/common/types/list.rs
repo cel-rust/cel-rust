@@ -1,6 +1,6 @@
 use crate::common::traits::{Adder, Indexer};
 use crate::common::types;
-use crate::common::types::{CelInt, CelUInt, Type};
+use crate::common::types::{CelInt, Type};
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;

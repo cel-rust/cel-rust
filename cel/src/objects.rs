@@ -1,7 +1,7 @@
-use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::ast::{operators, Expr};
+use crate::common::types::*;
 use crate::common::value::{CelVal, Val};
 use crate::context::Context;
-use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
 use std::any::Any;
 use std::borrow::{Borrow, Cow};
@@ -15,10 +15,6 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
-use crate::common::traits::Adder;
-use crate::common::types;
-use crate::common::types::*;
-use crate::ExecutionError::NoSuchOverload;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 
@@ -842,7 +838,7 @@ impl Value {
                                 if right.get_type() == BOOL_TYPE {
                                     Ok(right)
                                 } else {
-                                    Err(NoSuchOverload)
+                                    Err(ExecutionError::NoSuchOverload)
                                 }
                             };
                         }
@@ -855,7 +851,7 @@ impl Value {
                                 if right.get_type() == BOOL_TYPE {
                                     Ok(right)
                                 } else {
-                                    Err(NoSuchOverload)
+                                    Err(ExecutionError::NoSuchOverload)
                                 }
                             };
                         }
@@ -877,11 +873,11 @@ impl Value {
                             let result = match value {
                                 Cow::Borrowed(val) => Ok(val
                                     .as_indexer()
-                                    .ok_or(NoSuchOverload)?
+                                    .ok_or(ExecutionError::NoSuchOverload)?
                                     .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()))?,
-                                Cow::Owned(mut val) => Ok(Cow::Owned(
+                                Cow::Owned(val) => Ok(Cow::Owned(
                                     val.into_indexer()
-                                        .ok_or(NoSuchOverload)?
+                                        .ok_or(ExecutionError::NoSuchOverload)?
                                         .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref())?,
                                 )),
                             };
@@ -928,7 +924,7 @@ impl Value {
                                 Value::resolve_val(&call.args[0], ctx)?
                                     .as_ref()
                                     .as_adder()
-                                    .ok_or(NoSuchOverload)?
+                                    .ok_or(ExecutionError::NoSuchOverload)?
                                     .add(Value::resolve_val(&call.args[1], ctx)?.as_ref())
                                     .into_owned(),
                             ))
@@ -1233,7 +1229,7 @@ impl Value {
 fn try_bool(val: &dyn Val) -> Result<bool, ExecutionError> {
     val.downcast_ref::<CelBool>()
         .map(|b| *b.inner())
-        .ok_or(NoSuchOverload)
+        .ok_or(ExecutionError::NoSuchOverload)
 }
 
 impl ops::Add<Value> for Value {

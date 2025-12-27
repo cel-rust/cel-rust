@@ -15,7 +15,7 @@ pub struct Err {
 }
 
 impl Err {
-    pub fn maybe_no_such_overload(val: &dyn Val) -> Cow<dyn Val> {
+    pub fn maybe_no_such_overload(val: &dyn Val) -> Cow<'_, dyn Val> {
         if val.get_type() == types::UNKNOWN_TYPE || val.get_type() == types::ERROR_TYPE {
             Cow::Borrowed(val)
         } else {

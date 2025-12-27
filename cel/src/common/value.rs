@@ -49,7 +49,7 @@ pub trait Val: Any + Debug {
 
 impl dyn Val {
     pub fn downcast_ref<T: Val>(&self) -> Option<&T> {
-        (self as &dyn Any).downcast_ref::<T>()
+        <dyn Any>::downcast_ref::<T>(self)
     }
 }
 
