@@ -64,7 +64,7 @@ pub trait Indexer {
     }
 
     fn steal(self: Box<Self>, _idx: &dyn Val) -> Box<dyn Val> {
-        todo!("implement Steal")
+        Box::new(types::CelErr::no_such_overload())
     }
 }
 
