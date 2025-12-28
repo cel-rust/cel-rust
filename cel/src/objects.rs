@@ -18,6 +18,11 @@ use std::sync::LazyLock;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 
+const BOOL_TRUE: LazyLock<Cow<dyn Val>> =
+    LazyLock::new(|| Cow::<dyn Val>::Owned(Box::new(bool::TRUE)));
+const BOOL_FALSE: LazyLock<Cow<dyn Val>> =
+    LazyLock::new(|| Cow::<dyn Val>::Owned(Box::new(bool::FALSE)));
+
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
 /// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
@@ -857,46 +862,64 @@ impl Value {
                             return Value::resolve(&call.args[0], ctx)?
                                 % Value::resolve(&call.args[1], ctx)?
                         }
+                        */
                         operators::LESS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    == Ordering::Less,
-                            )
-                            .into();
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if lhs
+                                .as_comparer()
+                                .ok_or(ExecutionError::NoSuchOverload)?
+                                .compare(rhs.as_ref())?
+                                == Ordering::Less
+                            {
+                                Ok(BOOL_TRUE.to_owned())
+                            } else {
+                                Ok(BOOL_FALSE.to_owned())
+                            };
                         }
                         operators::LESS_EQUALS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    != Ordering::Greater,
-                            )
-                            .into();
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if lhs
+                                .as_comparer()
+                                .ok_or(ExecutionError::NoSuchOverload)?
+                                .compare(rhs.as_ref())?
+                                == Ordering::Greater
+                            {
+                                Ok(BOOL_FALSE.to_owned())
+                            } else {
+                                Ok(BOOL_TRUE.to_owned())
+                            };
                         }
                         operators::GREATER => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    == Ordering::Greater,
-                            )
-                            .into();
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if lhs
+                                .as_comparer()
+                                .ok_or(ExecutionError::NoSuchOverload)?
+                                .compare(rhs.as_ref())?
+                                == Ordering::Greater
+                            {
+                                Ok(BOOL_TRUE.to_owned())
+                            } else {
+                                Ok(BOOL_FALSE.to_owned())
+                            };
                         }
                         operators::GREATER_EQUALS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    != Ordering::Less,
-                            )
-                            .into();
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if lhs
+                                .as_comparer()
+                                .ok_or(ExecutionError::NoSuchOverload)?
+                                .compare(rhs.as_ref())?
+                                == Ordering::Less
+                            {
+                                Ok(BOOL_FALSE.to_owned())
+                            } else {
+                                Ok(BOOL_TRUE.to_owned())
+                            };
                         }
+                        /*
                         operators::IN => {
                             let left = Value::resolve(&call.args[0], ctx)?;
                             let right = Value::resolve(&call.args[1], ctx)?;
