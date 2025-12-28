@@ -1,8 +1,11 @@
+use std::borrow::Cow;
 use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use std::ops::Deref;
 use std::string::String as StdString;
+use crate::ExecutionError;
+use crate::ExecutionError::NoSuchOverload;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct String(StdString);
@@ -60,7 +63,11 @@ impl From<&str> for String {
     }
 }
 
-impl traits::Adder for String {}
+impl traits::Adder for String {
+    fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        todo!("implement Adder for String!")
+    }
+}
 
 impl String {
     pub fn new(str: &str) -> Self {
