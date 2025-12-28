@@ -934,11 +934,17 @@ impl Value {
                                     .into_owned(),
                             ))
                         }
-                        /*
                         operators::SUBSTRACT => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                - Value::resolve(&call.args[1], ctx)?
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[0], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_subtractor()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .sub(rhs.as_ref())?
+                                    .into_owned(),
+                            ));
                         }
+                        /*
                         operators::DIVIDE => {
                             return Value::resolve(&call.args[0], ctx)?
                                 / Value::resolve(&call.args[1], ctx)?

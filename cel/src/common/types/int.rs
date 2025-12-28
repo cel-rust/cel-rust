@@ -5,6 +5,7 @@ use crate::ExecutionError;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::Deref;
+use crate::common::traits::Subtractor;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Int(i64);
@@ -40,6 +41,10 @@ impl Val for Int {
         Some(self as &dyn traits::Comparer)
     }
 
+    fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        Some(self as &dyn Subtractor)
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Int(self.0))
     }
@@ -61,6 +66,16 @@ impl traits::Comparer for Int {
     fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
         if let Some(i) = rhs.downcast_ref::<Int>() {
             Ok(self.0.cmp(&i.0))
+        } else {
+            Err(ExecutionError::NoSuchOverload)
+        }
+    }
+}
+
+impl traits::Subtractor for Int {
+    fn sub<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(i) = rhs.downcast_ref::<Int>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self::from(self.0 - i.0))))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
