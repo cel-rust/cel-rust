@@ -55,8 +55,8 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
-    fn add<'a>(&self, rhs: &'a dyn Val) -> Cow<'a, dyn Val> {
-        types::CelErr::maybe_no_such_overload(rhs)
+    fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        Err(NoSuchOverload)
     }
 }
 
