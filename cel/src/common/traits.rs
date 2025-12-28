@@ -66,6 +66,12 @@ pub trait Comparer {
     }
 }
 
+pub trait Subtractor {
+    fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        Err(NoSuchOverload)
+    }
+}
+
 pub trait Indexer {
     fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         Err(NoSuchOverload)
