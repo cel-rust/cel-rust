@@ -1,9 +1,9 @@
-use crate::common::types;
 use crate::common::value::Val;
 use crate::ExecutionError;
 use crate::ExecutionError::NoSuchOverload;
 use std::any::Any;
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::fmt::Debug;
 
 /// ADDER_TYPE types provide a '+' operator overload.
@@ -56,6 +56,12 @@ pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
     fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        Err(NoSuchOverload)
+    }
+}
+
+pub trait Comparer {
+    fn compare(&self, _rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
         Err(NoSuchOverload)
     }
 }

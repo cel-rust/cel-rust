@@ -1,8 +1,9 @@
 use crate::common::traits;
-use crate::common::types::{CelErr, Type};
+use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -35,6 +36,10 @@ impl Val for Int {
         Some(self as &dyn traits::Adder)
     }
 
+    fn as_comparer(&self) -> Option<&dyn traits::Comparer> {
+        Some(self as &dyn traits::Comparer)
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Int(self.0))
     }
@@ -46,6 +51,16 @@ impl traits::Adder for Int {
             let t: Self = (self.0 + i.0).into();
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
+        } else {
+            Err(ExecutionError::NoSuchOverload)
+        }
+    }
+}
+
+impl traits::Comparer for Int {
+    fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
+        if let Some(i) = rhs.downcast_ref::<Int>() {
+            Ok(self.0.cmp(&i.0))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }

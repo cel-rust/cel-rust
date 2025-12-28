@@ -2,6 +2,9 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::ops::Deref;
 
+pub const TRUE: Bool = Bool(true);
+pub const FALSE: Bool = Bool(false);
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Bool(bool);
 

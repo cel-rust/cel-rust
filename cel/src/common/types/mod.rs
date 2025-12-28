@@ -1,6 +1,6 @@
 use crate::common::traits;
 
-mod bool;
+pub(crate) mod bool;
 mod bytes;
 mod double;
 mod duration;

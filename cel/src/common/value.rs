@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Indexer, Lister};
+use crate::common::traits::{Adder, Comparer, Indexer, Lister};
 use crate::common::types;
 use crate::common::types::Type;
 use std::any::Any;
@@ -29,6 +29,10 @@ pub trait Val: Any + Debug {
     fn get_type(&self) -> Type<'_>;
 
     fn as_adder(&self) -> Option<&dyn Adder> {
+        None
+    }
+
+    fn as_comparer(&self) -> Option<&dyn Comparer> {
         None
     }
 
