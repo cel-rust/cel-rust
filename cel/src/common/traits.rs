@@ -66,6 +66,10 @@ pub trait Comparer {
     }
 }
 
+pub trait Divider {
+    fn div<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
 pub trait Subtractor {
     fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         Err(NoSuchOverload)

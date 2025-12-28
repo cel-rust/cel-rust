@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Comparer, Indexer, Lister, Subtractor};
+use crate::common::traits::{Adder, Comparer, Divider, Indexer, Lister, Subtractor};
 use crate::common::types;
 use crate::common::types::Type;
 use std::any::Any;
@@ -33,6 +33,10 @@ pub trait Val: Any + Debug {
     }
 
     fn as_comparer(&self) -> Option<&dyn Comparer> {
+        None
+    }
+
+    fn as_divider(&self) -> Option<&dyn Divider> {
         None
     }
 
