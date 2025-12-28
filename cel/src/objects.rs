@@ -836,7 +836,7 @@ impl Value {
                                     .as_ref()
                                     .as_adder()
                                     .ok_or(ExecutionError::NoSuchOverload)?
-                                    .add(Value::resolve_val(&call.args[1], ctx)?.as_ref())
+                                    .add(Value::resolve_val(&call.args[1], ctx)?.as_ref())?
                                     .into_owned(),
                             ))
                         }
