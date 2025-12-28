@@ -704,6 +704,7 @@ impl TryFrom<&dyn Val> for Value {
             STRING_TYPE => Ok(Value::String(Arc::new(
                 v.downcast_ref::<CelString>().unwrap().inner().to_string(),
             ))),
+            NULL_TYPE => Ok(Value::Null),
             // add missing mappings here!
             // collections recurse here tho...
             _ => Err(ExecutionError::UnexpectedType {
@@ -718,11 +719,11 @@ impl TryFrom<Value> for Box<dyn Val> {
     type Error = ExecutionError;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
+            Value::Bool(b) => Ok(Box::new(Into::<CelBool>::into(b))),
             Value::Int(i) => Ok(Box::new(Into::<CelInt>::into(i))),
             Value::UInt(u) => Ok(Box::new(Into::<CelUInt>::into(u))),
             Value::Float(f) => Ok(Box::new(Into::<CelDouble>::into(f))),
             Value::String(s) => Ok(Box::new(Into::<CelString>::into(s.as_str()))),
-            Value::Bool(b) => Ok(Box::new(Into::<CelBool>::into(b))),
             Value::Null => Ok(Box::new(CelNull)),
             /*
             Value::Bytes(_) => {}
