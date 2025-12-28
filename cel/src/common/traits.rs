@@ -55,15 +55,11 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
-    fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        Err(NoSuchOverload)
-    }
+    fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
 pub trait Comparer {
-    fn compare(&self, _rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
-        Err(NoSuchOverload)
-    }
+    fn compare(&self, _rhs: &dyn Val) -> Result<Ordering, ExecutionError>;
 }
 
 pub trait Divider {
@@ -71,19 +67,13 @@ pub trait Divider {
 }
 
 pub trait Subtractor {
-    fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        Err(NoSuchOverload)
-    }
+    fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
 pub trait Indexer {
-    fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        Err(NoSuchOverload)
-    }
+    fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 
-    fn steal(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
-        Err(NoSuchOverload)
-    }
+    fn steal(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError>;
 }
 
 pub trait Lister: Debug + Any {
