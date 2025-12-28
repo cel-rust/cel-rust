@@ -855,11 +855,17 @@ impl Value {
                                     .into_owned(),
                             ));
                         }
-                        /*
                         operators::DIVIDE => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                / Value::resolve(&call.args[1], ctx)?
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[0], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_divider()
+                                  .ok_or(ExecutionError::NoSuchOverload)?
+                                  .div(rhs.as_ref())?
+                                  .into_owned(),
+                            ));
                         }
+                        /*
                         operators::MULTIPLY => {
                             return Value::resolve(&call.args[0], ctx)?
                                 * Value::resolve(&call.args[1], ctx)?
