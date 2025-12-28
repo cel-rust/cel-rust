@@ -690,29 +690,21 @@ impl From<Value> for ResolveResult {
     }
 }
 
-impl Value {
-    pub fn resolve_all(expr: &[Expression], ctx: &Context) -> ResolveResult {
-        let mut res = Vec::with_capacity(expr.len());
-        for expr in expr {
-            res.push(Value::resolve(expr, ctx)?);
-        }
-        Ok(Value::List(res.into()))
-    }
-
-    pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
-        let v = Self::resolve_val(expr, ctx)?;
+impl TryFrom<&dyn Val> for Value {
+    type Error = ExecutionError;
+    fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
         match v.get_type() {
             BOOL_TYPE => Ok(Value::Bool(
-                v.downcast_ref::<CelBool>().unwrap().inner().clone(),
+                *v.downcast_ref::<CelBool>().unwrap().inner(),
             )),
             INT_TYPE => Ok(Value::Int(
-                v.downcast_ref::<CelInt>().unwrap().inner().clone(),
+                *v.downcast_ref::<CelInt>().unwrap().inner(),
             )),
             UINT_TYPE => Ok(Value::UInt(
-                v.downcast_ref::<CelUInt>().unwrap().inner().clone(),
+                *v.downcast_ref::<CelUInt>().unwrap().inner(),
             )),
             DOUBLE_TYPE => Ok(Value::Float(
-                v.downcast_ref::<CelDouble>().unwrap().inner().clone(),
+                *v.downcast_ref::<CelDouble>().unwrap().inner(),
             )),
             STRING_TYPE => Ok(Value::String(Arc::new(
                 v.downcast_ref::<CelString>().unwrap().inner().to_string(),
@@ -724,6 +716,20 @@ impl Value {
                 want: "(BOOL|INT|UINT|STRING...)".to_string(),
             }),
         }
+    }
+}
+
+impl Value {
+    pub fn resolve_all(expr: &[Expression], ctx: &Context) -> ResolveResult {
+        let mut res = Vec::with_capacity(expr.len());
+        for expr in expr {
+            res.push(Value::resolve(expr, ctx)?);
+        }
+        Ok(Value::List(res.into()))
+    }
+
+    pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
+        Self::resolve_val(expr, ctx)?.as_ref().try_into()
     }
 
     #[inline(always)]
