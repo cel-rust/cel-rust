@@ -1,10 +1,10 @@
-use std::borrow::Cow;
 use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
+use crate::ExecutionError;
+use std::borrow::Cow;
 use std::ops::Deref;
 use std::string::String as StdString;
-use crate::ExecutionError;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct String(StdString);

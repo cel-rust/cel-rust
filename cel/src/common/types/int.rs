@@ -44,6 +44,10 @@ impl Val for Int {
         Some(self as &dyn traits::Divider)
     }
 
+    fn as_modder(&self) -> Option<&dyn traits::Modder> {
+        Some(self as &dyn traits::Modder)
+    }
+
     fn as_multiplier(&self) -> Option<&dyn traits::Multiplier> {
         Some(self as &dyn traits::Multiplier)
     }
@@ -83,6 +87,18 @@ impl traits::Divider for Int {
     fn div<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(i) = rhs.downcast_ref::<Int>() {
             let t: Self = (self.0 / i.0).into();
+            let b: Box<dyn Val> = Box::new(t);
+            Ok(Cow::Owned(b))
+        } else {
+            Err(ExecutionError::NoSuchOverload)
+        }
+    }
+}
+
+impl traits::Modder for Int {
+    fn modulo<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(i) = rhs.downcast_ref::<Int>() {
+            let t: Self = (self.0 % i.0).into();
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {

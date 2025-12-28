@@ -65,6 +65,10 @@ pub trait Divider {
     fn div<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
+pub trait Modder {
+    fn modulo<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
 pub trait Multiplier {
     fn mul<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }

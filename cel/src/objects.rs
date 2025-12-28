@@ -860,9 +860,9 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[0], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_divider()
-                                  .ok_or(ExecutionError::NoSuchOverload)?
-                                  .div(rhs.as_ref())?
-                                  .into_owned(),
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .div(rhs.as_ref())?
+                                    .into_owned(),
                             ));
                         }
                         operators::MULTIPLY => {
@@ -870,17 +870,21 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[0], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_multiplier()
-                                  .ok_or(ExecutionError::NoSuchOverload)?
-                                  .mul(rhs.as_ref())?
-                                  .into_owned(),
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .mul(rhs.as_ref())?
+                                    .into_owned(),
                             ));
                         }
-                        /*
                         operators::MODULO => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                % Value::resolve(&call.args[1], ctx)?
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[0], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_modder()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .modulo(rhs.as_ref())?
+                                    .into_owned(),
+                            ));
                         }
-                        */
                         operators::LESS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
