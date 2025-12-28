@@ -1,6 +1,5 @@
 use crate::common::value::Val;
 use crate::ExecutionError;
-use crate::ExecutionError::NoSuchOverload;
 use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -64,6 +63,10 @@ pub trait Comparer {
 
 pub trait Divider {
     fn div<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
+pub trait Multiplier {
+    fn mul<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
 pub trait Subtractor {

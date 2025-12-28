@@ -5,7 +5,6 @@ use crate::common::value::Val;
 use std::ops::Deref;
 use std::string::String as StdString;
 use crate::ExecutionError;
-use crate::ExecutionError::NoSuchOverload;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct String(StdString);

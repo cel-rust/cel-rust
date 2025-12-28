@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Comparer, Divider, Indexer, Lister, Subtractor};
+use crate::common::traits::{Adder, Comparer, Divider, Indexer, Lister, Multiplier, Subtractor};
 use crate::common::types;
 use crate::common::types::Type;
 use std::any::Any;
@@ -45,6 +45,10 @@ pub trait Val: Any + Debug {
     }
 
     fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {
+        None
+    }
+
+    fn as_multiplier(&self) -> Option<&dyn Multiplier> {
         None
     }
 
