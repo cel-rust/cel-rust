@@ -15,6 +15,7 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
+use crate::common::types;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 
@@ -783,15 +784,9 @@ impl TryFrom<&dyn Val> for Value {
     type Error = ExecutionError;
     fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
         match v.get_type() {
-            BOOL_TYPE => Ok(Value::Bool(
-                *v.downcast_ref::<CelBool>().unwrap().inner(),
-            )),
-            INT_TYPE => Ok(Value::Int(
-                *v.downcast_ref::<CelInt>().unwrap().inner(),
-            )),
-            UINT_TYPE => Ok(Value::UInt(
-                *v.downcast_ref::<CelUInt>().unwrap().inner(),
-            )),
+            BOOL_TYPE => Ok(Value::Bool(*v.downcast_ref::<CelBool>().unwrap().inner())),
+            INT_TYPE => Ok(Value::Int(*v.downcast_ref::<CelInt>().unwrap().inner())),
+            UINT_TYPE => Ok(Value::UInt(*v.downcast_ref::<CelUInt>().unwrap().inner())),
             DOUBLE_TYPE => Ok(Value::Float(
                 *v.downcast_ref::<CelDouble>().unwrap().inner(),
             )),
@@ -804,6 +799,29 @@ impl TryFrom<&dyn Val> for Value {
                 got: v.get_type().name().to_string(),
                 want: "(BOOL|INT|UINT|STRING...)".to_string(),
             }),
+        }
+    }
+}
+
+impl TryFrom<Value> for Box<dyn Val> {
+    type Error = ExecutionError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Int(i) => Ok(Box::new(Into::<CelInt>::into(i))),
+            Value::UInt(u) => Ok(Box::new(Into::<CelUInt>::into(u))),
+            Value::Float(f) => Ok(Box::new(Into::<CelDouble>::into(f))),
+            Value::String(s) => Ok(Box::new(Into::<CelString>::into(s.as_str()))),
+            Value::Bool(b) => Ok(Box::new(Into::<CelBool>::into(b))),
+            Value::Null => Ok(Box::new(CelNull)),
+            /*
+            Value::Bytes(_) => {}
+            Value::List(_) => {}
+            Value::Map(_) => {}
+            Value::Opaque(_) => {}
+            Value::Duration(_) => {}
+            Value::Timestamp(_) => {}
+             */
+            _ => Err(ExecutionError::UnsupportedTargetType { target: value }),
         }
     }
 }
