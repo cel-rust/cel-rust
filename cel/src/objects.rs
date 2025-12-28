@@ -3,6 +3,8 @@ use crate::common::types::*;
 use crate::common::value::{CelVal, Val};
 use crate::context::Context;
 use crate::{ExecutionError, Expression};
+#[cfg(feature = "chrono")]
+use chrono::TimeZone;
 use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -14,10 +16,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
-
-use crate::common::types;
-#[cfg(feature = "chrono")]
-use chrono::TimeZone;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const BOOL_TRUE: LazyLock<Cow<dyn Val>> =
     LazyLock::new(|| Cow::<dyn Val>::Owned(Box::new(bool::TRUE)));
@@ -705,6 +704,35 @@ impl TryFrom<&dyn Val> for Value {
                 v.downcast_ref::<CelString>().unwrap().inner().to_string(),
             ))),
             NULL_TYPE => Ok(Value::Null),
+            BYTES_TYPE => Ok(Value::Bytes(Arc::new(
+                v.downcast_ref::<CelBytes>().unwrap().inner().to_vec(),
+            ))),
+            #[cfg(feature = "chrono")]
+            DURATION_TYPE => Ok(Value::Duration(
+                chrono::Duration::from_std(
+                    v.downcast_ref::<CelDuration>().unwrap().inner().clone(),
+                )
+                .unwrap(),
+            )),
+            #[cfg(feature = "chrono")]
+            TIMESTAMP_TYPE => {
+                let ts = v.downcast_ref::<CelTimestamp>().unwrap().inner();
+                match ts.duration_since(UNIX_EPOCH) {
+                    Ok(duration) => Ok(Value::Timestamp(
+                        chrono::DateTime::from_timestamp(
+                            duration.as_secs() as i64,
+                            duration.subsec_nanos(),
+                        )
+                        .unwrap_or_default()
+                        .fixed_offset(),
+                    )),
+                    Err(_) => Err(ExecutionError::Overflow(
+                        "timestamp issue!",
+                        Value::Null,
+                        Value::Null,
+                    )),
+                }
+            }
             // add missing mappings here!
             // collections recurse here tho...
             _ => Err(ExecutionError::UnexpectedType {
@@ -725,13 +753,18 @@ impl TryFrom<Value> for Box<dyn Val> {
             Value::Float(f) => Ok(Box::new(Into::<CelDouble>::into(f))),
             Value::String(s) => Ok(Box::new(Into::<CelString>::into(s.as_str()))),
             Value::Null => Ok(Box::new(CelNull)),
+            Value::Bytes(b) => Ok(Box::new(Into::<CelBytes>::into(b.as_slice().to_vec()))),
+            #[cfg(feature = "chrono")]
+            Value::Duration(d) => Ok(Box::new(Into::<CelDuration>::into(d.to_std().unwrap()))),
+            #[cfg(feature = "chrono")]
+            Value::Timestamp(ts) => {
+                let ts: SystemTime = ts.into();
+                Ok(Box::new(Into::<CelTimestamp>::into(ts)))
+            }
             /*
-            Value::Bytes(_) => {}
             Value::List(_) => {}
             Value::Map(_) => {}
             Value::Opaque(_) => {}
-            Value::Duration(_) => {}
-            Value::Timestamp(_) => {}
              */
             _ => Err(ExecutionError::UnsupportedTargetType { target: value }),
         }
