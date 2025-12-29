@@ -1,4 +1,5 @@
 use crate::common::traits;
+use std::any::Any;
 
 pub(crate) mod bool;
 mod bytes;
@@ -13,6 +14,7 @@ mod string;
 mod timestamp;
 mod uint;
 
+use crate::common::value::Val;
 pub use bool::Bool as CelBool;
 pub use bytes::Bytes as CelBytes;
 pub use double::Double as CelDouble;
@@ -256,4 +258,13 @@ mod tests {
         assert_eq!(&param, map.parameters[1]);
         assert_eq!(2, map.parameters.len());
     }
+}
+
+fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
+    if <dyn Any>::is::<T>(&*value) {
+        let list = &mut Some(value);
+        let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
+        return Ok(list.take().unwrap());
+    }
+    Err(value)
 }

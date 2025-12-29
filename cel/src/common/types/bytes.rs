@@ -1,6 +1,5 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 use std::ops::Deref;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -53,17 +52,10 @@ impl From<Bytes> for Vec<u8> {
 }
 
 impl TryFrom<Box<dyn Val>> for Vec<u8> {
-    type Error = Box<dyn Any>;
+    type Error = Box<dyn Val>;
 
     fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
-        type T = Bytes;
-
-        if <dyn Any>::is::<T>(&*value) {
-            let list = &mut Some(value);
-            let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
-            return Ok(list.take().unwrap().into_inner());
-        }
-        Err(value)
+        super::cast_boxed::<Bytes>(value).map(|b| b.into_inner())
     }
 }
 

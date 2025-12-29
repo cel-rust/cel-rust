@@ -2,7 +2,6 @@ use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::ExecutionError;
-use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::string::String as StdString;
@@ -67,14 +66,7 @@ impl TryFrom<Box<dyn Val>> for StdString {
     type Error = Box<dyn Val>;
 
     fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
-        type T = String;
-
-        if <dyn Any>::is::<T>(&*value) {
-            let list = &mut Some(value);
-            let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
-            return Ok(list.take().unwrap().into_inner());
-        }
-        Err(value)
+        super::cast_boxed::<String>(value).map(|s| s.into_inner())
     }
 }
 
