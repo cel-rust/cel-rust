@@ -18,6 +18,7 @@ regex = { version = "1.10.5", optional = true }
 serde = "1.0"
 serde_json = { version = "1.0", optional = true }
 base64 = { version = "0.22.1", optional = true }
+bytes = { version = "1", optional = true }
 
 thiserror = "1.0"
 paste = "1.0"
@@ -33,6 +34,7 @@ harness = false
 
 [features]
 default = ["regex", "chrono"]
+bytes = ["dep:bytes"]
 json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
 chrono = ["dep:chrono"]
