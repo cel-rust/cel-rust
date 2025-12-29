@@ -7,7 +7,7 @@ use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct DefaultList(Vec<Box<dyn Val>>);
 
 impl DefaultList {
@@ -62,11 +62,10 @@ impl Indexer for DefaultList {
     fn get<'a>(&'a self, idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match idx.get_type() {
             types::INT_TYPE => {
-                let idx: i64 = idx
+                let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
                     .expect("We need an Indexer!")
-                    .inner()
-                    .clone();
+                    .inner();
                 Ok(Cow::Borrowed(
                     self.0
                         .get(idx as usize)
@@ -76,7 +75,7 @@ impl Indexer for DefaultList {
             }
             _ => Err(ExecutionError::UnexpectedType {
                 got: idx.get_type().runtime_type_name.to_string(),
-                want: format!("{}", types::INT_TYPE.runtime_type_name),
+                want: types::INT_TYPE.runtime_type_name.to_string(),
             }),
         }
     }
@@ -85,7 +84,7 @@ impl Indexer for DefaultList {
         let mut list = self;
         match idx.get_type() {
             types::INT_TYPE => {
-                let idx: i64 = idx.downcast_ref::<CelInt>().unwrap().inner().clone();
+                let idx: i64 = *idx.downcast_ref::<CelInt>().unwrap().inner();
                 if idx < 0 || idx as usize >= list.0.len() {
                     return Err(ExecutionError::IndexOutOfBounds(idx.into()));
                 }
@@ -93,7 +92,7 @@ impl Indexer for DefaultList {
             }
             _ => Err(ExecutionError::UnexpectedType {
                 got: idx.get_type().runtime_type_name.to_string(),
-                want: format!("{}", types::INT_TYPE.runtime_type_name),
+                want: types::INT_TYPE.runtime_type_name.to_string(),
             }),
         }
     }
@@ -115,12 +114,6 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [Box<dyn Val>] {
             return Ok(list.inner());
         }
         Err(value)
-    }
-}
-
-impl Default for DefaultList {
-    fn default() -> Self {
-        DefaultList(Vec::default())
     }
 }
 

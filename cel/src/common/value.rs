@@ -119,42 +119,18 @@ impl CelVal {
             CelVal::Error(_err) => todo!(),
             CelVal::Dyn => todo!(),
             CelVal::Any => todo!(),
-            CelVal::Boolean(b) => {
-                let b: types::CelBool = b.into();
-                Box::new(b)
-            }
-            CelVal::Bytes(bytes) => {
-                let bytes: types::CelBytes = bytes.into();
-                Box::new(bytes)
-            }
-            CelVal::Double(d) => {
-                let d: types::CelDouble = d.into();
-                Box::new(d)
-            }
-            CelVal::Duration(d) => {
-                let d: types::CelDuration = d.into();
-                Box::new(d)
-            }
-            CelVal::Int(i) => {
-                let i: types::CelInt = i.into();
-                Box::new(i)
-            }
+            CelVal::Boolean(b) => Box::new(b),
+            CelVal::Bytes(bytes) => Box::new(bytes),
+            CelVal::Double(d) => Box::new(d),
+            CelVal::Duration(d) => Box::new(d),
+            CelVal::Int(i) => Box::new(i),
             CelVal::List(_) => todo!(),
             CelVal::Map => todo!(),
             CelVal::Null => Box::new(types::CelNull),
-            CelVal::String(s) => {
-                let s: types::CelString = s.into();
-                Box::new(s)
-            }
-            CelVal::Timestamp(t) => {
-                let t: types::CelTimestamp = t.into();
-                Box::new(t)
-            }
+            CelVal::String(s) => Box::new(s),
+            CelVal::Timestamp(t) => Box::new(t),
             CelVal::Type => todo!(),
-            CelVal::UInt(u) => {
-                let u: types::CelUInt = u.into();
-                Box::new(u)
-            }
+            CelVal::UInt(u) => Box::new(u),
             CelVal::Unknown(_) => todo!(),
         }
     }

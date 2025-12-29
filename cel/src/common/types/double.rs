@@ -2,7 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::ops::Deref;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Double(f64);
 
 impl Double {
@@ -64,11 +64,5 @@ impl<'a> TryFrom<&'a dyn Val> for &'a f64 {
             return Ok(&d.0);
         }
         Err(value)
-    }
-}
-
-impl Default for Double {
-    fn default() -> Self {
-        Double(f64::default())
     }
 }

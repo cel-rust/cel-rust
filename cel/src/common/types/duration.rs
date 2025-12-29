@@ -3,7 +3,7 @@ use crate::common::value::Val;
 use std::ops::Deref;
 use std::time::Duration as StdDuration;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Duration(StdDuration);
 
 impl Duration {
@@ -64,11 +64,5 @@ impl<'a> TryFrom<&'a dyn Val> for &'a StdDuration {
             return Ok(&d.0);
         }
         Err(value)
-    }
-}
-
-impl Default for Duration {
-    fn default() -> Self {
-        Duration(StdDuration::default())
     }
 }

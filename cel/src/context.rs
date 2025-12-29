@@ -120,6 +120,7 @@ impl<'a> Context<'a> {
         }
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get_function(&self, name: &str) -> Option<&Function> {
         match self {
             Context::Root { functions, .. } => functions.get(name),

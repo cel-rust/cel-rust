@@ -18,11 +18,6 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-const BOOL_TRUE: LazyLock<Cow<dyn Val>> =
-    LazyLock::new(|| Cow::<dyn Val>::Owned(Box::new(bool::TRUE)));
-const BOOL_FALSE: LazyLock<Cow<dyn Val>> =
-    LazyLock::new(|| Cow::<dyn Val>::Owned(Box::new(bool::FALSE)));
-
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
 /// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
@@ -798,10 +793,8 @@ impl TryFrom<&dyn Val> for Value {
             ))),
             #[cfg(feature = "chrono")]
             DURATION_TYPE => Ok(Value::Duration(
-                chrono::Duration::from_std(
-                    v.downcast_ref::<CelDuration>().unwrap().inner().clone(),
-                )
-                .unwrap(),
+                chrono::Duration::from_std(*v.downcast_ref::<CelDuration>().unwrap().inner())
+                    .unwrap(),
             )),
             #[cfg(feature = "chrono")]
             TIMESTAMP_TYPE => {
@@ -931,7 +924,7 @@ impl Value {
                             ))))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
-                            let mut is_optional = call.func_name == operators::OPT_INDEX;
+                            let is_optional = call.func_name == operators::OPT_INDEX;
                             let value = Value::resolve_val(&call.args[0], ctx)?;
                             let result = match value {
                                 Cow::Borrowed(val) => Ok(val
@@ -955,9 +948,9 @@ impl Value {
                             };
                         }
                         operators::OPT_SELECT => {
-                            let operand = Value::resolve(&call.args[0], ctx)?;
+                            let _operand = Value::resolve(&call.args[0], ctx)?;
                             let field_literal = Value::resolve(&call.args[1], ctx)?;
-                            let field = match field_literal {
+                            let _field = match field_literal {
                                 Value::String(s) => s,
                                 _ => {
                                     return Err(ExecutionError::function_error(
@@ -1041,9 +1034,11 @@ impl Value {
                                 .compare(rhs.as_ref())?
                                 == Ordering::Less
                             {
-                                Ok(BOOL_TRUE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
                             } else {
-                                Ok(BOOL_FALSE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
+                                    false,
+                                ))))
                             };
                         }
                         operators::LESS_EQUALS => {
@@ -1055,9 +1050,11 @@ impl Value {
                                 .compare(rhs.as_ref())?
                                 == Ordering::Greater
                             {
-                                Ok(BOOL_FALSE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
+                                    false,
+                                ))))
                             } else {
-                                Ok(BOOL_TRUE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
                             };
                         }
                         operators::GREATER => {
@@ -1069,9 +1066,11 @@ impl Value {
                                 .compare(rhs.as_ref())?
                                 == Ordering::Greater
                             {
-                                Ok(BOOL_TRUE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
                             } else {
-                                Ok(BOOL_FALSE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
+                                    false,
+                                ))))
                             };
                         }
                         operators::GREATER_EQUALS => {
@@ -1083,9 +1082,11 @@ impl Value {
                                 .compare(rhs.as_ref())?
                                 == Ordering::Less
                             {
-                                Ok(BOOL_FALSE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
+                                    false,
+                                ))))
                             } else {
-                                Ok(BOOL_TRUE.to_owned())
+                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
                             };
                         }
                         /*
@@ -1204,8 +1205,9 @@ impl Value {
                 let list = list_expr
                     .elements
                     .iter()
-                    .enumerate()
-                    .map(|(idx, element)| {
+                    //.enumerate()
+                    //.map(|(_idx, element)| {
+                    .map(|element| {
                         Value::resolve_val(element, ctx).map(|value| {
                             /*
                             if list_expr.optional_indices.contains(&idx) {
@@ -1217,8 +1219,7 @@ impl Value {
                             } else {
                                 Some(value)
                             }*/
-                            let b = value.into_owned();
-                            b
+                            value.into_owned()
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?
@@ -1302,6 +1303,7 @@ impl Value {
     //               Attribute("b")),
     //        FunctionCall([Ident("c")]))
 
+    #[allow(dead_code)]
     fn member(self, name: &str) -> ResolveResult {
         // This will always either be because we're trying to access
         // a property on self, or a method on self.
@@ -1321,6 +1323,7 @@ impl Value {
     }
 
     #[inline(always)]
+    #[allow(dead_code)]
     fn to_bool(&self) -> Result<bool, ExecutionError> {
         match self {
             Value::Bool(v) => Ok(*v),

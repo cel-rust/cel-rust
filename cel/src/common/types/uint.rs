@@ -2,7 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::ops::Deref;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct UInt(u64);
 
 impl UInt {
