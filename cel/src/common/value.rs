@@ -1,5 +1,5 @@
 use crate::common::traits::{
-    Adder, Comparer, Divider, Indexer, Lister, Modder, Multiplier, Subtractor,
+    Adder, Comparer, Container, Divider, Indexer, Lister, Modder, Multiplier, Subtractor,
 };
 use crate::common::types;
 use crate::common::types::Type;
@@ -35,6 +35,10 @@ pub trait Val: Any + Debug {
     }
 
     fn as_comparer(&self) -> Option<&dyn Comparer> {
+        None
+    }
+
+    fn as_container(&self) -> Option<&dyn Container> {
         None
     }
 

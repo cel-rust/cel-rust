@@ -1089,26 +1089,22 @@ impl Value {
                                 Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
                             };
                         }
-                        /*
                         operators::IN => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            match (left, right) {
-                                (Value::String(l), Value::String(r)) => {
-                                    return Value::Bool(r.contains(&*l)).into()
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if let Some(container) = rhs.as_container() {
+                                match container.contains(lhs.as_ref())? {
+                                    true => Ok(Cow::<dyn Val>::Owned(Box::new(
+                                        Into::<CelBool>::into(true),
+                                    ))),
+                                    false => Ok(Cow::<dyn Val>::Owned(Box::new(
+                                        Into::<CelBool>::into(false),
+                                    ))),
                                 }
-                                (any, Value::List(v)) => {
-                                    return Value::Bool(v.contains(&any)).into()
-                                }
-                                (any, Value::Map(m)) => match KeyRef::try_from(&any) {
-                                    Ok(key) => return Value::Bool(m.contains_key(&key)).into(),
-                                    Err(_) => return Value::Bool(false).into(),
-                                },
-                                (left, right) => {
-                                    Err(ExecutionError::ValuesNotComparable(left, right))?
-                                }
-                            }                        }
-                         */
+                            } else {
+                                Err(ExecutionError::NoSuchOverload)
+                            };
+                        }
                         _ => (),
                     }
                 }
