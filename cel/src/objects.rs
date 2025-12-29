@@ -3,7 +3,7 @@ use crate::common::types::bool::Bool;
 use crate::common::types::*;
 use crate::common::value::{CelVal, Val};
 use crate::context::Context;
-use crate::{ExecutionError, Expression};
+use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 use std::any::Any;
@@ -1024,14 +1024,15 @@ impl Value {
                         _ => (),
                     }
                 }
-                /*
                 match &call.target {
                     None => {
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
                         })?;
+                        // todo fix this to _not_ use `Value`
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, &call.args);
-                        (func)(&mut ctx)
+                        let v = (func)(&mut ctx)?;
+                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                     }
                     Some(target) => {
                         let qualified_func = match &target.expr {
@@ -1055,18 +1056,20 @@ impl Value {
                                     ctx,
                                     &call.args,
                                 );
-                                (func)(&mut ctx)
+                                // todo fix this to _not_ use `Value`
+                                let v = (func)(&mut ctx)?;
+                                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                             }
                             Some(func) => {
                                 let mut ctx =
                                     FunctionContext::new(&call.func_name, None, ctx, &call.args);
-                                (func)(&mut ctx)
+                                // todo fix this to _not_ use `Value`
+                                let v = (func)(&mut ctx)?;
+                                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                             }
                         }
                     }
                 }
-                 */
-                todo!("Work harder")
             }
             /*
             Expr::Ident(name) => ctx.get_variable(name),
