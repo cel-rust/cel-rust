@@ -101,8 +101,8 @@ mod test {
 
     #[test]
     fn test_cow() {
-        let s1 = types::CelString::new("cel");
-        let s2 = types::CelString::new("cel");
+        let s1 = types::CelString::from("cel");
+        let s2 = types::CelString::from("cel");
         let b: Box<dyn Val> = Box::new(s1);
         let cow: Cow<dyn Val> = Cow::Owned(b);
         let borrowed: Cow<dyn Val> = Cow::Borrowed(&s2);

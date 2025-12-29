@@ -141,6 +141,28 @@ impl From<i64> for Int {
     }
 }
 
+impl TryFrom<Box<dyn Val>> for i64 {
+    type Error = Box<dyn Val>;
+
+    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+        if let Some(i) = value.downcast_ref::<Int>() {
+            return Ok(i.0);
+        }
+        Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
+    type Error = &'a dyn Val;
+
+    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+        if let Some(i) = value.downcast_ref::<Int>() {
+            return Ok(&i.0);
+        }
+        Err(value)
+    }
+}
+
 impl Default for Int {
     fn default() -> Self {
         Self(i64::default())

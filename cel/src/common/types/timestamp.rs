@@ -36,3 +36,25 @@ impl From<Timestamp> for SystemTime {
         timestamp.0
     }
 }
+
+impl TryFrom<Box<dyn Val>> for SystemTime {
+    type Error = Box<dyn Val>;
+
+    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+        if let Some(ts) = value.downcast_ref::<Timestamp>() {
+            return Ok(ts.0);
+        }
+        Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a dyn Val> for &'a SystemTime {
+    type Error = &'a dyn Val;
+
+    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+        if let Some(ts) = value.downcast_ref::<Timestamp>() {
+            return Ok(&ts.0);
+        }
+        Err(value)
+    }
+}

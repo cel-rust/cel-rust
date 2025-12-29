@@ -44,3 +44,24 @@ impl From<u64> for UInt {
         Self(value)
     }
 }
+
+impl TryFrom<Box<dyn Val>> for u64 {
+    type Error = Box<dyn Val>;
+
+    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+        if let Some(u) = value.downcast_ref::<UInt>() {
+            return Ok(u.0);
+        }
+        Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a dyn Val> for &'a u64 {
+    type Error = &'a dyn Val;
+    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+        if let Some(u) = value.downcast_ref::<UInt>() {
+            return Ok(&u.0);
+        }
+        Err(value)
+    }
+}

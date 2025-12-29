@@ -3,6 +3,7 @@ use crate::common::types;
 use crate::common::types::{CelInt, Type};
 use crate::common::value::Val;
 use crate::ExecutionError;
+use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
 
@@ -98,6 +99,38 @@ impl Indexer for DefaultList {
     }
 }
 
+impl TryFrom<Box<dyn Val>> for Vec<Box<dyn Val>> {
+    type Error = Box<dyn Val>;
+
+    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+        type T = DefaultList;
+
+        if <dyn Any>::is::<T>(&*value) {
+            let list = &mut Some(value);
+            let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
+            return Ok(list.take().unwrap().into_inner());
+        }
+        Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a dyn Val> for &'a [Box<dyn Val>] {
+    type Error = &'a dyn Val;
+
+    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+        if let Some(list) = <dyn Any>::downcast_ref::<DefaultList>(value) {
+            return Ok(list.inner());
+        }
+        Err(value)
+    }
+}
+
+impl Default for DefaultList {
+    fn default() -> Self {
+        DefaultList(Vec::default())
+    }
+}
+
 #[cfg(test)]
 pub mod tests {
     use crate::common::traits::Indexer;
@@ -166,5 +199,25 @@ pub mod tests {
         let idx: CelInt = 0.into();
         let expected: Box<dyn Val> = Box::new(Into::<CelString>::into("cel"));
         assert_eq!(Indexer::steal(list.into(), &idx), Ok(expected));
+    }
+
+    #[test]
+    fn try_into_vec() {
+        let v1: Box<dyn Val> = Box::new(Into::<CelString>::into("cel"));
+        let v2: Box<dyn Val> = Box::new(Into::<CelString>::into("rust"));
+        let list: Box<dyn Val> = Box::new(DefaultList(vec![v1, v2]));
+        let list: Vec<Box<dyn Val>> = list.try_into().unwrap();
+        assert_eq!(list[0].downcast_ref::<CelString>().unwrap().inner(), "cel");
+        assert_eq!(list[1].downcast_ref::<CelString>().unwrap().inner(), "rust");
+    }
+
+    #[test]
+    fn try_into_slice() {
+        let v1: Box<dyn Val> = Box::new(Into::<CelString>::into("cel"));
+        let v2: Box<dyn Val> = Box::new(Into::<CelString>::into("rust"));
+        let list: Box<dyn Val> = Box::new(DefaultList(vec![v1, v2]));
+        let list: &[Box<dyn Val>] = list.as_ref().try_into().unwrap();
+        assert_eq!(list[0].downcast_ref::<CelString>().unwrap().inner(), "cel");
+        assert_eq!(list[1].downcast_ref::<CelString>().unwrap().inner(), "rust");
     }
 }
