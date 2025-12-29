@@ -1,5 +1,5 @@
 use crate::common::traits::{
-    Adder, Comparer, Container, Divider, Indexer, Lister, Modder, Multiplier, Subtractor,
+    Adder, Comparer, Container, Divider, Indexer, Lister, Modder, Multiplier, Negator, Subtractor,
 };
 use crate::common::types;
 use crate::common::types::Type;
@@ -59,6 +59,10 @@ pub trait Val: Any + Debug {
     }
 
     fn as_multiplier(&self) -> Option<&dyn Multiplier> {
+        None
+    }
+
+    fn as_negator(&self) -> Option<&dyn Negator> {
         None
     }
 
