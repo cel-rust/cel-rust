@@ -1071,8 +1071,12 @@ impl Value {
                     }
                 }
             }
+            Expr::Ident(name) => {
+                let v = ctx.get_variable(name)?;
+                // todo fix this to _not_ use `Value`
+                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+            }
             /*
-            Expr::Ident(name) => ctx.get_variable(name),
             Expr::Select(select) => {
                 let left = Value::resolve(select.operand.deref(), ctx)?;
                 if select.test {
