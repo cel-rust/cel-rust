@@ -6,6 +6,10 @@ use std::ops::Deref;
 pub struct Bool(bool);
 
 impl Bool {
+    pub fn negate(&self) -> Self {
+        Self(!self.0)
+    }
+
     pub fn into_inner(self) -> bool {
         self.0
     }

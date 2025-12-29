@@ -77,6 +77,10 @@ pub trait Multiplier {
     fn mul<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
+pub trait Negator {
+    fn negate(&self) -> Result<Box<dyn Val>, ExecutionError>;
+}
+
 pub trait Subtractor {
     fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }

@@ -1,4 +1,5 @@
 use crate::common::ast::{operators, Expr};
+use crate::common::types::bool::Bool;
 use crate::common::types::*;
 use crate::common::value::{CelVal, Val};
 use crate::context::Context;
@@ -912,16 +913,16 @@ impl Value {
                             };
                         }
                         operators::EQUALS => {
-                            return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                            return Ok(bool(
                                 Value::resolve_val(&call.args[0], ctx)?
                                     .eq(&Value::resolve_val(&call.args[1], ctx)?),
-                            ))))
+                            ))
                         }
                         operators::NOT_EQUALS => {
-                            return Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                            return Ok(bool(
                                 Value::resolve_val(&call.args[0], ctx)?
                                     .ne(&Value::resolve_val(&call.args[1], ctx)?),
-                            ))))
+                            ))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
                             let is_optional = call.func_name == operators::OPT_INDEX;
@@ -1028,18 +1029,12 @@ impl Value {
                         operators::LESS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if lhs
-                                .as_comparer()
-                                .ok_or(ExecutionError::NoSuchOverload)?
-                                .compare(rhs.as_ref())?
-                                == Ordering::Less
-                            {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
-                            } else {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
-                                    false,
-                                ))))
-                            };
+                            return Ok(bool(
+                                lhs.as_comparer()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .compare(rhs.as_ref())?
+                                    == Ordering::Less,
+                            ));
                         }
                         operators::LESS_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
@@ -1050,28 +1045,20 @@ impl Value {
                                 .compare(rhs.as_ref())?
                                 == Ordering::Greater
                             {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
-                                    false,
-                                ))))
+                                Ok(bool(false))
                             } else {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
+                                Ok(bool(true))
                             };
                         }
                         operators::GREATER => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if lhs
-                                .as_comparer()
-                                .ok_or(ExecutionError::NoSuchOverload)?
-                                .compare(rhs.as_ref())?
-                                == Ordering::Greater
-                            {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
-                            } else {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
-                                    false,
-                                ))))
-                            };
+                            return Ok(bool(
+                                lhs.as_comparer()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .compare(rhs.as_ref())?
+                                    == Ordering::Greater,
+                            ));
                         }
                         operators::GREATER_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
@@ -1082,25 +1069,16 @@ impl Value {
                                 .compare(rhs.as_ref())?
                                 == Ordering::Less
                             {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(
-                                    false,
-                                ))))
+                                Ok(bool(false))
                             } else {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(true))))
+                                Ok(bool(true))
                             };
                         }
                         operators::IN => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return if let Some(container) = rhs.as_container() {
-                                match container.contains(lhs.as_ref())? {
-                                    true => Ok(Cow::<dyn Val>::Owned(Box::new(
-                                        Into::<CelBool>::into(true),
-                                    ))),
-                                    false => Ok(Cow::<dyn Val>::Owned(Box::new(
-                                        Into::<CelBool>::into(false),
-                                    ))),
-                                }
+                                Ok(bool(container.contains(lhs.as_ref())?))
                             } else {
                                 Err(ExecutionError::NoSuchOverload)
                             };
@@ -1108,31 +1086,34 @@ impl Value {
                         _ => (),
                     }
                 }
-                /*
                 if call.args.len() == 1 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_NOT => {
-                            let expr = Value::resolve(&call.args[0], ctx)?;
-                            return Ok(Value::Bool(!expr.to_bool()?));
+                            let expr = Value::resolve_val(&call.args[0], ctx)?;
+                            return expr
+                                .downcast_ref::<CelBool>()
+                                .map(Bool::negate)
+                                .ok_or(ExecutionError::NoSuchOverload)
+                                .map(|b| bool(b.into_inner()));
                         }
                         operators::NEGATE => {
-                            return match Value::resolve(&call.args[0], ctx)? {
-                                Value::Int(i) => Ok(Value::Int(-i)),
-                                Value::Float(f) => Ok(Value::Float(-f)),
-                                value => {
-                                    Err(ExecutionError::UnsupportedUnaryOperator("minus", value))
-                                }
-                            }
+                            let val = Value::resolve_val(&call.args[0], ctx)?;
+                            return Ok(Cow::<dyn Val>::Owned(
+                                val.as_negator()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .negate()?,
+                            ));
                         }
                         operators::NOT_STRICTLY_FALSE => {
-                            return match Value::resolve(&call.args[0], ctx)? {
-                                Value::Bool(b) => Ok(Value::Bool(b)),
-                                _ => Ok(Value::Bool(true)),
-                            }
+                            return Ok(bool(
+                                try_bool(Value::resolve_val(&call.args[0], ctx)?.as_ref())
+                                    .unwrap_or(true),
+                            ));
                         }
                         _ => (),
                     }
                 }
+                /*
                 match &call.target {
                     None => {
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
@@ -1326,6 +1307,10 @@ impl Value {
             _ => Err(ExecutionError::NoSuchOverload),
         }
     }
+}
+
+fn bool<'a>(boolean: bool) -> Cow<'a, dyn Val> {
+    Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(boolean)))
 }
 
 fn try_bool(val: &dyn Val) -> Result<bool, ExecutionError> {
