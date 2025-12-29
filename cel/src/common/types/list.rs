@@ -103,14 +103,7 @@ impl TryFrom<Box<dyn Val>> for Vec<Box<dyn Val>> {
     type Error = Box<dyn Val>;
 
     fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
-        type T = DefaultList;
-
-        if <dyn Any>::is::<T>(&*value) {
-            let list = &mut Some(value);
-            let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
-            return Ok(list.take().unwrap().into_inner());
-        }
-        Err(value)
+        super::cast_boxed::<DefaultList>(value).map(|l| l.into_inner())
     }
 }
 
