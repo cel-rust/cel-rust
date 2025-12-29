@@ -61,6 +61,10 @@ pub trait Comparer {
     fn compare(&self, _rhs: &dyn Val) -> Result<Ordering, ExecutionError>;
 }
 
+pub trait Container {
+    fn contains(&self, _value: &dyn Val) -> Result<bool, ExecutionError>;
+}
+
 pub trait Divider {
     fn div<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }

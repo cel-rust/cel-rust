@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Indexer};
+use crate::common::traits::{Adder, Container, Indexer};
 use crate::common::types;
 use crate::common::types::{CelInt, Type};
 use crate::common::value::Val;
@@ -41,6 +41,10 @@ impl Val for DefaultList {
         todo!()
     }
 
+    fn as_container(&self) -> Option<&dyn Container> {
+        Some(self as &dyn Container)
+    }
+
     fn as_indexer(&self) -> Option<&dyn Indexer> {
         Some(self as &dyn Indexer)
     }
@@ -55,6 +59,17 @@ impl Val for DefaultList {
             vec.push(i);
         }
         Box::new(DefaultList(vec))
+    }
+}
+
+impl Container for DefaultList {
+    fn contains(&self, value: &dyn Val) -> Result<bool, ExecutionError> {
+        for i in &self.0 {
+            if i.equals(value) {
+                return Ok(true);
+            }
+        }
+        Ok(false)
     }
 }
 
