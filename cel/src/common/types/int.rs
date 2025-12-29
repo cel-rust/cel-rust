@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::Deref;
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Int(i64);
 
 impl Int {
@@ -160,11 +160,5 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
             return Ok(&i.0);
         }
         Err(value)
-    }
-}
-
-impl Default for Int {
-    fn default() -> Self {
-        Self(i64::default())
     }
 }

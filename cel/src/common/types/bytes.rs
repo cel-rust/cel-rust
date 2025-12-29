@@ -2,7 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::ops::Deref;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bytes(Vec<u8>);
 
 impl Bytes {
@@ -31,7 +31,7 @@ impl Val for Bytes {
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
-            .map_or(false, |a| self.0.eq(&a.0))
+            .is_some_and(|a| self.0.eq(&a.0))
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
@@ -67,11 +67,5 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
             return Ok(bytes.inner());
         }
         Err(value)
-    }
-}
-
-impl Default for Bytes {
-    fn default() -> Self {
-        Bytes(Vec::default())
     }
 }

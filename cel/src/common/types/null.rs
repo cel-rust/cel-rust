@@ -1,7 +1,7 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct Null;
 
 impl Val for Null {

@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::string::String as StdString;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct String(StdString);
 
 impl String {
@@ -77,12 +77,6 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
             return Ok(s.inner());
         }
         Err(value)
-    }
-}
-
-impl Default for String {
-    fn default() -> Self {
-        Self(StdString::default())
     }
 }
 

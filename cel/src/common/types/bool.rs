@@ -2,10 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::ops::Deref;
 
-pub const TRUE: Bool = Bool(true);
-pub const FALSE: Bool = Bool(false);
-
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Bool(bool);
 
 impl Bool {
@@ -32,13 +29,11 @@ impl Val for Bool {
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
-        other
-            .downcast_ref::<Self>()
-            .map_or(false, |a| self.0 == a.0)
+        other.downcast_ref::<Self>().is_some_and(|a| self.0 == a.0)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 }
 
@@ -73,12 +68,6 @@ impl<'a> TryFrom<&'a dyn Val> for &'a bool {
             return Ok(&b.0);
         }
         Err(value)
-    }
-}
-
-impl Default for Bool {
-    fn default() -> Self {
-        Bool(bool::default())
     }
 }
 
