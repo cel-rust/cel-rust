@@ -2,6 +2,7 @@ use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::ExecutionError;
+use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
 use std::string::String as StdString;
@@ -62,14 +63,58 @@ impl From<&str> for String {
     }
 }
 
+impl TryFrom<Box<dyn Val>> for StdString {
+    type Error = Box<dyn Val>;
+
+    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+        type T = String;
+
+        if <dyn Any>::is::<T>(&*value) {
+            let list = &mut Some(value);
+            let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
+            return Ok(list.take().unwrap().into_inner());
+        }
+        Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a dyn Val> for &'a str {
+    type Error = &'a dyn Val;
+    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+        if let Some(s) = value.downcast_ref::<String>() {
+            return Ok(s.inner());
+        }
+        Err(value)
+    }
+}
+
+impl Default for String {
+    fn default() -> Self {
+        Self(StdString::default())
+    }
+}
+
 impl traits::Adder for String {
     fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         todo!("implement Adder for String!")
     }
 }
 
-impl String {
-    pub fn new(str: &str) -> Self {
-        Self(str.into())
+#[cfg(test)]
+mod tests {
+    use super::StdString;
+    use super::String;
+    use crate::common::value::Val;
+
+    #[test]
+    fn test_try_into_string() {
+        let str: Box<dyn Val> = Box::new(String::from("cel-rust"));
+        assert_eq!(Ok(StdString::from("cel-rust")), str.try_into())
+    }
+
+    #[test]
+    fn test_try_into_str() {
+        let str: Box<dyn Val> = Box::new(String::from("cel-rust"));
+        assert_eq!(Ok("cel-rust"), str.as_ref().try_into())
     }
 }

@@ -54,6 +54,34 @@ impl From<bool> for Bool {
     }
 }
 
+impl TryFrom<Box<dyn Val>> for bool {
+    type Error = Box<dyn Val>;
+
+    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+        if let Some(b) = value.downcast_ref::<Bool>() {
+            return Ok(b.0);
+        }
+        Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a dyn Val> for &'a bool {
+    type Error = &'a dyn Val;
+
+    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+        if let Some(b) = value.downcast_ref::<Bool>() {
+            return Ok(&b.0);
+        }
+        Err(value)
+    }
+}
+
+impl Default for Bool {
+    fn default() -> Self {
+        Bool(bool::default())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

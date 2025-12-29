@@ -1,5 +1,6 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
+use std::any::Any;
 use std::ops::Deref;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -48,5 +49,37 @@ impl From<Vec<u8>> for Bytes {
 impl From<Bytes> for Vec<u8> {
     fn from(value: Bytes) -> Self {
         value.0
+    }
+}
+
+impl TryFrom<Box<dyn Val>> for Vec<u8> {
+    type Error = Box<dyn Any>;
+
+    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+        type T = Bytes;
+
+        if <dyn Any>::is::<T>(&*value) {
+            let list = &mut Some(value);
+            let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
+            return Ok(list.take().unwrap().into_inner());
+        }
+        Err(value)
+    }
+}
+
+impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
+    type Error = &'a dyn Val;
+
+    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+        if let Some(bytes) = value.downcast_ref::<Bytes>() {
+            return Ok(bytes.inner());
+        }
+        Err(value)
+    }
+}
+
+impl Default for Bytes {
+    fn default() -> Self {
+        Bytes(Vec::default())
     }
 }
