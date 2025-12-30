@@ -1,4 +1,5 @@
-use crate::common::traits::{Container, Iterable};
+use std::borrow::Cow;
+use crate::common::traits::{Container, Indexer, Iterable};
 use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
@@ -6,6 +7,7 @@ use crate::ExecutionError;
 use std::collections::hash_map::Keys;
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::sync::Arc;
 
 #[derive(Debug, Default)]
 pub struct DefaultMap(HashMap<Key, Box<dyn Val>>);
@@ -37,6 +39,10 @@ impl Val for DefaultMap {
         Some(self)
     }
 
+    fn as_indexer(&self) -> Option<&dyn Indexer> {
+        Some(self)
+    }
+
     fn as_iterable(&self) -> Option<&dyn Iterable> {
         Some(self)
     }
@@ -61,6 +67,22 @@ impl Container for DefaultMap {
         // todo avoid cloning here
         let key: Key = key.clone_as_boxed().try_into()?;
         Ok(self.0.contains_key(&key))
+    }
+}
+
+impl Indexer for DefaultMap {
+    fn get<'a>(&'a self, key: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        let key: Key = key.clone_as_boxed().try_into()?;
+        self.0
+            .get(&key)
+            .map(|v| Cow::Borrowed(v.as_ref()))
+            .ok_or(ExecutionError::NoSuchKey(Arc::new(format!("{key:?}"))))
+    }
+
+    fn steal(self: Box<Self>, key: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
+        let mut map = self;
+        let key: Key = key.clone_as_boxed().try_into()?;
+        map.0.remove(&key).ok_or(ExecutionError::NoSuchKey(Arc::new(format!("{key:?}"))))
     }
 }
 
