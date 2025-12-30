@@ -1,9 +1,9 @@
-use std::borrow::Cow;
 use crate::common::traits::{Container, Indexer, Iterable};
 use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
 use crate::ExecutionError;
+use std::borrow::Cow;
 use std::collections::hash_map::Keys;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -82,7 +82,9 @@ impl Indexer for DefaultMap {
     fn steal(self: Box<Self>, key: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
         let mut map = self;
         let key: Key = key.clone_as_boxed().try_into()?;
-        map.0.remove(&key).ok_or(ExecutionError::NoSuchKey(Arc::new(format!("{key:?}"))))
+        map.0
+            .remove(&key)
+            .ok_or(ExecutionError::NoSuchKey(Arc::new(format!("{key:?}"))))
     }
 }
 
