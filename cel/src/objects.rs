@@ -91,6 +91,17 @@ pub enum Key {
     String(Arc<String>),
 }
 
+impl From<CelMapKey> for Key {
+    fn from(value: CelMapKey) -> Self {
+        match value {
+            CelMapKey::Bool(b) => b.into_inner().into(),
+            CelMapKey::Int(i) => i.into_inner().into(),
+            CelMapKey::String(s) => s.into_inner().into(),
+            CelMapKey::UInt(u) => u.into_inner().into(),
+        }
+    }
+}
+
 /// A borrowed version of [`Key`] that avoids allocating for lookups.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum KeyRef<'a> {

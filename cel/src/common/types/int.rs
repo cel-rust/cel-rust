@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::Deref;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Int(i64);
 
 impl Int {
