@@ -70,11 +70,11 @@ pub trait Divider {
 }
 
 pub trait Iterable {
-    fn iter(&self) -> &dyn Iterator;
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<'a> + 'a>;
 }
 
-pub trait Iterator {
-    fn next(&'_ self) -> Option<Cow<'_, dyn Val>>;
+pub trait Iterator<'a> {
+    fn next(&mut self) -> Option<&'a dyn Val>;
 }
 
 pub trait Modder {

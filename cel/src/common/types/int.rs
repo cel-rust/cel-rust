@@ -165,9 +165,9 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
 
 #[cfg(test)]
 mod tests {
-    use std::cmp::Ordering::{Equal, Greater, Less};
     use crate::common::traits::Comparer;
     use crate::common::types::CelInt;
+    use std::cmp::Ordering::{Equal, Greater, Less};
 
     #[test]
     fn test_compare() {

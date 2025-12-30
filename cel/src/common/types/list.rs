@@ -1,7 +1,7 @@
-use crate::common::traits::{Adder, Container, Indexer};
-use crate::common::types;
+use crate::common::traits::{Adder, Container, Indexer, Iterable};
 use crate::common::types::{CelInt, CelUInt, Type};
 use crate::common::value::Val;
+use crate::common::{traits, types};
 use crate::ExecutionError;
 use std::any::Any;
 use std::borrow::Cow;
@@ -42,6 +42,10 @@ impl Val for DefaultList {
     }
 
     fn as_indexer(&self) -> Option<&dyn Indexer> {
+        Some(self)
+    }
+
+    fn as_iterable(&self) -> Option<&dyn Iterable> {
         Some(self)
     }
 
@@ -142,6 +146,12 @@ impl Indexer for DefaultList {
     }
 }
 
+impl Iterable for DefaultList {
+    fn iter<'a>(&'a self) -> Box<dyn super::traits::Iterator<'a> + 'a> {
+        Box::new(SliceIterator::new(self.0.as_slice()))
+    }
+}
+
 impl From<Vec<Box<dyn Val>>> for DefaultList {
     fn from(v: Vec<Box<dyn Val>>) -> Self {
         Self(v)
@@ -164,6 +174,29 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [Box<dyn Val>] {
             return Ok(list.inner());
         }
         Err(value)
+    }
+}
+
+pub struct SliceIterator<'a> {
+    list: &'a [Box<dyn Val>],
+    pos: usize,
+}
+
+impl<'a> SliceIterator<'a> {
+    fn new(list: &'a [Box<dyn Val>]) -> Self {
+        Self { list, pos: 0 }
+    }
+}
+
+impl<'a> traits::Iterator<'a> for SliceIterator<'a> {
+    fn next(&mut self) -> Option<&'a dyn Val> {
+        if self.pos >= self.list.len() {
+            None
+        } else {
+            let r = &self.list[self.pos];
+            self.pos += 1;
+            Some(r.as_ref())
+        }
     }
 }
 
