@@ -73,18 +73,33 @@ impl Container for DefaultMap {
 impl Indexer for DefaultMap {
     fn get<'a>(&'a self, key: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         let key: Key = key.clone_as_boxed().try_into()?;
+
         self.0
             .get(&key)
             .map(|v| Cow::Borrowed(v.as_ref()))
-            .ok_or(ExecutionError::NoSuchKey(Arc::new(format!("{key:?}"))))
+            .ok_or_else(|| {
+                let key = match key {
+                    Key::Bool(b) => b.into_inner().to_string(),
+                    Key::Int(i) => i.into_inner().to_string(),
+                    Key::String(s) => s.into_inner(),
+                    Key::UInt(u) => u.into_inner().to_string(),
+                };
+                ExecutionError::NoSuchKey(Arc::new(key))
+            })
     }
 
     fn steal(self: Box<Self>, key: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
         let mut map = self;
         let key: Key = key.clone_as_boxed().try_into()?;
-        map.0
-            .remove(&key)
-            .ok_or(ExecutionError::NoSuchKey(Arc::new(format!("{key:?}"))))
+        map.0.remove(&key).ok_or_else(|| {
+            let key = match key {
+                Key::Bool(b) => b.into_inner().to_string(),
+                Key::Int(i) => i.into_inner().to_string(),
+                Key::String(s) => s.into_inner(),
+                Key::UInt(u) => u.into_inner().to_string(),
+            };
+            ExecutionError::NoSuchKey(Arc::new(key))
+        })
     }
 }
 
