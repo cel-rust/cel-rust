@@ -9,6 +9,10 @@ impl Val for Null {
         super::NULL_TYPE
     }
 
+    fn equals(&self, other: &dyn Val) -> bool {
+        other.downcast_ref::<Null>().is_some()
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Null)
     }

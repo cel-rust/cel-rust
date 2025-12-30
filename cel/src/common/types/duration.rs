@@ -32,6 +32,12 @@ impl Val for Duration {
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Duration(self.0))
     }
+
+    fn equals(&self, other: &dyn Val) -> bool {
+        other
+            .downcast_ref::<Self>()
+            .is_some_and(|other| self.0 == other.0)
+    }
 }
 
 impl From<StdDuration> for Duration {

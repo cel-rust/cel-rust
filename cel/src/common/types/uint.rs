@@ -28,6 +28,12 @@ impl Val for UInt {
         super::UINT_TYPE
     }
 
+    fn equals(&self, other: &dyn Val) -> bool {
+        other
+            .downcast_ref::<Self>()
+            .is_some_and(|other| self.0 == other.0)
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(UInt(self.0))
     }

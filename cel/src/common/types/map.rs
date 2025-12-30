@@ -41,6 +41,12 @@ impl Val for DefaultMap {
         Some(self)
     }
 
+    fn equals(&self, other: &dyn Val) -> bool {
+        other
+            .downcast_ref::<Self>()
+            .is_some_and(|other| self.0 == other.0)
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         let mut map = HashMap::with_capacity(self.0.len());
         for (k, v) in self.0.iter() {

@@ -37,10 +37,9 @@ impl Val for String {
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
-        match other.downcast_ref::<Self>() {
-            Some(s) => self.0 == s.0,
-            None => false,
-        }
+        other
+            .downcast_ref::<Self>()
+            .is_some_and(|other| self.0 == other.0)
     }
 }
 
