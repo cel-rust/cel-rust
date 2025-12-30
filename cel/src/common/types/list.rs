@@ -1,6 +1,6 @@
 use crate::common::traits::{Adder, Container, Indexer};
 use crate::common::types;
-use crate::common::types::{CelInt, Type};
+use crate::common::types::{CelInt, CelUInt, Type};
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::any::Any;
@@ -84,9 +84,25 @@ impl Indexer for DefaultList {
                         .as_ref(),
                 ))
             }
+            types::UINT_TYPE => {
+                let idx: u64 = *idx
+                    .downcast_ref::<CelUInt>()
+                    .expect("We need an Indexer!")
+                    .inner();
+                Ok(Cow::Borrowed(
+                    self.0
+                        .get(idx as usize)
+                        .ok_or(ExecutionError::IndexOutOfBounds(idx.into()))?
+                        .as_ref(),
+                ))
+            }
             _ => Err(ExecutionError::UnexpectedType {
                 got: idx.get_type().runtime_type_name.to_string(),
-                want: types::INT_TYPE.runtime_type_name.to_string(),
+                want: format!(
+                    "{}|{}",
+                    types::INT_TYPE.runtime_type_name,
+                    types::UINT_TYPE.runtime_type_name
+                ),
             }),
         }
     }
@@ -101,9 +117,20 @@ impl Indexer for DefaultList {
                 }
                 Ok(list.0.remove(idx as usize))
             }
+            types::UINT_TYPE => {
+                let idx: u64 = *idx.downcast_ref::<CelUInt>().unwrap().inner();
+                if idx as usize >= list.0.len() {
+                    return Err(ExecutionError::IndexOutOfBounds(idx.into()));
+                }
+                Ok(list.0.remove(idx as usize))
+            }
             _ => Err(ExecutionError::UnexpectedType {
                 got: idx.get_type().runtime_type_name.to_string(),
-                want: types::INT_TYPE.runtime_type_name.to_string(),
+                want: format!(
+                    "{}|{}",
+                    types::INT_TYPE.runtime_type_name,
+                    types::UINT_TYPE.runtime_type_name
+                ),
             }),
         }
     }
@@ -172,14 +199,14 @@ pub mod tests {
             Indexer::get(&list, &idx).err(),
             Some(UnexpectedType {
                 got: "string".to_string(),
-                want: "int".to_string(),
+                want: "int|uint".to_string(),
             })
         );
         assert_eq!(
             Indexer::steal(list.into(), &idx).err(),
             Some(UnexpectedType {
                 got: "string".to_string(),
-                want: "int".to_string(),
+                want: "int|uint".to_string(),
             })
         );
     }
