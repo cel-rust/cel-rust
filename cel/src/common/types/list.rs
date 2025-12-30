@@ -18,6 +18,14 @@ impl DefaultList {
     pub fn inner(&self) -> &[Box<dyn Val>] {
         &self.0
     }
+
+    fn clone(&self) -> Self {
+        let mut vec = Vec::with_capacity(self.0.len());
+        for i in self.0.iter().map(|i| i.clone_as_boxed()) {
+            vec.push(i);
+        }
+        Self(vec)
+    }
 }
 
 impl Deref for DefaultList {
@@ -34,7 +42,7 @@ impl Val for DefaultList {
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {
-        todo!()
+        Some(self)
     }
 
     fn as_container(&self) -> Option<&dyn Container> {
@@ -60,11 +68,21 @@ impl Val for DefaultList {
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
-        let mut vec = Vec::with_capacity(self.0.len());
-        for i in self.0.iter().map(|i| i.clone_as_boxed()) {
-            vec.push(i);
+        Box::new(self.clone())
+    }
+}
+
+impl Adder for DefaultList {
+    fn add<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        let mut rhs = rhs
+            .as_iterable()
+            .ok_or(ExecutionError::NoSuchOverload)?
+            .iter();
+        let mut list = self.clone();
+        while let Some(other) = rhs.next() {
+            list.0.push(other.clone_as_boxed());
         }
-        Box::new(DefaultList(vec))
+        Ok(Cow::<dyn Val>::Owned(Box::new(list)))
     }
 }
 
