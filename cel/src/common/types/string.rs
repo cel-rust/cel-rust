@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use std::ops::Deref;
 use std::string::String as StdString;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct String(StdString);
 
 impl String {

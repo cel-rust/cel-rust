@@ -2,7 +2,7 @@ use crate::common::types::Type;
 use crate::common::value::Val;
 use std::ops::Deref;
 
-#[derive(Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Bool(bool);
 
 impl Bool {

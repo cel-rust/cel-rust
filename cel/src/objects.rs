@@ -82,6 +82,17 @@ pub enum Key {
     String(Arc<String>),
 }
 
+impl From<CelMapKey> for Key {
+    fn from(value: CelMapKey) -> Self {
+        match value {
+            CelMapKey::Bool(b) => b.into_inner().into(),
+            CelMapKey::Int(i) => i.into_inner().into(),
+            CelMapKey::String(s) => s.into_inner().into(),
+            CelMapKey::UInt(u) => u.into_inner().into(),
+        }
+    }
+}
+
 /// Implement conversions from primitive types to [`Key`]
 impl From<String> for Key {
     fn from(v: String) -> Self {
