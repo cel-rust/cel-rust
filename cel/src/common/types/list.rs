@@ -38,11 +38,11 @@ impl Val for DefaultList {
     }
 
     fn as_container(&self) -> Option<&dyn Container> {
-        Some(self as &dyn Container)
+        Some(self)
     }
 
     fn as_indexer(&self) -> Option<&dyn Indexer> {
-        Some(self as &dyn Indexer)
+        Some(self)
     }
 
     fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {

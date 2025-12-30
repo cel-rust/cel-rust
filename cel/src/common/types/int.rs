@@ -33,27 +33,27 @@ impl Val for Int {
     }
 
     fn as_adder(&self) -> Option<&dyn traits::Adder> {
-        Some(self as &dyn traits::Adder)
+        Some(self)
     }
 
     fn as_comparer(&self) -> Option<&dyn traits::Comparer> {
-        Some(self as &dyn traits::Comparer)
+        Some(self)
     }
 
     fn as_divider(&self) -> Option<&dyn traits::Divider> {
-        Some(self as &dyn traits::Divider)
+        Some(self)
     }
 
     fn as_modder(&self) -> Option<&dyn traits::Modder> {
-        Some(self as &dyn traits::Modder)
+        Some(self)
     }
 
     fn as_multiplier(&self) -> Option<&dyn traits::Multiplier> {
-        Some(self as &dyn traits::Multiplier)
+        Some(self)
     }
 
     fn as_subtractor(&self) -> Option<&dyn traits::Subtractor> {
-        Some(self as &dyn traits::Subtractor)
+        Some(self)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
