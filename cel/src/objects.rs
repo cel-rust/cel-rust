@@ -93,6 +93,17 @@ impl From<CelMapKey> for Key {
     }
 }
 
+impl From<Key> for CelMapKey {
+    fn from(key: Key) -> Self {
+        match key {
+            Key::Int(i) => CelMapKey::from(i),
+            Key::Uint(u) => CelMapKey::from(u),
+            Key::Bool(b) => CelMapKey::from(b),
+            Key::String(s) => CelMapKey::from(s.as_str()),
+        }
+    }
+}
+
 /// Implement conversions from primitive types to [`Key`]
 impl From<String> for Key {
     fn from(v: String) -> Self {
@@ -763,7 +774,8 @@ impl TryFrom<&dyn Val> for Value {
             }
             _ => Err(ExecutionError::UnexpectedType {
                 got: v.get_type().name().to_string(),
-                want: "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)".to_string(),
+                want: "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
+                    .to_string(),
             }),
         }
     }
@@ -773,23 +785,34 @@ impl TryFrom<Value> for Box<dyn Val> {
     type Error = ExecutionError;
     fn try_from(value: Value) -> Result<Self, Self::Error> {
         match value {
-            Value::Bool(b) => Ok(Box::new(Into::<CelBool>::into(b))),
-            Value::Int(i) => Ok(Box::new(Into::<CelInt>::into(i))),
-            Value::UInt(u) => Ok(Box::new(Into::<CelUInt>::into(u))),
-            Value::Float(f) => Ok(Box::new(Into::<CelDouble>::into(f))),
-            Value::String(s) => Ok(Box::new(Into::<CelString>::into(s.as_str()))),
+            Value::Bool(b) => Ok(Box::new(CelBool::from(b))),
+            Value::Int(i) => Ok(Box::new(CelInt::from(i))),
+            Value::UInt(u) => Ok(Box::new(CelUInt::from(u))),
+            Value::Float(f) => Ok(Box::new(CelDouble::from(f))),
+            Value::String(s) => Ok(Box::new(CelString::from(s.as_str()))),
             Value::Null => Ok(Box::new(CelNull)),
-            Value::Bytes(b) => Ok(Box::new(Into::<CelBytes>::into(b.as_slice().to_vec()))),
+            Value::Bytes(b) => Ok(Box::new(CelBytes::from(b.as_slice().to_vec()))),
             #[cfg(feature = "chrono")]
-            Value::Duration(d) => Ok(Box::new(Into::<CelDuration>::into(d.to_std().unwrap()))),
+            Value::Duration(d) => Ok(Box::new(CelDuration::from(d.to_std().unwrap()))),
             #[cfg(feature = "chrono")]
             Value::Timestamp(ts) => {
                 let ts: SystemTime = ts.into();
-                Ok(Box::new(Into::<CelTimestamp>::into(ts)))
+                Ok(Box::new(CelTimestamp::from(ts)))
+            }
+            Value::List(l) => {
+                let result: Result<Vec<Box<dyn Val>>, ExecutionError> =
+                    (*l).clone().into_iter().map(|i| i.try_into()).collect();
+                Ok(Box::new(CelList::from(result?)))
+            }
+            Value::Map(map) => {
+                let result: Result<HashMap<CelMapKey, Box<dyn Val>>, ExecutionError> = (*map.map)
+                    .clone()
+                    .into_iter()
+                    .map(|(k, v)| v.clone().try_into().map(|v| (k.clone().into(), v)))
+                    .collect();
+                Ok(Box::new(CelMap::from(result?)))
             }
             /*
-            Value::List(_) => {}
-            Value::Map(_) => {}
             Value::Opaque(_) => {}
              */
             _ => Err(ExecutionError::UnsupportedTargetType { target: value }),
