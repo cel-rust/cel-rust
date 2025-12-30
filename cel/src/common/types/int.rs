@@ -162,3 +162,19 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
         Err(value)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::cmp::Ordering::{Equal, Greater, Less};
+    use crate::common::traits::Comparer;
+    use crate::common::types::CelInt;
+
+    #[test]
+    fn test_compare() {
+        let one = CelInt::from(1);
+        let two = CelInt::from(2);
+        assert_eq!(one.compare(&two), Ok(Less));
+        assert_eq!(two.compare(&one), Ok(Greater));
+        assert_eq!(two.compare(&two), Ok(Equal));
+    }
+}
