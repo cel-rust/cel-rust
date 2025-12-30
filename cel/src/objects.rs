@@ -1128,7 +1128,7 @@ impl Value {
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
                     .collect::<Vec<_>>();
-                Ok(Cow::<dyn Val>::Owned(Box::new(CelList::new(list))))
+                Ok(Cow::<dyn Val>::Owned(Box::new(CelList::from(list))))
             }
             /*
             Expr::Map(map_expr) => {
