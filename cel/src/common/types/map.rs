@@ -1,3 +1,4 @@
+use crate::common::traits::Container;
 use crate::common::types;
 use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Type};
 use crate::common::value::Val;
@@ -31,12 +32,24 @@ impl Val for DefaultMap {
         types::MAP_TYPE
     }
 
+    fn as_container(&self) -> Option<&dyn Container> {
+        Some(self)
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         let mut map = HashMap::with_capacity(self.0.len());
         for (k, v) in self.0.iter() {
             map.insert(k.clone(), v.clone_as_boxed());
         }
         Box::new(Self(map))
+    }
+}
+
+impl Container for DefaultMap {
+    fn contains(&self, key: &dyn Val) -> Result<bool, ExecutionError> {
+        // todo avoid cloning here
+        let key: Key = key.clone_as_boxed().try_into()?;
+        Ok(self.0.contains_key(&key))
     }
 }
 
