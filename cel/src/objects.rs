@@ -1213,33 +1213,36 @@ impl Value {
                 let map: Box<CelMap> = CelMap::from(map).into();
                 Ok(Cow::<dyn Val>::Owned(map))
             }
-            /*
             Expr::Comprehension(comprehension) => {
-                let accu_init = Value::resolve(&comprehension.accu_init, ctx)?;
-                let iter = Value::resolve(&comprehension.iter_range, ctx)?;
+                let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
+                let iter = Value::resolve_val(&comprehension.iter_range, ctx)?;
                 let mut ctx = ctx.new_inner_scope();
-                ctx.add_variable(&comprehension.accu_var, accu_init)
-                    .expect("Failed to add accu variable");
+                ctx.add_variable_from_value::<_, Value>(
+                    &comprehension.accu_var,
+                    accu_init.as_ref().try_into()?,
+                );
 
-                match iter {
-                    Value::List(items) => {
-                        for item in items.deref() {
-                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
+                match iter.get_type() {
+                    LIST_TYPE | MAP_TYPE => {
+                        let items = iter
+                            .as_iterable()
+                            .ok_or(ExecutionError::NoSuchOverload)?
+                            .iter();
+                        while let Some(item) = items.next() {
+                            if !try_bool(
+                                Value::resolve_val(&comprehension.loop_cond, &ctx)?.as_ref(),
+                            )? {
                                 break;
                             }
-                            ctx.add_variable_from_value(&comprehension.iter_var, item.clone());
-                            let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
-                            ctx.add_variable_from_value(&comprehension.accu_var, accu);
-                        }
-                    }
-                    Value::Map(map) => {
-                        for key in map.map.deref().keys() {
-                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
-                                break;
-                            }
-                            ctx.add_variable_from_value(&comprehension.iter_var, key.clone());
-                            let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
-                            ctx.add_variable_from_value(&comprehension.accu_var, accu);
+                            ctx.add_variable_from_value::<_, Value>(
+                                &comprehension.iter_var,
+                                item.as_ref().try_into()?,
+                            );
+                            let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
+                            ctx.add_variable_from_value::<_, Value>(
+                                &comprehension.accu_var,
+                                accu.as_ref().try_into()?,
+                            );
                         }
                     }
                     t => todo!("Support {t:?}"),
@@ -1248,31 +1251,12 @@ impl Value {
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
-             */
-            _ => todo!("Fix the other Expr"),
-        }
-    }
-
-    // >> a(b)
-    // Member(Ident("a"),
-    //        FunctionCall([Ident("b")]))
-    // >> a.b(c)
-    // Member(Member(Ident("a"),
-    //               Attribute("b")),
-    //        FunctionCall([Ident("c")]))
-
-    #[inline(always)]
-    #[allow(dead_code)]
-    fn to_bool(&self) -> Result<bool, ExecutionError> {
-        match self {
-            Value::Bool(v) => Ok(*v),
-            _ => Err(ExecutionError::NoSuchOverload),
         }
     }
 }
 
 fn bool<'a>(boolean: bool) -> Cow<'a, dyn Val> {
-    Cow::<dyn Val>::Owned(Box::new(Into::<CelBool>::into(boolean)))
+    Cow::<dyn Val>::Owned(Box::new(CelBool::from(boolean)))
 }
 
 fn try_bool(val: &dyn Val) -> Result<bool, ExecutionError> {
