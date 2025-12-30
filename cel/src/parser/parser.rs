@@ -2153,7 +2153,7 @@ ERROR: <input>:1:24: unsupported syntax '?'
                         &format!("\"{s}\"^#{}:{}#", expr.id, "*expr.Constant_StringValue")
                     }
                     LiteralValue::Boolean(b) => {
-                        &format!("{}^#{}:{}#", expr.id, b.inner(), "*expr.Constant_BoolValue")
+                        &format!("{}^#{}:{}#", b.inner(), expr.id, "*expr.Constant_BoolValue")
                     }
                     LiteralValue::Int(i) => {
                         &format!("{i}^#{}:{}#", expr.id, "*expr.Constant_Int64Value")
