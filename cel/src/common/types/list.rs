@@ -75,7 +75,7 @@ impl Indexer for DefaultList {
             types::INT_TYPE => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
-                    .expect("We need an Indexer!")
+                    .ok_or(ExecutionError::NoSuchOverload)?
                     .inner();
                 Ok(Cow::Borrowed(
                     self.0
@@ -87,7 +87,7 @@ impl Indexer for DefaultList {
             types::UINT_TYPE => {
                 let idx: u64 = *idx
                     .downcast_ref::<CelUInt>()
-                    .expect("We need an Indexer!")
+                    .ok_or(ExecutionError::NoSuchOverload)?
                     .inner();
                 Ok(Cow::Borrowed(
                     self.0
@@ -111,14 +111,20 @@ impl Indexer for DefaultList {
         let mut list = self;
         match idx.get_type() {
             types::INT_TYPE => {
-                let idx: i64 = *idx.downcast_ref::<CelInt>().unwrap().inner();
+                let idx: i64 = *idx
+                    .downcast_ref::<CelInt>()
+                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .inner();
                 if idx < 0 || idx as usize >= list.0.len() {
                     return Err(ExecutionError::IndexOutOfBounds(idx.into()));
                 }
                 Ok(list.0.remove(idx as usize))
             }
             types::UINT_TYPE => {
-                let idx: u64 = *idx.downcast_ref::<CelUInt>().unwrap().inner();
+                let idx: u64 = *idx
+                    .downcast_ref::<CelUInt>()
+                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .inner();
                 if idx as usize >= list.0.len() {
                     return Err(ExecutionError::IndexOutOfBounds(idx.into()));
                 }
