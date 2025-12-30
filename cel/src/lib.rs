@@ -1,28 +1,3 @@
-//! # Parser and Interpreter for the Common Expression Language (CEL)
-//!
-//! ## Usage example
-//!
-//! ```
-//! use cel::common::value::CelVal;
-//! let opaque_type = cel::common::types::Type::new_opaque_type("foo");
-//!
-//! let env = cel::Env::builder()
-//!     .add_type(opaque_type)
-//!     .add_variable("answer", &cel::common::types::UINT_TYPE)
-//!     .add_overload("is_it", "is_it_uint", &[&cel::common::types::UINT_TYPE], &cel::common::types::BOOL_TYPE, is_it)
-//!     .add_member_overload("is_it", "is_it_on_uint", &cel::common::types::UINT_TYPE, &[], &cel::common::types::BOOL_TYPE, is_it)
-//!     .build();
-//!
-//! let mut ast = env.parse("(answer == 42) == is_it(answer) && answer.is_it()")?;
-//! ast = env.check(ast)?;
-//!
-//! //let prog = Program::new(ast);
-//!
-//! fn is_it(val: &CelVal) -> CelVal {
-//!      CelVal::Boolean(true)
-//! }
-//! ```
-
 extern crate core;
 
 use std::convert::TryFrom;
