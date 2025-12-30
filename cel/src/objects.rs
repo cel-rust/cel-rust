@@ -1165,26 +1165,34 @@ impl Value {
                 // todo fix this to _not_ use `Value`
                 Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
             }
-            /*
             Expr::Select(select) => {
-                let left = Value::resolve(select.operand.deref(), ctx)?;
-                if select.test {
-                    match &left {
-                        Value::Map(map) => {
-                            for key in map.map.deref().keys() {
-                                if key.to_string().eq(&select.field) {
-                                    return Ok(Value::Bool(true));
-                                }
-                            }
-                            Ok(Value::Bool(false))
+                let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                match left.get_type() {
+                    MAP_TYPE => {
+                        let key: CelString = select.field.as_str().into();
+                        if select.test {
+                            Ok(bool(
+                                left.as_container()
+                                    .ok_or(ExecutionError::NoSuchKey(Arc::new(
+                                        key.inner().to_string(),
+                                    )))?
+                                    .contains(&key)?,
+                            ))
+                        } else {
+                            // todo avoid cloning when not needed
+                            Ok(Cow::<dyn Val>::Owned(
+                                left.as_indexer()
+                                    .ok_or(ExecutionError::NoSuchKey(Arc::new(
+                                        key.inner().to_string(),
+                                    )))?
+                                    .get(&key)?
+                                    .into_owned(),
+                            ))
                         }
-                        _ => Ok(Value::Bool(false)),
                     }
-                } else {
-                    left.member(&select.field)
+                    _ => Ok(bool(false)),
                 }
             }
-            */
             Expr::List(list_expr) => {
                 let list = list_expr
                     .elements
