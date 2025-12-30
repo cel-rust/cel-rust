@@ -1076,26 +1076,34 @@ impl Value {
                 // todo fix this to _not_ use `Value`
                 Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
             }
-            /*
             Expr::Select(select) => {
-                let left = Value::resolve(select.operand.deref(), ctx)?;
-                if select.test {
-                    match &left {
-                        Value::Map(map) => {
-                            for key in map.map.deref().keys() {
-                                if key.to_string().eq(&select.field) {
-                                    return Ok(Value::Bool(true));
-                                }
-                            }
-                            Ok(Value::Bool(false))
+                let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                match left.get_type() {
+                    MAP_TYPE => {
+                        let key: CelString = select.field.as_str().into();
+                        if select.test {
+                            Ok(bool(
+                                left.as_container()
+                                    .ok_or(ExecutionError::NoSuchKey(Arc::new(
+                                        key.inner().to_string(),
+                                    )))?
+                                    .contains(&key)?,
+                            ))
+                        } else {
+                            // todo avoid cloning when not needed
+                            Ok(Cow::<dyn Val>::Owned(
+                                left.as_indexer()
+                                    .ok_or(ExecutionError::NoSuchKey(Arc::new(
+                                        key.inner().to_string(),
+                                    )))?
+                                    .get(&key)?
+                                    .into_owned(),
+                            ))
                         }
-                        _ => Ok(Value::Bool(false)),
                     }
-                } else {
-                    left.member(&select.field)
+                    _ => Ok(bool(false)),
                 }
             }
-            */
             Expr::List(list_expr) => {
                 let list = list_expr
                     .elements
@@ -1197,29 +1205,6 @@ impl Value {
     // Member(Member(Ident("a"),
     //               Attribute("b")),
     //        FunctionCall([Ident("c")]))
-
-    #[allow(dead_code)]
-    fn member(self, name: &str) -> ResolveResult {
-        // todo! Ideally we would avoid creating a String just to create a Key for lookup in the
-        // map, but this would require something like the `hashbrown` crate's `Equivalent` trait.
-        let name: Arc<String> = name.to_owned().into();
-
-        // This will always either be because we're trying to access
-        // a property on self, or a method on self.
-        let child = match self {
-            Value::Map(ref m) => m.map.get(&name.clone().into()).cloned(),
-            _ => None,
-        };
-
-        // If the property is both an attribute and a method, then we
-        // give priority to the property. Maybe we can implement lookahead
-        // to see if the next token is a function call?
-        if let Some(child) = child {
-            child.into()
-        } else {
-            ExecutionError::NoSuchKey(name.clone()).into()
-        }
-    }
 
     #[inline(always)]
     #[allow(dead_code)]
