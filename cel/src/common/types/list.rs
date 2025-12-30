@@ -11,10 +11,6 @@ use std::ops::Deref;
 pub struct DefaultList(Vec<Box<dyn Val>>);
 
 impl DefaultList {
-    pub fn new(items: Vec<Box<dyn Val>>) -> Self {
-        Self(items)
-    }
-
     pub fn into_inner(self) -> Vec<Box<dyn Val>> {
         self.0
     }
@@ -110,6 +106,12 @@ impl Indexer for DefaultList {
                 want: types::INT_TYPE.runtime_type_name.to_string(),
             }),
         }
+    }
+}
+
+impl From<Vec<Box<dyn Val>>> for DefaultList {
+    fn from(v: Vec<Box<dyn Val>>) -> Self {
+        Self(v)
     }
 }
 
