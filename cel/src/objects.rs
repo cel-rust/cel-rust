@@ -1,4 +1,4 @@
-use crate::common::ast::{operators, Expr};
+use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::common::types::bool::Bool;
 use crate::common::types::*;
 use crate::common::value::{CelVal, Val};
@@ -1274,19 +1274,18 @@ impl Value {
                     .collect::<Vec<_>>();
                 Ok(Cow::<dyn Val>::Owned(Box::new(CelList::from(list))))
             }
-            /*
             Expr::Map(map_expr) => {
                 let mut map = HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
-                    let (k, v, is_optional) = match &entry.expr {
+                    let (k, v, _is_optional) = match &entry.expr {
                         EntryExpr::StructField(_) => panic!("WAT?"),
                         EntryExpr::MapEntry(e) => (&e.key, &e.value, e.optional),
                     };
-                    let key = Value::resolve(k, ctx)?
-                        .try_into()
-                        .map_err(ExecutionError::UnsupportedKeyType)?;
-                    let value = Value::resolve(v, ctx)?;
+                    let key: CelMapKey = Value::resolve_val(k, ctx)?.into_owned().try_into()?;
+                    // todo do not clone if not needed!
+                    let value = Value::resolve_val(v, ctx)?.into_owned();
 
+                    /*
                     if is_optional {
                         if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
                             if let Some(inner) = opt_val.value() {
@@ -1296,13 +1295,14 @@ impl Value {
                             map.insert(key, value);
                         }
                     } else {
-                        map.insert(key, value);
-                    }
+                     */
+                    map.insert(key, value);
+                    //}
                 }
-                Ok(Value::Map(Map {
-                    map: Arc::from(map),
-                }))
+                let map: Box<CelMap> = CelMap::from(map).into();
+                Ok(Cow::<dyn Val>::Owned(map))
             }
+            /*
             Expr::Comprehension(comprehension) => {
                 let accu_init = Value::resolve(&comprehension.accu_init, ctx)?;
                 let iter = Value::resolve(&comprehension.iter_range, ctx)?;
