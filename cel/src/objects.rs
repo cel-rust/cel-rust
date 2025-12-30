@@ -738,11 +738,32 @@ impl TryFrom<&dyn Val> for Value {
                     )),
                 }
             }
-            // add missing mappings here!
-            // collections recurse here tho...
+            LIST_TYPE => {
+                let list = v.downcast_ref::<CelList>().unwrap().inner();
+                Ok(Value::List(Arc::new(
+                    list.iter()
+                        .map(|i| i.as_ref().try_into().expect("Not a Value list item"))
+                        .collect(),
+                )))
+            }
+            MAP_TYPE => {
+                let map = v.downcast_ref::<CelMap>().unwrap().inner();
+                Ok(Value::Map(Map {
+                    map: Arc::new(
+                        map.iter()
+                            .map(|(k, v)| {
+                                (
+                                    Key::from(k.clone()),
+                                    Value::try_from(v.as_ref()).expect("Not a Value map value"),
+                                )
+                            })
+                            .collect(),
+                    ),
+                }))
+            }
             _ => Err(ExecutionError::UnexpectedType {
                 got: v.get_type().name().to_string(),
-                want: "(BOOL|INT|UINT|STRING...)".to_string(),
+                want: "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)".to_string(),
             }),
         }
     }
