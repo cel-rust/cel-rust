@@ -1,4 +1,5 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::types;
 use crate::common::types::bool::Bool;
 use crate::common::types::*;
 use crate::common::value::{CelVal, Val};
@@ -1004,10 +1005,14 @@ impl Value {
                             };
                         }
                         operators::OPT_SELECT => {
-                            let _operand = Value::resolve(&call.args[0], ctx)?;
-                            let field_literal = Value::resolve(&call.args[1], ctx)?;
-                            let _field = match field_literal {
-                                Value::String(s) => s,
+                            let _operand = Value::resolve_val(&call.args[0], ctx)?;
+                            let field_literal = Value::resolve_val(&call.args[1], ctx)?;
+                            let _field = match field_literal.get_type() {
+                                types::STRING_TYPE => field_literal
+                                    .downcast_ref::<CelString>()
+                                    .expect("field must be string")
+                                    .inner()
+                                    .to_string(),
                                 _ => {
                                     return Err(ExecutionError::function_error(
                                         "_?._",
@@ -1196,7 +1201,7 @@ impl Value {
                                     })?;
                                 let mut ctx = FunctionContext::new(
                                     &call.func_name,
-                                    Some(Value::resolve(target, ctx)?),
+                                    Some(Value::resolve_val(target, ctx)?.as_ref().try_into()?),
                                     ctx,
                                     &call.args,
                                 );
