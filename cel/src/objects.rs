@@ -959,7 +959,7 @@ impl Value {
                         }
                         operators::SUBSTRACT => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_subtractor()
                                     .ok_or(ExecutionError::NoSuchOverload)?
@@ -969,7 +969,7 @@ impl Value {
                         }
                         operators::DIVIDE => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_divider()
                                     .ok_or(ExecutionError::NoSuchOverload)?
@@ -979,7 +979,7 @@ impl Value {
                         }
                         operators::MULTIPLY => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_multiplier()
                                     .ok_or(ExecutionError::NoSuchOverload)?
@@ -989,7 +989,7 @@ impl Value {
                         }
                         operators::MODULO => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_modder()
                                     .ok_or(ExecutionError::NoSuchOverload)?
