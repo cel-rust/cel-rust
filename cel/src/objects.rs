@@ -1224,7 +1224,7 @@ impl Value {
 
                 match iter.get_type() {
                     LIST_TYPE | MAP_TYPE => {
-                        let items = iter
+                        let mut items = iter
                             .as_iterable()
                             .ok_or(ExecutionError::NoSuchOverload)?
                             .iter();
@@ -1236,7 +1236,7 @@ impl Value {
                             }
                             ctx.add_variable_from_value::<_, Value>(
                                 &comprehension.iter_var,
-                                item.as_ref().try_into()?,
+                                item.try_into()?,
                             );
                             let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
                             ctx.add_variable_from_value::<_, Value>(
