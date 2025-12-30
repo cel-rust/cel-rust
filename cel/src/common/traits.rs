@@ -69,6 +69,14 @@ pub trait Divider {
     fn div<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
+pub trait Iterable {
+    fn iter(&self) -> &dyn Iterator;
+}
+
+pub trait Iterator {
+    fn next(&'_ self) -> Option<Cow<'_, dyn Val>>;
+}
+
 pub trait Modder {
     fn modulo<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }

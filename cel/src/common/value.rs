@@ -1,5 +1,6 @@
 use crate::common::traits::{
-    Adder, Comparer, Container, Divider, Indexer, Lister, Modder, Multiplier, Negator, Subtractor,
+    Adder, Comparer, Container, Divider, Indexer, Iterable, Lister, Modder, Multiplier, Negator,
+    Subtractor,
 };
 use crate::common::types;
 use crate::common::types::Type;
@@ -51,6 +52,10 @@ pub trait Val: Any + Debug {
     }
 
     fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {
+        None
+    }
+
+    fn as_iterable(&self) -> Option<&dyn Iterable> {
         None
     }
 
