@@ -45,12 +45,18 @@ impl Val for DefaultList {
         Some(self)
     }
 
+    fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {
+        Some(self)
+    }
+
     fn as_iterable(&self) -> Option<&dyn Iterable> {
         Some(self)
     }
 
-    fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {
-        Some(self)
+    fn equals(&self, other: &dyn Val) -> bool {
+        other
+            .downcast_ref::<Self>()
+            .is_some_and(|other| self.0 == other.0)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
