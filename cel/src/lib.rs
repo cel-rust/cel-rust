@@ -257,11 +257,8 @@ mod tests {
         // Test that we can index into an array
         assert_output("arr[0] == 1", Ok(true.into()));
 
-        // Test that we can index into a string
-        assert_output(
-            "str[0]",
-            Err(ExecutionError::NoSuchKey("0".to_string().into())),
-        );
+        // Test that we cannot index into a string
+        assert_output("str[0]", Err(ExecutionError::NoSuchOverload));
     }
 
     #[test]
