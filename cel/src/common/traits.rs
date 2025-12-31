@@ -54,7 +54,7 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
 
 pub trait Adder {
-    fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+    fn add<'a>(&'a self, _rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
 pub trait Comparer {

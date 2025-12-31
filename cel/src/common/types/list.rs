@@ -73,7 +73,7 @@ impl Val for DefaultList {
 }
 
 impl Adder for DefaultList {
-    fn add<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         let mut rhs = rhs
             .as_iterable()
             .ok_or(ExecutionError::NoSuchOverload)?
