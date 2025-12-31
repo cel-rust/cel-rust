@@ -1,8 +1,9 @@
-use crate::common::traits;
+use crate::common::traits::{Adder, Comparer};
 use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::ops::Deref;
 use std::string::String as StdString;
 
@@ -32,14 +33,48 @@ impl Val for String {
         super::STRING_TYPE
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(String(self.0.clone()))
+    fn as_adder(&self) -> Option<&dyn Adder> {
+        Some(self)
+    }
+
+    fn as_comparer(&self) -> Option<&dyn Comparer> {
+        Some(self)
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
             .is_some_and(|other| self.0 == other.0)
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(String(self.0.clone()))
+    }
+}
+
+impl Adder for String {
+    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self(
+                self.0.clone() + rhs.0.as_str(),
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "add",
+                (self as &dyn Val).try_into()?,
+                rhs.try_into()?,
+            ))
+        }
+    }
+}
+
+impl Comparer for String {
+    fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(self.0.cmp(&rhs.0))
+        } else {
+            Err(ExecutionError::NoSuchOverload)
+        }
     }
 }
 
@@ -76,12 +111,6 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
             return Ok(s.inner());
         }
         Err(value)
-    }
-}
-
-impl traits::Adder for String {
-    fn add<'a>(&'a self, _rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        todo!("implement Adder for String!")
     }
 }
 
