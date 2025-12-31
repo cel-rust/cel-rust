@@ -5,7 +5,8 @@ use crate::{ExecutionError, Value};
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::{Add, Sub};
-use std::time::SystemTime;
+use std::sync::LazyLock;
+use std::time::{Duration, SystemTime};
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Timestamp(SystemTime);
@@ -48,12 +49,25 @@ impl Val for Timestamp {
     }
 }
 
+static MAX_TIMESTAMP: LazyLock<SystemTime> =
+    LazyLock::new(|| SystemTime::UNIX_EPOCH + Duration::from_secs(253402300799));
+
+#[cfg(feature = "chrono")]
+static MIN_TIMESTAMP: LazyLock<SystemTime> =
+    LazyLock::new(|| SystemTime::UNIX_EPOCH - Duration::from_secs(62135596800));
+
 impl Adder for Timestamp {
     fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self(
-                self.0.add(*rhs.inner()),
-            ))))
+            let result = self.0.add(*rhs.inner());
+            if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
+                return Err(ExecutionError::Overflow(
+                    "add",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ));
+            }
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self(result))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "add",
@@ -77,9 +91,15 @@ impl Comparer for Timestamp {
 impl Subtractor for Timestamp {
     fn sub<'a>(&'a self, rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self(
-                self.0.sub(*rhs.inner()),
-            ))))
+            let result = self.0.sub(*rhs.inner());
+            if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
+                return Err(ExecutionError::Overflow(
+                    "sub",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ));
+            }
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self(result))))
         } else if let Some(rhs) = rhs.downcast_ref::<Self>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(CelDuration::from(
                 self.0

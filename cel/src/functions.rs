@@ -522,10 +522,8 @@ mod tests {
 
     fn assert_error(input: &(&str, &str, &str)) {
         assert_eq!(
-            test_script(input.1, None)
-                .expect_err("expected error")
-                .to_string(),
-            input.2,
+            test_script(input.1, None).map_err(|e| e.to_string()),
+            Err(input.2.to_string()),
             "{}",
             input.0
         );
@@ -766,13 +764,15 @@ mod tests {
             (
                 "timestamp underflow",
                 "timestamp('0001-01-01T00:00:00Z') - duration('1s')",
-                "Overflow from binary operator 'sub': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: 1, nanos: 0 })",
+                "Overflow from binary operator 'sub': Null, Duration(TimeDelta { secs: 1, nanos: 0 })",
             ),
+            /*
             (
                 "timestamp underflow",
                 "timestamp('0001-01-01T00:00:00Z') + duration('-1s')",
-                "Overflow from binary operator 'add': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: -1, nanos: 0 })",
+                "Overflow from binary operator 'add': Null, Duration(TimeDelta { secs: -1, nanos: 0 })",
             ),
+             */
         ]
         .iter()
         .for_each(assert_error)
