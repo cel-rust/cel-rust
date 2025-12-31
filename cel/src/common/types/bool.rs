@@ -1,5 +1,7 @@
+use crate::common::traits::{Comparer, Negator};
 use crate::common::types::Type;
 use crate::common::value::Val;
+use crate::ExecutionError;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -32,12 +34,36 @@ impl Val for Bool {
         super::BOOL_TYPE
     }
 
+    fn as_comparer(&self) -> Option<&dyn Comparer> {
+        Some(self)
+    }
+
+    fn as_negator(&self) -> Option<&dyn Negator> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other.downcast_ref::<Self>().is_some_and(|a| self.0 == a.0)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(*self)
+    }
+}
+
+impl Comparer for Bool {
+    fn compare(&self, rhs: &dyn Val) -> Result<std::cmp::Ordering, crate::ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Bool>() {
+            Ok(self.0.cmp(&rhs.0))
+        } else {
+            Err(ExecutionError::NoSuchOverload)
+        }
+    }
+}
+
+impl Negator for Bool {
+    fn negate(&self) -> Result<Box<dyn Val>, ExecutionError> {
+        Ok(Box::new(self.negate()))
     }
 }
 
