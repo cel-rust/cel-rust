@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Divider, Multiplier, Negator, Subtractor};
-use crate::common::types::Type;
+use crate::common::types::{CelInt, CelUInt, Type};
 use crate::common::value::Val;
 use crate::{ExecutionError, Value};
 use std::borrow::Cow;
@@ -83,10 +83,20 @@ impl Adder for Double {
 
 impl Comparer for Double {
     fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
-        if let Some(other) = rhs.downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
             Ok(self
                 .0
-                .partial_cmp(&other.0)
+                .partial_cmp(&rhs.0)
+                .ok_or(ExecutionError::NoSuchOverload)?)
+        } else if let Some(rhs) = rhs.downcast_ref::<CelInt>() {
+            Ok(self
+                .0
+                .partial_cmp(&(*rhs.inner() as f64))
+                .ok_or(ExecutionError::NoSuchOverload)?)
+        } else if let Some(rhs) = rhs.downcast_ref::<CelUInt>() {
+            Ok(self
+                .0
+                .partial_cmp(&(*rhs.inner() as f64))
                 .ok_or(ExecutionError::NoSuchOverload)?)
         } else {
             Err(ExecutionError::NoSuchOverload)
