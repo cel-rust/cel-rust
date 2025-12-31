@@ -43,6 +43,10 @@ impl Val for DefaultMap {
         Some(self)
     }
 
+    fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {
+        Some(self)
+    }
+
     fn as_iterable(&self) -> Option<&dyn Iterable> {
         Some(self)
     }
