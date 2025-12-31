@@ -948,21 +948,30 @@ impl Value {
 
                         // all below is NOT special in the interpreter
                         operators::ADD => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
-                                Value::resolve_val(&call.args[0], ctx)?
-                                    .as_ref()
+                                lhs.as_ref()
                                     .as_adder()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .add(Value::resolve_val(&call.args[1], ctx)?.as_ref())?
+                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
+                                        "add",
+                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                    ))?
+                                    .add(rhs.as_ref())?
                                     .into_owned(),
-                            ))
+                            ));
                         }
                         operators::SUBSTRACT => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_subtractor()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
+                                        "sub",
+                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                    ))?
                                     .sub(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -972,7 +981,11 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_divider()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
+                                        "div",
+                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                    ))?
                                     .div(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -982,7 +995,11 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_multiplier()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
+                                        "mul",
+                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                    ))?
                                     .mul(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -992,7 +1009,11 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_modder()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
+                                        "rem",
+                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                    ))?
                                     .modulo(rhs.as_ref())?
                                     .into_owned(),
                             ));
