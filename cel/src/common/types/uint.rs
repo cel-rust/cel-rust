@@ -1,5 +1,9 @@
+use crate::common::traits::{Adder, Comparer, Divider, Modder, Multiplier, Subtractor};
 use crate::common::types::Type;
 use crate::common::value::Val;
+use crate::{ExecutionError, Value};
+use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
@@ -28,6 +32,30 @@ impl Val for UInt {
         super::UINT_TYPE
     }
 
+    fn as_adder(&self) -> Option<&dyn Adder> {
+        Some(self)
+    }
+
+    fn as_comparer(&self) -> Option<&dyn Comparer> {
+        Some(self)
+    }
+
+    fn as_divider(&self) -> Option<&dyn Divider> {
+        Some(self)
+    }
+
+    fn as_modder(&self) -> Option<&dyn Modder> {
+        Some(self)
+    }
+
+    fn as_multiplier(&self) -> Option<&dyn Multiplier> {
+        Some(self)
+    }
+
+    fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
@@ -36,6 +64,122 @@ impl Val for UInt {
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(UInt(self.0))
+    }
+}
+
+impl Adder for UInt {
+    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
+                self.0.checked_add(rhs.0).ok_or(ExecutionError::Overflow(
+                    "add",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ))?,
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "add",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                rhs.try_into().unwrap_or(Value::Null),
+            ))
+        }
+    }
+}
+
+impl Comparer for UInt {
+    fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(self.0.cmp(&rhs.0))
+        } else {
+            Err(ExecutionError::NoSuchOverload)
+        }
+    }
+}
+
+impl Divider for UInt {
+    fn div<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            if rhs.0 == 0 {
+                return Err(ExecutionError::DivisionByZero(self.0.into()));
+            }
+            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
+                self.0.checked_div(rhs.0).ok_or(ExecutionError::Overflow(
+                    "div",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ))?,
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "div",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                rhs.try_into().unwrap_or(Value::Null),
+            ))
+        }
+    }
+}
+
+impl Modder for UInt {
+    fn modulo<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            if rhs.0 == 0 {
+                return Err(ExecutionError::RemainderByZero(self.0.into()));
+            }
+            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
+                self.0.checked_rem(rhs.0).ok_or(ExecutionError::Overflow(
+                    "rem",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ))?,
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "rem",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                rhs.try_into().unwrap_or(Value::Null),
+            ))
+        }
+    }
+}
+
+impl Multiplier for UInt {
+    fn mul<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
+                self.0.checked_mul(rhs.0).ok_or(ExecutionError::Overflow(
+                    "mul",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ))?,
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "mul",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                rhs.try_into().unwrap_or(Value::Null),
+            ))
+        }
+    }
+}
+
+impl Subtractor for UInt {
+    fn sub<'a>(&'a self, rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
+                self.0.checked_sub(rhs.0).ok_or(ExecutionError::Overflow(
+                    "sub",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ))?,
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "sub",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                rhs.try_into().unwrap_or(Value::Null),
+            ))
+        }
     }
 }
 
