@@ -1633,7 +1633,7 @@ mod tests {
         numbers.insert(Key::Uint(1), "one".to_string());
         context.add_variable_from_value("numbers", numbers);
 
-        let program = Program::compile("numbers[1]").unwrap();
+        let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
     }
