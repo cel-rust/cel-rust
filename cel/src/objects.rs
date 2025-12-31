@@ -883,7 +883,11 @@ impl TryFrom<Value> for Box<dyn Val> {
             Value::Null => Ok(Box::new(CelNull)),
             Value::Bytes(b) => Ok(Box::new(CelBytes::from(b.as_slice().to_vec()))),
             #[cfg(feature = "chrono")]
-            Value::Duration(d) => Ok(Box::new(CelDuration::from(d.to_std().unwrap()))),
+            Value::Duration(d) => {
+                Ok(Box::new(CelDuration::from(d.to_std().map_err(|_| {
+                    ExecutionError::Overflow("duration", Value::Null, Value::Null)
+                })?)))
+            }
             #[cfg(feature = "chrono")]
             Value::Timestamp(ts) => {
                 let ts: SystemTime = ts.into();
