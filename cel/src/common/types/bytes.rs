@@ -1,6 +1,9 @@
+use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
+use std::borrow::Cow;
 use std::ops::Deref;
+use traits::{Adder, Comparer};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bytes(Vec<u8>);
@@ -28,6 +31,14 @@ impl Val for Bytes {
         super::BYTES_TYPE
     }
 
+    fn as_adder(&self) -> Option<&dyn Adder> {
+        Some(self)
+    }
+
+    fn as_comparer(&self) -> Option<&dyn Comparer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
@@ -36,6 +47,32 @@ impl Val for Bytes {
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Bytes(self.0.clone()))
+    }
+}
+
+impl Adder for Bytes {
+    fn add<'a>(&'a self, other: &dyn Val) -> Result<Cow<'a, dyn Val>, crate::ExecutionError> {
+        if let Some(bytes) = other.downcast_ref::<Bytes>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(Bytes(
+                self.0
+                    .clone()
+                    .into_iter()
+                    .chain(bytes.0.clone().into_iter())
+                    .collect(),
+            ))))
+        } else {
+            Err(crate::ExecutionError::NoSuchOverload)
+        }
+    }
+}
+
+impl Comparer for Bytes {
+    fn compare(&self, other: &dyn Val) -> Result<std::cmp::Ordering, crate::ExecutionError> {
+        if let Some(bytes) = other.downcast_ref::<Bytes>() {
+            Ok(self.0.cmp(&bytes.0))
+        } else {
+            Err(crate::ExecutionError::NoSuchOverload)
+        }
     }
 }
 
