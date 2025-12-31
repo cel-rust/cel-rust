@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Divider, Modder, Multiplier, Subtractor};
-use crate::common::types::Type;
+use crate::common::types::{CelDouble, CelInt, Type};
 use crate::common::value::Val;
 use crate::{ExecutionError, Value};
 use std::borrow::Cow;
@@ -91,6 +91,17 @@ impl Comparer for UInt {
     fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
             Ok(self.0.cmp(&rhs.0))
+        } else if let Some(rhs) = rhs.downcast_ref::<CelInt>() {
+            Ok(self
+                .0
+                .try_into()
+                .map(|a: i64| a.cmp(rhs.inner()))
+                // If the u64 doesn't fit into a i64 it must be greater than i64::MAX.
+                .unwrap_or(Ordering::Greater))
+        } else if let Some(rhs) = rhs.downcast_ref::<CelDouble>() {
+            Ok((*self.inner() as f64)
+                .partial_cmp(rhs.inner())
+                .ok_or(ExecutionError::NoSuchOverload)?)
         } else {
             Err(ExecutionError::NoSuchOverload)
         }

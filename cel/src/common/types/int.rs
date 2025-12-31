@@ -1,6 +1,6 @@
 use crate::common::traits;
 use crate::common::traits::Negator;
-use crate::common::types::Type;
+use crate::common::types::{CelDouble, CelUInt, Type};
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
@@ -90,8 +90,18 @@ impl traits::Adder for Int {
 
 impl traits::Comparer for Int {
     fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
-        if let Some(i) = rhs.downcast_ref::<Int>() {
+        if let Some(i) = rhs.downcast_ref::<Self>() {
             Ok(self.0.cmp(&i.0))
+        } else if let Some(u) = rhs.downcast_ref::<CelUInt>() {
+            Ok((*self.inner())
+                .try_into()
+                .map(|a: u64| a.cmp(u.inner()))
+                // If the i64 doesn't fit into a u64 it must be less than 0.
+                .unwrap_or(Ordering::Less))
+        } else if let Some(d) = rhs.downcast_ref::<CelDouble>() {
+            Ok((*self.inner() as f64)
+                .partial_cmp(d.inner())
+                .ok_or(ExecutionError::NoSuchOverload)?)
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
