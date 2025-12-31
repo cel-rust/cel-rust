@@ -978,7 +978,7 @@ mod tests {
     use serde::Serialize;
     use serde_bytes::Bytes;
     use std::{collections::HashMap, iter::FromIterator, sync::Arc};
-
+    use chrono::FixedOffset;
     #[cfg(feature = "chrono")]
     use super::{Duration, Timestamp};
 
@@ -1229,7 +1229,6 @@ mod tests {
     #[cfg(feature = "chrono")]
     #[test]
     fn test_time_types() {
-        use chrono::FixedOffset;
 
         let tests = to_value([
             TestTimeTypes {
@@ -1319,9 +1318,11 @@ mod tests {
 
         let program = Program::compile("test == expected").unwrap();
         let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", tests).unwrap();
-        let value = program.execute(&context).unwrap();
+        context.add_variable("expected", expected.clone()).unwrap();
+        context.add_variable("test", tests.clone()).unwrap();
+        let value = program
+            .execute(&context)
+            .expect(format!("{:#?} == {:#?}", tests, expected).as_str());
         assert_eq!(value, true.into());
     }
 
