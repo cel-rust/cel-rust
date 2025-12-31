@@ -68,7 +68,7 @@ impl Val for Int {
 }
 
 impl traits::Adder for Int {
-    fn add<'a>(&self, other: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn add<'a>(&'a self, other: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(i) = other.downcast_ref::<Int>() {
             let t: Self = self
                 .0

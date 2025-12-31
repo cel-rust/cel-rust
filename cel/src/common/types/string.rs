@@ -80,7 +80,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
 }
 
 impl traits::Adder for String {
-    fn add<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn add<'a>(&'a self, _rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         todo!("implement Adder for String!")
     }
 }
