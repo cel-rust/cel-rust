@@ -1,10 +1,11 @@
 use crate::common::traits;
+use crate::common::traits::Negator;
 use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::ops::Deref;
+use std::ops::{Deref, Neg};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Int(i64);
@@ -49,6 +50,10 @@ impl Val for Int {
     }
 
     fn as_multiplier(&self) -> Option<&dyn traits::Multiplier> {
+        Some(self)
+    }
+
+    fn as_negator(&self) -> Option<&dyn Negator> {
         Some(self)
     }
 
@@ -147,6 +152,12 @@ impl traits::Multiplier for Int {
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
+    }
+}
+
+impl Negator for Int {
+    fn negate(&self) -> Result<Box<dyn Val>, ExecutionError> {
+        Ok(Box::new(Self::from(self.0.neg())))
     }
 }
 
