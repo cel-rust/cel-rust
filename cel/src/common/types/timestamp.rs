@@ -1,5 +1,10 @@
-use crate::common::types::Type;
+use crate::common::traits::{Adder, Comparer, Subtractor};
+use crate::common::types::{CelDuration, Type};
 use crate::common::value::Val;
+use crate::{ExecutionError, Value};
+use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::ops::{Add, Sub};
 use std::time::SystemTime;
 
 #[derive(Clone, Debug, PartialEq)]
@@ -20,6 +25,18 @@ impl Val for Timestamp {
         super::TIMESTAMP_TYPE
     }
 
+    fn as_adder(&self) -> Option<&dyn Adder> {
+        Some(self)
+    }
+
+    fn as_comparer(&self) -> Option<&dyn Comparer> {
+        Some(self)
+    }
+
+    fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
@@ -28,6 +45,54 @@ impl Val for Timestamp {
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Timestamp(self.0))
+    }
+}
+
+impl Adder for Timestamp {
+    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self(
+                self.0.add(*rhs.inner()),
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "add",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                rhs.try_into().unwrap_or(Value::Null),
+            ))
+        }
+    }
+}
+
+impl Comparer for Timestamp {
+    fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(self.0.cmp(&rhs.0))
+        } else {
+            Err(ExecutionError::NoSuchOverload)
+        }
+    }
+}
+
+impl Subtractor for Timestamp {
+    fn sub<'a>(&'a self, rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self(
+                self.0.sub(*rhs.inner()),
+            ))))
+        } else if let Some(rhs) = rhs.downcast_ref::<Self>() {
+            Ok(Cow::<dyn Val>::Owned(Box::new(CelDuration::from(
+                self.0
+                    .duration_since(*rhs.inner())
+                    .map_err(|_| ExecutionError::Overflow("sub", Value::Null, Value::Null))?,
+            ))))
+        } else {
+            Err(ExecutionError::UnsupportedBinaryOperator(
+                "sub",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                rhs.try_into().unwrap_or(Value::Null),
+            ))
+        }
     }
 }
 
