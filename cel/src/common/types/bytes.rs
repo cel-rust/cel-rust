@@ -1,6 +1,7 @@
 use crate::common::traits;
 use crate::common::types::Type;
 use crate::common::value::Val;
+use crate::Value;
 use std::borrow::Cow;
 use std::ops::Deref;
 use traits::{Adder, Comparer};
@@ -54,14 +55,14 @@ impl Adder for Bytes {
     fn add<'a>(&'a self, other: &dyn Val) -> Result<Cow<'a, dyn Val>, crate::ExecutionError> {
         if let Some(bytes) = other.downcast_ref::<Bytes>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(Bytes(
-                self.0
-                    .clone()
-                    .into_iter()
-                    .chain(bytes.0.clone().into_iter())
-                    .collect(),
+                self.0.clone().into_iter().chain(bytes.0.clone()).collect(),
             ))))
         } else {
-            Err(crate::ExecutionError::NoSuchOverload)
+            Err(crate::ExecutionError::UnsupportedBinaryOperator(
+                "add",
+                (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                other.try_into().unwrap_or(Value::Null),
+            ))
         }
     }
 }
