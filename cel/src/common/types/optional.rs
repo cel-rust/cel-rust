@@ -33,9 +33,45 @@ impl Val for Optional {
     }
 }
 
+impl Optional {
+    pub fn none() -> Self {
+        Optional(None)
+    }
+
+    pub fn of(val: Box<dyn Val>) -> Self {
+        Optional(Some(OptionalInternal::Box(val)))
+    }
+
+    pub fn map(&self, f: impl FnOnce(&dyn Val) -> Box<dyn Val>) -> Self {
+        self.0
+            .as_ref()
+            .map(|val| {
+                let m = match val {
+                    OptionalInternal::Box(b) => f(b.as_ref()),
+                    OptionalInternal::Arc(a) => f(a.as_ref()),
+                };
+                Optional(Some(OptionalInternal::Box(m)))
+            })
+            .unwrap_or(Optional(None))
+    }
+
+    pub fn option(&self) -> Option<&dyn Val> {
+        self.0.as_ref().map(|val| match val {
+            OptionalInternal::Box(b) => b.as_ref(),
+            OptionalInternal::Arc(a) => a.as_ref(),
+        })
+    }
+}
+
 impl From<Option<Box<dyn Val>>> for Optional {
     fn from(val: Option<Box<dyn Val>>) -> Self {
         Optional(val.map(OptionalInternal::Box))
+    }
+}
+
+impl From<Box<dyn Val>> for Optional {
+    fn from(val: Box<dyn Val>) -> Self {
+        Optional(Some(OptionalInternal::Box(val)))
     }
 }
 

@@ -1229,7 +1229,6 @@ mod tests {
     #[cfg(feature = "chrono")]
     #[test]
     fn test_time_types() {
-
         let tests = to_value([
             TestTimeTypes {
                 dur: chrono::Duration::milliseconds(1527).into(),
