@@ -372,6 +372,10 @@ impl OptionalValue {
     pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
+
+    pub(crate) fn inner(&self) -> Option<&Value> {
+        self.value.as_ref()
+    }
 }
 
 impl Opaque for OptionalValue {
@@ -872,7 +876,17 @@ impl TryFrom<Value> for Box<dyn Val> {
                     .collect();
                 Ok(Box::new(CelMap::from(result?)))
             }
-            Value::Opaque(o) => Ok(Box::new(OpaqueVal(o))),
+            Value::Opaque(o) => {
+                let v: Box<dyn Val> = if let Some(value) = o.downcast_ref::<OptionalValue>() {
+                    match value.inner() {
+                        None => Box::new(CelOptional::none()),
+                        Some(v) => Box::new(CelOptional::of(v.clone().try_into()?)),
+                    }
+                } else {
+                    Box::new(OpaqueVal(o))
+                };
+                Ok(v)
+            }
             _ => Err(ExecutionError::UnsupportedTargetType { target: value }),
         }
     }
