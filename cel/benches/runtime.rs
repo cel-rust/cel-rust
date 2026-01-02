@@ -3,23 +3,21 @@ use cel::{Program, Value};
 use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use std::collections::HashMap;
 
-const EXPRESSIONS: [(&str, &str); 36] = [
-    ("ternary_1", "(1 || 2) ? 1 : 2"),
-    ("ternary_2", "(1 ? 2 : 3) ? 1 : 2"),
-    ("or_1", "1 || 2"),
-    ("and_1", "1 && 2"),
-    ("and_2", "1 && (false ? 2 : 3)"),
+const EXPRESSIONS: [(&str, &str); 34] = [
+    ("ternary_1", "(false || true) ? 1 : 2"),
+    ("ternary_2", "(true ? false : true) ? 1 : 2"),
+    ("or_1", "false || true"),
+    ("and_1", "true && false"),
+    ("and_2", "true && (false ? 2 : 3) > 2"),
     ("number", "1"),
     ("construct_list", "[1,2,3]"),
     ("construct_list_1", "[1]"),
-    ("construct_list_2", "[1, 2]"),
+    ("construct_list_2", "[a, 2]"),
     ("add_list", "[1,2,3] + [4, 5, 6]"),
     ("list_element", "[1,2,3][1]"),
     ("construct_dict", "{1: 2, '3': '4'}"),
     ("add_string", "'abc' + 'def'"),
-    ("list", "[1,2,3, Now, ]"),
     ("mapexpr", "{1 + a: 3}"),
-    ("map_merge", "{'a': 1} + {'a': 2, 'b': 3}"),
     ("size_list", "[1].size()"),
     ("size_list_1", "size([1])"),
     ("size_str", "'a'.size()"),
@@ -67,8 +65,9 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             ctx.add_variable_from_value("apple", true);
+            ctx.add_variable_from_value("a", 1);
             ctx.set_variable_resolver(&Resolver);
-            b.iter(|| program.execute(&ctx))
+            b.iter(|| program.execute(&ctx).expect("Eval failed!"))
         });
     }
 }
@@ -92,7 +91,7 @@ pub fn map_macro_benchmark(c: &mut Criterion) {
             let program = Program::compile("list.map(x, x * 2)").unwrap();
             let mut ctx = Context::default();
             ctx.add_variable_from_value("list", list);
-            b.iter(|| program.execute(&ctx).unwrap())
+            b.iter(|| program.execute(&ctx).expect("Eval failed!"))
         });
     }
     group.finish();
