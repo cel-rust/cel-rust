@@ -321,6 +321,42 @@ impl dyn Opaque {
     }
 }
 
+#[derive(Clone)]
+struct OpaqueVal(Arc<dyn Opaque>);
+
+impl Debug for OpaqueVal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OpaqueVal<{}>", self.0.runtime_type_name())
+    }
+}
+
+impl Val for OpaqueVal {
+    fn get_type(&self) -> Type<'_> {
+        OPTIONAL_TYPE
+    }
+
+    fn equals(&self, other: &dyn Val) -> bool {
+        if other.get_type() != OPTIONAL_TYPE {
+            false
+        } else {
+            match other.downcast_ref::<OpaqueVal>() {
+                None => false,
+                Some(other) => self.0.opaque_eq(other.0.deref()),
+            }
+        }
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(self.clone())
+    }
+}
+
+impl OpaqueVal {
+    fn clone_inner(&self) -> Arc<dyn Opaque> {
+        self.0.clone()
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct OptionalValue {
     value: Option<Value>,
@@ -341,6 +377,12 @@ impl OptionalValue {
 impl Opaque for OptionalValue {
     fn runtime_type_name(&self) -> &str {
         "optional_type"
+    }
+}
+
+impl From<OptionalValue> for Option<Value> {
+    fn from(value: OptionalValue) -> Self {
+        value.value
     }
 }
 
@@ -773,6 +815,9 @@ impl TryFrom<&dyn Val> for Value {
                     ),
                 }))
             }
+            OPTIONAL_TYPE => Ok(Value::Opaque(
+                v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
+            )),
             _ => Err(ExecutionError::UnexpectedType {
                 got: v.get_type().name().to_string(),
                 want: "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
@@ -817,9 +862,7 @@ impl TryFrom<Value> for Box<dyn Val> {
                     .collect();
                 Ok(Box::new(CelMap::from(result?)))
             }
-            /*
-            Value::Opaque(_) => {}
-             */
+            Value::Opaque(o) => Ok(Box::new(OpaqueVal(o))),
             _ => Err(ExecutionError::UnsupportedTargetType { target: value }),
         }
     }

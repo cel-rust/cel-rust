@@ -26,6 +26,7 @@ pub use list::DefaultList as CelList;
 pub use map::DefaultMap as CelMap;
 pub use map::Key as CelMapKey;
 pub use null::Null as CelNull;
+pub use optional::Optional as CelOptional;
 pub use string::String as CelString;
 pub use timestamp::Timestamp as CelTimestamp;
 pub use uint::UInt as CelUInt;
@@ -128,6 +129,8 @@ pub const LIST_TYPE: Type = Type::new_list_type(&[&DYN_TYPE]);
 pub const MAP_TYPE: Type = Type::new_map_type(&[&DYN_TYPE, &DYN_TYPE]);
 
 pub const NULL_TYPE: Type = Type::simple_type(Kind::NullType, "null_type");
+
+pub const OPTIONAL_TYPE: Type = Type::new_opaque_type("optional_type");
 
 pub const STRING_TYPE: Type = Type {
     kind: Kind::String,
