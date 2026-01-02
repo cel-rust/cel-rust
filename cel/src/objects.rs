@@ -1,9 +1,9 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
-use crate::common::types;
 use crate::common::types::bool::Bool;
 use crate::common::types::*;
 use crate::common::value::{CelVal, Val};
 use crate::context::Context;
+use crate::ExecutionError::NoSuchOverload;
 use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -815,9 +815,19 @@ impl TryFrom<&dyn Val> for Value {
                     ),
                 }))
             }
-            OPTIONAL_TYPE => Ok(Value::Opaque(
-                v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
-            )),
+            OPTIONAL_TYPE => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
+                None => v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
+                Some(opt) => {
+                    let opt: Option<Result<Value, _>> = opt.option().map(|v| v.try_into());
+                    match opt {
+                        None => Arc::new(OptionalValue::none()),
+                        Some(t) => match t {
+                            Ok(v) => Arc::new(OptionalValue::of(v)),
+                            Err(_) => Arc::new(OptionalValue::none()),
+                        },
+                    }
+                }
+            })),
             _ => Err(ExecutionError::UnexpectedType {
                 got: v.get_type().name().to_string(),
                 want: "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
@@ -953,24 +963,23 @@ impl Value {
                                 )),
                             };
                             return if is_optional {
-                                // Ok(match result {
-                                //     Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
-                                //     Err(_) => Value::Opaque(Arc::new(OptionalValue::none())),
-                                // })
-                                todo!("impl opt!")
+                                Ok(match result {
+                                    Ok(val) => Cow::<dyn Val>::Owned(Box::new(CelOptional::from(
+                                        val.clone_as_boxed(),
+                                    ))),
+                                    Err(_) => Cow::<dyn Val>::Owned(Box::new(CelOptional::none())),
+                                })
                             } else {
                                 result
                             };
                         }
                         operators::OPT_SELECT => {
-                            let _operand = Value::resolve_val(&call.args[0], ctx)?;
+                            let operand = Value::resolve_val(&call.args[0], ctx)?;
                             let field_literal = Value::resolve_val(&call.args[1], ctx)?;
-                            let _field = match field_literal.get_type() {
-                                types::STRING_TYPE => field_literal
+                            let field = match field_literal.get_type() {
+                                STRING_TYPE => field_literal
                                     .downcast_ref::<CelString>()
-                                    .expect("field must be string")
-                                    .inner()
-                                    .to_string(),
+                                    .expect("field must be string"),
                                 _ => {
                                     return Err(ExecutionError::function_error(
                                         "_?._",
@@ -978,18 +987,28 @@ impl Value {
                                     ))
                                 }
                             };
-                            todo!("impl opt!")
-                            // if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
-                            //     return match opt_val.value() {
-                            //         Some(inner) => Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                            //             inner.clone().member(&field)?,
-                            //         )))),
-                            //         None => Ok(operand),
-                            //     };
-                            // }
-                            // return Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                            //    operand.member(&field)?,
-                            // ))));
+                            return Ok(Cow::<dyn Val>::Owned(Box::new(
+                                if let Some(opt) = operand.as_ref().downcast_ref::<CelOptional>() {
+                                    opt.map(|operand| {
+                                        operand
+                                            .as_indexer()
+                                            .map(|i| {
+                                                i.get(field)
+                                                    .map(|v| v.clone_as_boxed())
+                                                    .unwrap_or(CelOptional::none().clone_as_boxed())
+                                            })
+                                            .unwrap_or(CelOptional::none().clone_as_boxed())
+                                    })
+                                } else {
+                                    CelOptional::of(
+                                        operand
+                                            .as_indexer()
+                                            .ok_or(NoSuchOverload)?
+                                            .get(field)?
+                                            .clone_as_boxed(),
+                                    )
+                                },
+                            )));
                         }
                         // END OF SPECIAL CASES
 
