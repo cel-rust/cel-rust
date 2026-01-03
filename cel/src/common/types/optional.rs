@@ -61,6 +61,13 @@ impl Optional {
             OptionalInternal::Arc(a) => a.as_ref(),
         })
     }
+
+    pub fn inner(&self) -> Option<&dyn Val> {
+        self.0.as_ref().map(|val| match val {
+            OptionalInternal::Box(b) => b.as_ref(),
+            OptionalInternal::Arc(a) => a.as_ref(),
+        })
+    }
 }
 
 impl From<Option<Box<dyn Val>>> for Optional {
