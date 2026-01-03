@@ -231,6 +231,15 @@ impl<'a> Type<'a> {
     }
 }
 
+fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
+    if <dyn Any>::is::<T>(&*value) {
+        let list = &mut Some(value);
+        let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
+        return Ok(list.take().unwrap());
+    }
+    Err(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -264,13 +273,4 @@ mod tests {
         assert_eq!(&param, map.parameters[1]);
         assert_eq!(2, map.parameters.len());
     }
-}
-
-fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
-    if <dyn Any>::is::<T>(&*value) {
-        let list = &mut Some(value);
-        let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
-        return Ok(list.take().unwrap());
-    }
-    Err(value)
 }

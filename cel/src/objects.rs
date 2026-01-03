@@ -18,6 +18,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
+#[cfg(feature = "chrono")]
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:

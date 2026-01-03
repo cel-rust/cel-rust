@@ -52,7 +52,6 @@ impl Val for Timestamp {
 static MAX_TIMESTAMP: LazyLock<SystemTime> =
     LazyLock::new(|| SystemTime::UNIX_EPOCH + Duration::from_secs(253402300799));
 
-#[cfg(feature = "chrono")]
 static MIN_TIMESTAMP: LazyLock<SystemTime> =
     LazyLock::new(|| SystemTime::UNIX_EPOCH - Duration::from_secs(62135596800));
 
