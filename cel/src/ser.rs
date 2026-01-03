@@ -1325,7 +1325,7 @@ mod tests {
         context.add_variable("test", tests.clone()).unwrap();
         let value = program
             .execute(&context)
-            .expect(format!("{:#?} == {:#?}", tests, expected).as_str());
+            .unwrap_or_else(|_| panic!("{:#?} == {:#?}", tests, expected));
         assert_eq!(value, true.into());
     }
 

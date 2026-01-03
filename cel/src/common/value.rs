@@ -102,29 +102,6 @@ impl PartialEq for dyn Val {
     }
 }
 
-#[cfg(test)]
-mod test {
-    use crate::common::types;
-    use crate::common::value::Val;
-    use std::borrow::Cow;
-
-    fn test(val: &dyn Val) -> bool {
-        val.get_type() == types::STRING_TYPE
-    }
-
-    #[test]
-    fn test_cow() {
-        let s1 = types::CelString::from("cel");
-        let s2 = types::CelString::from("cel");
-        let b: Box<dyn Val> = Box::new(s1);
-        let cow: Cow<dyn Val> = Cow::Owned(b);
-        let borrowed: Cow<dyn Val> = Cow::Borrowed(&s2);
-        assert!(test(borrowed.as_ref()));
-        assert!(test(cow.as_ref()));
-        assert!(test(borrowed.to_owned().as_ref()));
-    }
-}
-
 impl CelVal {
     pub fn into_val(self) -> Box<dyn Val> {
         match self {
@@ -146,5 +123,28 @@ impl CelVal {
             CelVal::UInt(u) => Box::new(u),
             CelVal::Unknown(_) => todo!(),
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::common::types;
+    use crate::common::value::Val;
+    use std::borrow::Cow;
+
+    fn test(val: &dyn Val) -> bool {
+        val.get_type() == types::STRING_TYPE
+    }
+
+    #[test]
+    fn test_cow() {
+        let s1 = types::CelString::from("cel");
+        let s2 = types::CelString::from("cel");
+        let b: Box<dyn Val> = Box::new(s1);
+        let cow: Cow<dyn Val> = Cow::Owned(b);
+        let borrowed: Cow<dyn Val> = Cow::Borrowed(&s2);
+        assert!(test(borrowed.as_ref()));
+        assert!(test(cow.as_ref()));
+        assert!(test(borrowed.clone().as_ref()));
     }
 }
