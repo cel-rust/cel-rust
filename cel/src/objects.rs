@@ -894,8 +894,8 @@ impl Value {
     #[inline(always)]
     pub fn resolve_val<'a: 'b, 'b>(
         expr: &'a Expression,
-        ctx: &'b Context,
-    ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        ctx: &'b Context<'b>,
+    ) -> Result<Cow<'b, dyn Val>, ExecutionError> {
         match &expr.expr {
             Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
@@ -1234,11 +1234,9 @@ impl Value {
                     }
                 }
             }
-            Expr::Ident(name) => {
-                let v = ctx.get_variable(name)?;
-                // todo fix this to _not_ use `Value`
-                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
-            }
+            Expr::Ident(name) => Ok(ctx
+                .get_variable(name)
+                .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
                 match left.get_type() {
@@ -1351,7 +1349,9 @@ impl Value {
                     }
                     t => todo!("Support {t:?}"),
                 }
-                Value::resolve_val(&comprehension.result, &ctx)
+                Ok(Cow::<dyn Val>::Owned(
+                    Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
+                ))
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),

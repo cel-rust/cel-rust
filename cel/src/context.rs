@@ -1,7 +1,9 @@
+use crate::common::value::Val;
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
 use crate::{functions, ExecutionError};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -33,12 +35,12 @@ use std::sync::Arc;
 pub enum Context<'a> {
     Root {
         functions: FunctionRegistry,
-        variables: BTreeMap<String, Value>,
+        variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
     },
     Child {
         parent: &'a Context<'a>,
-        variables: BTreeMap<String, Value>,
+        variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
     },
 }
@@ -55,10 +57,14 @@ impl<'a> Context<'a> {
     {
         match self {
             Context::Root { variables, .. } => {
-                variables.insert(name.into(), value.try_into_value()?);
+                let value = value.try_into_value()?;
+                let value: Box<dyn Val> = value.try_into().unwrap();
+                variables.insert(name.into(), value);
             }
             Context::Child { variables, .. } => {
-                variables.insert(name.into(), value.try_into_value()?);
+                let value = value.try_into_value()?;
+                let value: Box<dyn Val> = value.try_into().unwrap();
+                variables.insert(name.into(), value);
             }
         }
         Ok(())
@@ -71,10 +77,14 @@ impl<'a> Context<'a> {
     {
         match self {
             Context::Root { variables, .. } => {
-                variables.insert(name.into(), value.into());
+                let value = value.into();
+                let value: Box<dyn Val> = value.try_into().unwrap();
+                variables.insert(name.into(), value);
             }
             Context::Child { variables, .. } => {
-                variables.insert(name.into(), value.into());
+                let value = value.into();
+                let value: Box<dyn Val> = value.try_into().unwrap();
+                variables.insert(name.into(), value);
             }
         }
     }
@@ -90,7 +100,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
+    pub fn get_variable<S>(&'a self, name: S) -> Option<Cow<'a, dyn Val>>
     where
         S: AsRef<str>,
     {
@@ -101,22 +111,30 @@ impl<'a> Context<'a> {
                 parent,
                 resolver,
             } => resolver
-                .and_then(|r| r.resolve(name))
+                .and_then(|r| {
+                    r.resolve(name)
+                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
+                })
                 .or_else(|| {
                     variables
                         .get(name)
-                        .cloned()
-                        .or_else(|| parent.get_variable(name).ok())
-                })
-                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
+                        .map(|b| Cow::<dyn Val>::Borrowed(b.as_ref()))
+                        .or_else(|| parent.get_variable(name))
+                }),
             Context::Root {
                 variables,
                 resolver,
                 ..
             } => resolver
-                .and_then(|r| r.resolve(name))
-                .or_else(|| variables.get(name).cloned())
-                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
+                .and_then(|r| {
+                    r.resolve(name)
+                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
+                })
+                .or_else(|| {
+                    variables
+                        .get(name)
+                        .map(|v| Cow::<dyn Val>::Borrowed(v.as_ref()))
+                }),
         }
     }
 
