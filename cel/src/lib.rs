@@ -22,13 +22,6 @@ mod magic;
 pub mod objects;
 mod resolvers;
 
-// NEW API
-mod env;
-pub use env::Env;
-pub use env::EnvBuilder;
-
-pub mod stdlib;
-
 #[cfg(feature = "chrono")]
 mod duration;
 #[cfg(feature = "chrono")]

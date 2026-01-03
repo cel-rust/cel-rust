@@ -1,7 +1,7 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::common::types::bool::Bool;
 use crate::common::types::*;
-use crate::common::value::{CelVal, Val};
+use crate::common::value::Val;
 use crate::context::Context;
 use crate::ExecutionError::NoSuchOverload;
 use crate::{ExecutionError, Expression, FunctionContext};
@@ -469,21 +469,6 @@ impl Debug for Value {
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Opaque(o) => write!(f, "Opaque<{}>({:?})", o.runtime_type_name(), o.as_debug()),
             Value::Null => write!(f, "Null"),
-        }
-    }
-}
-
-impl From<CelVal> for Value {
-    fn from(val: CelVal) -> Self {
-        match val {
-            CelVal::String(s) => Value::String(Arc::new(s.into_inner())),
-            CelVal::Boolean(b) => Value::Bool(*b),
-            CelVal::Int(i) => Value::Int(*i),
-            CelVal::UInt(u) => Value::UInt(*u),
-            CelVal::Double(d) => Value::Float(*d),
-            CelVal::Bytes(bytes) => Value::Bytes(Arc::new(bytes.into_inner())),
-            CelVal::Null => Value::Null,
-            v => unimplemented!("{v:?}"),
         }
     }
 }

@@ -1,32 +1,9 @@
 use crate::common::traits::{
-    Adder, Comparer, Container, Divider, Indexer, Iterable, Lister, Modder, Multiplier, Negator,
-    Subtractor,
+    Adder, Comparer, Container, Divider, Indexer, Iterable, Modder, Multiplier, Negator, Subtractor,
 };
-use crate::common::types;
 use crate::common::types::Type;
 use std::any::Any;
 use std::fmt::Debug;
-
-#[derive(Debug)]
-pub enum CelVal {
-    Unspecified,
-    Error(types::CelErr),
-    Dyn,
-    Any,
-    Boolean(types::CelBool),
-    Bytes(types::CelBytes),
-    Double(types::CelDouble),
-    Duration(types::CelDuration),
-    Int(types::CelInt),
-    List(Box<dyn Lister>),
-    Map,
-    Null,
-    String(types::CelString),
-    Timestamp(types::CelTimestamp),
-    Type,
-    UInt(types::CelUInt),
-    Unknown(Box<dyn Val>),
-}
 
 pub trait Val: Any + Debug {
     fn get_type(&self) -> Type<'_>;
@@ -99,30 +76,6 @@ impl ToOwned for dyn Val {
 impl PartialEq for dyn Val {
     fn eq(&self, other: &Self) -> bool {
         self.equals(other)
-    }
-}
-
-impl CelVal {
-    pub fn into_val(self) -> Box<dyn Val> {
-        match self {
-            CelVal::Unspecified => todo!(),
-            CelVal::Error(_err) => todo!(),
-            CelVal::Dyn => todo!(),
-            CelVal::Any => todo!(),
-            CelVal::Boolean(b) => Box::new(b),
-            CelVal::Bytes(bytes) => Box::new(bytes),
-            CelVal::Double(d) => Box::new(d),
-            CelVal::Duration(d) => Box::new(d),
-            CelVal::Int(i) => Box::new(i),
-            CelVal::List(_) => todo!(),
-            CelVal::Map => todo!(),
-            CelVal::Null => Box::new(types::CelNull),
-            CelVal::String(s) => Box::new(s),
-            CelVal::Timestamp(t) => Box::new(t),
-            CelVal::Type => todo!(),
-            CelVal::UInt(u) => Box::new(u),
-            CelVal::Unknown(_) => todo!(),
-        }
     }
 }
 
