@@ -1285,25 +1285,23 @@ impl Value {
                 let list = list_expr
                     .elements
                     .iter()
-                    //.enumerate()
-                    //.map(|(_idx, element)| {
-                    .map(|element| {
+                    .enumerate()
+                    .map(|(idx, element)| {
                         Value::resolve_val(element, ctx).map(|value| {
-                            /*
                             if list_expr.optional_indices.contains(&idx) {
-                                if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                                    opt_val.value().cloned()
+                                if let Some(opt_val) = value.downcast_ref::<CelOptional>() {
+                                    opt_val.inner().map(|v| v.clone_as_boxed())
                                 } else {
-                                    Some(value)
+                                    Some(value.into_owned())
                                 }
                             } else {
-                                Some(value)
-                            }*/
-                            value.into_owned()
+                                Some(value.into_owned())
+                            }
                         })
                     })
                     .collect::<Result<Vec<_>, _>>()?
                     .into_iter()
+                    .flatten()
                     .collect::<Vec<_>>();
                 Ok(Cow::<dyn Val>::Owned(Box::new(CelList::from(list))))
             }
