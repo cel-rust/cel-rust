@@ -1413,30 +1413,23 @@ impl Value {
                     accu_init.as_ref().try_into()?,
                 );
 
-                match iter.get_type() {
-                    LIST_TYPE | MAP_TYPE => {
-                        let mut items = iter
-                            .as_iterable()
-                            .ok_or(ExecutionError::NoSuchOverload)?
-                            .iter();
-                        while let Some(item) = items.next() {
-                            if !try_bool(
-                                Value::resolve_val(&comprehension.loop_cond, &ctx)?.as_ref(),
-                            )? {
-                                break;
-                            }
-                            ctx.add_variable_from_value::<_, Value>(
-                                &comprehension.iter_var,
-                                item.try_into()?,
-                            );
-                            let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
-                            ctx.add_variable_from_value::<_, Value>(
-                                &comprehension.accu_var,
-                                accu.as_ref().try_into()?,
-                            );
-                        }
+                let mut items = iter
+                    .as_iterable()
+                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .iter();
+                while let Some(item) = items.next() {
+                    if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx)?.as_ref())? {
+                        break;
                     }
-                    t => todo!("Support {t:?}"),
+                    ctx.add_variable_from_value::<_, Value>(
+                        &comprehension.iter_var,
+                        item.try_into()?,
+                    );
+                    let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
+                    ctx.add_variable_from_value::<_, Value>(
+                        &comprehension.accu_var,
+                        accu.as_ref().try_into()?,
+                    );
                 }
                 Ok(Cow::<dyn Val>::Owned(
                     Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
