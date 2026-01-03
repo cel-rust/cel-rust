@@ -892,10 +892,10 @@ impl Value {
     }
 
     #[inline(always)]
-    pub fn resolve_val<'a: 'b, 'b>(
+    pub fn resolve_val<'a>(
         expr: &'a Expression,
-        ctx: &'b Context<'b>,
-    ) -> Result<Cow<'b, dyn Val>, ExecutionError> {
+        ctx: &'a Context<'a>,
+    ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match &expr.expr {
             Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
