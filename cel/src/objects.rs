@@ -966,15 +966,14 @@ impl Value {
                             let is_optional = call.func_name == operators::OPT_INDEX;
                             let value = Value::resolve_val(&call.args[0], ctx)?;
                             let result = match value {
-                                Cow::Borrowed(val) => Ok(val
+                                Cow::Borrowed(val) => val
                                     .as_indexer()
                                     .ok_or(ExecutionError::NoSuchOverload)?
-                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()))?,
-                                Cow::Owned(val) => Ok(Cow::Owned(
+                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()),
+                                Cow::Owned(val) =>
                                     val.into_indexer()
                                         .ok_or(ExecutionError::NoSuchOverload)?
-                                        .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref())?,
-                                )),
+                                        .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref()).map(Cow::Owned),
                             };
                             return if is_optional {
                                 Ok(match result {
