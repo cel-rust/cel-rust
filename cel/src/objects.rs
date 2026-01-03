@@ -1308,7 +1308,7 @@ impl Value {
             Expr::Map(map_expr) => {
                 let mut map = HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
-                    let (k, v, _is_optional) = match &entry.expr {
+                    let (k, v, is_optional) = match &entry.expr {
                         EntryExpr::StructField(_) => panic!("WAT?"),
                         EntryExpr::MapEntry(e) => (&e.key, &e.value, e.optional),
                     };
@@ -1316,19 +1316,17 @@ impl Value {
                     // todo do not clone if not needed!
                     let value = Value::resolve_val(v, ctx)?.into_owned();
 
-                    /*
                     if is_optional {
-                        if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                            if let Some(inner) = opt_val.value() {
-                                map.insert(key, inner.clone());
+                        if let Some(opt_val) = value.downcast_ref::<CelOptional>() {
+                            if let Some(inner) = opt_val.inner() {
+                                map.insert(key, inner.clone_as_boxed());
                             }
                         } else {
                             map.insert(key, value);
                         }
                     } else {
-                     */
-                    map.insert(key, value);
-                    //}
+                        map.insert(key, value);
+                    }
                 }
                 let map: Box<CelMap> = CelMap::from(map).into();
                 Ok(Cow::<dyn Val>::Owned(map))
