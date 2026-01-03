@@ -55,9 +55,10 @@ impl Val for String {
 impl Adder for String {
     fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self(
-                self.0.clone() + rhs.0.as_str(),
-            ))))
+            let mut s = StdString::with_capacity(rhs.0.len() + self.0.len());
+            s.push_str(&self.0);
+            s.push_str(&rhs.0);
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self(s))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "add",
