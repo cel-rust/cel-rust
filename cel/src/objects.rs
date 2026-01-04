@@ -1418,10 +1418,7 @@ impl Value {
                 let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
                 let iter = Value::resolve_val(&comprehension.iter_range, ctx)?;
                 let mut ctx = ctx.new_inner_scope();
-                ctx.add_variable_from_value::<_, Value>(
-                    &comprehension.accu_var,
-                    accu_init.as_ref().try_into()?,
-                );
+                ctx.add_variable_as_val(&comprehension.accu_var, accu_init.clone_as_boxed());
 
                 let mut items = iter
                     .as_iterable()
@@ -1431,15 +1428,9 @@ impl Value {
                     if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx)?.as_ref())? {
                         break;
                     }
-                    ctx.add_variable_from_value::<_, Value>(
-                        &comprehension.iter_var,
-                        item.try_into()?,
-                    );
+                    ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
                     let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
-                    ctx.add_variable_from_value::<_, Value>(
-                        &comprehension.accu_var,
-                        accu.as_ref().try_into()?,
-                    );
+                    ctx.add_variable_as_val(&comprehension.accu_var, accu.clone_as_boxed());
                 }
                 Ok(Cow::<dyn Val>::Owned(
                     Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
