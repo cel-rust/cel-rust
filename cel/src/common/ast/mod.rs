@@ -42,28 +42,27 @@ pub enum Expr {
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum LiteralValue {
-    Boolean(Box<CelBool>),
-    Bytes(Vec<u8>),
-    Double(f64),
-    Int(i64),
+    Boolean(CelBool),
+    Bytes(CelBytes),
+    Double(CelDouble),
+    Int(CelInt),
     Null,
-    String(String),
-    UInt(u64),
+    String(CelString),
+    UInt(CelUInt),
 }
 
 impl LiteralValue {
     pub fn to_val<'a>(&'a self) -> Cow<'a, dyn Val> {
         // todo refactor to return Cow::Borrowed
-        let v: Box<dyn Val> = match &self {
-            LiteralValue::Boolean(b) => return Cow::Borrowed(b.as_ref()),
-            LiteralValue::Bytes(b) => Box::new(CelBytes::from(b.clone())),
-            LiteralValue::Double(f) => Box::new(CelDouble::from(*f)),
-            LiteralValue::Int(i) => Box::new(CelInt::from(*i)),
-            LiteralValue::Null => Box::new(CelNull),
-            LiteralValue::String(s) => Box::new(CelString::from(s.clone())),
-            LiteralValue::UInt(ui) => Box::new(CelUInt::from(*ui)),
-        };
-        Cow::Owned(v)
+        match &self {
+            LiteralValue::Boolean(b) => Cow::Borrowed(b),
+            LiteralValue::Bytes(b) => Cow::Borrowed(b),
+            LiteralValue::Double(f) => Cow::Borrowed(f),
+            LiteralValue::Int(i) => Cow::Borrowed(i),
+            LiteralValue::Null => Cow::<dyn Val>::Owned(Box::new(CelNull)),
+            LiteralValue::String(s) => Cow::Borrowed(s),
+            LiteralValue::UInt(ui) => Cow::Borrowed(ui),
+        }
     }
 }
 
