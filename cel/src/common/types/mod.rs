@@ -1,25 +1,33 @@
 use crate::common::traits;
+use std::any::Any;
 
-mod bool;
+pub(crate) mod bool;
 mod bytes;
 mod double;
 mod duration;
 mod int;
+mod list;
+mod map;
 mod null;
 mod optional;
 mod string;
 mod timestamp;
 mod uint;
 
-pub use bool::Bool;
-pub use bytes::Bytes;
-pub use double::Double;
-pub use duration::Duration;
-pub use int::Int;
-pub use null::Null;
-pub use string::String;
-pub use timestamp::Timestamp;
-pub use uint::UInt;
+use crate::common::value::Val;
+pub use bool::Bool as CelBool;
+pub use bytes::Bytes as CelBytes;
+pub use double::Double as CelDouble;
+pub use duration::Duration as CelDuration;
+pub use int::Int as CelInt;
+pub use list::DefaultList as CelList;
+pub use map::DefaultMap as CelMap;
+pub use map::Key as CelMapKey;
+pub use null::Null as CelNull;
+pub use optional::Optional as CelOptional;
+pub use string::String as CelString;
+pub use timestamp::Timestamp as CelTimestamp;
+pub use uint::UInt as CelUInt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Kind {
@@ -120,6 +128,8 @@ pub const MAP_TYPE: Type = Type::new_map_type(&[&DYN_TYPE, &DYN_TYPE]);
 
 pub const NULL_TYPE: Type = Type::simple_type(Kind::NullType, "null_type");
 
+pub const OPTIONAL_TYPE: Type = Type::new_opaque_type("optional_type");
+
 pub const STRING_TYPE: Type = Type {
     kind: Kind::String,
     parameters: &[],
@@ -217,6 +227,15 @@ impl<'a> Type<'a> {
     pub fn has_trait(&self, t: u16) -> bool {
         self.trait_mask & t == t
     }
+}
+
+fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
+    if <dyn Any>::is::<T>(&*value) {
+        let list = &mut Some(value);
+        let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
+        return Ok(list.take().unwrap());
+    }
+    Err(value)
 }
 
 #[cfg(test)]

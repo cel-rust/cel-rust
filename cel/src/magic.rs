@@ -330,6 +330,7 @@ impl FunctionRegistry {
             .insert(name.to_string(), function.into_function());
     }
 
+    #[allow(dead_code)]
     pub(crate) fn get(&self, name: &str) -> Option<&Function> {
         self.functions.get(name)
     }

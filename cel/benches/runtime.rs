@@ -1,4 +1,5 @@
 use cel::context::{Context, VariableResolver};
+use cel::parser::Parser;
 use cel::{Program, Value};
 use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use std::collections::HashMap;
@@ -61,13 +62,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     let mut execution_group = c.benchmark_group("execute");
     for (name, expr) in black_box(&EXPRESSIONS) {
         execution_group.bench_function(BenchmarkId::from_parameter(name), |b| {
-            let program = Program::compile(expr).expect("Parsing failed");
+            let parser = Parser::default();
+            let ast = parser.parse(expr).expect("Parsing failed");
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             ctx.add_variable_from_value("apple", true);
             ctx.add_variable_from_value("a", 1);
             ctx.set_variable_resolver(&Resolver);
-            b.iter(|| program.execute(&ctx).expect("Eval failed!"))
+            b.iter(|| Value::resolve_val(&ast, &ctx).expect("Eval failed!"))
         });
     }
 }
@@ -88,10 +90,11 @@ pub fn map_macro_benchmark(c: &mut Criterion) {
     for size in sizes {
         group.bench_function(format!("map_{size}").as_str(), |b| {
             let list = (0..size).collect::<Vec<_>>();
-            let program = Program::compile("list.map(x, x * 2)").unwrap();
+            let parser = Parser::default();
+            let ast = parser.parse("list.map(x, x * 2)").expect("Parsing failed");
             let mut ctx = Context::default();
             ctx.add_variable_from_value("list", list);
-            b.iter(|| program.execute(&ctx).expect("Eval failed!"))
+            b.iter(|| Value::resolve_val(&ast, &ctx).expect("Eval failed!"))
         });
     }
     group.finish();
