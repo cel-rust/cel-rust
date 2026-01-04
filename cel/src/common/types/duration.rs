@@ -60,11 +60,9 @@ impl Adder for Duration {
         if let Some(rhs) = rhs.downcast_ref::<Duration>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(Duration(
                 // todo report the proper values in the error
-                self.0.checked_add(rhs.0).ok_or(ExecutionError::Overflow(
-                    "add",
-                    Value::Null,
-                    Value::Null,
-                ))?,
+                self.0
+                    .checked_add(rhs.0)
+                    .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
             ))))
         } else {
             Err(crate::ExecutionError::UnsupportedBinaryOperator(
@@ -91,11 +89,9 @@ impl Subtractor for Duration {
         if let Some(rhs) = rhs.downcast_ref::<Duration>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(Duration(
                 // todo report the proper values in the error
-                self.0.checked_sub(rhs.0).ok_or(ExecutionError::Overflow(
-                    "add",
-                    Value::Null,
-                    Value::Null,
-                ))?,
+                self.0
+                    .checked_sub(rhs.0)
+                    .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
             ))))
         } else {
             Err(ExecutionError::NoSuchOverload)

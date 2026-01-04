@@ -71,11 +71,13 @@ impl Adder for UInt {
     fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_add(rhs.0).ok_or(ExecutionError::Overflow(
-                    "add",
-                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                ))?,
+                self.0.checked_add(rhs.0).ok_or_else(|| {
+                    ExecutionError::Overflow(
+                        "add",
+                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                    )
+                })?,
             ))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
@@ -115,11 +117,13 @@ impl Divider for UInt {
                 return Err(ExecutionError::DivisionByZero(self.0.into()));
             }
             Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_div(rhs.0).ok_or(ExecutionError::Overflow(
-                    "div",
-                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                ))?,
+                self.0.checked_div(rhs.0).ok_or_else(|| {
+                    ExecutionError::Overflow(
+                        "div",
+                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                    )
+                })?,
             ))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
@@ -138,11 +142,13 @@ impl Modder for UInt {
                 return Err(ExecutionError::RemainderByZero(self.0.into()));
             }
             Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_rem(rhs.0).ok_or(ExecutionError::Overflow(
-                    "rem",
-                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                ))?,
+                self.0.checked_rem(rhs.0).ok_or_else(|| {
+                    ExecutionError::Overflow(
+                        "rem",
+                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                    )
+                })?,
             ))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
@@ -158,11 +164,13 @@ impl Multiplier for UInt {
     fn mul<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_mul(rhs.0).ok_or(ExecutionError::Overflow(
-                    "mul",
-                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                ))?,
+                self.0.checked_mul(rhs.0).ok_or_else(|| {
+                    ExecutionError::Overflow(
+                        "mul",
+                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                    )
+                })?,
             ))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
@@ -178,11 +186,13 @@ impl Subtractor for UInt {
     fn sub<'a>(&'a self, rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_sub(rhs.0).ok_or(ExecutionError::Overflow(
-                    "sub",
-                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                ))?,
+                self.0.checked_sub(rhs.0).ok_or_else(|| {
+                    ExecutionError::Overflow(
+                        "sub",
+                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                    )
+                })?,
             ))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(

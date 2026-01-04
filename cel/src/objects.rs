@@ -1035,11 +1035,13 @@ impl Value {
                             return Ok(Cow::Owned(
                                 lhs.as_ref()
                                     .as_adder()
-                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
-                                        "add",
-                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
-                                    ))?
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "add",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
                                     .add(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -1049,11 +1051,13 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_subtractor()
-                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
-                                        "sub",
-                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
-                                    ))?
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "sub",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
                                     .sub(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -1063,11 +1067,13 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_divider()
-                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
-                                        "div",
-                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
-                                    ))?
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "div",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
                                     .div(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -1077,11 +1083,13 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_multiplier()
-                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
-                                        "mul",
-                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
-                                    ))?
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "mul",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
                                     .mul(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -1091,11 +1099,13 @@ impl Value {
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(Cow::Owned(
                                 lhs.as_modder()
-                                    .ok_or(ExecutionError::UnsupportedBinaryOperator(
-                                        "rem",
-                                        lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                        rhs.as_ref().try_into().unwrap_or(Value::Null),
-                                    ))?
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "rem",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
                                     .modulo(rhs.as_ref())?
                                     .into_owned(),
                             ));
@@ -1245,18 +1255,18 @@ impl Value {
                         if select.test {
                             Ok(bool(
                                 left.as_container()
-                                    .ok_or(ExecutionError::NoSuchKey(Arc::new(
-                                        key.inner().to_string(),
-                                    )))?
+                                    .ok_or_else(|| {
+                                        ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
+                                    })?
                                     .contains(&key)?,
                             ))
                         } else {
                             // todo avoid cloning when not needed
                             Ok(Cow::<dyn Val>::Owned(
                                 left.as_indexer()
-                                    .ok_or(ExecutionError::NoSuchKey(Arc::new(
-                                        key.inner().to_string(),
-                                    )))?
+                                    .ok_or_else(|| {
+                                        ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
+                                    })?
                                     .get(&key)?
                                     .into_owned(),
                             ))
@@ -1370,12 +1380,12 @@ impl ops::Add<Value> for Value {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_add(r)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_add(r)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l + r).into(),
@@ -1405,14 +1415,14 @@ impl ops::Add<Value> for Value {
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Duration(r)) => l
                 .checked_add(&r)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Duration),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Add, &l, &r),
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Timestamp(r)) => r
                 .checked_add_signed(l)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Timestamp),
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
                 "add", left, right,
@@ -1429,12 +1439,12 @@ impl ops::Sub<Value> for Value {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_sub(r)
-                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_sub(r)
-                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l - r).into(),
@@ -1442,7 +1452,7 @@ impl ops::Sub<Value> for Value {
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Duration(r)) => l
                 .checked_sub(&r)
-                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Duration),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Sub, &l, &r),
@@ -1468,14 +1478,14 @@ impl ops::Div<Value> for Value {
                     Err(ExecutionError::DivisionByZero(l.into()))
                 } else {
                     l.checked_div(r)
-                        .ok_or(ExecutionError::Overflow("div", l.into(), r.into()))
+                        .ok_or_else(|| ExecutionError::Overflow("div", l.into(), r.into()))
                         .map(Value::Int)
                 }
             }
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_div(r)
-                .ok_or(ExecutionError::DivisionByZero(l.into()))
+                .ok_or_else(|| ExecutionError::DivisionByZero(l.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l / r).into(),
@@ -1495,12 +1505,12 @@ impl ops::Mul<Value> for Value {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_mul(r)
-                .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("mul", l.into(), r.into()))
                 .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_mul(r)
-                .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("mul", l.into(), r.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l * r).into(),
@@ -1523,14 +1533,14 @@ impl ops::Rem<Value> for Value {
                     Err(ExecutionError::RemainderByZero(l.into()))
                 } else {
                     l.checked_rem(r)
-                        .ok_or(ExecutionError::Overflow("rem", l.into(), r.into()))
+                        .ok_or_else(|| ExecutionError::Overflow("rem", l.into(), r.into()))
                         .map(Value::Int)
                 }
             }
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_rem(r)
-                .ok_or(ExecutionError::RemainderByZero(l.into()))
+                .ok_or_else(|| ExecutionError::RemainderByZero(l.into()))
                 .map(Value::UInt),
 
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
@@ -1572,11 +1582,7 @@ fn checked_op(
         TsOp::Add => lhs.checked_add_signed(*rhs),
         TsOp::Sub => lhs.checked_sub_signed(*rhs),
     }
-    .ok_or(ExecutionError::Overflow(
-        op.str(),
-        (*lhs).into(),
-        (*rhs).into(),
-    ))?;
+    .ok_or_else(|| ExecutionError::Overflow(op.str(), (*lhs).into(), (*rhs).into()))?;
 
     // Check for cel-spec limits
     if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
