@@ -89,6 +89,20 @@ impl<'a> Context<'a> {
         }
     }
 
+    pub(crate) fn add_variable_as_val<S>(&mut self, name: S, value: Box<dyn Val>)
+    where
+        S: Into<String>,
+    {
+        match self {
+            Context::Root { variables, .. } => {
+                variables.insert(name.into(), value);
+            }
+            Context::Child { variables, .. } => {
+                variables.insert(name.into(), value);
+            }
+        }
+    }
+
     pub fn set_variable_resolver(&mut self, r: &'a dyn VariableResolver) {
         match self {
             Context::Root { resolver, .. } => {
