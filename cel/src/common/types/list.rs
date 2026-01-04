@@ -108,7 +108,7 @@ impl Indexer for DefaultList {
                 Ok(Cow::Borrowed(
                     self.0
                         .get(idx as usize)
-                        .ok_or(ExecutionError::IndexOutOfBounds(idx.into()))?
+                        .ok_or_else(|| ExecutionError::IndexOutOfBounds(idx.into()))?
                         .as_ref(),
                 ))
             }
@@ -120,7 +120,7 @@ impl Indexer for DefaultList {
                 Ok(Cow::Borrowed(
                     self.0
                         .get(idx as usize)
-                        .ok_or(ExecutionError::IndexOutOfBounds(idx.into()))?
+                        .ok_or_else(|| ExecutionError::IndexOutOfBounds(idx.into()))?
                         .as_ref(),
                 ))
             }

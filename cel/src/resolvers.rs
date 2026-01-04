@@ -36,10 +36,7 @@ impl Resolver for Argument {
         let arg = ctx
             .args
             .get(index)
-            .ok_or(ExecutionError::invalid_argument_count(
-                index + 1,
-                ctx.args.len(),
-            ))?;
+            .ok_or_else(|| ExecutionError::invalid_argument_count(index + 1, ctx.args.len()))?;
         Value::resolve(arg, ctx.ptx)
     }
 }

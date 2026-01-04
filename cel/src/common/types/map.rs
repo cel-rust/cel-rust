@@ -177,16 +177,20 @@ impl TryFrom<Box<dyn Val>> for Key {
                 .downcast_ref::<CelBool>()
                 .copied()
                 .map(Key::Bool)
-                .ok_or(ExecutionError::UnsupportedKeyType(
-                    value.as_ref().try_into().expect("Can't convert key!"),
-                ))?,
+                .ok_or_else(|| {
+                    ExecutionError::UnsupportedKeyType(
+                        value.as_ref().try_into().expect("Can't convert key!"),
+                    )
+                })?,
             types::INT_TYPE => value
                 .downcast_ref::<CelInt>()
                 .copied()
                 .map(Key::Int)
-                .ok_or(ExecutionError::UnsupportedKeyType(
-                    value.as_ref().try_into().expect("Can't convert key!"),
-                ))?,
+                .ok_or_else(|| {
+                    ExecutionError::UnsupportedKeyType(
+                        value.as_ref().try_into().expect("Can't convert key!"),
+                    )
+                })?,
             types::STRING_TYPE => {
                 let s = super::cast_boxed::<CelString>(value).map_err(|v| {
                     ExecutionError::UnsupportedKeyType(
@@ -199,9 +203,11 @@ impl TryFrom<Box<dyn Val>> for Key {
                 .downcast_ref::<CelUInt>()
                 .copied()
                 .map(Key::UInt)
-                .ok_or(ExecutionError::UnsupportedKeyType(
-                    value.as_ref().try_into().expect("Can't convert key!"),
-                ))?,
+                .ok_or_else(|| {
+                    ExecutionError::UnsupportedKeyType(
+                        value.as_ref().try_into().expect("Can't convert key!"),
+                    )
+                })?,
             _ => {
                 return Err(ExecutionError::UnsupportedKeyType(
                     value.as_ref().try_into().expect("Can't convert key!"),

@@ -78,7 +78,7 @@ impl traits::Adder for Int {
             let t: Self = self
                 .0
                 .checked_add(i.0)
-                .ok_or(ExecutionError::Overflow("add", self.0.into(), i.0.into()))?
+                .ok_or_else(|| ExecutionError::Overflow("add", self.0.into(), i.0.into()))?
                 .into();
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
@@ -114,11 +114,10 @@ impl traits::Divider for Int {
             if i.0 == 0 {
                 return Err(ExecutionError::DivisionByZero(self.0.into()));
             }
-            let t: Self = (self.0.checked_div(i.0).ok_or(ExecutionError::Overflow(
-                "div",
-                self.0.into(),
-                i.0.into(),
-            ))?)
+            let t: Self = (self
+                .0
+                .checked_div(i.0)
+                .ok_or_else(|| ExecutionError::Overflow("div", self.0.into(), i.0.into()))?)
             .into();
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
@@ -134,11 +133,10 @@ impl traits::Modder for Int {
             if i.0 == 0 {
                 return Err(ExecutionError::RemainderByZero(self.0.into()));
             }
-            let t: Self = (self.0.checked_rem(i.0).ok_or(ExecutionError::Overflow(
-                "rem",
-                self.0.into(),
-                i.0.into(),
-            ))?)
+            let t: Self = (self
+                .0
+                .checked_rem(i.0)
+                .ok_or_else(|| ExecutionError::Overflow("rem", self.0.into(), i.0.into()))?)
             .into();
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
@@ -151,11 +149,10 @@ impl traits::Modder for Int {
 impl traits::Multiplier for Int {
     fn mul<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(i) = rhs.downcast_ref::<Int>() {
-            let t: Self = (self.0.checked_mul(i.0).ok_or(ExecutionError::Overflow(
-                "mul",
-                self.0.into(),
-                i.0.into(),
-            ))?)
+            let t: Self = (self
+                .0
+                .checked_mul(i.0)
+                .ok_or_else(|| ExecutionError::Overflow("mul", self.0.into(), i.0.into()))?)
             .into();
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
@@ -175,11 +172,9 @@ impl traits::Subtractor for Int {
     fn sub<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         if let Some(i) = rhs.downcast_ref::<Int>() {
             Ok(Cow::<dyn Val>::Owned(Box::new(Self::from(
-                self.0.checked_sub(i.0).ok_or(ExecutionError::Overflow(
-                    "sub",
-                    self.0.into(),
-                    i.0.into(),
-                ))?,
+                self.0
+                    .checked_sub(i.0)
+                    .ok_or_else(|| ExecutionError::Overflow("sub", self.0.into(), i.0.into()))?,
             ))))
         } else {
             Err(ExecutionError::NoSuchOverload)
