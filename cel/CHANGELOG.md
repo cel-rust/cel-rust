@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1](https://github.com/cel-rust/cel-rust/compare/v0.12.0...v0.12.1) - 2026-01-06
+
+### Fixed
+
+- *(bench)* Make sure expression compiles
+
+### Other
+
+- update minimal rust version to 1.86
+
 ## [0.12.0](https://github.com/cel-rust/cel-rust/compare/v0.11.6...v0.12.0) - 2025-12-29
 
 ### Added
