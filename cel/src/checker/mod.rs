@@ -19,6 +19,7 @@
 //! // checked.type_map contains the inferred type for each expression
 //! ```
 
+pub mod container;
 pub mod env;
 pub mod stdlib;
 pub mod types;
@@ -27,10 +28,11 @@ pub use env::{FunctionOverload, TypeEnv};
 pub use types::{CelType, WrapperType};
 
 use crate::common::ast::{
-    BindExpr, CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedExpr, ListExpr, MapExpr,
-    SelectExpr, StructExpr,
+    to_qualified_name, BindExpr, CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryExpr,
+    IdedExpr, ListExpr, MapEntryExpr, MapExpr, SelectExpr, StructExpr, StructFieldExpr,
 };
 use crate::common::value::CelVal;
+use container::resolve_candidate_names;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -96,6 +98,10 @@ pub struct TypeChecker<'a> {
     type_bindings: HashMap<Arc<str>, CelType>,
     /// Scoped variable types (for comprehensions).
     scoped_vars: Vec<HashMap<String, CelType>>,
+    /// Pending AST rewrites: SelectExpr id -> rewritten Ident expression.
+    /// When a qualified name like `a.b.c` resolves to a known variable,
+    /// we rewrite the SelectExpr chain to a single Ident.
+    rewrites: HashMap<u64, IdedExpr>,
 }
 
 impl<'a> TypeChecker<'a> {
@@ -108,6 +114,7 @@ impl<'a> TypeChecker<'a> {
             errors: Vec::new(),
             type_bindings: HashMap::new(),
             scoped_vars: Vec::new(),
+            rewrites: HashMap::new(),
         }
     }
 
@@ -118,13 +125,109 @@ impl<'a> TypeChecker<'a> {
         self.infer(expr);
 
         if self.errors.is_empty() {
+            // Apply any pending AST rewrites (qualified name resolution)
+            let rewritten_expr = self.apply_rewrites(expr.clone());
             Ok(CheckedExpr {
-                expr: expr.clone(),
+                expr: rewritten_expr,
                 type_map: std::mem::take(&mut self.type_map),
                 reference_map: std::mem::take(&mut self.reference_map),
             })
         } else {
             Err(std::mem::take(&mut self.errors))
+        }
+    }
+
+    /// Recursively apply pending AST rewrites to an expression tree.
+    ///
+    /// This is called after type inference to transform SelectExpr chains
+    /// that resolved to qualified names into simple Ident expressions.
+    fn apply_rewrites(&self, expr: IdedExpr) -> IdedExpr {
+        // Check if this node should be rewritten
+        if let Some(rewritten) = self.rewrites.get(&expr.id) {
+            return rewritten.clone();
+        }
+
+        // Recursively apply to children
+        let new_expr = match expr.expr {
+            Expr::Select(select) => Expr::Select(SelectExpr {
+                operand: Box::new(self.apply_rewrites(*select.operand)),
+                field: select.field,
+                test: select.test,
+            }),
+            Expr::Call(call) => Expr::Call(CallExpr {
+                func_name: call.func_name,
+                target: call.target.map(|t| Box::new(self.apply_rewrites(*t))),
+                args: call
+                    .args
+                    .into_iter()
+                    .map(|a| self.apply_rewrites(a))
+                    .collect(),
+            }),
+            Expr::List(list) => Expr::List(ListExpr {
+                elements: list
+                    .elements
+                    .into_iter()
+                    .map(|e| self.apply_rewrites(e))
+                    .collect(),
+                optional_indices: list.optional_indices,
+            }),
+            Expr::Map(map) => Expr::Map(MapExpr {
+                entries: map
+                    .entries
+                    .into_iter()
+                    .map(|entry| IdedEntryExpr {
+                        id: entry.id,
+                        expr: match entry.expr {
+                            EntryExpr::MapEntry(me) => EntryExpr::MapEntry(MapEntryExpr {
+                                key: self.apply_rewrites(me.key),
+                                value: self.apply_rewrites(me.value),
+                                optional: me.optional,
+                            }),
+                            other => other,
+                        },
+                    })
+                    .collect(),
+            }),
+            Expr::Struct(s) => Expr::Struct(StructExpr {
+                type_name: s.type_name,
+                entries: s
+                    .entries
+                    .into_iter()
+                    .map(|entry| IdedEntryExpr {
+                        id: entry.id,
+                        expr: match entry.expr {
+                            EntryExpr::StructField(sf) => EntryExpr::StructField(StructFieldExpr {
+                                field: sf.field,
+                                value: self.apply_rewrites(sf.value),
+                                optional: sf.optional,
+                            }),
+                            other => other,
+                        },
+                    })
+                    .collect(),
+            }),
+            Expr::Comprehension(comp) => Expr::Comprehension(Box::new(ComprehensionExpr {
+                iter_range: self.apply_rewrites(comp.iter_range),
+                iter_var: comp.iter_var,
+                iter_var2: comp.iter_var2,
+                accu_var: comp.accu_var,
+                accu_init: self.apply_rewrites(comp.accu_init),
+                loop_cond: self.apply_rewrites(comp.loop_cond),
+                loop_step: self.apply_rewrites(comp.loop_step),
+                result: self.apply_rewrites(comp.result),
+            })),
+            Expr::Bind(bind) => Expr::Bind(Box::new(BindExpr {
+                var: bind.var,
+                init: self.apply_rewrites(bind.init),
+                result: self.apply_rewrites(bind.result),
+            })),
+            // Literals and Idents don't have children
+            other => other,
+        };
+
+        IdedExpr {
+            id: expr.id,
+            expr: new_expr,
         }
     }
 
@@ -215,7 +318,35 @@ impl<'a> TypeChecker<'a> {
     }
 
     /// Infer the type of a select expression (field access).
+    ///
+    /// This implements two-phase resolution:
+    /// 1. First, try to interpret the select chain as a qualified name (e.g., `a.b.c.d`)
+    ///    and resolve it using container-based C++ namespace rules.
+    /// 2. If qualified name resolution fails, fall back to actual field selection.
     fn infer_select(&mut self, id: u64, sel: &SelectExpr) -> CelType {
+        // Phase 1: Try to interpret as a qualified name
+        // Build a temporary Expr to pass to to_qualified_name
+        let select_expr = Expr::Select(sel.clone());
+        if let Some(qname) = to_qualified_name(&select_expr) {
+            let container = self.env.container().map(|s| s.as_ref());
+            for candidate in resolve_candidate_names(container, &qname) {
+                if let Some(var_type) = self.env.resolve_variable(&candidate) {
+                    // Found! Store the rewrite to convert SelectExpr -> Ident
+                    self.rewrites.insert(
+                        id,
+                        IdedExpr {
+                            id,
+                            expr: Expr::Ident(candidate.clone()),
+                        },
+                    );
+                    self.reference_map
+                        .insert(id, Reference::Variable(candidate.into()));
+                    return var_type.clone();
+                }
+            }
+        }
+
+        // Phase 2: Fall back to actual field selection
         let operand_type = self.infer(&sel.operand);
 
         // Handle error propagation

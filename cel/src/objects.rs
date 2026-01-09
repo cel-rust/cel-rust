@@ -1,3 +1,4 @@
+use crate::checker::container::resolve_candidate_names;
 use crate::common::ast::{operators, EntryExpr, Expr, SelectExpr};
 use crate::context::Context;
 use crate::functions::FunctionContext;
@@ -748,7 +749,6 @@ impl TryInto<Key> for Value {
             Value::UInt(v) => Ok(Key::Uint(v)),
             Value::String(v) => Ok(Key::String(v)),
             Value::Bool(v) => Ok(Key::Bool(v)),
-            Value::Namespace(v) => Ok(Key::String(v)),
             _ => Err(self),
         }
     }
@@ -992,10 +992,6 @@ pub enum Value {
 
     Function(Arc<String>, Option<Box<Value>>),
 
-    // Namespace: used for extension field identifiers like cel.expr.conformance.proto2.int32_ext
-    // Field access on a namespace builds a qualified string path
-    Namespace(Arc<String>),
-
     // Atoms
     Int(i64),
     UInt(u64),
@@ -1020,7 +1016,6 @@ impl Debug for Value {
             Value::Map(m) => write!(f, "Map({:?})", m),
             Value::Struct(s) => write!(f, "Struct({:?})", s),
             Value::Function(name, func) => write!(f, "Function({:?}, {:?})", name, func),
-            Value::Namespace(path) => write!(f, "Namespace({:?})", path),
             Value::Int(i) => write!(f, "Int({:?})", i),
             Value::UInt(u) => write!(f, "UInt({:?})", u),
             Value::Float(d) => write!(f, "Float({:?})", d),
@@ -1059,7 +1054,6 @@ pub enum ValueType {
     Map,
     Struct,
     Function,
-    Namespace,
     Int,
     UInt,
     Float,
@@ -1080,7 +1074,6 @@ impl Display for ValueType {
             ValueType::Map => write!(f, "map"),
             ValueType::Struct => write!(f, "struct"),
             ValueType::Function => write!(f, "function"),
-            ValueType::Namespace => write!(f, "namespace"),
             ValueType::Int => write!(f, "int"),
             ValueType::UInt => write!(f, "uint"),
             ValueType::Float => write!(f, "float"),
@@ -1103,7 +1096,6 @@ impl Value {
             Value::Map(_) => ValueType::Map,
             Value::Struct(_) => ValueType::Struct,
             Value::Function(_, _) => ValueType::Function,
-            Value::Namespace(_) => ValueType::Namespace,
             Value::Int(_) => ValueType::Int,
             Value::UInt(_) => ValueType::UInt,
             Value::Float(_) => ValueType::Float,
@@ -1261,7 +1253,6 @@ impl PartialEq for Value {
                 }
                 false
             }
-            (Value::Namespace(a), Value::Namespace(b)) => a == b,
             (_, _) => false,
         }
     }
@@ -1588,7 +1579,8 @@ impl Value {
 }
 
 /// Helper function to try resolving a Select expression as a qualified identifier.
-/// For example, for `a.b.c`, try resolving variables: "a.b.c", then "a.b", then "a"
+/// For example, for `a.b.c`, try resolving variables using C++ namespace resolution order.
+/// With container "pkg", tries: "pkg.a.b.c", "a.b.c", then prefixes like "pkg.a.b", "a.b", etc.
 /// Returns (base_value, remaining_fields) if a match is found, None otherwise.
 fn try_resolve_qualified_select(
     select: &SelectExpr,
@@ -1610,13 +1602,21 @@ fn try_resolve_qualified_select(
                 fields.push(base_name.clone());
                 fields.reverse(); // Now fields is [base, field1, field2, ...]
 
+                // Get container for C++ namespace-style resolution
+                let container = ctx.get_container();
+
                 // Try longest prefix first: "base.field1.field2", then "base.field1", then "base"
                 for prefix_len in (1..=fields.len()).rev() {
                     let qualified_name = fields[..prefix_len].join(".");
-                    if let Ok(value) = ctx.get_variable(&qualified_name) {
-                        // Found a match! Return value and remaining fields
-                        let remaining = fields[prefix_len..].to_vec();
-                        return Some((value, remaining));
+
+                    // Use container resolution to generate candidate names
+                    let candidates = resolve_candidate_names(container, &qualified_name);
+                    for candidate in candidates {
+                        if let Ok(value) = ctx.get_variable(&candidate) {
+                            // Found a match! Return value and remaining fields
+                            let remaining = fields[prefix_len..].to_vec();
+                            return Some((value, remaining));
+                        }
                     }
                 }
                 return None;
@@ -3174,12 +3174,6 @@ impl Value {
                     // Try to infer the appropriate default value
                     get_proto_field_default(&s.type_name, name.as_str(), legacy_enum)
                 }
-            }
-            Value::Namespace(ref path) => {
-                // Build extended path: "cel" + ".expr" = "cel.expr"
-                // This enables: cel.expr.conformance.proto2.int32_ext
-                let new_path = format!("{}.{}", path, name.as_str());
-                Some(Value::Namespace(Arc::new(new_path)))
             }
             _ => None,
         };

@@ -371,7 +371,6 @@ pub fn type_(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
         }
         // Enum values should return their qualified type name
         Value::Enum(_, type_name) => return Ok(Value::String(type_name.clone())),
-        Value::Namespace(_) => "string",
         #[cfg(feature = "chrono")]
         Value::Timestamp(_) => "google.protobuf.Timestamp",
         #[cfg(feature = "chrono")]
@@ -491,7 +490,6 @@ pub fn type_of(This(this): This<Value>) -> Result<Value> {
         Value::List(_) => "list",
         Value::Map(_) => "map",
         Value::Null => "null_type",
-        Value::Namespace(_) => "string",
         #[cfg(feature = "chrono")]
         Value::Timestamp(_) => "google.protobuf.Timestamp",
         #[cfg(feature = "chrono")]
@@ -1902,15 +1900,13 @@ pub mod time {
 }
 
 /// Proto extension functions for hasExt and getExt
-/// These check for extension fields in proto messages
+/// These check for extension fields in proto messages.
+/// The ext_field should be a String containing the fully qualified extension field name
+/// (e.g., "cel.expr.conformance.proto2.int32_ext"). This is resolved from qualified
+/// identifier expressions via the container-based resolution in objects.rs.
 pub fn proto_has_ext(_ftx: &FunctionContext, msg: Value, ext_field: Value) -> Result<Value> {
-    // For conformance tests, check if msg (as Struct) has the extension field
-    // ext_field can be either a String or a Namespace (from qualified identifiers like cel.expr.conformance.proto2.int32_ext)
     match (msg, ext_field) {
         (Value::Struct(s), Value::String(field_name)) => {
-            Ok(Value::Bool(s.fields.contains_key(field_name.as_str())))
-        }
-        (Value::Struct(s), Value::Namespace(field_name)) => {
             Ok(Value::Bool(s.fields.contains_key(field_name.as_str())))
         }
         _ => Ok(Value::Bool(false)),
@@ -1920,11 +1916,6 @@ pub fn proto_has_ext(_ftx: &FunctionContext, msg: Value, ext_field: Value) -> Re
 pub fn proto_get_ext(_ftx: &FunctionContext, msg: Value, ext_field: Value) -> Result<Value> {
     match (msg, ext_field) {
         (Value::Struct(s), Value::String(field_name)) => s
-            .fields
-            .get(field_name.as_str())
-            .cloned()
-            .ok_or_else(|| ExecutionError::NoSuchKey(field_name.clone())),
-        (Value::Struct(s), Value::Namespace(field_name)) => s
             .fields
             .get(field_name.as_str())
             .cloned()
@@ -2760,7 +2751,6 @@ fn format_value_as_string(value: &Value) -> String {
             }
         }
         Value::String(s) => s.as_str().to_string(),
-        Value::Namespace(n) => n.as_str().to_string(),
         Value::Bytes(b) => {
             // Convert bytes to string using from_utf8_lossy
             std::string::String::from_utf8_lossy(b.as_slice()).into_owned()

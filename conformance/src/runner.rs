@@ -1436,6 +1436,46 @@ fn register_fully_qualified_enum_maps(context: &mut cel::Context, is_legacy: boo
             map: Arc::new(global_enum_map3),
         }),
     );
+
+    // Register proto2 extension field names as string variables
+    // These are used by proto.hasExt and proto.getExt functions
+    register_proto_extension_fields(context);
+}
+
+/// Register proto extension field names as string variables.
+/// This enables expressions like `proto.hasExt(msg, cel.expr.conformance.proto2.int32_ext)`
+/// to resolve the extension field name to a string.
+fn register_proto_extension_fields(context: &mut cel::Context) {
+    // Proto2 package-scoped extensions
+    let proto2_extensions = [
+        "cel.expr.conformance.proto2.int32_ext",
+        "cel.expr.conformance.proto2.nested_ext",
+        "cel.expr.conformance.proto2.test_all_types_ext",
+        "cel.expr.conformance.proto2.nested_enum_ext",
+        "cel.expr.conformance.proto2.repeated_test_all_types",
+    ];
+
+    for ext_name in proto2_extensions {
+        context.add_variable(
+            ext_name,
+            cel::objects::Value::String(Arc::new(ext_name.to_string())),
+        );
+    }
+
+    // Proto2 message-scoped extensions (Proto2ExtensionScopedMessage)
+    let proto2_message_extensions = [
+        "cel.expr.conformance.proto2.Proto2ExtensionScopedMessage.int64_ext",
+        "cel.expr.conformance.proto2.Proto2ExtensionScopedMessage.message_scoped_nested_ext",
+        "cel.expr.conformance.proto2.Proto2ExtensionScopedMessage.nested_enum_ext",
+        "cel.expr.conformance.proto2.Proto2ExtensionScopedMessage.message_scoped_repeated_test_all_types",
+    ];
+
+    for ext_name in proto2_message_extensions {
+        context.add_variable(
+            ext_name,
+            cel::objects::Value::String(Arc::new(ext_name.to_string())),
+        );
+    }
 }
 
 #[derive(Debug)]

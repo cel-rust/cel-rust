@@ -183,3 +183,31 @@ pub struct OffsetRange {
     pub start: u32,
     pub stop: u32,
 }
+
+/// Attempts to convert a select expression chain to a qualified name string.
+///
+/// For example, given an AST representing `a.b.c.d`:
+/// ```text
+/// Select { operand: Select { operand: Select { operand: Ident("a"), field: "b" }, field: "c" }, field: "d" }
+/// ```
+/// This function returns `Some("a.b.c.d")`.
+///
+/// Returns `None` if:
+/// - The expression is not an identifier or select chain
+/// - Any select in the chain has `test: true` (presence test)
+/// - The chain contains non-identifier operands (e.g., function calls)
+pub fn to_qualified_name(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Ident(name) => Some(name.clone()),
+        Expr::Select(select) if !select.test => {
+            let operand_name = to_qualified_name(&select.operand.expr)?;
+            Some(format!("{}.{}", operand_name, select.field))
+        }
+        _ => None,
+    }
+}
+
+/// Variant that works on IdedExpr for convenience.
+pub fn to_qualified_name_from_ided(expr: &IdedExpr) -> Option<String> {
+    to_qualified_name(&expr.expr)
+}

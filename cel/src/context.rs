@@ -405,9 +405,6 @@ impl Default for Context<'_> {
             Value::String(Arc::new("google.protobuf.Duration".to_string())),
         );
 
-        // Namespace for proto extensions (e.g., cel.expr.conformance.proto2.int32_ext)
-        ctx.add_variable("cel", Value::Namespace(Arc::new("cel".to_string())));
-
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
 
