@@ -69,7 +69,6 @@ impl Display for ParseErrors {
 
 impl Error for ParseErrors {}
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct ParseError {
     pub source: Option<Box<dyn Error + Send + Sync + 'static>>,

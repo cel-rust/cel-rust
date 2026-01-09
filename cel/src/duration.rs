@@ -8,11 +8,8 @@ use nom::number::complete::double;
 use nom::IResult;
 
 // Constants representing time units in nanoseconds
-#[allow(dead_code)]
 const SECOND: u64 = 1_000_000_000;
-#[allow(dead_code)]
 const MILLISECOND: u64 = 1_000_000;
-#[allow(dead_code)]
 const MICROSECOND: u64 = 1_000;
 
 /// Parses a duration string into a [`Duration`]. Duration strings support the
