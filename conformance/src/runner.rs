@@ -95,9 +95,8 @@ impl ConformanceRunner {
                 }
 
                 // Catch panics so we can continue running all tests
-                let test_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                    self.run_test(test)
-                }));
+                let test_result =
+                    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.run_test(test)));
 
                 let result = match test_result {
                     Ok(r) => r,

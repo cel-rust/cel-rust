@@ -203,16 +203,9 @@ pub fn convert_any_to_cel_value(any: &Any) -> Result<CelValue, ConversionError> 
             }
         }
         return Ok(String(Arc::new(std::string::String::new())));
-    } else if type_url.contains("google.protobuf.UInt32Value") {
-        if let Some((field_and_type, _)) = decode_varint(&any.value) {
-            if field_and_type == 0x08 {
-                if let Some((val, _)) = decode_varint(&any.value[1..]) {
-                    return Ok(UInt(val));
-                }
-            }
-        }
-        return Ok(UInt(0));
-    } else if type_url.contains("google.protobuf.UInt64Value") {
+    } else if type_url.contains("google.protobuf.UInt32Value")
+        || type_url.contains("google.protobuf.UInt64Value")
+    {
         if let Some((field_and_type, _)) = decode_varint(&any.value) {
             if field_and_type == 0x08 {
                 if let Some((val, _)) = decode_varint(&any.value[1..]) {
