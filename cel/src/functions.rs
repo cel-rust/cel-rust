@@ -1709,7 +1709,7 @@ pub mod time {
         }
     }
 
-/// Extract hours from a timestamp or total hours from a duration
+    /// Extract hours from a timestamp or total hours from a duration
     pub fn get_hours(
         _ftx: &FunctionContext,
         This(this): This<Value>,
