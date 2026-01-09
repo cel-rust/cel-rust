@@ -33,6 +33,7 @@ pub const ALL: &str = "all";
 pub const EXISTS: &str = "exists";
 pub const MAP: &str = "map";
 pub const FILTER: &str = "filter";
+pub const BIND: &str = "bind";
 
 pub const NOT_STRICTLY_FALSE: &str = "@not_strictly_false";
 pub const IN: &str = "@in";
