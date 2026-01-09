@@ -17,6 +17,7 @@ pub use functions::FunctionContext;
 pub use objects::{ResolveResult, Value};
 use parser::{Expression, ExpressionReferences, Parser};
 pub use parser::{ParseError, ParseErrors};
+pub mod checker;
 pub mod functions;
 mod magic;
 pub mod objects;
@@ -35,6 +36,9 @@ pub use ser::SerializationError;
 mod json;
 #[cfg(feature = "json")]
 pub use json::ConvertToJsonError;
+
+#[cfg(feature = "proto")]
+pub mod proto_compare;
 
 use magic::FromContext;
 
@@ -65,7 +69,7 @@ pub enum ExecutionError {
     NoSuchKey(Arc<String>),
     /// Indicates that the script used an existing operator or function with
     /// values of one or more types for which no overload was declared.
-    #[error("No such overload")]
+    #[error("no_such_overload")]
     NoSuchOverload,
     /// Indicates that the script attempted to reference an undeclared variable
     /// method, or function.
@@ -113,6 +117,11 @@ pub enum ExecutionError {
     Overflow(&'static str, Value, Value),
     #[error("Index out of bounds: {0:?}")]
     IndexOutOfBounds(Value),
+    #[error("Failed with repeated key")]
+    DuplicateKey(Value),
+    /// Indicates that evaluation depth limit was exceeded, preventing stack overflow.
+    #[error("Evaluation depth limit of {0} exceeded")]
+    EvaluationDepthExceeded(u32),
 }
 
 impl ExecutionError {
@@ -162,7 +171,7 @@ pub struct Program {
 
 impl Program {
     pub fn compile(source: &str) -> Result<Program, ParseErrors> {
-        let parser = Parser::default();
+        let parser = Parser::default().enable_optional_syntax(true);
         parser
             .parse(source)
             .map(|expression| Program { expression })
@@ -299,6 +308,43 @@ mod tests {
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             let res = test_script(script, Some(ctx));
             assert_eq!(res, error.into(), "{name}");
+        }
+    }
+
+    #[test]
+    fn test_literal_no_field_access() {
+        // google.protobuf wrapper types should unwrap to their primitive values
+        // Then accessing fields on the primitive should fail
+        let test_cases = vec![
+            ("google.protobuf.Int32Value{value: -123}.value", "Int32Value"),
+            ("google.protobuf.Int64Value{value: -123}.value", "Int64Value"),
+            ("google.protobuf.UInt32Value{value: 123u}.value", "UInt32Value"),
+            ("google.protobuf.UInt64Value{value: 123u}.value", "UInt64Value"),
+            ("google.protobuf.FloatValue{value: 3.1416}.value", "FloatValue"),
+            ("google.protobuf.DoubleValue{value: 3.1416}.value", "DoubleValue"),
+            ("google.protobuf.BoolValue{value: true}.value", "BoolValue"),
+            ("google.protobuf.StringValue{value: 'foo'}.value", "StringValue"),
+            ("google.protobuf.BytesValue{value: b'foo'}.value", "BytesValue"),
+            ("google.protobuf.ListValue{values: [3.0, 'foo']}.values", "ListValue"),
+            ("google.protobuf.Struct{fields: {'a': 1.0}}.fields", "Struct"),
+            // google.protobuf.Value types unwrap to their inner value
+            ("google.protobuf.Value{number_value: 12.5}.number_value", "Value.number"),
+            ("google.protobuf.Value{string_value: 'foo'}.string_value", "Value.string"),
+            ("google.protobuf.Value{bool_value: true}.bool_value", "Value.bool"),
+            ("google.protobuf.Value{list_value: []}.list_value", "Value.list"),
+            ("google.protobuf.Value{struct_value: {'a': 1.0}}.struct_value", "Value.struct"),
+            // google.protobuf.Any should not allow field access
+            ("google.protobuf.Any{type_url: 'type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes', value: b'\\x08\\x96\\x01'}.type_url", "Any"),
+        ];
+
+        for (expr, type_name) in test_cases {
+            let result = test_script(expr, None);
+            assert!(
+                result.is_err(),
+                "{}: Expected error but got {:?}",
+                type_name,
+                result
+            );
         }
     }
 }

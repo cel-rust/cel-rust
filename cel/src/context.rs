@@ -35,11 +35,14 @@ pub enum Context<'a> {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Value>,
         resolver: Option<&'a dyn VariableResolver>,
+        container: Option<String>,
+        legacy_enum_semantics: bool,
     },
     Child {
         parent: &'a Context<'a>,
         variables: BTreeMap<String, Value>,
         resolver: Option<&'a dyn VariableResolver>,
+        container: Option<String>,
     },
 }
 
@@ -90,6 +93,59 @@ impl<'a> Context<'a> {
         }
     }
 
+    pub fn with_container(mut self, container: String) -> Self {
+        match &mut self {
+            Context::Root { container: c, .. } => {
+                *c = Some(container);
+            }
+            Context::Child { container: c, .. } => {
+                *c = Some(container);
+            }
+        }
+        self
+    }
+
+    /// Enable legacy enum semantics where enums are represented as plain integers.
+    /// This is needed for compatibility with older CEL implementations.
+    pub fn with_legacy_enum_semantics(mut self, legacy: bool) -> Self {
+        match &mut self {
+            Context::Root {
+                legacy_enum_semantics,
+                ..
+            } => {
+                *legacy_enum_semantics = legacy;
+            }
+            Context::Child { .. } => {
+                // Child contexts inherit from parent, cannot set directly
+            }
+        }
+        self
+    }
+
+    /// Check if legacy enum semantics are enabled.
+    pub fn is_legacy_enum_mode(&self) -> bool {
+        match self {
+            Context::Root {
+                legacy_enum_semantics,
+                ..
+            } => *legacy_enum_semantics,
+            Context::Child { parent, .. } => parent.is_legacy_enum_mode(),
+        }
+    }
+
+    /// Get the container prefix for type name qualification
+    pub fn get_container(&self) -> Option<&str> {
+        match self {
+            Context::Root { container, .. } => container.as_deref(),
+            Context::Child {
+                container, parent, ..
+            } => {
+                // Child context can have its own container, or inherit from parent
+                container.as_deref().or_else(|| parent.get_container())
+            }
+        }
+    }
+
     pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
     where
         S: AsRef<str>,
@@ -100,23 +156,54 @@ impl<'a> Context<'a> {
                 variables,
                 parent,
                 resolver,
-            } => resolver
-                .and_then(|r| r.resolve(name))
-                .or_else(|| {
-                    variables
-                        .get(name)
-                        .cloned()
-                        .or_else(|| parent.get_variable(name).ok())
-                })
-                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
+                container,
+            } => {
+                // Try container-qualified name first
+                if let Some(ref cont) = container {
+                    let qualified = format!("{}.{}", cont, name);
+                    if let Some(val) = resolver
+                        .and_then(|r| r.resolve(&qualified))
+                        .or_else(|| variables.get(&qualified).cloned())
+                        .or_else(|| parent.get_variable(&qualified).ok())
+                    {
+                        return Ok(val);
+                    }
+                }
+
+                // Fall back to unqualified name
+                resolver
+                    .and_then(|r| r.resolve(name))
+                    .or_else(|| {
+                        variables
+                            .get(name)
+                            .cloned()
+                            .or_else(|| parent.get_variable(name).ok())
+                    })
+                    .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into()))
+            }
             Context::Root {
                 variables,
                 resolver,
+                container,
                 ..
-            } => resolver
-                .and_then(|r| r.resolve(name))
-                .or_else(|| variables.get(name).cloned())
-                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
+            } => {
+                // Try container-qualified name first
+                if let Some(ref cont) = container {
+                    let qualified = format!("{}.{}", cont, name);
+                    if let Some(val) = resolver
+                        .and_then(|r| r.resolve(&qualified))
+                        .or_else(|| variables.get(&qualified).cloned())
+                    {
+                        return Ok(val);
+                    }
+                }
+
+                // Fall back to unqualified name
+                resolver
+                    .and_then(|r| r.resolve(name))
+                    .or_else(|| variables.get(name).cloned())
+                    .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into()))
+            }
         }
     }
 
@@ -136,6 +223,15 @@ impl<'a> Context<'a> {
         };
     }
 
+    /// Returns the container namespace for type resolution.
+    /// When evaluating struct literals, unqualified type names are prefixed with this container.
+    pub fn container(&self) -> Option<&str> {
+        match self {
+            Context::Root { container, .. } => container.as_deref(),
+            Context::Child { container, .. } => container.as_deref(),
+        }
+    }
+
     pub fn resolve(&self, expr: &Expression) -> Result<Value, ExecutionError> {
         Value::resolve(expr, self)
     }
@@ -149,6 +245,7 @@ impl<'a> Context<'a> {
             parent: self,
             variables: Default::default(),
             resolver: None,
+            container: None,
         }
     }
 
@@ -168,6 +265,8 @@ impl<'a> Context<'a> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            container: None,
+            legacy_enum_semantics: false,
         }
     }
 }
@@ -178,6 +277,8 @@ impl Default for Context<'_> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            container: None,
+            legacy_enum_semantics: false,
         };
 
         ctx.add_function("contains", functions::contains);
@@ -186,11 +287,42 @@ impl Default for Context<'_> {
         ctx.add_function("min", functions::min);
         ctx.add_function("startsWith", functions::starts_with);
         ctx.add_function("endsWith", functions::ends_with);
+        ctx.add_function("charAt", functions::char_at);
+        ctx.add_function("indexOf", functions::index_of);
+        ctx.add_function("lastIndexOf", functions::last_index_of);
+        ctx.add_function("quote", functions::quote);
+        ctx.add_function("strings.quote", functions::quote);
+        ctx.add_function("isNaN", functions::is_nan);
+        ctx.add_function("math.isNaN", functions::is_nan);
+        ctx.add_function("sign", functions::sign);
+        ctx.add_function("split", functions::split);
+        ctx.add_function("substring", functions::substring);
+        ctx.add_function("trim", functions::trim);
+        ctx.add_function("replace", functions::replace);
+        ctx.add_function("decode", functions::decode);
+        ctx.add_function("exists", functions::exists_func);
+        ctx.add_function("all", functions::all_func);
+        ctx.add_function("existsOne", functions::exists_one_func);
+        ctx.add_function("transformList", functions::transform_list);
+        ctx.add_function("transformMap", functions::transform_map);
+        ctx.add_function("round", functions::round);
+        ctx.add_function("join", functions::join);
+        ctx.add_function("base64", functions::base64_encode);
+        ctx.add_function("base64.encode", functions::base64_encode);
+        ctx.add_function("base64.decode", functions::base64_decode);
         ctx.add_function("string", functions::string);
         ctx.add_function("bytes", functions::bytes);
         ctx.add_function("double", functions::double);
         ctx.add_function("int", functions::int);
         ctx.add_function("uint", functions::uint);
+        ctx.add_function("dyn", functions::dyn_);
+        ctx.add_function("type", functions::type_);
+        ctx.add_function("list", functions::list_constructor);
+        ctx.add_function("map", functions::map_constructor);
+        ctx.add_function("null_type", functions::null_type);
+        ctx.add_function("math", functions::math_type);
+        ctx.add_function("bool", functions::bool_constructor_default);
+        ctx.add_function("bool", functions::bool_constructor);
         ctx.add_function("optional.none", functions::optional_none);
         ctx.add_function("optional.of", functions::optional_of);
         ctx.add_function(
@@ -201,6 +333,80 @@ impl Default for Context<'_> {
         ctx.add_function("hasValue", functions::optional_has_value);
         ctx.add_function("or", functions::optional_or_optional);
         ctx.add_function("orValue", functions::optional_or_value);
+        ctx.add_function("optMap", functions::optional_map);
+        ctx.add_function("optFlatMap", functions::optional_flat_map);
+        ctx.add_function("greatest", functions::greatest);
+        ctx.add_function("least", functions::least);
+        ctx.add_function("math.greatest", functions::greatest);
+        ctx.add_function("math.least", functions::least);
+        ctx.add_function("trunc", functions::trunc);
+        ctx.add_function("floor", functions::floor);
+        ctx.add_function("ceil", functions::ceil);
+        ctx.add_function("isFinite", functions::is_finite);
+        ctx.add_function("isInf", functions::is_inf);
+        ctx.add_function("bitOr", functions::bit_or);
+        ctx.add_function("bitXor", functions::bit_xor);
+        ctx.add_function("bitAnd", functions::bit_and);
+        ctx.add_function("bitNot", functions::bit_not);
+        ctx.add_function("bitShiftLeft", functions::bit_shift_left);
+        ctx.add_function("bitShiftRight", functions::bit_shift_right);
+        ctx.add_function("abs", functions::abs);
+        ctx.add_function("math.abs", functions::abs);
+        ctx.add_function("math.sign", functions::sign);
+        ctx.add_function("math.pi", functions::math_pi);
+        ctx.add_function("math.e", functions::math_e);
+        ctx.add_function("math.round", functions::round);
+        ctx.add_function("math.floor", functions::floor);
+        ctx.add_function("math.ceil", functions::ceil);
+        ctx.add_function("math.trunc", functions::trunc);
+        ctx.add_function("math.isFinite", functions::is_finite);
+        ctx.add_function("math.isInf", functions::is_inf);
+        ctx.add_function("math.bitOr", functions::bit_or);
+        ctx.add_function("math.bitXor", functions::bit_xor);
+        ctx.add_function("math.bitAnd", functions::bit_and);
+        ctx.add_function("math.bitNot", functions::bit_not);
+        ctx.add_function("math.bitShiftLeft", functions::bit_shift_left);
+        ctx.add_function("math.bitShiftRight", functions::bit_shift_right);
+        ctx.add_function("lowerAscii", functions::lower_ascii);
+        ctx.add_function("upperAscii", functions::upper_ascii);
+        ctx.add_function("reverse", functions::reverse);
+        ctx.add_function("format", functions::format);
+
+        // Proto extension functions
+        ctx.add_function("proto.hasExt", functions::proto_has_ext);
+        ctx.add_function("proto.getExt", functions::proto_get_ext);
+
+        ctx.add_variable("type", Value::String(Arc::new("type".to_string())));
+        ctx.add_variable(
+            "null_type",
+            Value::String(Arc::new("null_type".to_string())),
+        );
+        ctx.add_variable(
+            "optional_type",
+            Value::String(Arc::new("optional_type".to_string())),
+        );
+        ctx.add_variable("double", Value::String(Arc::new("double".to_string())));
+        ctx.add_variable("bool", Value::String(Arc::new("bool".to_string())));
+        ctx.add_variable("int", Value::String(Arc::new("int".to_string())));
+        ctx.add_variable("uint", Value::String(Arc::new("uint".to_string())));
+        ctx.add_variable("string", Value::String(Arc::new("string".to_string())));
+        ctx.add_variable("bytes", Value::String(Arc::new("bytes".to_string())));
+        ctx.add_variable("list", Value::String(Arc::new("list".to_string())));
+        ctx.add_variable("map", Value::String(Arc::new("map".to_string())));
+        ctx.add_variable("math", Value::String(Arc::new("math".to_string())));
+
+        // Google protobuf type constants
+        ctx.add_variable(
+            "google.protobuf.Timestamp",
+            Value::String(Arc::new("google.protobuf.Timestamp".to_string())),
+        );
+        ctx.add_variable(
+            "google.protobuf.Duration",
+            Value::String(Arc::new("google.protobuf.Duration".to_string())),
+        );
+
+        // Namespace for proto extensions (e.g., cel.expr.conformance.proto2.int32_ext)
+        ctx.add_variable("cel", Value::Namespace(Arc::new("cel".to_string())));
 
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
@@ -208,7 +414,12 @@ impl Default for Context<'_> {
         #[cfg(feature = "chrono")]
         {
             ctx.add_function("duration", functions::duration);
+            // Overload: duration(duration) -> duration (identity)
+            // Register as a separate function that accepts Value
+            ctx.add_function("duration", functions::time::duration_value);
             ctx.add_function("timestamp", functions::timestamp);
+            // Overload: timestamp(int) -> timestamp (converts Unix timestamp in seconds)
+            ctx.add_function("timestamp", functions::time::timestamp_from_int);
             ctx.add_function("getFullYear", functions::time::timestamp_year);
             ctx.add_function("getMonth", functions::time::timestamp_month);
             ctx.add_function("getDayOfYear", functions::time::timestamp_year_day);

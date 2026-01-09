@@ -8,8 +8,11 @@ use nom::number::complete::double;
 use nom::IResult;
 
 // Constants representing time units in nanoseconds
+#[allow(dead_code)]
 const SECOND: u64 = 1_000_000_000;
+#[allow(dead_code)]
 const MILLISECOND: u64 = 1_000_000;
+#[allow(dead_code)]
 const MICROSECOND: u64 = 1_000;
 
 /// Parses a duration string into a [`Duration`]. Duration strings support the
@@ -97,6 +100,7 @@ fn to_duration(num: f64, unit: Unit) -> Duration {
 /// formats as 0s.
 ///
 /// This is a direct port of the Go version of the time.Duration(0).String() function.
+#[allow(dead_code)]
 pub fn format_duration(d: &Duration) -> String {
     let buf = &mut [0u8; 32];
     let mut w = buf.len();
@@ -175,6 +179,7 @@ pub fn format_duration(d: &Duration) -> String {
     String::from_utf8_lossy(&buf[w..]).into_owned()
 }
 
+#[allow(dead_code)]
 fn format_float(buf: &mut [u8], mut v: u64, prec: usize) -> (usize, u64) {
     let mut w = buf.len();
     let mut print = false;
@@ -194,6 +199,7 @@ fn format_float(buf: &mut [u8], mut v: u64, prec: usize) -> (usize, u64) {
     (w, v)
 }
 
+#[allow(dead_code)]
 fn format_int(buf: &mut [u8], mut v: u64) -> usize {
     let mut w = buf.len();
     if v == 0 {

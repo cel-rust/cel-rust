@@ -7,6 +7,8 @@ for simplicity, speed, safety, and
 portability. CEL's C-like syntax looks nearly identical to equivalent expressions in C++, Go, Java, and TypeScript. CEL
 is ideal for lightweight expression evaluation when a fully sandboxed scripting language is too resource intensive.
 
+It passes all conformance tests. 
+
 ```java
 // Check whether a resource name starts with a group name.
 resource.name.startsWith("/groups/" + auth.claims.group)

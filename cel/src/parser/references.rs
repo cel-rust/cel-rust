@@ -150,6 +150,10 @@ impl IdedExpr {
                     }
                 }
             }
+            Expr::Bind(bind_expr) => {
+                bind_expr.init._references(variables, functions);
+                bind_expr.result._references(variables, functions);
+            }
         }
     }
 }

@@ -98,6 +98,68 @@ impl Display for ParseError {
 
 impl Error for ParseError {}
 
+/// Pre-parse check for excessive nesting/complexity to prevent stack overflow.
+/// Scans the source string for nesting characters and binary operators,
+/// returns Some(depth) if the complexity exceeds the limit, None otherwise.
+/// This is a conservative check that may reject some valid expressions,
+/// but prevents stack overflow during parsing.
+fn check_nesting_depth(source: &str, limit: u16) -> Option<u16> {
+    let mut depth: u16 = 0;
+    let mut max_depth: u16 = 0;
+    let mut in_string = false;
+    let mut string_char = ' ';
+    let mut prev_char = ' ';
+    let mut operator_count: u16 = 0;
+
+    for c in source.chars() {
+        // Track string literals to avoid counting brackets inside strings
+        if !in_string {
+            if c == '"' || c == '\'' {
+                in_string = true;
+                string_char = c;
+            } else if c == '(' || c == '[' || c == '{' {
+                depth = depth.saturating_add(1);
+                max_depth = max_depth.max(depth);
+                if max_depth > limit {
+                    return Some(max_depth);
+                }
+            } else if c == ')' || c == ']' || c == '}' {
+                depth = depth.saturating_sub(1);
+            } else if c == '?' && prev_char != '.' {
+                // Ternary operator (but not optional access .?)
+                depth = depth.saturating_add(1);
+                max_depth = max_depth.max(depth);
+                if max_depth > limit {
+                    return Some(max_depth);
+                }
+            } else if c == ':' {
+                // End of ternary condition (but could also be map entry)
+                depth = depth.saturating_sub(1);
+            } else if c == '+' || c == '-' || c == '*' || c == '/' || c == '%' {
+                // Binary operators contribute to parser recursion depth
+                // due to left-recursive grammar rules
+                if prev_char != c && prev_char != '&' && prev_char != '|' {
+                    operator_count = operator_count.saturating_add(1);
+                    // Operator chains cause deep parser recursion
+                    // Each operator adds to stack depth
+                    if operator_count > limit {
+                        return Some(operator_count);
+                    }
+                }
+            } else if (c == '&' && prev_char == '&') || (c == '|' && prev_char == '|') {
+                operator_count = operator_count.saturating_add(1);
+                if operator_count > limit {
+                    return Some(operator_count);
+                }
+            }
+        } else if c == string_char && prev_char != '\\' {
+            in_string = false;
+        }
+        prev_char = c;
+    }
+    None
+}
+
 pub struct Parser {
     ast: ast::Ast,
     helper: ParserHelper,
@@ -114,7 +176,7 @@ impl Parser {
             },
             helper: ParserHelper::default(),
             errors: Vec::default(),
-            max_recursion_depth: 96,
+            max_recursion_depth: 50,
             enable_optional_syntax: false,
         }
     }
@@ -172,6 +234,23 @@ impl Parser {
         target: IdedExpr,
         args: Vec<IdedExpr>,
     ) -> IdedExpr {
+        // Special handling for namespace-qualified macros like cel.bind
+        // Check if target is an identifier that could be a namespace
+        if let Expr::Ident(ref namespace) = target.expr {
+            let qualified_name = format!("{}.{}", namespace, func_name);
+            if let Some(expander) = macros::find_expander(&qualified_name, None, &args) {
+                let mut helper = MacroExprHelper {
+                    helper: &mut self.helper,
+                    id,
+                };
+                return match expander(&mut helper, None, args) {
+                    Ok(expr) => expr,
+                    Err(err) => self.report_parse_error(None, err),
+                };
+            }
+        }
+
+        // Standard member call or macro
         match macros::find_expander(&func_name, Some(&target), &args) {
             None => IdedExpr {
                 id,
@@ -195,6 +274,22 @@ impl Parser {
     }
 
     pub fn parse(mut self, source: &str) -> Result<IdedExpr, ParseErrors> {
+        // Pre-parse check for excessive nesting to prevent stack overflow
+        if let Some(depth) = check_nesting_depth(source, self.max_recursion_depth) {
+            return Err(ParseErrors {
+                errors: vec![ParseError {
+                    source: None,
+                    pos: (0, 0),
+                    msg: format!(
+                        "Expression nesting depth {} exceeds limit of {}",
+                        depth, self.max_recursion_depth
+                    ),
+                    expr_id: 0,
+                    source_info: None,
+                }],
+            });
+        }
+
         let parse_errors = Rc::new(RefCell::new(Vec::<ParseError>::new()));
         let stream = InputStream::new(source);
         let mut lexer = gen::CELLexer::new(stream);
@@ -269,7 +364,16 @@ impl Parser {
                     continue;
                 }
                 Some(ident) => {
-                    let field_name = ident.get_text().to_string();
+                    let field_text = ident.get_text();
+                    // Strip backticks from escaped identifiers (e.g., `in` -> in)
+                    let field_name = if field_text.starts_with('`')
+                        && field_text.ends_with('`')
+                        && field_text.len() > 1
+                    {
+                        field_text[1..field_text.len() - 1].to_string()
+                    } else {
+                        field_text.to_string()
+                    };
                     let value = self.visit(ctx.values[i].as_ref());
                     let is_optional = match (&field.opt, self.enable_optional_syntax) {
                         (Some(opt), false) => {
@@ -403,7 +507,7 @@ impl<'a> CELListener<'a> for RecursionListener {
     }
 
     fn exit_expr(&mut self, _ctx: &ExprContext<'a>) {
-        self.depth -= 1;
+        self.depth = self.depth.saturating_sub(1);
     }
 }
 
@@ -417,7 +521,7 @@ impl<'a> ParseTreeListener<'a, CELParserContextType> for RecursionListener {
             return Err(ANTLRError::OtherError(Arc::new(ParseError {
                 source: None,
                 pos,
-                msg: format!("Recursion limit of {} exceeded", self.max),
+                msg: format!("Expression nesting limit of {} exceeded", self.max),
                 expr_id: 0,
                 source_info: None,
             })));
@@ -690,8 +794,9 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 IdedExpr::default()
             }
             Some(member) => {
+                // Even number of negations cancel out
                 if ctx.ops.len() % 2 == 0 {
-                    self.visit(member.as_ref());
+                    return self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
                 let target = self.visit(member.as_ref());
@@ -706,8 +811,9 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 self.report_error::<ParseError, _>(&ctx.start(), None, "No `MemberContextAll`!")
             }
             Some(member) => {
+                // Even number of negations cancel out
                 if ctx.ops.len() % 2 == 0 {
-                    self.visit(member.as_ref());
+                    return self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
                 let target = self.visit(member.as_ref());
@@ -741,6 +847,12 @@ impl gen::CELVisitorCompat<'_> for Parser {
         if let (Some(member), Some(id), Some(op)) = (&ctx.member(), &ctx.id, &ctx.op) {
             let operand = self.visit(member.as_ref());
             let field = id.get_text();
+            // Strip backticks from escaped identifiers (e.g., `foo.bar` -> foo.bar)
+            let field = if field.starts_with('`') && field.ends_with('`') && field.len() > 1 {
+                field[1..field.len() - 1].to_string()
+            } else {
+                field
+            };
             if let Some(_opt) = &ctx.opt {
                 return if self.enable_optional_syntax {
                     let field_literal = self
@@ -925,16 +1037,45 @@ impl gen::CELVisitorCompat<'_> for Parser {
     }
 
     fn visit_Int(&mut self, ctx: &IntContext<'_>) -> Self::Return {
-        let string = ctx.get_text();
         if let Some(token) = ctx.tok.as_ref() {
-            let val = match if let Some(string) = string.strip_prefix("0x") {
-                i64::from_str_radix(string, 16)
+            let tok_text = token.get_text();
+            let string = &tok_text;
+
+            // Handle sign separately for hex literals only
+            let (is_negative, string_to_parse) = if ctx.sign.is_some() {
+                // If there's a sign token, the number string doesn't include it
+                (true, string)
             } else {
-                string.parse::<i64>()
+                // No sign token, use string as-is (may start with '-' for non-hex)
+                (false, string)
+            };
+
+            // Parse the number
+            let val = match if let Some(hex_str) = string_to_parse.strip_prefix("0x") {
+                // For hex: parse unsigned and apply sign
+                let unsigned_val = match u64::from_str_radix(hex_str, 16) {
+                    Ok(v) => v,
+                    Err(e) => return self.report_error(token, Some(e), "invalid int literal"),
+                };
+                // Convert to signed and apply negation if needed
+                if is_negative {
+                    Ok(-(unsigned_val as i64))
+                } else {
+                    Ok(unsigned_val as i64)
+                }
+            } else {
+                // For decimal: parse with sign included in string
+                let full_string = if is_negative {
+                    format!("-{}", string_to_parse)
+                } else {
+                    string_to_parse.to_string()
+                };
+                full_string.parse::<i64>()
             } {
                 Ok(v) => v,
                 Err(e) => return self.report_error(token, Some(e), "invalid int literal"),
             };
+
             self.helper
                 .next_expr(token, Expr::Literal(CelVal::Int(val)))
         } else {
@@ -1004,7 +1145,56 @@ impl gen::CELVisitorCompat<'_> for Parser {
     fn visit_Bytes(&mut self, ctx: &BytesContext<'_>) -> Self::Return {
         if let Some(token) = ctx.tok.as_deref() {
             let string = ctx.get_text();
-            match parse::parse_bytes(&string[2..string.len() - 1]) {
+
+            // Check if this is a raw bytes literal (br"...", bR"...", Br"...", or BR"...")
+            let is_raw = string.len() >= 3 && {
+                let first_two = &string[0..2];
+                first_two == "br" || first_two == "bR" || first_two == "Br" || first_two == "BR"
+            };
+
+            let result = if is_raw {
+                // Raw bytes: strip prefix (br/bR/Br/BR + quote) and trailing quote, no escape processing
+                let start = if string.starts_with("br\"\"\"")
+                    || string.starts_with("bR\"\"\"")
+                    || string.starts_with("Br\"\"\"")
+                    || string.starts_with("BR\"\"\"")
+                    || string.starts_with("br'''")
+                    || string.starts_with("bR'''")
+                    || string.starts_with("Br'''")
+                    || string.starts_with("BR'''")
+                {
+                    5 // br""" or br'''
+                } else {
+                    3 // br" or br'
+                };
+                let end = if string.ends_with("\"\"\"") || string.ends_with("'''") {
+                    3
+                } else {
+                    1
+                };
+                let content = &string[start..string.len() - end];
+                // For raw bytes, just convert the string directly to bytes (no escape processing)
+                Ok(content.as_bytes().to_vec())
+            } else {
+                // Regular bytes: strip prefix (b/B + quote) and trailing quote, process escapes
+                let start = if string.starts_with("b\"\"\"")
+                    || string.starts_with("B\"\"\"")
+                    || string.starts_with("b'''")
+                    || string.starts_with("B'''")
+                {
+                    4 // b"""
+                } else {
+                    2 // b"
+                };
+                let end = if string.ends_with("\"\"\"") || string.ends_with("'''") {
+                    3
+                } else {
+                    1
+                };
+                parse::parse_bytes(&string[start..string.len() - end])
+            };
+
+            match result {
                 Ok(bytes) => self
                     .helper
                     .next_expr(token, Expr::Literal(CelVal::Bytes(bytes))),
@@ -2237,6 +2427,16 @@ ERROR: <input>:1:24: unsupported syntax '?'
                     self.dec_indent();
                     self.push("}");
                     &format!("^#{}:{}#", expr.id, "*expr.Expr_StructExpr")
+                }
+                Expr::Bind(bind) => {
+                    self.push("cel.bind(");
+                    self.push(&bind.var);
+                    self.push(", ");
+                    self.buffer(&bind.init);
+                    self.push(", ");
+                    self.buffer(&bind.result);
+                    self.push(")");
+                    &format!("^#{}:{}#", expr.id, "*expr.Expr_BindExpr")
                 }
             };
             self.push(e);

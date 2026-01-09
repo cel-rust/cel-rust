@@ -58,12 +58,26 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                 }
                 Some((idx, c2)) => {
                     let byte: u8 = match c2 {
-                        'x' => {
+                        // Standard escape sequences
+                        'a' => 0x07, // Bell
+                        'b' => 0x08, // Backspace
+                        'f' => 0x0C, // Form feed
+                        'n' => 0x0A, // Line feed
+                        'r' => 0x0D, // Carriage return
+                        't' => 0x09, // Tab
+                        'v' => 0x0B, // Vertical tab
+                        '\\' => b'\\',
+                        '?' => b'?',
+                        '\'' => b'\'',
+                        '"' => b'"',
+                        '`' => b'`',
+                        // Hex escape sequences (lowercase and uppercase)
+                        'x' | 'X' => {
                             let hex: String = [
                                 chars
                                     .next()
                                     .ok_or(ParseSequenceError::InvalidEscape {
-                                        escape: "\\x".to_string(),
+                                        escape: format!("\\{c2}"),
                                         index: idx,
                                         string: s.to_string(),
                                     })?
@@ -71,7 +85,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                                 chars
                                     .next()
                                     .ok_or(ParseSequenceError::InvalidEscape {
-                                        escape: "\\x".to_string(),
+                                        escape: format!("\\{c2}"),
                                         index: idx,
                                         string: s.to_string(),
                                     })?
@@ -87,6 +101,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                                 }
                             })?
                         }
+                        // Octal escape sequences
                         n if ('0'..='3').contains(&n) => {
                             let octal: String = [
                                 n,
@@ -175,6 +190,22 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
 /// The returned result can display a human readable error if the string cannot be parsed as a
 /// valid quoted string.
 pub fn parse_string(s: &str) -> Result<String, ParseSequenceError> {
+    // Check for raw triple-quoted strings first (r''' or r""" or R''' or R""")
+    if s.starts_with("r'''")
+        || s.starts_with("r\"\"\"")
+        || s.starts_with("R'''")
+        || s.starts_with("R\"\"\"")
+    {
+        let quote = if s.contains("'''") { '\'' } else { '"' };
+        return parse_raw_triple_quoted_string(s, quote);
+    }
+
+    // Check for regular triple-quoted strings (''' or """)
+    if s.starts_with("'''") || s.starts_with("\"\"\"") {
+        let quote = if s.starts_with("'''") { '\'' } else { '"' };
+        return parse_triple_quoted_string(s, quote);
+    }
+
     let mut chars = s.chars().enumerate();
     let res = String::with_capacity(s.len());
 
@@ -282,17 +313,17 @@ fn parse_quoted_string(
                         '\\' => c2,
                         '?' => c2,
                         '\'' => {
-                            push_escape_character = in_double_quotes;
+                            push_escape_character = false; // Single quotes don't need escaping inside double quotes
                             c2
                         }
                         '"' => {
-                            push_escape_character = in_single_quotes;
+                            push_escape_character = false; // Double quotes are always escaped, even in single-quoted strings
                             c2
                         }
                         '`' => c2,
-                        'x' | 'u' | 'U' => {
+                        'x' | 'X' | 'u' | 'U' => {
                             let length = match c2 {
-                                'x' => 2,
+                                'x' | 'X' => 2,
                                 'u' => 4,
                                 'U' => 8,
                                 _ => unreachable!(),
@@ -356,6 +387,103 @@ fn parse_quoted_string(
     // Ensure string has a closing quote
     if in_single_quotes || in_double_quotes {
         return Err(ParseSequenceError::MissingClosingQuote);
+    }
+
+    Ok(res)
+}
+
+fn parse_raw_triple_quoted_string(s: &str, quote: char) -> Result<String, ParseSequenceError> {
+    let triple_quote = if quote == '\'' { "'''" } else { "\"\"\"" };
+    let prefix_len = 4; // r''' or r"""
+
+    // Ensure string starts with r''' or r""" and ends with ''' or """
+    if s.len() < prefix_len + 3 || !s.ends_with(triple_quote) {
+        return Err(ParseSequenceError::MissingClosingQuote);
+    }
+
+    // Extract content between r''' and ''' (or r""" and """)
+    // All characters including backslashes and quotes are literal
+    let content = &s[prefix_len..s.len() - 3];
+    Ok(content.to_string())
+}
+
+fn parse_triple_quoted_string(s: &str, quote: char) -> Result<String, ParseSequenceError> {
+    let triple_quote = if quote == '\'' { "'''" } else { "\"\"\"" };
+
+    // Ensure string starts and ends with triple quotes
+    if !s.starts_with(triple_quote) || !s.ends_with(triple_quote) || s.len() < 6 {
+        return Err(ParseSequenceError::MissingClosingQuote);
+    }
+
+    // Extract content between triple quotes
+    let content = &s[3..s.len() - 3];
+    let mut chars = content.chars().enumerate();
+    let mut res = String::with_capacity(content.len());
+
+    // Process content with escape sequences, but don't treat single quotes/double quotes as terminators
+    while let Some((idx, c)) = chars.next() {
+        if c == '\\' {
+            match chars.next() {
+                None => {
+                    return Err(ParseSequenceError::InvalidEscape {
+                        escape: format!("{c}"),
+                        index: idx + 3, // Offset by opening quotes
+                        string: String::from(s),
+                    });
+                }
+                Some((idx, c2)) => {
+                    let value = match c2 {
+                        'a' => '\u{07}',
+                        'b' => '\u{08}',
+                        'v' => '\u{0B}',
+                        'f' => '\u{0C}',
+                        'n' => '\n',
+                        'r' => '\r',
+                        't' => '\t',
+                        '\\' => c2,
+                        '?' => c2,
+                        '\'' => c2, // Process escape sequences for quotes in triple-quoted strings
+                        '"' => c2,  // Process escape sequences for quotes in triple-quoted strings
+                        '`' => c2,
+                        'x' | 'X' | 'u' | 'U' => {
+                            let length = match c2 {
+                                'x' | 'X' => 2,
+                                'u' => 4,
+                                'U' => 8,
+                                _ => unreachable!(),
+                            };
+
+                            parse_unicode_hex(length, &mut chars).map_err(|x| {
+                                ParseSequenceError::InvalidUnicode {
+                                    source: x.clone(),
+                                    index: idx + 3, // Offset by opening quotes
+                                    string: String::from(s),
+                                }
+                            })?
+                        }
+                        n if ('0'..='3').contains(&n) => parse_unicode_oct(&n, &mut chars)
+                            .map_err(|x| ParseSequenceError::InvalidUnicode {
+                                source: x.clone(),
+                                index: idx + 3, // Offset by opening quotes
+                                string: String::from(s),
+                            })?,
+                        _ => {
+                            return Err(ParseSequenceError::InvalidEscape {
+                                escape: format!("{c}{c2}"),
+                                index: idx + 3, // Offset by opening quotes
+                                string: String::from(s),
+                            });
+                        }
+                    };
+
+                    res.push(value);
+                    continue;
+                }
+            };
+        }
+
+        // For triple-quoted strings, all other characters are literal (including quotes)
+        res.push(c);
     }
 
     Ok(res)
@@ -458,7 +586,7 @@ mod tests {
             ("\"Hello \\\\\"", Ok(String::from("Hello \\"))),
             ("\"Hello \\?\"", Ok(String::from("Hello ?"))),
             ("\"Hello \\\"\"", Ok(String::from("Hello \""))),
-            ("\"Hello \\'\"", Ok(String::from("Hello \\'"))),
+            ("\"Hello \\'\"", Ok(String::from("Hello '"))),
             ("\"Hello \\`\"", Ok(String::from("Hello `"))),
             ("\"Hello \\x20 \"", Ok(String::from("Hello   "))),
             ("\"Hello \\x60\"", Ok(String::from("Hello `"))),
