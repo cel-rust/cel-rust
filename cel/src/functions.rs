@@ -1,6 +1,6 @@
 use crate::context::Context;
 use crate::magic::{Arguments, This};
-use crate::objects::{OptionalValue, Value};
+use crate::objects::{KeyRef, OptionalValue, Value};
 use crate::parser::Expression;
 use crate::resolvers::Resolver;
 use crate::ExecutionError;
@@ -117,9 +117,9 @@ pub fn size(ftx: &FunctionContext, This(this): This<Value>) -> Result<i64> {
 pub fn contains(This(this): This<Value>, arg: Value) -> Result<Value> {
     Ok(match this {
         Value::List(v) => v.contains(&arg),
-        Value::Map(v) => v
-            .map
-            .contains_key(&arg.try_into().map_err(ExecutionError::UnsupportedKeyType)?),
+        Value::Map(v) => {
+            v.contains_key(&KeyRef::try_from(&arg).map_err(ExecutionError::UnsupportedKeyType)?)
+        }
         Value::String(s) => {
             if let Value::String(arg) = arg {
                 s.contains(arg.as_str())

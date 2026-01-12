@@ -3,6 +3,7 @@ use crate::context::Context;
 use crate::functions::FunctionContext;
 use crate::{ExecutionError, Expression};
 use std::any::Any;
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -57,17 +58,26 @@ impl PartialOrd for Map {
 }
 
 impl Map {
+    pub(crate) fn contains_key(&self, key: &(dyn AsKeyRef + '_)) -> bool {
+        self.map.contains_key(key)
+    }
     /// Returns a reference to the value corresponding to the key. Implicitly converts between int
     /// and uint keys.
-    pub fn get(&self, key: &Key) -> Option<&Value> {
+    pub fn get(&self, key: &(dyn AsKeyRef + '_)) -> Option<&Value> {
         self.map.get(key).or_else(|| {
             // Also check keys that are cross type comparable.
-            let converted = match key {
-                Key::Int(k) => Key::Uint(u64::try_from(*k).ok()?),
-                Key::Uint(k) => Key::Int(i64::try_from(*k).ok()?),
-                _ => return None,
-            };
-            self.map.get(&converted)
+            let keyref = key.as_keyref();
+            match keyref {
+                KeyRef::Int(k) => {
+                    let converted = u64::try_from(k).ok()?;
+                    self.map.get(&Key::Uint(converted))
+                }
+                KeyRef::Uint(k) => {
+                    let converted = i64::try_from(k).ok()?;
+                    self.map.get(&Key::Int(converted))
+                }
+                _ => None,
+            }
         })
     }
 }
@@ -78,6 +88,71 @@ pub enum Key {
     Uint(u64),
     Bool(bool),
     String(Arc<String>),
+}
+
+/// A borrowed version of [`Key`] that avoids allocating for lookups.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum KeyRef<'a> {
+    Int(i64),
+    Uint(u64),
+    Bool(bool),
+    String(&'a str),
+}
+
+/// Trait for converting to a borrowed [`KeyRef`] for efficient lookups.
+pub trait AsKeyRef {
+    fn as_keyref(&self) -> KeyRef<'_>;
+}
+
+impl AsKeyRef for Key {
+    fn as_keyref(&self) -> KeyRef<'_> {
+        match self {
+            Key::Int(i) => KeyRef::Int(*i),
+            Key::Uint(u) => KeyRef::Uint(*u),
+            Key::Bool(b) => KeyRef::Bool(*b),
+            Key::String(s) => KeyRef::String(s.as_str()),
+        }
+    }
+}
+
+impl<'a> AsKeyRef for KeyRef<'a> {
+    fn as_keyref(&self) -> KeyRef<'a> {
+        *self
+    }
+}
+
+/// Trait object implementations for `dyn AsKeyRef` to enable hashing and comparison.
+impl<'a> PartialEq for dyn AsKeyRef + 'a {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_keyref().eq(&other.as_keyref())
+    }
+}
+
+impl<'a> Eq for dyn AsKeyRef + 'a {}
+
+impl<'a> std::hash::Hash for dyn AsKeyRef + 'a {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_keyref().hash(state)
+    }
+}
+
+impl<'a> PartialOrd for dyn AsKeyRef + 'a {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> Ord for dyn AsKeyRef + 'a {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_keyref().cmp(&other.as_keyref())
+    }
+}
+
+/// Implement `Borrow<dyn AsKeyRef>` for `Key` to enable efficient lookups.
+impl<'a> Borrow<dyn AsKeyRef + 'a> for Key {
+    fn borrow(&self) -> &(dyn AsKeyRef + 'a) {
+        self
+    }
 }
 
 /// Implement conversions from primitive types to [`Key`]
@@ -166,6 +241,21 @@ impl TryInto<Key> for Value {
             Value::String(v) => Ok(Key::String(v)),
             Value::Bool(v) => Ok(Key::Bool(v)),
             _ => Err(self),
+        }
+    }
+}
+
+/// Implement conversions from [`KeyRef`] into [`Value`]
+impl<'a> TryFrom<&'a Value> for KeyRef<'a> {
+    type Error = Value;
+
+    fn try_from(value: &'a Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Int(v) => Ok(KeyRef::Int(*v)),
+            Value::UInt(v) => Ok(KeyRef::Uint(*v)),
+            Value::String(v) => Ok(KeyRef::String(v.as_str())),
+            Value::Bool(v) => Ok(KeyRef::Bool(*v)),
+            _ => Err(value.clone()),
         }
     }
 }
@@ -792,8 +882,8 @@ impl Value {
                                 (any, Value::List(v)) => {
                                     return Value::Bool(v.contains(&any)).into()
                                 }
-                                (any, Value::Map(m)) => match any.try_into() {
-                                    Ok(key) => return Value::Bool(m.map.contains_key(&key)).into(),
+                                (any, Value::Map(m)) => match KeyRef::try_from(&any) {
+                                    Ok(key) => return Value::Bool(m.contains_key(&key)).into(),
                                     Err(_) => return Value::Bool(false).into(),
                                 },
                                 (left, right) => {
@@ -852,27 +942,22 @@ impl Value {
                                 (Value::String(_), Value::Int(idx)) => {
                                     Err(ExecutionError::NoSuchKey(idx.to_string().into()))
                                 }
-                                (Value::Map(map), Value::String(property)) => {
-                                    let key: Key = (&**property).into();
-                                    map.get(&key)
-                                        .cloned()
-                                        .ok_or_else(|| ExecutionError::NoSuchKey(property))
-                                }
+                                (Value::Map(map), Value::String(property)) => map
+                                    .get(&KeyRef::String(property.as_str()))
+                                    .cloned()
+                                    .ok_or_else(|| ExecutionError::NoSuchKey(property)),
                                 (Value::Map(map), Value::Bool(property)) => {
-                                    let key: Key = property.into();
-                                    map.get(&key).cloned().ok_or_else(|| {
+                                    map.get(&KeyRef::Bool(property)).cloned().ok_or_else(|| {
                                         ExecutionError::NoSuchKey(property.to_string().into())
                                     })
                                 }
                                 (Value::Map(map), Value::Int(property)) => {
-                                    let key: Key = property.into();
-                                    map.get(&key).cloned().ok_or_else(|| {
+                                    map.get(&KeyRef::Int(property)).cloned().ok_or_else(|| {
                                         ExecutionError::NoSuchKey(property.to_string().into())
                                     })
                                 }
                                 (Value::Map(map), Value::UInt(property)) => {
-                                    let key: Key = property.into();
-                                    map.get(&key).cloned().ok_or_else(|| {
+                                    map.get(&KeyRef::Uint(property)).cloned().ok_or_else(|| {
                                         ExecutionError::NoSuchKey(property.to_string().into())
                                     })
                                 }
@@ -1105,14 +1190,10 @@ impl Value {
     //        FunctionCall([Ident("c")]))
 
     fn member(self, name: &str) -> ResolveResult {
-        // todo! Ideally we would avoid creating a String just to create a Key for lookup in the
-        // map, but this would require something like the `hashbrown` crate's `Equivalent` trait.
-        let name: Arc<String> = name.to_owned().into();
-
         // This will always either be because we're trying to access
         // a property on self, or a method on self.
         let child = match self {
-            Value::Map(ref m) => m.map.get(&name.clone().into()).cloned(),
+            Value::Map(ref m) => m.get(&KeyRef::String(name)).cloned(),
             _ => None,
         };
 
@@ -1122,7 +1203,7 @@ impl Value {
         if let Some(child) = child {
             child.into()
         } else {
-            ExecutionError::NoSuchKey(name.clone()).into()
+            ExecutionError::NoSuchKey(Arc::new(name.to_owned())).into()
         }
     }
 
