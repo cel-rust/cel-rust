@@ -10,6 +10,13 @@ use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, ExecutionError>;
 
+pub mod k8s;
+
+#[cfg(feature = "chrono")]
+pub mod time;
+#[cfg(feature = "chrono")]
+pub use time::{duration, timestamp};
+
 /// `FunctionContext` is a context object passed to functions when they are called.
 ///
 /// It contains references to the target object (if the function is called as
@@ -315,154 +322,6 @@ pub fn matches(
     }
 }
 
-#[cfg(feature = "chrono")]
-pub use time::duration;
-#[cfg(feature = "chrono")]
-pub use time::timestamp;
-
-#[cfg(feature = "chrono")]
-pub mod time {
-    use super::Result;
-    use crate::magic::This;
-    use crate::{ExecutionError, Value};
-    use chrono::{Datelike, Days, Months, Timelike};
-    use std::sync::Arc;
-
-    /// Duration parses the provided argument into a [`Value::Duration`] value.
-    ///
-    /// The argument must be string, and must be in the format of a duration. See
-    /// the [`parse_duration`] documentation for more information on the supported
-    /// formats.
-    ///
-    /// # Examples
-    /// - `1h` parses as 1 hour
-    /// - `1.5h` parses as 1 hour and 30 minutes
-    /// - `1h30m` parses as 1 hour and 30 minutes
-    /// - `1h30m1s` parses as 1 hour, 30 minutes, and 1 second
-    /// - `1ms` parses as 1 millisecond
-    /// - `1.5ms` parses as 1 millisecond and 500 microseconds
-    /// - `1ns` parses as 1 nanosecond
-    /// - `1.5ns` parses as 1 nanosecond (sub-nanosecond durations not supported)
-    pub fn duration(value: Arc<String>) -> crate::functions::Result<Value> {
-        Ok(Value::Duration(_duration(value.as_str())?))
-    }
-
-    /// Timestamp parses the provided argument into a [`Value::Timestamp`] value.
-    /// The
-    pub fn timestamp(value: Arc<String>) -> Result<Value> {
-        Ok(Value::Timestamp(
-            chrono::DateTime::parse_from_rfc3339(value.as_str())
-                .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
-        ))
-    }
-
-    /// A wrapper around [`parse_duration`] that converts errors into [`ExecutionError`].
-    /// and only returns the duration, rather than returning the remaining input.
-    fn _duration(i: &str) -> Result<chrono::Duration> {
-        let (_, duration) = crate::duration::parse_duration(i)
-            .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
-        Ok(duration)
-    }
-
-    fn _timestamp(i: &str) -> Result<chrono::DateTime<chrono::FixedOffset>> {
-        chrono::DateTime::parse_from_rfc3339(i)
-            .map_err(|e| ExecutionError::function_error("timestamp", e.to_string()))
-    }
-
-    pub fn timestamp_year(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok(this.year().into())
-    }
-
-    pub fn timestamp_month(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.month0() as i32).into())
-    }
-
-    pub fn timestamp_year_day(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        let year = this
-            .checked_sub_days(Days::new(this.day0() as u64))
-            .unwrap()
-            .checked_sub_months(Months::new(this.month0()))
-            .unwrap();
-        Ok(this.signed_duration_since(year).num_days().into())
-    }
-
-    pub fn timestamp_month_day(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.day0() as i32).into())
-    }
-
-    pub fn timestamp_date(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.day() as i32).into())
-    }
-
-    pub fn timestamp_weekday(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.weekday().num_days_from_sunday() as i32).into())
-    }
-
-    pub fn get_hours(This(this): This<Value>) -> Result<Value> {
-        Ok(match this {
-            Value::Timestamp(ts) => (ts.hour() as i32).into(),
-            Value::Duration(d) => (d.num_hours() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getHours",
-                    "expected timestamp or duration",
-                ))
-            }
-        })
-    }
-
-    pub fn get_minutes(This(this): This<Value>) -> Result<Value> {
-        Ok(match this {
-            Value::Timestamp(ts) => (ts.minute() as i32).into(),
-            Value::Duration(d) => (d.num_minutes() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getMinutes",
-                    "expected timestamp or duration",
-                ))
-            }
-        })
-    }
-
-    pub fn get_seconds(This(this): This<Value>) -> Result<Value> {
-        Ok(match this {
-            Value::Timestamp(ts) => (ts.second() as i32).into(),
-            Value::Duration(d) => (d.num_seconds() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getSeconds",
-                    "expected timestamp or duration",
-                ))
-            }
-        })
-    }
-
-    pub fn get_milliseconds(This(this): This<Value>) -> Result<Value> {
-        Ok(match this {
-            Value::Timestamp(ts) => (ts.timestamp_subsec_millis() as i32).into(),
-            Value::Duration(d) => (d.num_milliseconds() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getMilliseconds",
-                    "expected timestamp or duration",
-                ))
-            }
-        })
-    }
-}
-
 pub fn max(Arguments(args): Arguments) -> Result<Value> {
     // If items is a list of values, then operate on the list
     let items = if args.len() == 1 {
@@ -513,23 +372,10 @@ pub fn min(Arguments(args): Arguments) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
-    use crate::context::Context;
-    use crate::tests::test_script;
-
-    fn assert_script(input: &(&str, &str)) {
-        assert_eq!(test_script(input.1, None), Ok(true.into()), "{}", input.0);
-    }
-
-    fn assert_error(input: &(&str, &str, &str)) {
-        assert_eq!(
-            test_script(input.1, None)
-                .expect_err("expected error")
-                .to_string(),
-            input.2,
-            "{}",
-            input.0
-        );
-    }
+    use crate::{
+        context::Context,
+        test_utils::{assert_error, assert_script, test_script},
+    };
 
     #[test]
     fn test_size() {
@@ -541,7 +387,7 @@ mod tests {
             ("size as a list method", "[1, 2, 3].size() == 3"),
             ("size as a string method", "'foobar'.size() == 6"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -577,14 +423,14 @@ mod tests {
                 r#"{'John': 'smart'}.map(key, key) == ['John']"#,
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
     #[test]
     fn test_filter() {
         [("filter list", "[1, 2, 3].filter(x, x > 2) == [3]")]
-            .iter()
+            .into_iter()
             .for_each(assert_script);
     }
 
@@ -595,7 +441,7 @@ mod tests {
             ("all list #2", "[0, 1, 2].all(x, x > 0) == false"),
             ("all map", "{0: 0, 1:1, 2:2}.all(x, x >= 0) == true"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -607,7 +453,7 @@ mod tests {
             ("exist list #3", "[0, 1, 2, 2].exists(x, x == 2)"),
             ("exist map", "{0: 0, 1:1, 2:2}.exists(x, x > 0)"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -618,7 +464,7 @@ mod tests {
             ("exist list #2", "[0, 1, 2].exists_one(x, x == 0)"),
             ("exist map", "{0: 0, 1:1, 2:2}.exists_one(x, x == 2)"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -633,7 +479,7 @@ mod tests {
             ("max empty list", "max([]) == null"),
             ("max no args", "max() == null"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -652,7 +498,7 @@ mod tests {
             ("min empty list", "min([]) == null"),
             ("min no args", "min() == null"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -662,7 +508,7 @@ mod tests {
             ("starts with true", "'foobar'.startsWith('foo') == true"),
             ("starts with false", "'foobar'.startsWith('bar') == false"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -672,7 +518,7 @@ mod tests {
             ("ends with true", "'foobar'.endsWith('bar') == true"),
             ("ends with false", "'foobar'.endsWith('foo') == false"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -744,7 +590,7 @@ mod tests {
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
 
         [
@@ -774,7 +620,7 @@ mod tests {
                 "Overflow from binary operator 'add': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: -1, nanos: 0 })",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_error)
     }
 
@@ -821,7 +667,7 @@ mod tests {
                 "duration('90s').getSeconds() == 90",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -850,7 +696,7 @@ mod tests {
                 "timestamp('2023-05-29T00:00:00Z').string() == '2023-05-29T00:00:00+00:00'",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -911,7 +757,7 @@ mod tests {
             ("float", "10.5.string() == '10.5'"),
             ("bytes", "b'foo'.string() == 'foo'"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -921,7 +767,7 @@ mod tests {
             ("string", "bytes('abc') == b'abc'"),
             ("bytes", "bytes('abc') == b'\\x61b\\x63'"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -932,7 +778,7 @@ mod tests {
             ("int", "10.double() == 10.0"),
             ("double", "10.0.double() == 10.0"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -942,7 +788,7 @@ mod tests {
             ("string", "'10'.uint() == 10.uint()"),
             ("double", "10.5.uint() == 10.uint()"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -954,7 +800,7 @@ mod tests {
             ("uint", "10.uint().int() == 10"),
             ("double", "10.5.int() == 10"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -969,7 +815,7 @@ mod tests {
             ("map || bool", "{} || false", "No such overload"),
             ("null || bool", "null || false", "No such overload"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_error)
     }
 }

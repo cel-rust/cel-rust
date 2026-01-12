@@ -202,6 +202,16 @@ impl Default for Context<'_> {
         ctx.add_function("or", functions::optional_or_optional);
         ctx.add_function("orValue", functions::optional_or_value);
 
+        #[cfg(feature = "k8s-list")]
+        {
+            ctx.add_function("isSorted", functions::k8s::list::is_sorted);
+            // Skipping sum (Needs additional infrastructure: fallible add)
+            // Skipping max (Due to overloads)
+            // Skipping min (Due to overloads)
+            ctx.add_function("indexOf", functions::k8s::list::index_of);
+            ctx.add_function("lastIndexOf", functions::k8s::list::last_index_of);
+        }
+
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
 
