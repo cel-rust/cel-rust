@@ -39,3 +39,5 @@ json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
 chrono = ["dep:chrono"]
 dhat-heap = [ ] # if you are doing heap profiling
+k8s = ["k8s-list"]
+k8s-list = [ ]
