@@ -14,6 +14,18 @@ Thank you for your interest in contributing to cel-rust! This document outlines 
 
 Opening an issue allows us to coordinate and ensure your effort is well-spent. We appreciate your understanding!
 
+## Project Priorities
+
+When contributing to cel-rust, please keep in mind our project priorities, in order:
+
+1. **Spec Compliance** — Full conformance with the [CEL specification](https://github.com/google/cel-spec) is our primary goal. Correctness and compatibility come first.
+
+2. **User Experience** — The library should be ergonomic, well-documented, and easy to integrate into Rust projects.
+
+3. **Performance** — We care about performance, but not at the expense of correctness or usability.
+
+These priorities guide our decision-making. For example, if a contribution improves performance but breaks spec compliance, we'll prioritize the spec.
+
 ## AI Assistance Notice
 
 > [!IMPORTANT]
@@ -58,7 +70,26 @@ Failure to disclose AI assistance is disrespectful to maintainers and makes it d
 3. **Write tests** for new functionality
 4. **Follow existing code style** — run `cargo fmt` and `cargo clippy`
 5. **Update documentation** if you're changing public APIs
-6. **Write clear commit messages** that explain the "why" not just the "what"
+6. **Write clear commit messages** following the [Conventional Commits](https://www.conventionalcommits.org/) pattern
+7. **Sign off your commits** — all commits must include a DCO sign-off (see below)
+
+### Developer Certificate of Origin (DCO)
+
+All commits must be signed off with a Developer Certificate of Origin (DCO). This is verified automatically by GitHub Actions.
+
+To sign off your commits, add the `-s` flag when committing:
+
+```bash
+git commit -s -m "Your commit message"
+```
+
+This adds a `Signed-off-by` line to your commit message:
+
+```
+Signed-off-by: Your Name <your.email@example.com>
+```
+
+By signing off, you certify that you have the right to submit the code under the project's license and agree to the [Developer Certificate of Origin](https://developercertificate.org/).
 
 ## Code of Conduct
 
