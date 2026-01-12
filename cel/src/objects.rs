@@ -1,6 +1,7 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::context::Context;
 use crate::functions::FunctionContext;
+use crate::magic::Function;
 use crate::{ExecutionError, Expression};
 use std::any::Any;
 use std::cmp::Ordering;
@@ -285,6 +286,20 @@ pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
     /// cannot be represented as JSON.
     #[cfg(feature = "json")]
     fn json(&self) -> Option<serde_json::Value> {
+        None
+    }
+
+    /// Resolves a function by name from this opaque value.
+    ///
+    /// This allows opaque types to provide built-in functions that can be called
+    /// on instances of the type. When a function call is made on an opaque value
+    /// (e.g., `opaque_value.my_function()`), the runtime will first check if the
+    /// opaque type provides the function via this method before falling back to
+    /// the context's function registry.
+    ///
+    /// The default implementation returns `None`, indicating that the opaque type
+    /// does not provide any built-in functions.
+    fn resolve_function(&self, _name: &str) -> Option<&Function> {
         None
     }
 }
@@ -965,19 +980,32 @@ impl Value {
                         };
                         match qualified_func {
                             None => {
-                                let func =
-                                    ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
+                                // Resolve the target value first
+                                let target_value = Value::resolve(target, ctx)?;
+
+                                // Try to get function from Opaque first, then fall back to context
+                                let opaque_func = match &target_value {
+                                    Value::Opaque(opaque) => {
+                                        opaque.resolve_function(call.func_name.as_str())
+                                    }
+                                    _ => None,
+                                };
+
+                                let func = opaque_func
+                                    .or_else(|| ctx.get_function(call.func_name.as_str()))
+                                    .ok_or_else(|| {
                                         ExecutionError::UndeclaredReference(
                                             call.func_name.clone().into(),
                                         )
                                     })?;
-                                let mut ctx = FunctionContext::new(
+
+                                let mut func_ctx = FunctionContext::new(
                                     &call.func_name,
-                                    Some(Value::resolve(target, ctx)?),
+                                    Some(target_value.clone()),
                                     ctx,
                                     &call.args,
                                 );
-                                (func)(&mut ctx)
+                                func(&mut func_ctx)
                             }
                             Some(func) => {
                                 let mut ctx =
@@ -1725,6 +1753,111 @@ mod tests {
                 Ok(Value::String(Arc::new("value".into()))),
                 prog.execute(&ctx)
             );
+        }
+
+        #[test]
+        fn test_opaque_fn_resolve() {
+            use crate::magic::Function;
+            use std::sync::OnceLock;
+
+            // Define an opaque type with limited built-in functions
+            #[derive(Debug, Eq, PartialEq, Serialize)]
+            struct OpaqueA {
+                value: String,
+            }
+
+            impl OpaqueA {
+                fn custom_function() -> &'static Function {
+                    static CUSTOM_FN: OnceLock<Function> = OnceLock::new();
+                    CUSTOM_FN.get_or_init(|| {
+                        Box::new(|_ftx: &mut FunctionContext| {
+                            Ok(Value::String(Arc::new("opaque".to_string())))
+                        })
+                    })
+                }
+            }
+
+            impl Opaque for OpaqueA {
+                fn runtime_type_name(&self) -> &str {
+                    "fallback_type"
+                }
+
+                fn resolve_function(&self, name: &str) -> Option<&Function> {
+                    match name {
+                        "opaque" => Some(Self::custom_function()),
+                        "both" => Some(Self::custom_function()),
+                        _ => None,
+                    }
+                }
+            }
+
+            #[derive(Debug, Eq, PartialEq, Serialize)]
+            struct OpaqueB {
+                value: String,
+            }
+
+            impl OpaqueB {
+                fn custom_function() -> &'static Function {
+                    static CUSTOM_FN: OnceLock<Function> = OnceLock::new();
+                    CUSTOM_FN
+                        .get_or_init(|| Box::new(|_ftx: &mut FunctionContext| Ok(Value::Int(1))))
+                }
+            }
+
+            impl Opaque for OpaqueB {
+                fn runtime_type_name(&self) -> &str {
+                    "fallback_type"
+                }
+
+                fn resolve_function(&self, name: &str) -> Option<&Function> {
+                    match name {
+                        "opaque" => Some(Self::custom_function()),
+                        "both" => Some(Self::custom_function()),
+                        _ => None,
+                    }
+                }
+            }
+
+            pub fn context_fn(_ftx: &FunctionContext) -> Result<Value, ExecutionError> {
+                Ok(Value::String(Arc::new("context".to_string())))
+            }
+
+            let opaquea = Arc::new(OpaqueA {
+                value: "test".to_string(),
+            });
+            let opaqueb = Arc::new(OpaqueB {
+                value: "test".to_string(),
+            });
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("obj", Value::Opaque(opaquea));
+            ctx.add_variable_from_value("other", Value::Opaque(opaqueb));
+            ctx.add_function("context", context_fn);
+            ctx.add_function("both", context_fn);
+
+            // Test that context function works
+            let prog = Program::compile("obj.context()").unwrap();
+            assert_eq!(
+                Ok(Value::String(Arc::new("context".to_string()))),
+                prog.execute(&ctx)
+            );
+
+            // Test that opaque function works
+            let prog = Program::compile("obj.opaque()").unwrap();
+            assert_eq!(
+                Ok(Value::String(Arc::new("opaque".to_string()))),
+                prog.execute(&ctx),
+            );
+
+            // Test that opaque function has precedence
+            let prog = Program::compile("obj.both()").unwrap();
+            assert_eq!(
+                Ok(Value::String(Arc::new("opaque".to_string()))),
+                prog.execute(&ctx),
+            );
+
+            // Test that we can 'overload' function across two opaques
+            let prog = Program::compile("other.both()").unwrap();
+            assert_eq!(Ok(Value::Int(1)), prog.execute(&ctx),);
         }
 
         #[test]
