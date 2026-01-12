@@ -1,9 +1,10 @@
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
-use crate::{functions, ExecutionError};
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use crate::{ExecutionError, functions};
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.

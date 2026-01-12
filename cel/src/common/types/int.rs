@@ -1,6 +1,7 @@
+use std::any::Any;
+
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 
 pub struct Int(i64);
 

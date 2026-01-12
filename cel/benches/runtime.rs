@@ -1,8 +1,10 @@
-use cel::context::{Context, VariableResolver};
-use cel::{Program, Value};
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use std::collections::HashMap;
 
+use cel::context::{Context, VariableResolver};
+use cel::{Program, Value};
+use criterion::{BenchmarkId, Criterion, black_box, criterion_group};
+
+#[rustfmt::skip]
 const EXPRESSIONS: [(&str, &str); 34] = [
     ("ternary_1", "(false || true) ? 1 : 2"),
     ("ternary_2", "(true ? false : true) ? 1 : 2"),

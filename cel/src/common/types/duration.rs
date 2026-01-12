@@ -1,7 +1,8 @@
-use crate::common::types::Type;
-use crate::common::value::Val;
 use std::any::Any;
 use std::time::Duration as StdDuration;
+
+use crate::common::types::Type;
+use crate::common::value::Val;
 
 pub struct Duration(StdDuration);
 

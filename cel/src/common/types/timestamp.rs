@@ -1,7 +1,8 @@
-use crate::common::types::Type;
-use crate::common::value::Val;
 use std::any::Any;
 use std::time::SystemTime;
+
+use crate::common::types::Type;
+use crate::common::value::Val;
 
 pub struct Timestamp(SystemTime);
 

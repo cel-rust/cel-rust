@@ -1,12 +1,13 @@
 #![no_main]
 
-use cel::objects::{Key, Map};
-use cel::Value;
-use chrono::TimeZone;
-use libfuzzer_sys::fuzz_target;
 use std::collections::HashMap;
 use std::hint::black_box;
 use std::sync::Arc;
+
+use cel::Value;
+use cel::objects::{Key, Map};
+use chrono::TimeZone;
+use libfuzzer_sys::fuzz_target;
 
 #[derive(Debug, arbitrary::Arbitrary)]
 enum BinOp {

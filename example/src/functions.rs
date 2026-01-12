@@ -1,8 +1,9 @@
 #![allow(clippy::too_many_arguments)]
+use std::sync::Arc;
+
 use cel::extractors::This;
 use cel::{Context, ExecutionError, FunctionContext, Program, ResolveResult, Value};
 use chrono::{DateTime, Duration, FixedOffset};
-use std::sync::Arc;
 
 fn main() {
     let program = Program::compile("add(2, 3) == 5 && ''.isEmpty() && fail()").unwrap();

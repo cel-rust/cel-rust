@@ -1,0 +1,3 @@
+# https://doc.rust-lang.org/nightly/edition-guide/rust-2024/rustfmt-style-edition.html
+style_edition = "2024"
+use_field_init_shorthand = true
