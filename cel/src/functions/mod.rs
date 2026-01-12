@@ -372,23 +372,10 @@ pub fn min(Arguments(args): Arguments) -> Result<Value> {
 
 #[cfg(test)]
 mod tests {
-    use crate::context::Context;
-    use crate::tests::test_script;
-
-    fn assert_script(input: &(&str, &str)) {
-        assert_eq!(test_script(input.1, None), Ok(true.into()), "{}", input.0);
-    }
-
-    fn assert_error(input: &(&str, &str, &str)) {
-        assert_eq!(
-            test_script(input.1, None)
-                .expect_err("expected error")
-                .to_string(),
-            input.2,
-            "{}",
-            input.0
-        );
-    }
+    use crate::{
+        context::Context,
+        test_utils::{assert_error, assert_script, test_script},
+    };
 
     #[test]
     fn test_size() {
@@ -400,7 +387,7 @@ mod tests {
             ("size as a list method", "[1, 2, 3].size() == 3"),
             ("size as a string method", "'foobar'.size() == 6"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -436,14 +423,14 @@ mod tests {
                 r#"{'John': 'smart'}.map(key, key) == ['John']"#,
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
     #[test]
     fn test_filter() {
         [("filter list", "[1, 2, 3].filter(x, x > 2) == [3]")]
-            .iter()
+            .into_iter()
             .for_each(assert_script);
     }
 
@@ -454,7 +441,7 @@ mod tests {
             ("all list #2", "[0, 1, 2].all(x, x > 0) == false"),
             ("all map", "{0: 0, 1:1, 2:2}.all(x, x >= 0) == true"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -466,7 +453,7 @@ mod tests {
             ("exist list #3", "[0, 1, 2, 2].exists(x, x == 2)"),
             ("exist map", "{0: 0, 1:1, 2:2}.exists(x, x > 0)"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -477,7 +464,7 @@ mod tests {
             ("exist list #2", "[0, 1, 2].exists_one(x, x == 0)"),
             ("exist map", "{0: 0, 1:1, 2:2}.exists_one(x, x == 2)"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -492,7 +479,7 @@ mod tests {
             ("max empty list", "max([]) == null"),
             ("max no args", "max() == null"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -511,7 +498,7 @@ mod tests {
             ("min empty list", "min([]) == null"),
             ("min no args", "min() == null"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -521,7 +508,7 @@ mod tests {
             ("starts with true", "'foobar'.startsWith('foo') == true"),
             ("starts with false", "'foobar'.startsWith('bar') == false"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -531,7 +518,7 @@ mod tests {
             ("ends with true", "'foobar'.endsWith('bar') == true"),
             ("ends with false", "'foobar'.endsWith('foo') == false"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -603,7 +590,7 @@ mod tests {
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
 
         [
@@ -633,7 +620,7 @@ mod tests {
                 "Overflow from binary operator 'add': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: -1, nanos: 0 })",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_error)
     }
 
@@ -680,7 +667,7 @@ mod tests {
                 "duration('90s').getSeconds() == 90",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -709,7 +696,7 @@ mod tests {
                 "timestamp('2023-05-29T00:00:00Z').string() == '2023-05-29T00:00:00+00:00'",
             ),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -770,7 +757,7 @@ mod tests {
             ("float", "10.5.string() == '10.5'"),
             ("bytes", "b'foo'.string() == 'foo'"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -780,7 +767,7 @@ mod tests {
             ("string", "bytes('abc') == b'abc'"),
             ("bytes", "bytes('abc') == b'\\x61b\\x63'"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -791,7 +778,7 @@ mod tests {
             ("int", "10.double() == 10.0"),
             ("double", "10.0.double() == 10.0"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -801,7 +788,7 @@ mod tests {
             ("string", "'10'.uint() == 10.uint()"),
             ("double", "10.5.uint() == 10.uint()"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -813,7 +800,7 @@ mod tests {
             ("uint", "10.uint().int() == 10"),
             ("double", "10.5.int() == 10"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_script);
     }
 
@@ -828,7 +815,7 @@ mod tests {
             ("map || bool", "{} || false", "No such overload"),
             ("null || bool", "null || false", "No such overload"),
         ]
-        .iter()
+        .into_iter()
         .for_each(assert_error)
     }
 }

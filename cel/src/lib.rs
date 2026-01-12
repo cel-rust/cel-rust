@@ -5,6 +5,8 @@ use std::sync::Arc;
 use thiserror::Error;
 
 mod macros;
+#[cfg(test)]
+mod test_utils;
 
 pub mod common;
 pub mod context;
@@ -205,18 +207,10 @@ impl TryFrom<&str> for Program {
 mod tests {
     use crate::context::Context;
     use crate::objects::{ResolveResult, Value};
+    use crate::test_utils::test_script;
     use crate::{ExecutionError, Program};
     use std::collections::HashMap;
     use std::convert::TryInto;
-
-    /// Tests the provided script and returns the result. An optional context can be provided.
-    pub(crate) fn test_script(script: &str, ctx: Option<Context>) -> ResolveResult {
-        let program = match Program::compile(script) {
-            Ok(p) => p,
-            Err(e) => panic!("{}", e),
-        };
-        program.execute(&ctx.unwrap_or_default())
-    }
 
     #[test]
     fn parse() {

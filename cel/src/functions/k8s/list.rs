@@ -65,3 +65,43 @@ fn find_position<'a>(
         None => Ok(-1i64),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::test_utils::assert_script_eq;
+
+    #[test]
+    fn is_sorted() {
+        #[rustfmt::skip]
+        [
+            ("is not alphabetically sorted", "['c', 'a', 'b'].isSorted()", false.into()),
+            ("is alphabetically sorted", "['a', 'b', 'c'].isSorted()", true.into()),
+            ("is not numerically sorted", "[3, 1, 2].isSorted()", false.into()),
+            ("is numerically sorted", "[1, 2, 3].isSorted()", true.into()),
+        ]
+        .into_iter()
+        .for_each(assert_script_eq);
+    }
+
+    #[test]
+    fn index_of() {
+        #[rustfmt::skip]
+        [
+            ("index of a is 0", "['a', 'b', 'a'].indexOf('a')", 0.into()),
+            ("index of b is 0", "['a', 'b', 'a'].indexOf('b')", 1.into()),
+        ]
+        .into_iter()
+        .for_each(assert_script_eq);
+    }
+
+    #[test]
+    fn last_index_of() {
+        #[rustfmt::skip]
+        [
+            ("last index of a is 0", "['a', 'b', 'a'].lastIndexOf('a')", 0.into()),
+            ("last index of b is 1", "['a', 'b', 'a'].lastIndexOf('b')", 1.into()),
+        ]
+        .into_iter()
+        .for_each(assert_script_eq);
+    }
+}
