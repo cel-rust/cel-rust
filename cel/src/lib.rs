@@ -2,6 +2,7 @@ extern crate core;
 
 use std::convert::TryFrom;
 use std::sync::Arc;
+
 use thiserror::Error;
 
 mod macros;
@@ -28,20 +29,16 @@ mod duration;
 pub use ser::{Duration, Timestamp};
 
 mod ser;
-pub use ser::to_value;
-pub use ser::SerializationError;
+pub use ser::{SerializationError, to_value};
 
 #[cfg(feature = "json")]
 mod json;
 #[cfg(feature = "json")]
 pub use json::ConvertToJsonError;
-
 use magic::FromContext;
 
 pub mod extractors {
-    pub use crate::magic::{Arguments, Identifier, This};
-
-    pub use crate::magic::{IntoFunction, IntoResolveResult};
+    pub use crate::magic::{Arguments, Identifier, IntoFunction, IntoResolveResult, This};
 }
 
 #[derive(Error, Clone, Debug, PartialEq)]
@@ -203,11 +200,12 @@ impl TryFrom<&str> for Program {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::convert::TryInto;
+
     use crate::context::Context;
     use crate::objects::{ResolveResult, Value};
     use crate::{ExecutionError, Program};
-    use std::collections::HashMap;
-    use std::convert::TryInto;
 
     /// Tests the provided script and returns the result. An optional context can be provided.
     pub(crate) fn test_script(script: &str, ctx: Option<Context>) -> ResolveResult {

@@ -1,7 +1,3 @@
-use crate::common::ast::{operators, EntryExpr, Expr};
-use crate::context::Context;
-use crate::functions::FunctionContext;
-use crate::{ExecutionError, Expression};
 use std::any::Any;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -13,9 +9,14 @@ use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
 
-use crate::common::value::CelVal;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
+
+use crate::common::ast::{EntryExpr, Expr, operators};
+use crate::common::value::CelVal;
+use crate::context::Context;
+use crate::functions::FunctionContext;
+use crate::{ExecutionError, Expression};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -305,9 +306,11 @@ impl OptionalValue {
     pub fn of(value: Value) -> Self {
         OptionalValue { value: Some(value) }
     }
+
     pub fn none() -> Self {
         OptionalValue { value: None }
     }
+
     pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
@@ -346,12 +349,14 @@ pub trait TryIntoValue {
 
 impl<T: serde::Serialize> TryIntoValue for T {
     type Error = crate::ser::SerializationError;
+
     fn try_into_value(self) -> Result<Value, Self::Error> {
         crate::ser::to_value(self)
     }
 }
 impl TryIntoValue for Value {
     type Error = Infallible;
+
     fn try_into_value(self) -> Result<Value, Self::Error> {
         Ok(self)
     }
@@ -710,37 +715,37 @@ impl Value {
                     match call.func_name.as_str() {
                         operators::ADD => {
                             return Value::resolve(&call.args[0], ctx)?
-                                + Value::resolve(&call.args[1], ctx)?
+                                + Value::resolve(&call.args[1], ctx)?;
                         }
                         operators::SUBSTRACT => {
                             return Value::resolve(&call.args[0], ctx)?
-                                - Value::resolve(&call.args[1], ctx)?
+                                - Value::resolve(&call.args[1], ctx)?;
                         }
                         operators::DIVIDE => {
                             return Value::resolve(&call.args[0], ctx)?
-                                / Value::resolve(&call.args[1], ctx)?
+                                / Value::resolve(&call.args[1], ctx)?;
                         }
                         operators::MULTIPLY => {
                             return Value::resolve(&call.args[0], ctx)?
-                                * Value::resolve(&call.args[1], ctx)?
+                                * Value::resolve(&call.args[1], ctx)?;
                         }
                         operators::MODULO => {
                             return Value::resolve(&call.args[0], ctx)?
-                                % Value::resolve(&call.args[1], ctx)?
+                                % Value::resolve(&call.args[1], ctx)?;
                         }
                         operators::EQUALS => {
                             return Value::Bool(
                                 Value::resolve(&call.args[0], ctx)?
                                     .eq(&Value::resolve(&call.args[1], ctx)?),
                             )
-                            .into()
+                            .into();
                         }
                         operators::NOT_EQUALS => {
                             return Value::Bool(
                                 Value::resolve(&call.args[0], ctx)?
                                     .ne(&Value::resolve(&call.args[1], ctx)?),
                             )
-                            .into()
+                            .into();
                         }
                         operators::LESS => {
                             let left = Value::resolve(&call.args[0], ctx)?;
@@ -787,10 +792,10 @@ impl Value {
                             let right = Value::resolve(&call.args[1], ctx)?;
                             match (left, right) {
                                 (Value::String(l), Value::String(r)) => {
-                                    return Value::Bool(r.contains(&*l)).into()
+                                    return Value::Bool(r.contains(&*l)).into();
                                 }
                                 (any, Value::List(v)) => {
-                                    return Value::Bool(v.contains(&any)).into()
+                                    return Value::Bool(v.contains(&any)).into();
                                 }
                                 (any, Value::Map(m)) => match any.try_into() {
                                     Ok(key) => return Value::Bool(m.map.contains_key(&key)).into(),
@@ -829,7 +834,7 @@ impl Value {
                                 value = match opt_val.value() {
                                     Some(inner) => inner.clone(),
                                     None => {
-                                        return Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+                                        return Ok(Value::Opaque(Arc::new(OptionalValue::none())));
                                     }
                                 };
                             }
@@ -905,7 +910,7 @@ impl Value {
                                     return Err(ExecutionError::function_error(
                                         "_?._",
                                         "field must be string",
-                                    ))
+                                    ));
                                 }
                             };
                             if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
@@ -936,13 +941,13 @@ impl Value {
                                 value => {
                                     Err(ExecutionError::UnsupportedUnaryOperator("minus", value))
                                 }
-                            }
+                            };
                         }
                         operators::NOT_STRICTLY_FALSE => {
                             return match Value::resolve(&call.args[0], ctx)? {
                                 Value::Bool(b) => Ok(Value::Bool(b)),
                                 _ => Ok(Value::Bool(true)),
-                            }
+                            };
                         }
                         _ => (),
                     }
@@ -1365,9 +1370,11 @@ fn checked_op(
 
 #[cfg(test)]
 mod tests {
-    use crate::{objects::Key, Context, ExecutionError, Program, Value};
     use std::collections::HashMap;
     use std::sync::Arc;
+
+    use crate::objects::Key;
+    use crate::{Context, ExecutionError, Program, Value};
 
     #[test]
     fn test_indexed_map_access() {
@@ -1662,14 +1669,16 @@ mod tests {
     }
 
     mod opaque {
-        use crate::objects::{Map, Opaque, OptionalValue};
-        use crate::parser::Parser;
-        use crate::{Context, ExecutionError, FunctionContext, Program, Value};
-        use serde::Serialize;
         use std::collections::HashMap;
         use std::fmt::Debug;
         use std::ops::Deref;
         use std::sync::Arc;
+
+        use serde::Serialize;
+
+        use crate::objects::{Map, Opaque, OptionalValue};
+        use crate::parser::Parser;
+        use crate::{Context, ExecutionError, FunctionContext, Program, Value};
 
         #[derive(Debug, Eq, PartialEq, Serialize)]
         struct MyStruct {

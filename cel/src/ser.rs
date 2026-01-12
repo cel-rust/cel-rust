@@ -3,18 +3,21 @@
 // from [serde_json](https://github.com/serde-rs/json/blob/master/src/value/ser.rs),
 // also mentioned in the [serde documentation](https://serde.rs/).
 
-use crate::{objects::Key, Value};
-use serde::{
-    ser::{self, Impossible},
-    Serialize,
-};
-use std::{collections::HashMap, fmt::Display, iter::FromIterator, sync::Arc};
-use thiserror::Error;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::iter::FromIterator;
+use std::sync::Arc;
 
 #[cfg(feature = "chrono")]
 use chrono::FixedOffset;
+use serde::Serialize;
 #[cfg(feature = "chrono")]
 use serde::ser::SerializeStruct;
+use serde::ser::{self, Impossible};
+use thiserror::Error;
+
+use crate::Value;
+use crate::objects::Key;
 
 pub struct Serializer;
 pub struct KeySerializer;
@@ -59,9 +62,9 @@ impl Duration {
     // newtype to indicate we want to rebuild the duration in the result, while
     // remaining compatible with most other Serializer implementations.
     const NAME: &str = "$__cel_private_Duration";
-    const STRUCT_NAME: &str = "Duration";
-    const SECS_FIELD: &str = "secs";
     const NANOS_FIELD: &str = "nanos";
+    const SECS_FIELD: &str = "secs";
+    const STRUCT_NAME: &str = "Duration";
 }
 
 #[cfg(feature = "chrono")]
@@ -208,16 +211,15 @@ where
 }
 
 impl ser::Serializer for Serializer {
-    type Ok = Value;
     type Error = SerializationError;
-
+    type Ok = Value;
+    type SerializeMap = SerializeMap;
     type SerializeSeq = SerializeVec;
+    type SerializeStruct = SerializeMap;
+    type SerializeStructVariant = SerializeStructVariant;
     type SerializeTuple = SerializeVec;
     type SerializeTupleStruct = SerializeVec;
     type SerializeTupleVariant = SerializeTupleVariant;
-    type SerializeMap = SerializeMap;
-    type SerializeStruct = SerializeMap;
-    type SerializeStructVariant = SerializeStructVariant;
 
     fn serialize_bool(self, v: bool) -> Result<Value> {
         Ok(Value::Bool(v))
@@ -412,8 +414,8 @@ struct SerializeTimestamp {
 }
 
 impl ser::SerializeSeq for SerializeVec {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
@@ -429,8 +431,8 @@ impl ser::SerializeSeq for SerializeVec {
 }
 
 impl ser::SerializeTuple for SerializeVec {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
     where
@@ -445,8 +447,8 @@ impl ser::SerializeTuple for SerializeVec {
 }
 
 impl ser::SerializeTupleStruct for SerializeVec {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
@@ -461,8 +463,8 @@ impl ser::SerializeTupleStruct for SerializeVec {
 }
 
 impl ser::SerializeTupleVariant for SerializeTupleVariant {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
     where
@@ -479,8 +481,8 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
 }
 
 impl ser::SerializeMap for SerializeMap {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
 
     fn serialize_key<T>(&mut self, key: &T) -> Result<()>
     where
@@ -511,8 +513,8 @@ impl ser::SerializeMap for SerializeMap {
 }
 
 impl ser::SerializeStruct for SerializeMap {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
@@ -527,8 +529,8 @@ impl ser::SerializeStruct for SerializeMap {
 }
 
 impl ser::SerializeStructVariant for SerializeStructVariant {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
     where
@@ -547,8 +549,9 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 
 #[cfg(feature = "chrono")]
 impl ser::SerializeStruct for SerializeTimestamp {
-    type Ok = Value;
     type Error = SerializationError;
+    type Ok = Value;
+
     fn serialize_field<T>(
         &mut self,
         key: &'static str,
@@ -595,16 +598,15 @@ impl ser::SerializeStruct for SerializeTimestamp {
 }
 
 impl ser::Serializer for KeySerializer {
-    type Ok = Key;
     type Error = SerializationError;
-
+    type Ok = Key;
+    type SerializeMap = Impossible<Key, SerializationError>;
     type SerializeSeq = Impossible<Key, SerializationError>;
+    type SerializeStruct = Impossible<Key, SerializationError>;
+    type SerializeStructVariant = Impossible<Key, SerializationError>;
     type SerializeTuple = Impossible<Key, SerializationError>;
     type SerializeTupleStruct = Impossible<Key, SerializationError>;
     type SerializeTupleVariant = Impossible<Key, SerializationError>;
-    type SerializeMap = Impossible<Key, SerializationError>;
-    type SerializeStruct = Impossible<Key, SerializationError>;
-    type SerializeStructVariant = Impossible<Key, SerializationError>;
 
     fn serialize_bool(self, v: bool) -> Result<Key> {
         Ok(Key::Bool(v))
@@ -792,18 +794,16 @@ enum TimeSerializer {
 
 #[cfg(feature = "chrono")]
 impl ser::Serializer for TimeSerializer {
-    type Ok = Value;
     type Error = SerializationError;
-
-    type SerializeStruct = SerializeTimestamp;
-
+    type Ok = Value;
+    type SerializeMap = SerializeMap;
     // Should never be used, so just reuse existing.
     type SerializeSeq = SerializeVec;
+    type SerializeStruct = SerializeTimestamp;
+    type SerializeStructVariant = SerializeStructVariant;
     type SerializeTuple = SerializeVec;
     type SerializeTupleStruct = SerializeVec;
     type SerializeTupleVariant = SerializeTupleVariant;
-    type SerializeMap = SerializeMap;
-    type SerializeStructVariant = SerializeStructVariant;
 
     fn serialize_struct(self, name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
         if !matches!(self, Self::Duration { .. }) || name != Duration::STRUCT_NAME {
@@ -973,14 +973,17 @@ impl ser::Serializer for TimeSerializer {
 
 #[cfg(test)]
 mod tests {
-    use crate::{objects::Key, to_value, Value};
-    use crate::{Context, Program};
+    use std::collections::HashMap;
+    use std::iter::FromIterator;
+    use std::sync::Arc;
+
     use serde::Serialize;
     use serde_bytes::Bytes;
-    use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 
     #[cfg(feature = "chrono")]
     use super::{Duration, Timestamp};
+    use crate::objects::Key;
+    use crate::{Context, Program, Value, to_value};
 
     macro_rules! primitive_test {
         ($functionName:ident, $strValue: literal, $value: expr) => {

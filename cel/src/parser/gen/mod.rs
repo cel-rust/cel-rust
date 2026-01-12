@@ -1,3 +1,7 @@
+// Hacky workaround due to this: https://github.com/rust-lang/rust/issues/54726
+// See https://github.com/ttencate/godot_rust_tools/pull/21
+#![cfg_attr(any(), rustfmt::skip)]
+
 #[doc(hidden)]
 /// The code here is the generated code by antlr4 based off the CEL.g4 grammar, which comes
 /// from Google's [Golang CEL](https://github.com/google/cel-go).

@@ -1,5 +1,6 @@
-use cel::{Context, Program};
 use std::thread::scope;
+
+use cel::{Context, Program};
 
 fn main() {
     let program = Program::compile("a + b").unwrap();

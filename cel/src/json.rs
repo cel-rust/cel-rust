@@ -1,8 +1,9 @@
-use crate::Value;
 use base64::prelude::*;
 #[cfg(feature = "chrono")]
 use chrono::Duration;
 use thiserror::Error;
+
+use crate::Value;
 
 #[derive(Debug, Clone, Error)]
 #[error("unable to convert value to json: {0:?}")]
@@ -69,12 +70,14 @@ impl Value {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::Map;
-    use crate::Value as CelValue;
+    use std::collections::HashMap;
+
     #[cfg(feature = "chrono")]
     use chrono::Duration;
     use serde_json::json;
-    use std::collections::HashMap;
+
+    use crate::Value as CelValue;
+    use crate::objects::Map;
 
     #[test]
     fn test_cel_value_to_json() {

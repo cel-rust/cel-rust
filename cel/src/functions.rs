@@ -1,12 +1,13 @@
+use std::cmp::Ordering;
+use std::convert::TryInto;
+use std::sync::Arc;
+
+use crate::ExecutionError;
 use crate::context::Context;
 use crate::magic::{Arguments, This};
 use crate::objects::{OptionalValue, Value};
 use crate::parser::Expression;
 use crate::resolvers::Resolver;
-use crate::ExecutionError;
-use std::cmp::Ordering;
-use std::convert::TryInto;
-use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, ExecutionError>;
 
@@ -322,11 +323,13 @@ pub use time::timestamp;
 
 #[cfg(feature = "chrono")]
 pub mod time {
+    use std::sync::Arc;
+
+    use chrono::{Datelike, Days, Months, Timelike};
+
     use super::Result;
     use crate::magic::This;
     use crate::{ExecutionError, Value};
-    use chrono::{Datelike, Days, Months, Timelike};
-    use std::sync::Arc;
 
     /// Duration parses the provided argument into a [`Value::Duration`] value.
     ///
@@ -418,7 +421,7 @@ pub mod time {
                 return Err(ExecutionError::function_error(
                     "getHours",
                     "expected timestamp or duration",
-                ))
+                ));
             }
         })
     }
@@ -431,7 +434,7 @@ pub mod time {
                 return Err(ExecutionError::function_error(
                     "getMinutes",
                     "expected timestamp or duration",
-                ))
+                ));
             }
         })
     }
@@ -444,7 +447,7 @@ pub mod time {
                 return Err(ExecutionError::function_error(
                     "getSeconds",
                     "expected timestamp or duration",
-                ))
+                ));
             }
         })
     }
@@ -457,7 +460,7 @@ pub mod time {
                 return Err(ExecutionError::function_error(
                     "getMilliseconds",
                     "expected timestamp or duration",
-                ))
+                ));
             }
         })
     }
