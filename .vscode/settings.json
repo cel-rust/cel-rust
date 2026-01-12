@@ -1,0 +1,10 @@
+{
+  "rust-analyzer.imports.granularity.group": "module",
+  "rust-analyzer.rustfmt.overrideCommand": [
+    "rustfmt",
+    "+nightly-2026-01-12",
+    "--edition",
+    "2024",
+    "--"
+  ]
+}
