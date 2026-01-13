@@ -913,9 +913,7 @@ impl TryFrom<Value> for Box<dyn Val> {
             #[cfg(feature = "chrono")]
             Value::Duration(d) => Ok(Box::new(CelDuration::from(d))),
             #[cfg(feature = "chrono")]
-            Value::Timestamp(ts) => {
-                Ok(Box::new(CelTimestamp::from(ts)))
-            }
+            Value::Timestamp(ts) => Ok(Box::new(CelTimestamp::from(ts))),
             Value::List(l) => {
                 let result: Result<Vec<Box<dyn Val>>, ExecutionError> =
                     (*l).clone().into_iter().map(|i| i.try_into()).collect();

@@ -973,14 +973,14 @@ impl ser::Serializer for TimeSerializer {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "chrono")]
+    use super::{Duration, Timestamp};
     use crate::{objects::Key, to_value, Value};
     use crate::{Context, Program};
+    use chrono::FixedOffset;
     use serde::Serialize;
     use serde_bytes::Bytes;
     use std::{collections::HashMap, iter::FromIterator, sync::Arc};
-    use chrono::FixedOffset;
-    #[cfg(feature = "chrono")]
-    use super::{Duration, Timestamp};
 
     macro_rules! primitive_test {
         ($functionName:ident, $strValue: literal, $value: expr) => {
