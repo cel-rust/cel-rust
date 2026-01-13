@@ -3,9 +3,12 @@ use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
 use crate::ExecutionError;
-use std::borrow::Cow;
+use crate::ExecutionError::NoSuchOverload;
+use std::borrow::{Borrow, Cow};
+use std::cmp::Ordering;
 use std::collections::hash_map::Keys;
 use std::collections::HashMap;
+use std::hash::Hash;
 use std::ops::Deref;
 use std::sync::Arc;
 
@@ -68,21 +71,40 @@ impl Val for DefaultMap {
 
 impl Container for DefaultMap {
     fn contains(&self, key: &dyn Val) -> Result<bool, ExecutionError> {
-        // todo avoid cloning here
-        let key: Key = key.clone_as_boxed().try_into()?;
-        Ok(self.0.contains_key(&key))
+        if let Some(s) = key.downcast_ref::<CelString>() {
+            Ok(self.0.contains_key(s as &dyn AsKeyRef))
+        } else if let Some(i) = key.downcast_ref::<CelInt>() {
+            Ok(self.0.contains_key(i as &dyn AsKeyRef))
+        } else if let Some(u) = key.downcast_ref::<CelUInt>() {
+            Ok(self.0.contains_key(u as &dyn AsKeyRef))
+        } else if let Some(b) = key.downcast_ref::<CelBool>() {
+            Ok(self.0.contains_key(b as &dyn AsKeyRef))
+        } else {
+            let key: Key = key.clone_as_boxed().try_into()?;
+            Ok(self.0.contains_key(&key))
+        }
     }
 }
 
 impl Indexer for DefaultMap {
     fn get<'a>(&'a self, key: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        let key: Key = key.clone_as_boxed().try_into()?;
+        let k = if let Some(s) = key.downcast_ref::<CelString>() {
+            s as &dyn AsKeyRef
+        } else if let Some(i) = key.downcast_ref::<CelInt>() {
+            i as &dyn AsKeyRef
+        } else if let Some(u) = key.downcast_ref::<CelUInt>() {
+            u as &dyn AsKeyRef
+        } else if let Some(b) = key.downcast_ref::<CelBool>() {
+            b as &dyn AsKeyRef
+        } else {
+            return Err(NoSuchOverload);
+        };
 
         self.0
-            .get(&key)
+            .get(k)
             .map(|v| Cow::Borrowed(v.as_ref()))
             .ok_or_else(|| {
-                let key = match key {
+                let key = match key.clone_as_boxed().try_into().unwrap() {
                     Key::Bool(b) => b.into_inner().to_string(),
                     Key::Int(i) => i.into_inner().to_string(),
                     Key::String(s) => s.into_inner(),
@@ -119,12 +141,36 @@ impl From<HashMap<Key, Box<dyn Val>>> for DefaultMap {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash, Ord, Clone, PartialOrd)]
+#[derive(Debug, Eq, Clone)]
 pub enum Key {
     Bool(CelBool),
     Int(CelInt),
     String(CelString),
     UInt(CelUInt),
+}
+
+impl Hash for Key {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_keyref().hash(state);
+    }
+}
+
+impl PartialEq for Key {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_keyref() == other.as_keyref()
+    }
+}
+
+impl PartialOrd for Key {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Key {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_keyref().cmp(&other.as_keyref())
+    }
 }
 
 impl Key {
@@ -135,6 +181,94 @@ impl Key {
             Key::String(s) => s,
             Key::UInt(u) => u,
         }
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+pub enum KeyRef<'a> {
+    Int(i64),
+    Uint(u64),
+    Bool(bool),
+    String(&'a str),
+}
+
+/// Trait for converting to a borrowed [`KeyRef`] for efficient lookups.
+pub trait AsKeyRef {
+    fn as_keyref(&self) -> KeyRef<'_>;
+}
+
+impl AsKeyRef for Key {
+    fn as_keyref(&self) -> KeyRef<'_> {
+        match self {
+            Key::Int(i) => KeyRef::Int(*i.inner()),
+            Key::UInt(u) => KeyRef::Uint(*u.inner()),
+            Key::Bool(b) => KeyRef::Bool(*b.inner()),
+            Key::String(s) => KeyRef::String(s.inner()),
+        }
+    }
+}
+
+impl AsKeyRef for CelString {
+    fn as_keyref(&self) -> KeyRef<'_> {
+        KeyRef::String(self.inner())
+    }
+}
+
+impl AsKeyRef for CelInt {
+    fn as_keyref(&self) -> KeyRef<'_> {
+        KeyRef::Int(*self.inner())
+    }
+}
+
+impl AsKeyRef for CelUInt {
+    fn as_keyref(&self) -> KeyRef<'_> {
+        KeyRef::Uint(*self.inner())
+    }
+}
+
+impl AsKeyRef for CelBool {
+    fn as_keyref(&self) -> KeyRef<'_> {
+        KeyRef::Bool(*self.inner())
+    }
+}
+
+impl<'a> AsKeyRef for KeyRef<'a> {
+    fn as_keyref(&self) -> KeyRef<'a> {
+        *self
+    }
+}
+
+/// Trait object implementations for `dyn AsKeyRef` to enable hashing and comparison.
+impl<'a> PartialEq for dyn AsKeyRef + 'a {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_keyref().eq(&other.as_keyref())
+    }
+}
+
+impl<'a> Eq for dyn AsKeyRef + 'a {}
+
+impl<'a> Hash for dyn AsKeyRef + 'a {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_keyref().hash(state)
+    }
+}
+
+impl<'a> PartialOrd for dyn AsKeyRef + 'a {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl<'a> Ord for dyn AsKeyRef + 'a {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.as_keyref().cmp(&other.as_keyref())
+    }
+}
+
+/// Implement `Borrow<dyn AsKeyRef>` for `Key` to enable efficient lookups.
+impl<'a> Borrow<dyn AsKeyRef + 'a> for Key {
+    fn borrow(&self) -> &(dyn AsKeyRef + 'a) {
+        self
     }
 }
 
