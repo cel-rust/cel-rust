@@ -72,5 +72,5 @@ jobs:
       - name: Run example-anyhow
         run: cargo run --bin example-anyhow --manifest-path example/Cargo.toml --features anyhow
         # Build, don't run since it starts an HTTP server
-      #- name: Run example-axum
-      #  run: cargo build --bin example-axum --manifest-path example/Cargo.toml --features axum
+      - name: Run example-axum
+        run: cargo build --bin example-axum --manifest-path example/Cargo.toml --features axum

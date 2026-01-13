@@ -51,10 +51,10 @@ path = "src/threads.rs"
 name = "example-serde"
 path = "src/serde.rs"
 
-#[[bin]]
-#name = "example-axum"
-#path = "src/axum.rs"
-#required-features = ["axum"]
+[[bin]]
+name = "example-axum"
+path = "src/axum.rs"
+required-features = ["axum"]
 
 [[bin]]
 name = "example-json"

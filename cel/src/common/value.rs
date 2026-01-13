@@ -5,7 +5,7 @@ use crate::common::types::Type;
 use std::any::Any;
 use std::fmt::Debug;
 
-pub trait Val: Any + Debug {
+pub trait Val: Any + Debug + Send + Sync {
     fn get_type(&self) -> Type<'_>;
 
     fn as_adder(&self) -> Option<&dyn Adder> {

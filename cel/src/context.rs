@@ -300,3 +300,15 @@ impl<T: VariableResolver> VariableResolver for &T {
         (**self).resolve(variable)
     }
 }
+
+#[cfg(test)]
+mod test {
+    // A helper function that requires T to implement some traits
+    fn assert_send<T: Send>() {}
+
+    #[test]
+    fn test_context_is_send() {
+        // This line will only compile if assertion passes
+        assert_send::<super::Context>();
+    }
+}
