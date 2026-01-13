@@ -4,23 +4,22 @@ use crate::common::value::Val;
 use crate::{ExecutionError, Value};
 use std::borrow::Cow;
 use std::ops::Deref;
-use std::time::Duration as StdDuration;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct Duration(StdDuration);
+pub struct Duration(chrono::Duration);
 
 impl Duration {
-    pub fn into_inner(self) -> StdDuration {
+    pub fn into_inner(self) -> chrono::Duration {
         self.0
     }
 
-    pub fn inner(&self) -> &StdDuration {
+    pub fn inner(&self) -> &chrono::Duration {
         &self.0
     }
 }
 
 impl Deref for Duration {
-    type Target = StdDuration;
+    type Target = chrono::Duration;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -61,7 +60,7 @@ impl Adder for Duration {
             Ok(Cow::<dyn Val>::Owned(Box::new(Duration(
                 // todo report the proper values in the error
                 self.0
-                    .checked_add(rhs.0)
+                    .checked_add(&rhs.0)
                     .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
             ))))
         } else {
@@ -90,7 +89,7 @@ impl Subtractor for Duration {
             Ok(Cow::<dyn Val>::Owned(Box::new(Duration(
                 // todo report the proper values in the error
                 self.0
-                    .checked_sub(rhs.0)
+                    .checked_sub(&rhs.0)
                     .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
             ))))
         } else {
@@ -99,19 +98,19 @@ impl Subtractor for Duration {
     }
 }
 
-impl From<StdDuration> for Duration {
-    fn from(duration: StdDuration) -> Self {
+impl From<chrono::Duration> for Duration {
+    fn from(duration: chrono::Duration) -> Self {
         Self(duration)
     }
 }
 
-impl From<Duration> for StdDuration {
+impl From<Duration> for chrono::Duration {
     fn from(duration: Duration) -> Self {
         duration.0
     }
 }
 
-impl TryFrom<Box<dyn Val>> for StdDuration {
+impl TryFrom<Box<dyn Val>> for chrono::Duration {
     type Error = Box<dyn Val>;
 
     fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
@@ -122,7 +121,7 @@ impl TryFrom<Box<dyn Val>> for StdDuration {
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a StdDuration {
+impl<'a> TryFrom<&'a dyn Val> for &'a chrono::Duration {
     type Error = &'a dyn Val;
     fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
         if let Some(d) = value.downcast_ref::<Duration>() {

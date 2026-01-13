@@ -18,8 +18,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
-#[cfg(feature = "chrono")]
-use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -849,27 +847,12 @@ impl TryFrom<&dyn Val> for Value {
             ))),
             #[cfg(feature = "chrono")]
             DURATION_TYPE => Ok(Value::Duration(
-                chrono::Duration::from_std(*v.downcast_ref::<CelDuration>().unwrap().inner())
-                    .unwrap(),
+                *v.downcast_ref::<CelDuration>().unwrap().inner(),
             )),
             #[cfg(feature = "chrono")]
             TIMESTAMP_TYPE => {
                 let ts = v.downcast_ref::<CelTimestamp>().unwrap().inner();
-                match ts.duration_since(UNIX_EPOCH) {
-                    Ok(duration) => Ok(Value::Timestamp(
-                        chrono::DateTime::from_timestamp(
-                            duration.as_secs() as i64,
-                            duration.subsec_nanos(),
-                        )
-                        .unwrap_or_default()
-                        .fixed_offset(),
-                    )),
-                    Err(_) => Err(ExecutionError::Overflow(
-                        "timestamp issue!",
-                        Value::Null,
-                        Value::Null,
-                    )),
-                }
+                Ok(Value::Timestamp(*ts))
             }
             LIST_TYPE => {
                 let list = v.downcast_ref::<CelList>().unwrap().inner();
@@ -928,14 +911,9 @@ impl TryFrom<Value> for Box<dyn Val> {
             Value::Null => Ok(Box::new(CelNull)),
             Value::Bytes(b) => Ok(Box::new(CelBytes::from(b.as_slice().to_vec()))),
             #[cfg(feature = "chrono")]
-            Value::Duration(d) => {
-                Ok(Box::new(CelDuration::from(d.to_std().map_err(|_| {
-                    ExecutionError::Overflow("duration", Value::Null, Value::Null)
-                })?)))
-            }
+            Value::Duration(d) => Ok(Box::new(CelDuration::from(d))),
             #[cfg(feature = "chrono")]
             Value::Timestamp(ts) => {
-                let ts: SystemTime = ts.into();
                 Ok(Box::new(CelTimestamp::from(ts)))
             }
             Value::List(l) => {

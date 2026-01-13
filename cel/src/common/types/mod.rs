@@ -4,6 +4,7 @@ use std::any::Any;
 pub(crate) mod bool;
 mod bytes;
 mod double;
+#[cfg(feature = "chrono")]
 mod duration;
 mod int;
 mod list;
@@ -11,6 +12,7 @@ mod map;
 mod null;
 mod optional;
 mod string;
+#[cfg(feature = "chrono")]
 mod timestamp;
 mod uint;
 
@@ -18,6 +20,7 @@ use crate::common::value::Val;
 pub use bool::Bool as CelBool;
 pub use bytes::Bytes as CelBytes;
 pub use double::Double as CelDouble;
+#[cfg(feature = "chrono")]
 pub use duration::Duration as CelDuration;
 pub use int::Int as CelInt;
 pub use list::DefaultList as CelList;
@@ -26,6 +29,7 @@ pub use map::Key as CelMapKey;
 pub use null::Null as CelNull;
 pub use optional::Optional as CelOptional;
 pub use string::String as CelString;
+#[cfg(feature = "chrono")]
 pub use timestamp::Timestamp as CelTimestamp;
 pub use uint::UInt as CelUInt;
 
