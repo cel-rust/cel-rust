@@ -233,11 +233,18 @@ impl<'a> Type<'a> {
     }
 }
 
+/// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`
+/// Will return `Result::Ok` if the type check succeeded with the actual Box to the
+/// `Box<T>`. `Result::Err` with the `Box<dyn Val>` back to the caller should the type check
+/// fail.
 fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
     if <dyn Any>::is::<T>(&*value) {
-        let list = &mut Some(value);
-        let list = unsafe { &mut *(list as *mut _ as *mut Option<Box<T>>) };
-        return Ok(list.take().unwrap());
+        let temp_container = &mut Some(value);
+        // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
+        // that check for memory safety because we have implemented Any for all types; no other
+        // impls can exist as they would conflict with our impl.
+        let temp_container = unsafe { &mut *(temp_container as *mut _ as *mut Option<Box<T>>) };
+        return Ok(temp_container.take().unwrap());
     }
     Err(value)
 }
