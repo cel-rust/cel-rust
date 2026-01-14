@@ -420,11 +420,11 @@ impl Debug for OpaqueVal {
 
 impl Val for OpaqueVal {
     fn get_type(&self) -> Type<'_> {
-        OPTIONAL_TYPE
+        Type::new_opaque_type(self.0.runtime_type_name())
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
-        if other.get_type() != OPTIONAL_TYPE {
+        if other.get_type() != self.get_type() {
             false
         } else {
             match other.downcast_ref::<OpaqueVal>() {
@@ -890,11 +890,18 @@ impl TryFrom<&dyn Val> for Value {
                     }
                 }
             })),
-            _ => Err(ExecutionError::UnexpectedType {
-                got: v.get_type().name().to_string(),
-                want: "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
-                    .to_string(),
-            }),
+            _ => {
+                if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
+                    Ok(Value::Opaque(opaque.0.clone()))
+                } else {
+                    Err(ExecutionError::UnexpectedType {
+                        got: v.get_type().name().to_string(),
+                        want:
+                            "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
+                                .to_string(),
+                    })
+                }
+            }
         }
     }
 }
