@@ -2,7 +2,7 @@
 name = "cel"
 description = "A parser and interpreter for the Common Expression Language (CEL)"
 repository = "https://github.com/cel-rust/cel-rust"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["Clark McCauley <me@clarkmccauley.com>", "Alex Snaps <alex@wcgw.dev>"]
 edition = "2021"
 rust-version = "1.86.0"
