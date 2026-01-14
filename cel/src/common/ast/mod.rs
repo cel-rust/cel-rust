@@ -1,4 +1,6 @@
-use crate::common::value::CelVal;
+use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelNull, CelString, CelUInt};
+use crate::common::value::Val;
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 pub mod operators;
@@ -26,7 +28,7 @@ pub enum Expr {
     List(ListExpr),
 
     /// LiteralKind represents a primitive scalar literal.
-    Literal(CelVal),
+    Literal(LiteralValue),
 
     /// MapKind represents a map literal expression.
     Map(MapExpr),
@@ -36,6 +38,32 @@ pub enum Expr {
 
     /// StructKind represents a struct literal expression.
     Struct(StructExpr),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum LiteralValue {
+    Boolean(CelBool),
+    Bytes(CelBytes),
+    Double(CelDouble),
+    Int(CelInt),
+    Null,
+    String(CelString),
+    UInt(CelUInt),
+}
+
+impl LiteralValue {
+    pub fn to_val<'a>(&'a self) -> Cow<'a, dyn Val> {
+        // todo refactor to return Cow::Borrowed
+        match &self {
+            LiteralValue::Boolean(b) => Cow::Borrowed(b),
+            LiteralValue::Bytes(b) => Cow::Borrowed(b),
+            LiteralValue::Double(f) => Cow::Borrowed(f),
+            LiteralValue::Int(i) => Cow::Borrowed(i),
+            LiteralValue::Null => Cow::<dyn Val>::Owned(Box::new(CelNull)),
+            LiteralValue::String(s) => Cow::Borrowed(s),
+            LiteralValue::UInt(ui) => Cow::Borrowed(ui),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

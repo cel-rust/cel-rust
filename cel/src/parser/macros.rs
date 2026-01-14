@@ -1,5 +1,6 @@
-use crate::common::ast::{operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr};
-use crate::common::value::CelVal::{Boolean, Int};
+use crate::common::ast::{
+    operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr, LiteralValue,
+};
 use crate::parser::{MacroExprHelper, ParseError};
 
 pub type MacroExpander = fn(
@@ -71,7 +72,7 @@ fn exists_macro_expander(
     let mut arguments = vec![args.remove(1)];
     let v = extract_ident(args.remove(0), helper)?;
 
-    let init = helper.next_expr(Expr::Literal(Boolean(false)));
+    let init = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
     let result_binding = "@result".to_string();
     let accu_ident = helper.next_expr(Expr::Ident(result_binding.clone()));
     let arg = helper.next_expr(Expr::Call(CallExpr {
@@ -122,7 +123,7 @@ fn all_macro_expander(
     let mut arguments = vec![args.remove(1)];
     let v = extract_ident(args.remove(0), helper)?;
 
-    let init = helper.next_expr(Expr::Literal(Boolean(true)));
+    let init = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
     let result_binding = "@result".to_string();
     let accu_ident = helper.next_expr(Expr::Ident(result_binding.clone()));
     let condition = helper.next_expr(Expr::Call(CallExpr {
@@ -169,13 +170,13 @@ fn exists_one_macro_expander(
     let mut arguments = vec![args.remove(1)];
     let v = extract_ident(args.remove(0), helper)?;
 
-    let init = helper.next_expr(Expr::Literal(Int(0)));
+    let init = helper.next_expr(Expr::Literal(LiteralValue::Int(0.into())));
     let result_binding = "@result".to_string();
-    let condition = helper.next_expr(Expr::Literal(Boolean(true)));
+    let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
 
     let args = vec![
         helper.next_expr(Expr::Ident(result_binding.clone())),
-        helper.next_expr(Expr::Literal(Int(1))),
+        helper.next_expr(Expr::Literal(LiteralValue::Int(1.into()))),
     ];
     arguments.push(helper.next_expr(Expr::Call(CallExpr {
         func_name: operators::ADD.to_string(),
@@ -191,7 +192,7 @@ fn exists_one_macro_expander(
     }));
 
     let accu = helper.next_expr(Expr::Ident(result_binding.clone()));
-    let one = helper.next_expr(Expr::Literal(Int(1)));
+    let one = helper.next_expr(Expr::Literal(LiteralValue::Int(1.into())));
     let result = helper.next_expr(Expr::Call(CallExpr {
         func_name: operators::EQUALS.to_string(),
         target: None,
@@ -229,7 +230,7 @@ fn map_macro_expander(
 
     let init = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
     let result_binding = "@result".to_string();
-    let condition = helper.next_expr(Expr::Literal(Boolean(true)));
+    let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
 
     let filter = args.pop();
 
@@ -289,7 +290,7 @@ fn filter_macro_expander(
 
     let init = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
     let result_binding = "@result".to_string();
-    let condition = helper.next_expr(Expr::Literal(Boolean(true)));
+    let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
 
     let args = vec![
         helper.next_expr(Expr::Ident(result_binding.clone())),

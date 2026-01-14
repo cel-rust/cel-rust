@@ -973,14 +973,14 @@ impl ser::Serializer for TimeSerializer {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "chrono")]
+    use super::{Duration, Timestamp};
     use crate::{objects::Key, to_value, Value};
     use crate::{Context, Program};
+    use chrono::FixedOffset;
     use serde::Serialize;
     use serde_bytes::Bytes;
     use std::{collections::HashMap, iter::FromIterator, sync::Arc};
-
-    #[cfg(feature = "chrono")]
-    use super::{Duration, Timestamp};
 
     macro_rules! primitive_test {
         ($functionName:ident, $strValue: literal, $value: expr) => {
@@ -1229,8 +1229,6 @@ mod tests {
     #[cfg(feature = "chrono")]
     #[test]
     fn test_time_types() {
-        use chrono::FixedOffset;
-
         let tests = to_value([
             TestTimeTypes {
                 dur: chrono::Duration::milliseconds(1527).into(),
@@ -1319,9 +1317,11 @@ mod tests {
 
         let program = Program::compile("test == expected").unwrap();
         let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", tests).unwrap();
-        let value = program.execute(&context).unwrap();
+        context.add_variable("expected", expected.clone()).unwrap();
+        context.add_variable("test", tests.clone()).unwrap();
+        let value = program
+            .execute(&context)
+            .unwrap_or_else(|_| panic!("{:#?} == {:#?}", tests, expected));
         assert_eq!(value, true.into());
     }
 

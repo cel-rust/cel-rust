@@ -1,25 +1,37 @@
 use crate::common::traits;
+use std::any::Any;
 
-mod bool;
+pub(crate) mod bool;
 mod bytes;
 mod double;
+#[cfg(feature = "chrono")]
 mod duration;
 mod int;
+mod list;
+mod map;
 mod null;
 mod optional;
 mod string;
+#[cfg(feature = "chrono")]
 mod timestamp;
 mod uint;
 
-pub use bool::Bool;
-pub use bytes::Bytes;
-pub use double::Double;
-pub use duration::Duration;
-pub use int::Int;
-pub use null::Null;
-pub use string::String;
-pub use timestamp::Timestamp;
-pub use uint::UInt;
+use crate::common::value::Val;
+pub use bool::Bool as CelBool;
+pub use bytes::Bytes as CelBytes;
+pub use double::Double as CelDouble;
+#[cfg(feature = "chrono")]
+pub use duration::Duration as CelDuration;
+pub use int::Int as CelInt;
+pub use list::DefaultList as CelList;
+pub use map::DefaultMap as CelMap;
+pub use map::Key as CelMapKey;
+pub use null::Null as CelNull;
+pub use optional::Optional as CelOptional;
+pub use string::String as CelString;
+#[cfg(feature = "chrono")]
+pub use timestamp::Timestamp as CelTimestamp;
+pub use uint::UInt as CelUInt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Kind {
@@ -120,6 +132,8 @@ pub const MAP_TYPE: Type = Type::new_map_type(&[&DYN_TYPE, &DYN_TYPE]);
 
 pub const NULL_TYPE: Type = Type::simple_type(Kind::NullType, "null_type");
 
+pub const OPTIONAL_TYPE: Type = Type::new_opaque_type("optional_type");
+
 pub const STRING_TYPE: Type = Type {
     kind: Kind::String,
     parameters: &[],
@@ -217,6 +231,22 @@ impl<'a> Type<'a> {
     pub fn has_trait(&self, t: u16) -> bool {
         self.trait_mask & t == t
     }
+}
+
+/// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`
+/// Will return `Result::Ok` if the type check succeeded with the actual Box to the
+/// `Box<T>`. `Result::Err` with the `Box<dyn Val>` back to the caller should the type check
+/// fail.
+fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
+    if <dyn Any>::is::<T>(&*value) {
+        let temp_container = &mut Some(value);
+        // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
+        // that check for memory safety because we have implemented Any for all types; no other
+        // impls can exist as they would conflict with our impl.
+        let temp_container = unsafe { &mut *(temp_container as *mut _ as *mut Option<Box<T>>) };
+        return Ok(temp_container.take().unwrap());
+    }
+    Err(value)
 }
 
 #[cfg(test)]

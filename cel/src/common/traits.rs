@@ -1,3 +1,10 @@
+use crate::common::value::Val;
+use crate::ExecutionError;
+use std::any::Any;
+use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::fmt::Debug;
+
 /// ADDER_TYPE types provide a '+' operator overload.
 pub const ADDER_TYPE: u16 = 1;
 
@@ -45,3 +52,53 @@ pub const SUBTRACTOR_TYPE: u16 = SIZER_TYPE << 1;
 
 /// FOLDABLE_TYPE types support comprehensions v2 macros which iterate over (key, value) pairs.
 pub const FOLDABLE_TYPE: u16 = SUBTRACTOR_TYPE << 1;
+
+pub trait Adder {
+    fn add<'a>(&'a self, _rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
+pub trait Comparer {
+    fn compare(&self, _rhs: &dyn Val) -> Result<Ordering, ExecutionError>;
+}
+
+pub trait Container {
+    fn contains(&self, _value: &dyn Val) -> Result<bool, ExecutionError>;
+}
+
+pub trait Divider {
+    fn div<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
+pub trait Iterable {
+    fn iter<'a>(&'a self) -> Box<dyn Iterator<'a> + 'a>;
+}
+
+pub trait Iterator<'a> {
+    fn next(&mut self) -> Option<&'a dyn Val>;
+}
+
+pub trait Modder {
+    fn modulo<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
+pub trait Multiplier {
+    fn mul<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
+pub trait Negator {
+    fn negate(&self) -> Result<Box<dyn Val>, ExecutionError>;
+}
+
+pub trait Subtractor {
+    fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+}
+
+pub trait Indexer {
+    fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+
+    fn steal(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError>;
+}
+
+pub trait Lister: Debug + Any {
+    fn as_indexer(&self) -> &dyn Indexer;
+}

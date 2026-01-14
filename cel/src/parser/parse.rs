@@ -62,7 +62,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                             let hex: String = [
                                 chars
                                     .next()
-                                    .ok_or(ParseSequenceError::InvalidEscape {
+                                    .ok_or_else(|| ParseSequenceError::InvalidEscape {
                                         escape: "\\x".to_string(),
                                         index: idx,
                                         string: s.to_string(),
@@ -70,7 +70,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                                     .1,
                                 chars
                                     .next()
-                                    .ok_or(ParseSequenceError::InvalidEscape {
+                                    .ok_or_else(|| ParseSequenceError::InvalidEscape {
                                         escape: "\\x".to_string(),
                                         index: idx,
                                         string: s.to_string(),
@@ -92,7 +92,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                                 n,
                                 chars
                                     .next()
-                                    .ok_or(ParseSequenceError::InvalidEscape {
+                                    .ok_or_else(|| ParseSequenceError::InvalidEscape {
                                         escape: format!("\\{n}"),
                                         index: idx,
                                         string: s.to_string(),
@@ -100,7 +100,7 @@ pub fn parse_bytes(s: &str) -> Result<Vec<u8>, ParseSequenceError> {
                                     .1,
                                 chars
                                     .next()
-                                    .ok_or(ParseSequenceError::InvalidEscape {
+                                    .ok_or_else(|| ParseSequenceError::InvalidEscape {
                                         escape: format!("\\{n}"),
                                         index: idx,
                                         string: s.to_string(),

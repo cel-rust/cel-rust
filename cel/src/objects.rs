@@ -1,9 +1,14 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::types::bool::Bool;
+use crate::common::types::*;
+use crate::common::value::Val;
 use crate::context::Context;
-use crate::functions::FunctionContext;
-use crate::{ExecutionError, Expression};
+use crate::ExecutionError::NoSuchOverload;
+use crate::{ExecutionError, Expression, FunctionContext};
+#[cfg(feature = "chrono")]
+use chrono::TimeZone;
 use std::any::Any;
-use std::borrow::Borrow;
+use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -13,10 +18,6 @@ use std::ops::Deref;
 use std::sync::Arc;
 #[cfg(feature = "chrono")]
 use std::sync::LazyLock;
-
-use crate::common::value::CelVal;
-#[cfg(feature = "chrono")]
-use chrono::TimeZone;
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -88,6 +89,28 @@ pub enum Key {
     Uint(u64),
     Bool(bool),
     String(Arc<String>),
+}
+
+impl From<CelMapKey> for Key {
+    fn from(value: CelMapKey) -> Self {
+        match value {
+            CelMapKey::Bool(b) => b.into_inner().into(),
+            CelMapKey::Int(i) => i.into_inner().into(),
+            CelMapKey::String(s) => s.into_inner().into(),
+            CelMapKey::UInt(u) => u.into_inner().into(),
+        }
+    }
+}
+
+impl From<Key> for CelMapKey {
+    fn from(key: Key) -> Self {
+        match key {
+            Key::Int(i) => CelMapKey::from(i),
+            Key::Uint(u) => CelMapKey::from(u),
+            Key::Bool(b) => CelMapKey::from(b),
+            Key::String(s) => CelMapKey::from(s.as_str()),
+        }
+    }
 }
 
 /// A borrowed version of [`Key`] that avoids allocating for lookups.
@@ -386,6 +409,42 @@ impl dyn Opaque {
     }
 }
 
+#[derive(Clone)]
+struct OpaqueVal(Arc<dyn Opaque>);
+
+impl Debug for OpaqueVal {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OpaqueVal<{}>", self.0.runtime_type_name())
+    }
+}
+
+impl Val for OpaqueVal {
+    fn get_type(&self) -> Type<'_> {
+        Type::new_opaque_type(self.0.runtime_type_name())
+    }
+
+    fn equals(&self, other: &dyn Val) -> bool {
+        if other.get_type() != self.get_type() {
+            false
+        } else {
+            match other.downcast_ref::<OpaqueVal>() {
+                None => false,
+                Some(other) => self.0.opaque_eq(other.0.deref()),
+            }
+        }
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(self.clone())
+    }
+}
+
+impl OpaqueVal {
+    fn clone_inner(&self) -> Arc<dyn Opaque> {
+        self.0.clone()
+    }
+}
+
 #[derive(Debug, Eq, PartialEq)]
 pub struct OptionalValue {
     value: Option<Value>,
@@ -401,11 +460,21 @@ impl OptionalValue {
     pub fn value(&self) -> Option<&Value> {
         self.value.as_ref()
     }
+
+    pub(crate) fn inner(&self) -> Option<&Value> {
+        self.value.as_ref()
+    }
 }
 
 impl Opaque for OptionalValue {
     fn runtime_type_name(&self) -> &str {
         "optional_type"
+    }
+}
+
+impl From<OptionalValue> for Option<Value> {
+    fn from(value: OptionalValue) -> Self {
+        value.value
     }
 }
 
@@ -487,21 +556,6 @@ impl Debug for Value {
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Opaque(o) => write!(f, "Opaque<{}>({:?})", o.runtime_type_name(), o.as_debug()),
             Value::Null => write!(f, "Null"),
-        }
-    }
-}
-
-impl From<CelVal> for Value {
-    fn from(val: CelVal) -> Self {
-        match val {
-            CelVal::String(s) => Value::String(Arc::new(s)),
-            CelVal::Boolean(b) => Value::Bool(b),
-            CelVal::Int(i) => Value::Int(i),
-            CelVal::UInt(u) => Value::UInt(u),
-            CelVal::Double(d) => Value::Float(d),
-            CelVal::Bytes(bytes) => Value::Bytes(Arc::new(bytes)),
-            CelVal::Null => Value::Null,
-            v => unimplemented!("{v:?}"),
         }
     }
 }
@@ -774,6 +828,128 @@ impl From<Value> for ResolveResult {
     }
 }
 
+impl TryFrom<&dyn Val> for Value {
+    type Error = ExecutionError;
+    fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
+        match v.get_type() {
+            BOOL_TYPE => Ok(Value::Bool(*v.downcast_ref::<CelBool>().unwrap().inner())),
+            INT_TYPE => Ok(Value::Int(*v.downcast_ref::<CelInt>().unwrap().inner())),
+            UINT_TYPE => Ok(Value::UInt(*v.downcast_ref::<CelUInt>().unwrap().inner())),
+            DOUBLE_TYPE => Ok(Value::Float(
+                *v.downcast_ref::<CelDouble>().unwrap().inner(),
+            )),
+            STRING_TYPE => Ok(Value::String(Arc::new(
+                v.downcast_ref::<CelString>().unwrap().inner().to_string(),
+            ))),
+            NULL_TYPE => Ok(Value::Null),
+            BYTES_TYPE => Ok(Value::Bytes(Arc::new(
+                v.downcast_ref::<CelBytes>().unwrap().inner().to_vec(),
+            ))),
+            #[cfg(feature = "chrono")]
+            DURATION_TYPE => Ok(Value::Duration(
+                *v.downcast_ref::<CelDuration>().unwrap().inner(),
+            )),
+            #[cfg(feature = "chrono")]
+            TIMESTAMP_TYPE => {
+                let ts = v.downcast_ref::<CelTimestamp>().unwrap().inner();
+                Ok(Value::Timestamp(*ts))
+            }
+            LIST_TYPE => {
+                let list = v.downcast_ref::<CelList>().unwrap().inner();
+                Ok(Value::List(Arc::new(
+                    list.iter()
+                        .map(|i| i.as_ref().try_into().expect("Not a Value list item"))
+                        .collect(),
+                )))
+            }
+            MAP_TYPE => {
+                let map = v.downcast_ref::<CelMap>().unwrap().inner();
+                Ok(Value::Map(Map {
+                    map: Arc::new(
+                        map.iter()
+                            .map(|(k, v)| {
+                                (
+                                    Key::from(k.clone()),
+                                    Value::try_from(v.as_ref()).expect("Not a Value map value"),
+                                )
+                            })
+                            .collect(),
+                    ),
+                }))
+            }
+            OPTIONAL_TYPE => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
+                None => v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
+                Some(opt) => {
+                    let opt: Option<Result<Value, _>> = opt.option().map(|v| v.try_into());
+                    match opt {
+                        None => Arc::new(OptionalValue::none()),
+                        Some(t) => match t {
+                            Ok(v) => Arc::new(OptionalValue::of(v)),
+                            Err(_) => Arc::new(OptionalValue::none()),
+                        },
+                    }
+                }
+            })),
+            _ => {
+                if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
+                    Ok(Value::Opaque(opaque.0.clone()))
+                } else {
+                    Err(ExecutionError::UnexpectedType {
+                        got: v.get_type().name().to_string(),
+                        want:
+                            "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
+                                .to_string(),
+                    })
+                }
+            }
+        }
+    }
+}
+
+impl TryFrom<Value> for Box<dyn Val> {
+    type Error = ExecutionError;
+    fn try_from(value: Value) -> Result<Self, Self::Error> {
+        match value {
+            Value::Bool(b) => Ok(Box::new(CelBool::from(b))),
+            Value::Int(i) => Ok(Box::new(CelInt::from(i))),
+            Value::UInt(u) => Ok(Box::new(CelUInt::from(u))),
+            Value::Float(f) => Ok(Box::new(CelDouble::from(f))),
+            Value::String(s) => Ok(Box::new(CelString::from(s.as_str()))),
+            Value::Null => Ok(Box::new(CelNull)),
+            Value::Bytes(b) => Ok(Box::new(CelBytes::from(b.as_slice().to_vec()))),
+            #[cfg(feature = "chrono")]
+            Value::Duration(d) => Ok(Box::new(CelDuration::from(d))),
+            #[cfg(feature = "chrono")]
+            Value::Timestamp(ts) => Ok(Box::new(CelTimestamp::from(ts))),
+            Value::List(l) => {
+                let result: Result<Vec<Box<dyn Val>>, ExecutionError> =
+                    (*l).clone().into_iter().map(|i| i.try_into()).collect();
+                Ok(Box::new(CelList::from(result?)))
+            }
+            Value::Map(map) => {
+                let result: Result<HashMap<CelMapKey, Box<dyn Val>>, ExecutionError> = (*map.map)
+                    .clone()
+                    .into_iter()
+                    .map(|(k, v)| v.clone().try_into().map(|v| (k.clone().into(), v)))
+                    .collect();
+                Ok(Box::new(CelMap::from(result?)))
+            }
+            Value::Opaque(o) => {
+                let v: Box<dyn Val> = if let Some(value) = o.downcast_ref::<OptionalValue>() {
+                    match value.inner() {
+                        None => Box::new(CelOptional::none()),
+                        Some(v) => Box::new(CelOptional::of(v.clone().try_into()?)),
+                    }
+                } else {
+                    Box::new(OpaqueVal(o))
+                };
+                Ok(v)
+            }
+            _ => Err(ExecutionError::UnsupportedTargetType { target: value }),
+        }
+    }
+}
+
 impl Value {
     pub fn resolve_all(expr: &[Expression], ctx: &Context) -> ResolveResult {
         let mut res = Vec::with_capacity(expr.len());
@@ -783,209 +959,115 @@ impl Value {
         Ok(Value::List(res.into()))
     }
 
-    #[inline(always)]
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
+        Self::resolve_val(expr, ctx)?.as_ref().try_into()
+    }
+
+    #[inline(always)]
+    pub fn resolve_val<'a>(
+        expr: &'a Expression,
+        ctx: &'a Context<'a>,
+    ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         match &expr.expr {
-            Expr::Literal(val) => Ok(val.clone().into()),
+            Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
+                // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
-                    let cond = Value::resolve(&call.args[0], ctx)?;
-                    return if cond.to_bool()? {
-                        Value::resolve(&call.args[1], ctx)
+                    let cond = Value::resolve_val(&call.args[0], ctx)?;
+                    return if try_bool(cond.as_ref())? {
+                        Value::resolve_val(&call.args[1], ctx)
                     } else {
-                        Value::resolve(&call.args[2], ctx)
+                        Value::resolve_val(&call.args[2], ctx)
                     };
                 }
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
-                        operators::ADD => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                + Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::SUBSTRACT => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                - Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::DIVIDE => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                / Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::MULTIPLY => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                * Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::MODULO => {
-                            return Value::resolve(&call.args[0], ctx)?
-                                % Value::resolve(&call.args[1], ctx)?
-                        }
-                        operators::EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .eq(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
-                        }
-                        operators::NOT_EQUALS => {
-                            return Value::Bool(
-                                Value::resolve(&call.args[0], ctx)?
-                                    .ne(&Value::resolve(&call.args[1], ctx)?),
-                            )
-                            .into()
-                        }
-                        operators::LESS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    == Ordering::Less,
-                            )
-                            .into();
-                        }
-                        operators::LESS_EQUALS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    != Ordering::Greater,
-                            )
-                            .into();
-                        }
-                        operators::GREATER => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    == Ordering::Greater,
-                            )
-                            .into();
-                        }
-                        operators::GREATER_EQUALS => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            return Value::Bool(
-                                left.partial_cmp(&right)
-                                    .ok_or(ExecutionError::ValuesNotComparable(left, right))?
-                                    != Ordering::Less,
-                            )
-                            .into();
-                        }
-                        operators::IN => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            let right = Value::resolve(&call.args[1], ctx)?;
-                            match (left, right) {
-                                (Value::String(l), Value::String(r)) => {
-                                    return Value::Bool(r.contains(&*l)).into()
-                                }
-                                (any, Value::List(v)) => {
-                                    return Value::Bool(v.contains(&any)).into()
-                                }
-                                (any, Value::Map(m)) => match KeyRef::try_from(&any) {
-                                    Ok(key) => return Value::Bool(m.contains_key(&key)).into(),
-                                    Err(_) => return Value::Bool(false).into(),
-                                },
-                                (left, right) => {
-                                    Err(ExecutionError::ValuesNotComparable(left, right))?
-                                }
-                            }
-                        }
                         operators::LOGICAL_OR => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            return if left.to_bool()? {
-                                left.into()
+                            let left = Value::resolve_val(&call.args[0], ctx)?;
+                            return if try_bool(left.as_ref())? {
+                                Ok(left)
                             } else {
-                                Value::resolve(&call.args[1], ctx)
+                                let right = Value::resolve_val(&call.args[1], ctx)?;
+                                if right.get_type() == BOOL_TYPE {
+                                    Ok(right)
+                                } else {
+                                    Err(ExecutionError::NoSuchOverload)
+                                }
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = Value::resolve(&call.args[0], ctx)?;
-                            return if !left.to_bool()? {
-                                Value::Bool(false)
+                            let left = Value::resolve_val(&call.args[0], ctx)?;
+                            return if !try_bool(left.as_ref())? {
+                                Ok(left)
                             } else {
-                                let right = Value::resolve(&call.args[1], ctx)?;
-                                Value::Bool(right.to_bool()?)
-                            }
-                            .into();
-                        }
-                        operators::INDEX | operators::OPT_INDEX => {
-                            let mut value = Value::resolve(&call.args[0], ctx)?;
-                            let idx = Value::resolve(&call.args[1], ctx)?;
-                            let mut is_optional = call.func_name == operators::OPT_INDEX;
-
-                            if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                                is_optional = true;
-                                value = match opt_val.value() {
-                                    Some(inner) => inner.clone(),
-                                    None => {
-                                        return Ok(Value::Opaque(Arc::new(OptionalValue::none())))
-                                    }
-                                };
-                            }
-
-                            let result = match (value, idx) {
-                                (Value::List(items), Value::Int(idx)) => {
-                                    if idx >= 0 && (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::List(items), Value::UInt(idx)) => {
-                                    if (idx as usize) < items.len() {
-                                        items[idx as usize].clone().into()
-                                    } else {
-                                        Err(ExecutionError::IndexOutOfBounds(idx.into()))
-                                    }
-                                }
-                                (Value::String(_), Value::Int(idx)) => {
-                                    Err(ExecutionError::NoSuchKey(idx.to_string().into()))
-                                }
-                                (Value::Map(map), Value::String(property)) => map
-                                    .get(&KeyRef::String(property.as_str()))
-                                    .cloned()
-                                    .ok_or_else(|| ExecutionError::NoSuchKey(property)),
-                                (Value::Map(map), Value::Bool(property)) => {
-                                    map.get(&KeyRef::Bool(property)).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(map), Value::Int(property)) => {
-                                    map.get(&KeyRef::Int(property)).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(map), Value::UInt(property)) => {
-                                    map.get(&KeyRef::Uint(property)).cloned().ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(property.to_string().into())
-                                    })
-                                }
-                                (Value::Map(_), index) => {
-                                    Err(ExecutionError::UnsupportedMapIndex(index))
-                                }
-                                (Value::List(_), index) => {
-                                    Err(ExecutionError::UnsupportedListIndex(index))
-                                }
-                                (value, index) => {
-                                    Err(ExecutionError::UnsupportedIndex(value, index))
+                                let right = Value::resolve_val(&call.args[1], ctx)?;
+                                if right.get_type() == BOOL_TYPE {
+                                    Ok(right)
+                                } else {
+                                    Err(ExecutionError::NoSuchOverload)
                                 }
                             };
+                        }
+                        operators::EQUALS => {
+                            return Ok(bool(
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .eq(&Value::resolve_val(&call.args[1], ctx)?),
+                            ))
+                        }
+                        operators::NOT_EQUALS => {
+                            return Ok(bool(
+                                Value::resolve_val(&call.args[0], ctx)?
+                                    .ne(&Value::resolve_val(&call.args[1], ctx)?),
+                            ))
+                        }
+                        operators::INDEX | operators::OPT_INDEX => {
+                            let mut is_optional = call.func_name == operators::OPT_INDEX;
+                            let value = Value::resolve_val(&call.args[0], ctx)?;
 
+                            let value = if let Some(opt) = value.downcast_ref::<CelOptional>() {
+                                is_optional = true;
+                                match opt.inner() {
+                                    // todo try to keep this borrowed
+                                    Some(v) => Cow::Owned(v.clone_as_boxed()),
+                                    None => {
+                                        return Ok(Cow::<dyn Val>::Owned(Box::new(
+                                            CelOptional::none(),
+                                        )))
+                                    }
+                                }
+                            } else {
+                                value
+                            };
+
+                            let result = match value {
+                                Cow::Borrowed(val) => val
+                                    .as_indexer()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()),
+                                Cow::Owned(val) => val
+                                    .into_indexer()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref())
+                                    .map(Cow::Owned),
+                            };
                             return if is_optional {
                                 Ok(match result {
-                                    Ok(val) => Value::Opaque(Arc::new(OptionalValue::of(val))),
-                                    Err(_) => Value::Opaque(Arc::new(OptionalValue::none())),
+                                    Ok(val) => Cow::<dyn Val>::Owned(Box::new(CelOptional::from(
+                                        val.clone_as_boxed(),
+                                    ))),
+                                    Err(_) => Cow::<dyn Val>::Owned(Box::new(CelOptional::none())),
                                 })
                             } else {
                                 result
                             };
                         }
                         operators::OPT_SELECT => {
-                            let operand = Value::resolve(&call.args[0], ctx)?;
-                            let field_literal = Value::resolve(&call.args[1], ctx)?;
-                            let field = match field_literal {
-                                Value::String(s) => s,
+                            let operand = Value::resolve_val(&call.args[0], ctx)?;
+                            let field_literal = Value::resolve_val(&call.args[1], ctx)?;
+                            let field = match field_literal.get_type() {
+                                STRING_TYPE => field_literal
+                                    .downcast_ref::<CelString>()
+                                    .expect("field must be string"),
                                 _ => {
                                     return Err(ExecutionError::function_error(
                                         "_?._",
@@ -993,17 +1075,169 @@ impl Value {
                                     ))
                                 }
                             };
-                            if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
-                                return match opt_val.value() {
-                                    Some(inner) => Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                                        inner.clone().member(&field)?,
-                                    )))),
-                                    None => Ok(operand),
-                                };
-                            }
-                            return Ok(Value::Opaque(Arc::new(OptionalValue::of(
-                                operand.member(&field)?,
-                            ))));
+                            return Ok(Cow::<dyn Val>::Owned(Box::new(
+                                if let Some(opt) = operand.as_ref().downcast_ref::<CelOptional>() {
+                                    opt.map(|operand| {
+                                        operand
+                                            .as_indexer()
+                                            .map(|i| {
+                                                i.get(field)
+                                                    .map(|v| v.clone_as_boxed())
+                                                    .unwrap_or(CelOptional::none().clone_as_boxed())
+                                            })
+                                            .unwrap_or(CelOptional::none().clone_as_boxed())
+                                    })
+                                } else {
+                                    CelOptional::of(
+                                        operand
+                                            .as_indexer()
+                                            .ok_or(NoSuchOverload)?
+                                            .get(field)?
+                                            .clone_as_boxed(),
+                                    )
+                                },
+                            )));
+                        }
+                        // END OF SPECIAL CASES
+
+                        // all below is NOT special in the interpreter
+                        operators::ADD => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_ref()
+                                    .as_adder()
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "add",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
+                                    .add(rhs.as_ref())?
+                                    .into_owned(),
+                            ));
+                        }
+                        operators::SUBSTRACT => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_subtractor()
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "sub",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
+                                    .sub(rhs.as_ref())?
+                                    .into_owned(),
+                            ));
+                        }
+                        operators::DIVIDE => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_divider()
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "div",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
+                                    .div(rhs.as_ref())?
+                                    .into_owned(),
+                            ));
+                        }
+                        operators::MULTIPLY => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_multiplier()
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "mul",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
+                                    .mul(rhs.as_ref())?
+                                    .into_owned(),
+                            ));
+                        }
+                        operators::MODULO => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return Ok(Cow::Owned(
+                                lhs.as_modder()
+                                    .ok_or_else(|| {
+                                        ExecutionError::UnsupportedBinaryOperator(
+                                            "rem",
+                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                        )
+                                    })?
+                                    .modulo(rhs.as_ref())?
+                                    .into_owned(),
+                            ));
+                        }
+                        operators::LESS => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return Ok(bool(
+                                lhs.as_comparer()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .compare(rhs.as_ref())?
+                                    == Ordering::Less,
+                            ));
+                        }
+                        operators::LESS_EQUALS => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if lhs
+                                .as_comparer()
+                                .ok_or(ExecutionError::NoSuchOverload)?
+                                .compare(rhs.as_ref())?
+                                == Ordering::Greater
+                            {
+                                Ok(bool(false))
+                            } else {
+                                Ok(bool(true))
+                            };
+                        }
+                        operators::GREATER => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return Ok(bool(
+                                lhs.as_comparer()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .compare(rhs.as_ref())?
+                                    == Ordering::Greater,
+                            ));
+                        }
+                        operators::GREATER_EQUALS => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if lhs
+                                .as_comparer()
+                                .ok_or(ExecutionError::NoSuchOverload)?
+                                .compare(rhs.as_ref())?
+                                == Ordering::Less
+                            {
+                                Ok(bool(false))
+                            } else {
+                                Ok(bool(true))
+                            };
+                        }
+                        operators::IN => {
+                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
+                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            return if let Some(container) = rhs.as_container() {
+                                Ok(bool(container.contains(lhs.as_ref())?))
+                            } else {
+                                Err(ExecutionError::NoSuchOverload)
+                            };
                         }
                         _ => (),
                     }
@@ -1011,23 +1245,26 @@ impl Value {
                 if call.args.len() == 1 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_NOT => {
-                            let expr = Value::resolve(&call.args[0], ctx)?;
-                            return Ok(Value::Bool(!expr.to_bool()?));
+                            let expr = Value::resolve_val(&call.args[0], ctx)?;
+                            return expr
+                                .downcast_ref::<CelBool>()
+                                .map(Bool::negate)
+                                .ok_or(ExecutionError::NoSuchOverload)
+                                .map(|b| bool(b.into_inner()));
                         }
                         operators::NEGATE => {
-                            return match Value::resolve(&call.args[0], ctx)? {
-                                Value::Int(i) => Ok(Value::Int(-i)),
-                                Value::Float(f) => Ok(Value::Float(-f)),
-                                value => {
-                                    Err(ExecutionError::UnsupportedUnaryOperator("minus", value))
-                                }
-                            }
+                            let val = Value::resolve_val(&call.args[0], ctx)?;
+                            return Ok(Cow::<dyn Val>::Owned(
+                                val.as_negator()
+                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .negate()?,
+                            ));
                         }
                         operators::NOT_STRICTLY_FALSE => {
-                            return match Value::resolve(&call.args[0], ctx)? {
-                                Value::Bool(b) => Ok(Value::Bool(b)),
-                                _ => Ok(Value::Bool(true)),
-                            }
+                            return Ok(bool(
+                                try_bool(Value::resolve_val(&call.args[0], ctx)?.as_ref())
+                                    .unwrap_or(true),
+                            ));
                         }
                         _ => (),
                     }
@@ -1037,8 +1274,10 @@ impl Value {
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
                         })?;
+                        // todo fix this to _not_ use `Value`
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, &call.args);
-                        (func)(&mut ctx)
+                        let v = (func)(&mut ctx)?;
+                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                     }
                     Some(target) => {
                         let qualified_func = match &target.expr {
@@ -1058,38 +1297,54 @@ impl Value {
                                     })?;
                                 let mut ctx = FunctionContext::new(
                                     &call.func_name,
-                                    Some(Value::resolve(target, ctx)?),
+                                    Some(Value::resolve_val(target, ctx)?.as_ref().try_into()?),
                                     ctx,
                                     &call.args,
                                 );
-                                (func)(&mut ctx)
+                                // todo fix this to _not_ use `Value`
+                                let v = (func)(&mut ctx)?;
+                                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                             }
                             Some(func) => {
                                 let mut ctx =
                                     FunctionContext::new(&call.func_name, None, ctx, &call.args);
-                                (func)(&mut ctx)
+                                // todo fix this to _not_ use `Value`
+                                let v = (func)(&mut ctx)?;
+                                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                             }
                         }
                     }
                 }
             }
-            Expr::Ident(name) => ctx.get_variable(name),
+            Expr::Ident(name) => Ok(ctx
+                .get_variable(name)
+                .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
-                let left = Value::resolve(select.operand.deref(), ctx)?;
-                if select.test {
-                    match &left {
-                        Value::Map(map) => {
-                            for key in map.map.deref().keys() {
-                                if key.to_string().eq(&select.field) {
-                                    return Ok(Value::Bool(true));
-                                }
-                            }
-                            Ok(Value::Bool(false))
+                let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                match left.get_type() {
+                    MAP_TYPE => {
+                        let key: CelString = select.field.as_str().into();
+                        if select.test {
+                            Ok(bool(
+                                left.as_container()
+                                    .ok_or_else(|| {
+                                        ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
+                                    })?
+                                    .contains(&key)?,
+                            ))
+                        } else {
+                            // todo avoid cloning when not needed
+                            Ok(Cow::<dyn Val>::Owned(
+                                left.as_indexer()
+                                    .ok_or_else(|| {
+                                        ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
+                                    })?
+                                    .get(&key)?
+                                    .into_owned(),
+                            ))
                         }
-                        _ => Ok(Value::Bool(false)),
                     }
-                } else {
-                    left.member(&select.field)
+                    _ => Ok(bool(false)),
                 }
             }
             Expr::List(list_expr) => {
@@ -1098,15 +1353,15 @@ impl Value {
                     .iter()
                     .enumerate()
                     .map(|(idx, element)| {
-                        Value::resolve(element, ctx).map(|value| {
+                        Value::resolve_val(element, ctx).map(|value| {
                             if list_expr.optional_indices.contains(&idx) {
-                                if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                                    opt_val.value().cloned()
+                                if let Some(opt_val) = value.downcast_ref::<CelOptional>() {
+                                    opt_val.inner().map(|v| v.clone_as_boxed())
                                 } else {
-                                    Some(value)
+                                    Some(value.into_owned())
                                 }
                             } else {
-                                Some(value)
+                                Some(value.into_owned())
                             }
                         })
                     })
@@ -1114,7 +1369,7 @@ impl Value {
                     .into_iter()
                     .flatten()
                     .collect::<Vec<_>>();
-                Value::List(list.into()).into()
+                Ok(Cow::<dyn Val>::Owned(Box::new(CelList::from(list))))
             }
             Expr::Map(map_expr) => {
                 let mut map = HashMap::with_capacity(map_expr.entries.len());
@@ -1123,15 +1378,14 @@ impl Value {
                         EntryExpr::StructField(_) => panic!("WAT?"),
                         EntryExpr::MapEntry(e) => (&e.key, &e.value, e.optional),
                     };
-                    let key = Value::resolve(k, ctx)?
-                        .try_into()
-                        .map_err(ExecutionError::UnsupportedKeyType)?;
-                    let value = Value::resolve(v, ctx)?;
+                    let key: CelMapKey = Value::resolve_val(k, ctx)?.into_owned().try_into()?;
+                    // todo do not clone if not needed!
+                    let value = Value::resolve_val(v, ctx)?.into_owned();
 
                     if is_optional {
-                        if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                            if let Some(inner) = opt_val.value() {
-                                map.insert(key, inner.clone());
+                        if let Some(opt_val) = value.downcast_ref::<CelOptional>() {
+                            if let Some(inner) = opt_val.inner() {
+                                map.insert(key, inner.clone_as_boxed());
                             }
                         } else {
                             map.insert(key, value);
@@ -1140,80 +1394,45 @@ impl Value {
                         map.insert(key, value);
                     }
                 }
-                Ok(Value::Map(Map {
-                    map: Arc::from(map),
-                }))
+                let map: Box<CelMap> = CelMap::from(map).into();
+                Ok(Cow::<dyn Val>::Owned(map))
             }
             Expr::Comprehension(comprehension) => {
-                let accu_init = Value::resolve(&comprehension.accu_init, ctx)?;
-                let iter = Value::resolve(&comprehension.iter_range, ctx)?;
+                let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
+                let iter = Value::resolve_val(&comprehension.iter_range, ctx)?;
                 let mut ctx = ctx.new_inner_scope();
-                ctx.add_variable(&comprehension.accu_var, accu_init)
-                    .expect("Failed to add accu variable");
+                ctx.add_variable_as_val(&comprehension.accu_var, accu_init.clone_as_boxed());
 
-                match iter {
-                    Value::List(items) => {
-                        for item in items.deref() {
-                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
-                                break;
-                            }
-                            ctx.add_variable_from_value(&comprehension.iter_var, item.clone());
-                            let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
-                            ctx.add_variable_from_value(&comprehension.accu_var, accu);
-                        }
+                let mut items = iter
+                    .as_iterable()
+                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .iter();
+                while let Some(item) = items.next() {
+                    if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx)?.as_ref())? {
+                        break;
                     }
-                    Value::Map(map) => {
-                        for key in map.map.deref().keys() {
-                            if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
-                                break;
-                            }
-                            ctx.add_variable_from_value(&comprehension.iter_var, key.clone());
-                            let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
-                            ctx.add_variable_from_value(&comprehension.accu_var, accu);
-                        }
-                    }
-                    t => todo!("Support {t:?}"),
+                    ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
+                    let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
+                    ctx.add_variable_as_val(&comprehension.accu_var, accu.clone_as_boxed());
                 }
-                Value::resolve(&comprehension.result, &ctx)
+                Ok(Cow::<dyn Val>::Owned(
+                    Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
+                ))
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
         }
     }
+}
 
-    // >> a(b)
-    // Member(Ident("a"),
-    //        FunctionCall([Ident("b")]))
-    // >> a.b(c)
-    // Member(Member(Ident("a"),
-    //               Attribute("b")),
-    //        FunctionCall([Ident("c")]))
+fn bool<'a>(boolean: bool) -> Cow<'a, dyn Val> {
+    Cow::<dyn Val>::Owned(Box::new(CelBool::from(boolean)))
+}
 
-    fn member(self, name: &str) -> ResolveResult {
-        // This will always either be because we're trying to access
-        // a property on self, or a method on self.
-        let child = match self {
-            Value::Map(ref m) => m.get(&KeyRef::String(name)).cloned(),
-            _ => None,
-        };
-
-        // If the property is both an attribute and a method, then we
-        // give priority to the property. Maybe we can implement lookahead
-        // to see if the next token is a function call?
-        if let Some(child) = child {
-            child.into()
-        } else {
-            ExecutionError::NoSuchKey(Arc::new(name.to_owned())).into()
-        }
-    }
-
-    #[inline(always)]
-    fn to_bool(&self) -> Result<bool, ExecutionError> {
-        match self {
-            Value::Bool(v) => Ok(*v),
-            _ => Err(ExecutionError::NoSuchOverload),
-        }
-    }
+fn try_bool(val: &dyn Val) -> Result<bool, ExecutionError> {
+    val.downcast_ref::<CelBool>()
+        .map(|b| *b.inner())
+        .ok_or(ExecutionError::NoSuchOverload)
 }
 
 impl ops::Add<Value> for Value {
@@ -1224,12 +1443,12 @@ impl ops::Add<Value> for Value {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_add(r)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_add(r)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l + r).into(),
@@ -1259,14 +1478,14 @@ impl ops::Add<Value> for Value {
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Duration(r)) => l
                 .checked_add(&r)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Duration),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Add, &l, &r),
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Timestamp(r)) => r
                 .checked_add_signed(l)
-                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Timestamp),
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
                 "add", left, right,
@@ -1283,12 +1502,12 @@ impl ops::Sub<Value> for Value {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_sub(r)
-                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_sub(r)
-                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l - r).into(),
@@ -1296,7 +1515,7 @@ impl ops::Sub<Value> for Value {
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Duration(r)) => l
                 .checked_sub(&r)
-                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Duration),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Sub, &l, &r),
@@ -1322,14 +1541,14 @@ impl ops::Div<Value> for Value {
                     Err(ExecutionError::DivisionByZero(l.into()))
                 } else {
                     l.checked_div(r)
-                        .ok_or(ExecutionError::Overflow("div", l.into(), r.into()))
+                        .ok_or_else(|| ExecutionError::Overflow("div", l.into(), r.into()))
                         .map(Value::Int)
                 }
             }
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_div(r)
-                .ok_or(ExecutionError::DivisionByZero(l.into()))
+                .ok_or_else(|| ExecutionError::DivisionByZero(l.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l / r).into(),
@@ -1349,12 +1568,12 @@ impl ops::Mul<Value> for Value {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_mul(r)
-                .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("mul", l.into(), r.into()))
                 .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_mul(r)
-                .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
+                .ok_or_else(|| ExecutionError::Overflow("mul", l.into(), r.into()))
                 .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l * r).into(),
@@ -1377,14 +1596,14 @@ impl ops::Rem<Value> for Value {
                     Err(ExecutionError::RemainderByZero(l.into()))
                 } else {
                     l.checked_rem(r)
-                        .ok_or(ExecutionError::Overflow("rem", l.into(), r.into()))
+                        .ok_or_else(|| ExecutionError::Overflow("rem", l.into(), r.into()))
                         .map(Value::Int)
                 }
             }
 
             (Value::UInt(l), Value::UInt(r)) => l
                 .checked_rem(r)
-                .ok_or(ExecutionError::RemainderByZero(l.into()))
+                .ok_or_else(|| ExecutionError::RemainderByZero(l.into()))
                 .map(Value::UInt),
 
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
@@ -1426,11 +1645,7 @@ fn checked_op(
         TsOp::Add => lhs.checked_add_signed(*rhs),
         TsOp::Sub => lhs.checked_sub_signed(*rhs),
     }
-    .ok_or(ExecutionError::Overflow(
-        op.str(),
-        (*lhs).into(),
-        (*rhs).into(),
-    ))?;
+    .ok_or_else(|| ExecutionError::Overflow(op.str(), (*lhs).into(), (*rhs).into()))?;
 
     // Check for cel-spec limits
     if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
@@ -1469,7 +1684,7 @@ mod tests {
         numbers.insert(Key::Uint(1), "one".to_string());
         context.add_variable_from_value("numbers", numbers);
 
-        let program = Program::compile("numbers[1]").unwrap();
+        let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
     }

@@ -1,7 +1,7 @@
 use crate::common::types::Type;
 use crate::common::value::Val;
-use std::any::Any;
 
+#[derive(Clone, Debug, Default)]
 pub struct Null;
 
 impl Val for Null {
@@ -9,7 +9,11 @@ impl Val for Null {
         super::NULL_TYPE
     }
 
-    fn into_inner(self) -> Box<dyn Any> {
-        Box::new(None::<()>)
+    fn equals(&self, other: &dyn Val) -> bool {
+        other.downcast_ref::<Null>().is_some()
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(Null)
     }
 }
