@@ -1,9 +1,8 @@
-use crate::context::Context;
-use crate::magic::{Arguments, This};
-use crate::objects::{KeyRef, OptionalValue, Value};
+use crate::context::{Context, VariableResolver};
+use crate::magic::{Argument, FromValue, This};
+use crate::objects::{BytesValue, KeyRef, OpaqueValue, OptionalValue, StringValue, Value};
 use crate::parser::Expression;
-use crate::resolvers::Resolver;
-use crate::ExecutionError;
+use crate::{ExecutionError, ResolveResult};
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -16,20 +15,90 @@ type Result<T> = std::result::Result<T, ExecutionError>;
 /// a method), the program context ([`Context`]) which gives functions access
 /// to variables, and the arguments to the function call.
 #[derive(Clone)]
-pub struct FunctionContext<'context, 'call: 'context> {
-    pub name: &'call str,
-    pub this: Option<Value>,
-    pub ptx: &'context Context<'context>,
-    pub args: &'call [Expression],
+pub struct FunctionContext<'vars, 'rf> {
+    pub name: &'vars str,
+    pub this: Option<Value<'vars>>,
+    pub ptx: &'vars Context,
+    pub args: &'vars [Expression],
     pub arg_idx: usize,
+    pub variables: &'rf dyn VariableResolver<'vars>,
 }
 
-impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
+impl<'vars, 'rf> FunctionContext<'vars, 'rf> {
+    pub fn vars(&self) -> &'rf dyn VariableResolver<'vars> {
+        self.variables
+    }
+}
+impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
+    pub fn this<T: FromValue<'a>>(&self) -> Result<T> {
+        if let Some(ref this) = self.this {
+            Ok(T::from_value(this)?)
+        } else {
+            Err(ExecutionError::missing_argument_or_target())
+        }
+    }
+    pub fn this_or_arg<T: FromValue<'a>>(&self) -> Result<T> {
+        match self.this() {
+            Ok(val) => Ok(val),
+            Err(_e) => self.arg(0),
+        }
+    }
+    pub fn this_value(&self) -> Result<Value<'a>> {
+        self.this()
+    }
+    pub fn this_or_arg_value(&self) -> Result<Value<'a>> {
+        self.this_or_arg()
+    }
+    pub fn value(&self, index: usize) -> Result<Value<'a>> {
+        let arg = self
+            .args
+            .get(index)
+            .ok_or(ExecutionError::invalid_argument_count(
+                index + 1,
+                self.args.len(),
+            ))?;
+        Value::resolve(arg, self.ptx, self.variables)
+    }
+    pub fn arg<T: FromValue<'a>>(&self, index: usize) -> Result<T> {
+        let v = self.value(index)?;
+        T::from_value(&v)
+    }
+    pub fn ident(&self, index: usize) -> Result<&'a str> {
+        match &self.expr(index)?.expr {
+            Expr::Ident(ident) => Ok(ident),
+            expr => Err(ExecutionError::UnexpectedType {
+                got: format!("{expr:?}"),
+                want: "identifier".to_string(),
+            }),
+        }
+    }
+
+    pub fn value_iter(&self) -> impl Iterator<Item = Result<Value<'a>>> + use<'a, '_, 'vars> {
+        self.args
+            .iter()
+            .map(|e| Value::resolve(e, self.ptx, self.variables))
+    }
+
+    pub fn expr_iter(&self) -> impl Iterator<Item = &'a Expression> + use<'a, 'vars> {
+        self.args.iter()
+    }
+    pub fn expr(&self, index: usize) -> Result<&'a Expression> {
+        self.args
+            .get(index)
+            .ok_or(ExecutionError::invalid_argument_count(
+                index + 1,
+                self.args.len(),
+            ))
+    }
+}
+
+impl<'vars, 'rf> FunctionContext<'vars, 'rf> {
     pub fn new(
-        name: &'call str,
-        this: Option<Value>,
-        ptx: &'context Context<'context>,
-        args: &'call [Expression],
+        name: &'vars str,
+        this: Option<Value<'vars>>,
+        ptx: &'vars Context,
+        args: &'vars [Expression],
+        variables: &'rf dyn VariableResolver<'vars>,
     ) -> Self {
         Self {
             name,
@@ -37,15 +106,8 @@ impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
             ptx,
             args,
             arg_idx: 0,
+            variables,
         }
-    }
-
-    /// Resolves the given expression using the program's [`Context`].
-    pub fn resolve<R>(&self, resolver: R) -> Result<Value>
-    where
-        R: Resolver,
-    {
-        resolver.resolve(self)
     }
 
     /// Returns an execution error for the currently execution function.
@@ -73,15 +135,16 @@ impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
 /// ```skip
 /// 'foobar'.size() == 6
 /// ```
-pub fn size(ftx: &FunctionContext, This(this): This<Value>) -> Result<i64> {
-    let size = match this {
+pub fn size<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+    let value = this.load_or_arg_value(ftx)?;
+    let size = match value {
         Value::List(l) => l.len(),
         Value::Map(m) => m.map.len(),
-        Value::String(s) => s.len(),
-        Value::Bytes(b) => b.len(),
+        Value::String(s) => s.as_ref().len(),
+        Value::Bytes(b) => b.as_ref().len(),
         value => return Err(ftx.error(format!("cannot determine the size of {value:?}"))),
     };
-    Ok(size as i64)
+    Ok(Value::Int(size as i64))
 }
 
 /// Returns true if the target contains the provided argument. The actual behavior
@@ -114,30 +177,40 @@ pub fn size(ftx: &FunctionContext, This(this): This<Value>) -> Result<i64> {
 /// ```cel
 /// b"abc".contains(b"c") == true
 /// ```
-pub fn contains(This(this): This<Value>, arg: Value) -> Result<Value> {
-    Ok(match this {
-        Value::List(v) => v.contains(&arg),
-        Value::Map(v) => {
-            v.contains_key(&KeyRef::try_from(&arg).map_err(ExecutionError::UnsupportedKeyType)?)
-        }
+pub fn contains<'a>(
+    ftx: &mut FunctionContext<'a, '_>,
+    this: This,
+    arg: Argument,
+) -> ResolveResult<'a> {
+    let this = this.load_or_arg_value(ftx)?;
+    let arg: Value<'a> = arg.load_value(ftx)?;
+    Ok(Value::Bool(match this {
+        Value::List(v) => v.as_ref().contains(&arg),
+        Value::Map(v) => v.contains_key(
+            &KeyRef::try_from(&arg)
+                .map_err(|v| ExecutionError::UnsupportedKeyType(v.as_static()))?,
+        ),
         Value::String(s) => {
             if let Value::String(arg) = arg {
-                s.contains(arg.as_str())
+                s.as_ref().contains(arg.as_ref())
             } else {
                 false
             }
         }
         Value::Bytes(b) => {
             if let Value::Bytes(arg) = arg {
-                let s = arg.as_slice();
-                b.windows(arg.len()).any(|w| w == s)
+                let needle = arg.as_ref();
+                if needle.is_empty() {
+                    true
+                } else {
+                    b.as_ref().windows(needle.len()).any(|w| w == needle)
+                }
             } else {
                 false
             }
         }
         _ => false,
-    }
-    .into())
+    }))
 }
 
 // Performs a type conversion on the target. The following conversions are currently
@@ -149,7 +222,8 @@ pub fn contains(This(this): This<Value>, arg: Value) -> Result<Value> {
 // * `uint` - Returns the unsigned integer value of the target.
 // * `float` - Returns the float value of the target.
 // * `bytes` - Converts bytes to string using from_utf8_lossy.
-pub fn string(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
+pub fn string<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    let this = ftx.this_or_arg_value()?;
     Ok(match this {
         Value::String(v) => Value::String(v.clone()),
         #[cfg(feature = "chrono")]
@@ -159,19 +233,23 @@ pub fn string(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
         Value::Int(v) => Value::String(v.to_string().into()),
         Value::UInt(v) => Value::String(v.to_string().into()),
         Value::Float(v) => Value::String(v.to_string().into()),
-        Value::Bytes(v) => Value::String(Arc::new(String::from_utf8_lossy(v.as_slice()).into())),
+        Value::Bytes(v) => Value::String(StringValue::Owned(Arc::from(
+            String::from_utf8_lossy(v.as_ref()).as_ref(),
+        ))),
         v => return Err(ftx.error(format!("cannot convert {v:?} to string"))),
     })
 }
-
-pub fn bytes(value: Arc<String>) -> Result<Value> {
-    Ok(Value::Bytes(value.as_bytes().to_vec().into()))
+pub fn bytes<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    let value: StringValue = ftx.arg(0)?;
+    Ok(Value::Bytes(BytesValue::Owned(value.as_bytes().into())))
 }
 
 // Performs a type conversion on the target.
-pub fn double(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
+pub fn double<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    let this = ftx.this_or_arg_value()?;
     Ok(match this {
         Value::String(v) => v
+            .as_ref()
             .parse::<f64>()
             .map(Value::Float)
             .map_err(|e| ftx.error(format!("string parse error: {e}")))?,
@@ -183,9 +261,11 @@ pub fn double(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
 }
 
 // Performs a type conversion on the target.
-pub fn uint(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
+pub fn uint<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    let this = ftx.this_or_arg_value()?;
     Ok(match this {
         Value::String(v) => v
+            .as_ref()
             .parse::<u64>()
             .map(Value::UInt)
             .map_err(|e| ftx.error(format!("string parse error: {e}")))?,
@@ -205,9 +285,11 @@ pub fn uint(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
 }
 
 // Performs a type conversion on the target.
-pub fn int(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
+pub fn int<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    let this = ftx.this_or_arg_value()?;
     Ok(match this {
         Value::String(v) => v
+            .as_ref()
             .parse::<i64>()
             .map(Value::Int)
             .map_err(|e| ftx.error(format!("string parse error: {e}")))?,
@@ -223,56 +305,86 @@ pub fn int(ftx: &FunctionContext, This(this): This<Value>) -> Result<Value> {
     })
 }
 
-pub fn optional_none(ftx: &FunctionContext) -> Result<Value> {
+pub fn optional_none<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
     if ftx.this.is_some() || !ftx.args.is_empty() {
         return Err(ftx.error("unsupported function"));
     }
-    Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+    Ok(Value::Opaque(OpaqueValue::Arc(Arc::new(
+        OptionalValue::none(),
+    ))))
 }
 
-pub fn optional_of(ftx: &FunctionContext, value: Value) -> Result<Value> {
+pub fn optional_of<'a>(ftx: &mut FunctionContext<'a, '_>, value: Argument) -> ResolveResult<'a> {
     if ftx.this.is_some() {
         return Err(ftx.error("unsupported function"));
     }
-    Ok(Value::Opaque(Arc::new(OptionalValue::of(value))))
+    let value: Value = value.load_value(ftx)?;
+    // TODO: avoid as_static
+    Ok(Value::Opaque(OpaqueValue::Arc(Arc::new(
+        OptionalValue::of(value.as_static()),
+    ))))
 }
 
-pub fn optional_of_non_zero_value(ftx: &FunctionContext, value: Value) -> Result<Value> {
+pub fn optional_of_non_zero_value<'a>(
+    ftx: &mut FunctionContext<'a, '_>,
+    value: Argument,
+) -> ResolveResult<'a> {
     if ftx.this.is_some() {
         return Err(ftx.error("unsupported function"));
     }
+    let value: Value = value.load_value(ftx)?;
     if value.is_zero() {
-        Ok(Value::Opaque(Arc::new(OptionalValue::none())))
+        Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
     } else {
-        Ok(Value::Opaque(Arc::new(OptionalValue::of(value))))
+        Ok(Value::Opaque(
+            Arc::new(OptionalValue::of(value.as_static())).into(),
+        ))
     }
 }
-pub fn optional_value(This(this): This<Value>) -> Result<Value> {
-    <&OptionalValue>::try_from(&this)?
+
+pub fn optional_value<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+    let this: Value = this.load_or_arg_value(ftx)?;
+    OptionalValue::try_from(this)?
         .value()
         .cloned()
-        .ok_or_else(|| ExecutionError::function_error("value", "optional.none() dereference"))
+        .map(|v| v.as_static())
+        .ok_or_else(|| ftx.error("optional.none() dereference"))
 }
 
-pub fn optional_has_value(This(this): This<Value>) -> Result<bool> {
-    Ok(<&OptionalValue>::try_from(&this)?.value().is_some())
+pub fn optional_has_value<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+    let this: Value = this.load_or_arg_value(ftx)?;
+    Ok(Value::Bool(
+        OptionalValue::try_from(this)?.value().is_some(),
+    ))
 }
 
-pub fn optional_or_optional(This(this): This<Value>, other: Value) -> Result<Value> {
-    let this_opt: &OptionalValue = (&this).try_into()?;
+pub fn optional_or_optional<'a>(
+    ftx: &mut FunctionContext<'a, '_>,
+    this: This,
+    other: Argument,
+) -> ResolveResult<'a> {
+    let this: Value = this.load_or_arg_value(ftx)?;
+    let other: Value = other.load_value(ftx)?;
+    let this_opt: OptionalValue = this.clone().try_into()?;
     match this_opt.value() {
         Some(_) => Ok(this),
         None => {
-            let _: &OptionalValue = (&other).try_into()?;
+            let _: OptionalValue = other.clone().try_into()?;
             Ok(other)
         }
     }
 }
 
-pub fn optional_or_value(This(this): This<Value>, other: Value) -> Result<Value> {
-    let this_opt: &OptionalValue = (&this).try_into()?;
+pub fn optional_or_value<'a>(
+    ftx: &mut FunctionContext<'a, '_>,
+    this: This,
+    other: Argument,
+) -> ResolveResult<'a> {
+    let this: Value = this.load_or_arg_value(ftx)?;
+    let other: Value = other.load_value(ftx)?;
+    let this_opt: OptionalValue = this.try_into()?;
     match this_opt.value() {
-        Some(v) => Ok(v.clone()),
+        Some(v) => Ok(v.clone().as_static()),
         None => Ok(other),
     }
 }
@@ -283,8 +395,14 @@ pub fn optional_or_value(This(this): This<Value>, other: Value) -> Result<Value>
 /// ```cel
 /// "abc".startsWith("a") == true
 /// ```
-pub fn starts_with(This(this): This<Arc<String>>, prefix: Arc<String>) -> bool {
-    this.starts_with(prefix.as_str())
+pub fn starts_with<'a>(
+    ftx: &mut FunctionContext<'a, '_>,
+    this: This,
+    prefix: Argument,
+) -> ResolveResult<'a> {
+    let this: StringValue = this.load_or_arg(ftx)?;
+    let prefix: StringValue = prefix.load_value(ftx)?;
+    Ok(Value::Bool(this.as_ref().starts_with(prefix.as_ref())))
 }
 
 /// Returns true if a string ends with another string.
@@ -293,8 +411,14 @@ pub fn starts_with(This(this): This<Arc<String>>, prefix: Arc<String>) -> bool {
 /// ```cel
 /// "abc".endsWith("c") == true
 /// ```
-pub fn ends_with(This(this): This<Arc<String>>, suffix: Arc<String>) -> bool {
-    this.ends_with(suffix.as_str())
+pub fn ends_with<'a>(
+    ftx: &mut FunctionContext<'a, '_>,
+    this: This,
+    suffix: Argument,
+) -> ResolveResult<'a> {
+    let this: StringValue = this.load_or_arg(ftx)?;
+    let suffix: StringValue = suffix.load_value(ftx)?;
+    Ok(Value::Bool(this.as_ref().ends_with(suffix.as_ref())))
 }
 
 /// Returns true if a string matches the regular expression.
@@ -304,17 +428,20 @@ pub fn ends_with(This(this): This<Arc<String>>, suffix: Arc<String>) -> bool {
 /// "abc".matches("^[a-z]*$") == true
 /// ```
 #[cfg(feature = "regex")]
-pub fn matches(
-    ftx: &FunctionContext,
-    This(this): This<Arc<String>>,
-    regex: Arc<String>,
-) -> Result<bool> {
+pub fn matches<'a>(
+    ftx: &mut FunctionContext<'a, '_>,
+    this: This,
+    regex: Argument,
+) -> ResolveResult<'a> {
+    let this: StringValue = this.load_or_arg(ftx)?;
+    let regex: StringValue = regex.load_value(ftx)?;
     match regex::Regex::new(&regex) {
-        Ok(re) => Ok(re.is_match(&this)),
-        Err(err) => Err(ftx.error(format!("'{regex}' not a valid regex:\n{err}"))),
+        Ok(re) => Ok(Value::Bool(re.is_match(&this))),
+        Err(err) => Err(ftx.error(format!("'{}' not a valid regex:\n{err}", regex.as_ref()))),
     }
 }
 
+use crate::common::ast::Expr;
 #[cfg(feature = "chrono")]
 pub use time::duration;
 #[cfg(feature = "chrono")]
@@ -322,11 +449,11 @@ pub use time::timestamp;
 
 #[cfg(feature = "chrono")]
 pub mod time {
-    use super::Result;
-    use crate::magic::This;
+    use super::{FunctionContext, ResolveResult, Result};
+    use crate::magic::{Argument, This};
+    use crate::objects::StringValue;
     use crate::{ExecutionError, Value};
-    use chrono::{Datelike, Days, Months, Timelike};
-    use std::sync::Arc;
+    use chrono::{Datelike, Timelike};
 
     /// Duration parses the provided argument into a [`Value::Duration`] value.
     ///
@@ -343,16 +470,18 @@ pub mod time {
     /// - `1.5ms` parses as 1 millisecond and 500 microseconds
     /// - `1ns` parses as 1 nanosecond
     /// - `1.5ns` parses as 1 nanosecond (sub-nanosecond durations not supported)
-    pub fn duration(value: Arc<String>) -> crate::functions::Result<Value> {
-        Ok(Value::Duration(_duration(value.as_str())?))
+    pub fn duration<'a>(ftx: &mut FunctionContext<'a, '_>, value: Argument) -> ResolveResult<'a> {
+        let value: StringValue = value.load_value(ftx)?;
+        Ok(Value::Duration(_duration(value.as_ref())?))
     }
 
     /// Timestamp parses the provided argument into a [`Value::Timestamp`] value.
     /// The
-    pub fn timestamp(value: Arc<String>) -> Result<Value> {
+    pub fn timestamp<'a>(ftx: &mut FunctionContext<'a, '_>, value: Argument) -> ResolveResult<'a> {
+        let value: StringValue = value.load_value(ftx)?;
         Ok(Value::Timestamp(
-            chrono::DateTime::parse_from_rfc3339(value.as_str())
-                .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
+            chrono::DateTime::parse_from_rfc3339(value.as_ref())
+                .map_err(|e| ftx.error(e.to_string()))?,
         ))
     }
 
@@ -368,153 +497,180 @@ pub mod time {
         chrono::DateTime::parse_from_rfc3339(i)
             .map_err(|e| ExecutionError::function_error("timestamp", e.to_string()))
     }
-
-    pub fn timestamp_year(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok(this.year().into())
+    //
+    pub fn timestamp_year<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+        let this: chrono::DateTime<chrono::FixedOffset> = this.load_or_arg(ftx)?;
+        Ok(Value::Int(this.year() as i64))
     }
 
-    pub fn timestamp_month(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.month0() as i32).into())
+    pub fn timestamp_month<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+        let this: chrono::DateTime<chrono::FixedOffset> = this.load_or_arg(ftx)?;
+        Ok(Value::Int(this.month0() as i64))
     }
 
-    pub fn timestamp_year_day(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        let year = this
-            .checked_sub_days(Days::new(this.day0() as u64))
-            .unwrap()
-            .checked_sub_months(Months::new(this.month0()))
-            .unwrap();
-        Ok(this.signed_duration_since(year).num_days().into())
+    pub fn timestamp_year_day<'a>(
+        ftx: &mut FunctionContext<'a, '_>,
+        this: This,
+    ) -> ResolveResult<'a> {
+        let this: chrono::DateTime<chrono::FixedOffset> = this.load_or_arg(ftx)?;
+        Ok(Value::Int(this.ordinal0() as i64))
     }
 
-    pub fn timestamp_month_day(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.day0() as i32).into())
+    pub fn timestamp_month_day<'a>(
+        ftx: &mut FunctionContext<'a, '_>,
+        this: This,
+    ) -> ResolveResult<'a> {
+        let this: chrono::DateTime<chrono::FixedOffset> = this.load_or_arg(ftx)?;
+        Ok(Value::Int(this.day0() as i64))
     }
 
-    pub fn timestamp_date(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.day() as i32).into())
+    pub fn timestamp_date<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+        let this: chrono::DateTime<chrono::FixedOffset> = this.load_or_arg(ftx)?;
+        Ok(Value::Int(this.day() as i64))
     }
 
-    pub fn timestamp_weekday(
-        This(this): This<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> Result<Value> {
-        Ok((this.weekday().num_days_from_sunday() as i32).into())
+    pub fn timestamp_weekday<'a>(
+        ftx: &mut FunctionContext<'a, '_>,
+        this: This,
+    ) -> ResolveResult<'a> {
+        let this: chrono::DateTime<chrono::FixedOffset> = this.load_or_arg(ftx)?;
+        Ok(Value::Int(this.weekday().num_days_from_sunday() as i64))
     }
 
-    pub fn get_hours(This(this): This<Value>) -> Result<Value> {
+    pub fn get_hours<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+        let this: Value = this.load_or_arg_value(ftx)?;
         Ok(match this {
             Value::Timestamp(ts) => (ts.hour() as i32).into(),
             Value::Duration(d) => (d.num_hours() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getHours",
-                    "expected timestamp or duration",
-                ))
-            }
+            _ => return Err(ftx.error("expected timestamp or duration")),
         })
     }
 
-    pub fn get_minutes(This(this): This<Value>) -> Result<Value> {
+    pub fn get_minutes<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+        let this: Value = this.load_or_arg_value(ftx)?;
         Ok(match this {
             Value::Timestamp(ts) => (ts.minute() as i32).into(),
             Value::Duration(d) => (d.num_minutes() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getMinutes",
-                    "expected timestamp or duration",
-                ))
-            }
+            _ => return Err(ftx.error("expected timestamp or duration")),
         })
     }
 
-    pub fn get_seconds(This(this): This<Value>) -> Result<Value> {
+    pub fn get_seconds<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<'a> {
+        let this: Value = this.load_or_arg_value(ftx)?;
         Ok(match this {
             Value::Timestamp(ts) => (ts.second() as i32).into(),
             Value::Duration(d) => (d.num_seconds() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getSeconds",
-                    "expected timestamp or duration",
-                ))
-            }
+            _ => return Err(ftx.error("expected timestamp or duration")),
         })
     }
 
-    pub fn get_milliseconds(This(this): This<Value>) -> Result<Value> {
+    pub fn get_milliseconds<'a>(
+        ftx: &mut FunctionContext<'a, '_>,
+        this: This,
+    ) -> ResolveResult<'a> {
+        let this: Value = this.load_or_arg_value(ftx)?;
         Ok(match this {
             Value::Timestamp(ts) => (ts.timestamp_subsec_millis() as i32).into(),
             Value::Duration(d) => (d.num_milliseconds() as i32).into(),
-            _ => {
-                return Err(ExecutionError::function_error(
-                    "getMilliseconds",
-                    "expected timestamp or duration",
-                ))
-            }
+            _ => return Err(ftx.error("expected timestamp or duration")),
         })
     }
 }
 
-pub fn max(Arguments(args): Arguments) -> Result<Value> {
-    // If items is a list of values, then operate on the list
-    let items = if args.len() == 1 {
-        match &args[0] {
-            Value::List(values) => values,
-            _ => return Ok(args[0].clone()),
-        }
-    } else {
-        &args
-    };
+pub fn max<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    let args_len = ftx.args.len();
+    if args_len == 0 {
+        return Ok(Value::Null);
+    }
 
-    items
-        .iter()
-        .skip(1)
-        .try_fold(items.first().unwrap_or(&Value::Null), |acc, x| {
-            match acc.partial_cmp(x) {
-                Some(Ordering::Greater) => Ok(acc),
-                Some(_) => Ok(x),
-                None => Err(ExecutionError::ValuesNotComparable(acc.clone(), x.clone())),
-            }
-        })
-        .cloned()
+    if args_len == 1 {
+        let value = ftx.value(0)?;
+        if let Value::List(values) = value {
+            let items = values.as_ref();
+            let acc = items.first().unwrap_or(&Value::Null);
+            return values
+                .as_ref()
+                .iter()
+                .skip(1)
+                .try_fold(acc, |acc, x| match acc.partial_cmp(x) {
+                    Some(Ordering::Greater) => Ok(acc),
+                    Some(_) => Ok(x),
+                    None => Err(ExecutionError::ValuesNotComparable(
+                        acc.as_static(),
+                        x.as_static(),
+                    )),
+                })
+                .cloned();
+        }
+        // If there is 1 element, it is obviously the max
+        return Ok(value);
+    }
+
+    let mut values_a = ftx.value_iter();
+    let values_b = ftx.value_iter();
+    let acc = values_a.next().transpose()?.unwrap_or(Value::Null);
+    values_b.skip(1).try_fold(acc, |acc, x| {
+        let x = x?;
+        match acc.partial_cmp(&x) {
+            Some(Ordering::Greater) => Ok(acc),
+            Some(_) => Ok(x),
+            None => Err(ExecutionError::ValuesNotComparable(
+                acc.as_static(),
+                x.as_static(),
+            )),
+        }
+    })
 }
+//
+pub fn min<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    let args_len = ftx.args.len();
+    if args_len == 0 {
+        return Ok(Value::Null);
+    }
 
-pub fn min(Arguments(args): Arguments) -> Result<Value> {
-    // If items is a list of values, then operate on the list
-    let items = if args.len() == 1 {
-        match &args[0] {
-            Value::List(values) => values,
-            _ => return Ok(args[0].clone()),
+    if args_len == 1 {
+        let value = ftx.value(0)?;
+        if let Value::List(values) = value {
+            let items = values.as_ref();
+            let acc = items.first().unwrap_or(&Value::Null);
+            return values
+                .as_ref()
+                .iter()
+                .skip(1)
+                .try_fold(acc, |acc, x| match acc.partial_cmp(x) {
+                    Some(Ordering::Less) => Ok(acc),
+                    Some(_) => Ok(x),
+                    None => Err(ExecutionError::ValuesNotComparable(
+                        acc.as_static(),
+                        x.as_static(),
+                    )),
+                })
+                .cloned();
         }
-    } else {
-        &args
-    };
+        // If there is 1 element, it is obviously the min
+        return Ok(value);
+    }
 
-    items
-        .iter()
-        .skip(1)
-        .try_fold(items.first().unwrap_or(&Value::Null), |acc, x| {
-            match acc.partial_cmp(x) {
-                Some(Ordering::Less) => Ok(acc),
-                Some(_) => Ok(x),
-                None => Err(ExecutionError::ValuesNotComparable(acc.clone(), x.clone())),
-            }
-        })
-        .cloned()
+    let mut values_a = ftx.value_iter();
+    let values_b = ftx.value_iter();
+    let acc = values_a.next().transpose()?.unwrap_or(Value::Null);
+    values_b.skip(1).try_fold(acc, |acc, x| {
+        let x = x?;
+        match acc.partial_cmp(&x) {
+            Some(Ordering::Less) => Ok(acc),
+            Some(_) => Ok(x),
+            None => Err(ExecutionError::ValuesNotComparable(
+                acc.as_static(),
+                x.as_static(),
+            )),
+        }
+    })
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::context::Context;
-    use crate::tests::test_script;
+    use crate::context::{Context, MapResolver};
+    use crate::tests::{test_script, test_script_vars};
 
     fn assert_script(input: &(&str, &str)) {
         assert_eq!(test_script(input.1, None), Ok(true.into()), "{}", input.0);
@@ -553,9 +709,14 @@ mod tests {
         ];
 
         for (name, script) in tests {
-            let mut ctx = Context::default();
-            ctx.add_variable_from_value("foo", std::collections::HashMap::from([("bar", 1)]));
-            assert_eq!(test_script(script, Some(ctx)), Ok(true.into()), "{name}");
+            assert_eq!(
+                test_script_vars(
+                    script,
+                    &[("foo", std::collections::HashMap::from([("bar", 1)]).into())]
+                ),
+                Ok(true.into()),
+                "{name}"
+            );
         }
     }
 
@@ -828,15 +989,14 @@ mod tests {
     #[cfg(feature = "chrono")]
     #[test]
     fn test_timestamp_variable() {
-        let mut context = Context::default();
         let ts: chrono::DateTime<chrono::FixedOffset> =
             chrono::DateTime::parse_from_rfc3339("2023-05-29T00:00:00Z").unwrap();
-        context
-            .add_variable("ts", crate::Value::Timestamp(ts))
-            .unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("ts", crate::Value::Timestamp(ts));
 
         let program = crate::Program::compile("ts == timestamp('2023-05-29T00:00:00Z')").unwrap();
-        let result = program.execute(&context).unwrap();
+        let ctx = Context::default();
+        let result = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(result, true.into());
     }
 

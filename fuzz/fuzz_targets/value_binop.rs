@@ -1,10 +1,9 @@
 #![no_main]
 
-use cel::objects::{Key, Map};
+use cel::objects::{BytesValue, Key, ListValue, Map, StringValue};
 use cel::Value;
 use chrono::TimeZone;
 use libfuzzer_sys::fuzz_target;
-use std::collections::HashMap;
 use std::hint::black_box;
 use std::sync::Arc;
 
@@ -22,8 +21,8 @@ enum BinOp {
 #[derive(Debug)]
 struct Input {
     op: BinOp,
-    lhs: Value,
-    rhs: Value,
+    lhs: Value<'static>,
+    rhs: Value<'static>,
 }
 
 #[automatically_derived]
@@ -39,7 +38,7 @@ impl<'arbitrary> arbitrary::Arbitrary<'arbitrary> for Input {
 fn arbitrary_value(
     u: &mut arbitrary::Unstructured<'_>,
     mut depth: u32,
-) -> arbitrary::Result<Value> {
+) -> arbitrary::Result<Value<'static>> {
     if u.is_empty() {
         if depth > 0 {
             return Err(arbitrary::Error::NotEnoughData);
@@ -55,11 +54,11 @@ fn arbitrary_value(
                 for _ in 0..length {
                     list.push(arbitrary_value(u, depth)?);
                 }
-                Value::List(Arc::new(list))
+                Value::List(ListValue::Owned(list.into()))
             }
             1u64 => {
                 let length = <u8 as arbitrary::Arbitrary>::arbitrary(u)?;
-                let mut map = HashMap::with_capacity(length as usize);
+                let mut map = hashbrown::HashMap::with_capacity(length as usize);
                 for _ in 0..length {
                     map.insert(arbitrary_key(u)?, arbitrary_value(u, depth)?);
                 }
@@ -68,8 +67,14 @@ fn arbitrary_value(
             2u64 => Value::Int(arbitrary::Arbitrary::arbitrary(u)?),
             3u64 => Value::UInt(arbitrary::Arbitrary::arbitrary(u)?),
             4u64 => Value::Float(arbitrary::Arbitrary::arbitrary(u)?),
-            5u64 => Value::String(arbitrary::Arbitrary::arbitrary(u)?),
-            6u64 => Value::Bytes(arbitrary::Arbitrary::arbitrary(u)?),
+            5u64 => {
+                let s: String = arbitrary::Arbitrary::arbitrary(u)?;
+                Value::String(StringValue::Owned(s.into()))
+            }
+            6u64 => {
+                let b: Vec<u8> = arbitrary::Arbitrary::arbitrary(u)?;
+                Value::Bytes(BytesValue::Owned(b.into()))
+            }
             7u64 => Value::Bool(arbitrary::Arbitrary::arbitrary(u)?),
             8u64 => Value::Duration(chrono::Duration::nanoseconds(
                 arbitrary::Arbitrary::arbitrary(u)?,
@@ -91,7 +96,10 @@ fn arbitrary_key(u: &mut arbitrary::Unstructured<'_>) -> arbitrary::Result<Key> 
             0u64 => Key::Int(arbitrary::Arbitrary::arbitrary(u)?),
             1u64 => Key::Uint(arbitrary::Arbitrary::arbitrary(u)?),
             2u64 => Key::Bool(arbitrary::Arbitrary::arbitrary(u)?),
-            3u64 => Key::String(Arc::new(arbitrary::Arbitrary::arbitrary(u)?)),
+            3u64 => {
+                let k: String = arbitrary::Arbitrary::arbitrary(u)?;
+                Key::String(Arc::from(k.as_ref()))
+            }
             _ => unreachable!(),
         },
     )

@@ -1,9 +1,8 @@
-use crate::magic::{Function, FunctionRegistry, IntoFunction};
+use crate::functions;
+use crate::magic::{Function, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
-use crate::parser::Expression;
-use crate::{functions, ExecutionError};
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use hashbrown::Equivalent;
+use std::collections::{BTreeMap, HashMap};
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.
@@ -30,126 +29,43 @@ use std::sync::Arc;
 ///                  ↑
 /// Only in scope for the duration of the map expression
 ///
-pub enum Context<'a> {
-    Root {
-        functions: FunctionRegistry,
-        variables: BTreeMap<String, Value>,
-        resolver: Option<&'a dyn VariableResolver>,
-    },
-    Child {
-        parent: &'a Context<'a>,
-        variables: BTreeMap<String, Value>,
-        resolver: Option<&'a dyn VariableResolver>,
-    },
+///
+pub struct Context {
+    pub functions: BTreeMap<String, Function>,
+    pub qualified_functions: hashbrown::HashMap<(String, String), Function>,
 }
 
-impl<'a> Context<'a> {
-    pub fn add_variable<S, V>(
-        &mut self,
-        name: S,
-        value: V,
-    ) -> Result<(), <V as TryIntoValue>::Error>
-    where
-        S: Into<String>,
-        V: TryIntoValue,
-    {
-        match self {
-            Context::Root { variables, .. } => {
-                variables.insert(name.into(), value.try_into_value()?);
-            }
-            Context::Child { variables, .. } => {
-                variables.insert(name.into(), value.try_into_value()?);
-            }
-        }
-        Ok(())
-    }
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+struct QualifiedKeyRef<'a>(&'a str, &'a str);
 
-    pub fn add_variable_from_value<S, V>(&mut self, name: S, value: V)
-    where
-        S: Into<String>,
-        V: Into<Value>,
-    {
-        match self {
-            Context::Root { variables, .. } => {
-                variables.insert(name.into(), value.into());
-            }
-            Context::Child { variables, .. } => {
-                variables.insert(name.into(), value.into());
-            }
-        }
+impl Equivalent<(String, String)> for QualifiedKeyRef<'_> {
+    fn equivalent(&self, key: &(String, String)) -> bool {
+        self == &QualifiedKeyRef(&key.0, &key.1)
     }
+}
 
-    pub fn set_variable_resolver(&mut self, r: &'a dyn VariableResolver) {
-        match self {
-            Context::Root { resolver, .. } => {
-                *resolver = Some(r);
-            }
-            Context::Child { resolver, .. } => {
-                *resolver = Some(r);
-            }
-        }
+impl Context {
+    pub(crate) fn get_qualified_function(&self, base: &str, name: &str) -> Option<&Function> {
+        self.qualified_functions.get(&QualifiedKeyRef(base, name))
     }
-
-    pub fn get_variable<S>(&self, name: S) -> Result<Value, ExecutionError>
-    where
-        S: AsRef<str>,
-    {
-        let name = name.as_ref();
-        match self {
-            Context::Child {
-                variables,
-                parent,
-                resolver,
-            } => resolver
-                .and_then(|r| r.resolve(name))
-                .or_else(|| {
-                    variables
-                        .get(name)
-                        .cloned()
-                        .or_else(|| parent.get_variable(name).ok())
-                })
-                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
-            Context::Root {
-                variables,
-                resolver,
-                ..
-            } => resolver
-                .and_then(|r| r.resolve(name))
-                .or_else(|| variables.get(name).cloned())
-                .ok_or_else(|| ExecutionError::UndeclaredReference(name.to_string().into())),
-        }
-    }
-
     pub(crate) fn get_function(&self, name: &str) -> Option<&Function> {
-        match self {
-            Context::Root { functions, .. } => functions.get(name),
-            Context::Child { parent, .. } => parent.get_function(name),
-        }
+        self.functions.get(name)
     }
 
     pub fn add_function<T: 'static, F>(&mut self, name: &str, value: F)
     where
         F: IntoFunction<T> + 'static + Send + Sync,
     {
-        if let Context::Root { functions, .. } = self {
-            functions.add(name, value);
-        };
+        self.functions
+            .insert(name.to_string(), value.into_function());
     }
 
-    pub fn resolve(&self, expr: &Expression) -> Result<Value, ExecutionError> {
-        Value::resolve(expr, self)
-    }
-
-    pub fn resolve_all(&self, exprs: &[Expression]) -> Result<Value, ExecutionError> {
-        Value::resolve_all(exprs, self)
-    }
-
-    pub fn new_inner_scope(&self) -> Context<'_> {
-        Context::Child {
-            parent: self,
-            variables: Default::default(),
-            resolver: None,
-        }
+    pub fn add_qualified_function<T: 'static, F>(&mut self, base: &str, name: &str, value: F)
+    where
+        F: IntoFunction<T> + 'static + Send + Sync,
+    {
+        self.qualified_functions
+            .insert((base.to_string(), name.to_string()), value.into_function());
     }
 
     /// Constructs a new empty context with no variables or functions.
@@ -164,20 +80,25 @@ impl<'a> Context<'a> {
     /// context.add_function("add", |a: i64, b: i64| a + b);
     /// ```
     pub fn empty() -> Self {
-        Context::Root {
-            variables: Default::default(),
+        Context {
             functions: Default::default(),
-            resolver: None,
+            qualified_functions: Default::default(),
         }
     }
+    // pub fn resolve<'e>(&self, expr: &'e Expression, ) -> Result<Value<'e>, ExecutionError> {
+    //     Value::<'e>::resolve(expr, self)
+    // }
+    //
+    // pub fn resolve_all(&self, exprs: &[Expression]) -> Result<Value, ExecutionError> {
+    //     Value::resolve_all(exprs, self)
+    // }
 }
 
-impl Default for Context<'_> {
+impl Default for Context {
     fn default() -> Self {
-        let mut ctx = Context::Root {
-            variables: Default::default(),
+        let mut ctx = Context {
             functions: Default::default(),
-            resolver: None,
+            qualified_functions: Default::default(),
         };
 
         ctx.add_function("contains", functions::contains);
@@ -191,10 +112,12 @@ impl Default for Context<'_> {
         ctx.add_function("double", functions::double);
         ctx.add_function("int", functions::int);
         ctx.add_function("uint", functions::uint);
-        ctx.add_function("optional.none", functions::optional_none);
-        ctx.add_function("optional.of", functions::optional_of);
-        ctx.add_function(
-            "optional.ofNonZeroValue",
+
+        ctx.add_qualified_function("optional", "none", functions::optional_none);
+        ctx.add_qualified_function("optional", "of", functions::optional_of);
+        ctx.add_qualified_function(
+            "optional",
+            "ofNonZeroValue",
             functions::optional_of_non_zero_value,
         );
         ctx.add_function("value", functions::optional_value);
@@ -204,7 +127,7 @@ impl Default for Context<'_> {
 
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
-
+        //
         #[cfg(feature = "chrono")]
         {
             ctx.add_function("duration", functions::duration);
@@ -225,45 +148,106 @@ impl Default for Context<'_> {
     }
 }
 
-/// VariableResolver implements a custom resolver for variables that is consulted before looking at
-/// variables added to the context. This allows dynamic variables, or avoiding HashMap lookup/creation.
-///
-///
-/// # Example
-/// ```
-/// struct ValueContext {
-///     request: cel::Value,
-///     response: cel::Value,
-/// }
-///
-/// impl cel::context::VariableResolver for ValueContext {
-///     fn resolve(&self, variable: &str) -> Option<cel::Value> {
-///         match variable {
-///             "request" => Some(self.request.clone()),
-///             "response" => Some(self.response.clone()),
-///             _ => None,
-///         }
-///     }
-/// }
-/// ```
-pub trait VariableResolver: Send + Sync {
-    fn resolve(&self, variable: &str) -> Option<Value>;
-}
-
-impl<T: VariableResolver> VariableResolver for Box<T> {
-    fn resolve(&self, variable: &str) -> Option<Value> {
-        (**self).resolve(variable)
+pub trait VariableResolver<'a> {
+    fn resolve(&self, expr: &str) -> Option<Value<'a>>;
+    fn resolve_member(&self, _expr: &str, _member: &str) -> Option<Value<'a>> {
+        None
     }
 }
 
-impl<T: VariableResolver> VariableResolver for Arc<T> {
-    fn resolve(&self, variable: &str) -> Option<Value> {
-        (**self).resolve(variable)
+pub struct DefaultVariableResolver;
+
+impl<'a> VariableResolver<'a> for DefaultVariableResolver {
+    fn resolve(&self, _expr: &str) -> Option<Value<'a>> {
+        None
     }
 }
 
-impl<T: VariableResolver> VariableResolver for &T {
-    fn resolve(&self, variable: &str) -> Option<Value> {
-        (**self).resolve(variable)
+pub struct SingleVarResolver<'a, 'rf> {
+    base: &'rf dyn VariableResolver<'a>,
+    name: &'a str,
+    val: Value<'a>,
+}
+
+impl<'a, 'rf> SingleVarResolver<'a, 'rf> {
+    pub fn new(base: &'rf dyn VariableResolver<'a>, name: &'a str, val: Value<'a>) -> Self {
+        SingleVarResolver { base, name, val }
+    }
+}
+
+impl<'a, 'rf> VariableResolver<'a> for SingleVarResolver<'a, 'rf> {
+    fn resolve(&self, expr: &str) -> Option<Value<'a>> {
+        if expr == self.name {
+            Some(self.val.clone())
+        } else {
+            self.base.resolve(expr)
+        }
+    }
+}
+
+pub struct CompositeResolver<'a, 'rf> {
+    primary: &'rf dyn VariableResolver<'a>,
+    fallback: &'rf dyn VariableResolver<'a>,
+}
+
+impl<'a, 'rf> CompositeResolver<'a, 'rf> {
+    pub fn new(
+        primary: &'rf dyn VariableResolver<'a>,
+        fallback: &'rf dyn VariableResolver<'a>,
+    ) -> Self {
+        CompositeResolver { primary, fallback }
+    }
+}
+
+impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
+    fn resolve(&self, expr: &str) -> Option<Value<'a>> {
+        if let Some(v) = self.primary.resolve(expr) {
+            return Some(v);
+        }
+        self.fallback.resolve(expr)
+    }
+}
+
+pub struct MapResolver<'a> {
+    variables: HashMap<&'a str, Value<'a>>,
+}
+
+impl<'a> Default for MapResolver<'a> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<'a> MapResolver<'a> {
+    pub fn new() -> Self {
+        MapResolver {
+            variables: Default::default(),
+        }
+    }
+
+    pub fn add_variable<V>(
+        &mut self,
+        name: &'a str,
+        value: V,
+    ) -> Result<(), <V as TryIntoValue<'a>>::Error>
+    where
+        V: TryIntoValue<'a>,
+    {
+        let v = value.try_into_value()?;
+        self.variables.insert(name, v);
+        Ok(())
+    }
+
+    pub fn add_variable_from_value<V>(&mut self, name: &'a str, value: V)
+    where
+        V: Into<Value<'a>>,
+    {
+        self.variables.insert(name, value.into());
+    }
+}
+
+impl<'a> VariableResolver<'a> for MapResolver<'a> {
+    fn resolve(&self, expr: &str) -> Option<Value<'a>> {
+        self.variables.get(expr).cloned()
     }
 }

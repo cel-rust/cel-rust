@@ -22,8 +22,11 @@ bytes = { version = "1", optional = true }
 
 thiserror = "1.0"
 paste = "1.0"
+tracking-allocator = "0.4.0"
+hashbrown = "0.16.1"
 
 [dev-dependencies]
+pprof = { version = "0.15", features = ["protobuf", "protobuf-codec", "criterion"] }
 criterion = { version = "0.5.1", features = ["html_reports"] }
 serde_bytes = "0.11.14"
 dhat = { version = "0.3.3" }
@@ -33,7 +36,7 @@ name = "runtime"
 harness = false
 
 [features]
-default = ["regex", "chrono"]
+default = ["regex", "chrono", "json", "bytes"]
 bytes = ["dep:bytes"]
 json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]

@@ -1,9 +1,13 @@
-use cel::context::{Context, VariableResolver};
+use cel::context::{CompositeResolver, Context, MapResolver, VariableResolver};
 use cel::{Program, Value};
-use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
+use criterion::{criterion_group, BenchmarkId, Criterion};
+use pprof::criterion::Output;
 use std::collections::HashMap;
+use std::hint::black_box;
+use std::marker::PhantomData;
+use std::time::Duration;
 
-const EXPRESSIONS: [(&str, &str); 34] = [
+const EXPRESSIONS: [(&str, &str); 35] = [
     ("ternary_1", "(false || true) ? 1 : 2"),
     ("ternary_2", "(true ? false : true) ? 1 : 2"),
     ("or_1", "false || true"),
@@ -38,12 +42,13 @@ const EXPRESSIONS: [(&str, &str); 34] = [
     ("variable resolver", "banana"),
     ("variable hashmap", "apple"),
     ("stress", "true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true"),
+    ("regex", "'abc'.matches('^[a-z]*$')"),
 ];
 
-struct Resolver;
+struct Resolver<'a>(PhantomData<&'a ()>);
 
-impl VariableResolver for Resolver {
-    fn resolve(&self, expr: &str) -> Option<Value> {
+impl<'a> VariableResolver<'a> for Resolver<'a> {
+    fn resolve(&self, expr: &str) -> Option<Value<'a>> {
         const V: Value = Value::Bool(false);
         const NOT_V: Value = Value::Bool(true);
         match expr {
@@ -62,12 +67,14 @@ pub fn criterion_benchmark(c: &mut Criterion) {
     for (name, expr) in black_box(&EXPRESSIONS) {
         execution_group.bench_function(BenchmarkId::from_parameter(name), |b| {
             let program = Program::compile(expr).expect("Parsing failed");
-            let mut ctx = Context::default();
-            ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
-            ctx.add_variable_from_value("apple", true);
-            ctx.add_variable_from_value("a", 1);
-            ctx.set_variable_resolver(&Resolver);
-            b.iter(|| program.execute(&ctx).expect("Eval failed!"))
+            // eprintln!("{program:#?}");
+            let ctx = Context::default();
+            let mut vars = MapResolver::new();
+            vars.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
+            vars.add_variable_from_value("apple", true);
+            vars.add_variable_from_value("a", 1);
+            let rv = CompositeResolver::new(&vars, &Resolver(PhantomData));
+            b.iter(|| Value::resolve(program.expression(), &ctx, &rv).expect("Eval failed!"))
         });
     }
 }
@@ -83,15 +90,16 @@ pub fn criterion_benchmark_parsing(c: &mut Criterion) {
 
 pub fn map_macro_benchmark(c: &mut Criterion) {
     let mut group = c.benchmark_group("map list");
-    let sizes = vec![1, 10, 100, 1000, 10000, 100000];
+    let sizes = vec![1, 10, 100, 1000, 10000];
 
     for size in sizes {
         group.bench_function(format!("map_{size}").as_str(), |b| {
             let list = (0..size).collect::<Vec<_>>();
             let program = Program::compile("list.map(x, x * 2)").unwrap();
-            let mut ctx = Context::default();
-            ctx.add_variable_from_value("list", list);
-            b.iter(|| program.execute(&ctx).expect("Eval failed!"))
+            let ctx = Context::default();
+            let mut vars = MapResolver::new();
+            vars.add_variable_from_value("list", list);
+            b.iter(|| program.execute_with(&ctx, &vars).expect("Eval failed!"))
         });
     }
     group.finish();
@@ -99,7 +107,10 @@ pub fn map_macro_benchmark(c: &mut Criterion) {
 
 criterion_group! {
     name = benches;
-    config = Criterion::default();
+    config = Criterion::default()
+      .warm_up_time(Duration::from_millis(10))
+      .measurement_time(Duration::from_millis(100))
+      .with_profiler(pprof::criterion::PProfProfiler::new(100, Output::Protobuf));
     targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark
 }
 

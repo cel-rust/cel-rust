@@ -1,5 +1,5 @@
 [workspace]
-members = ["cel", "example", "fuzz"]
+members = ["cel", "fuzz"]
 resolver = "2"
 
 [profile.bench]
@@ -7,4 +7,4 @@ lto = true
 codegen-units = 1
 opt-level = 3
 # Line numbers for dhat
-debug = 1
+debug = true

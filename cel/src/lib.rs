@@ -33,15 +33,20 @@ pub use ser::SerializationError;
 
 #[cfg(feature = "json")]
 mod json;
+mod optimize;
+#[cfg(test)]
+mod test;
+
+pub use optimize::Optimizer;
+
 #[cfg(feature = "json")]
 pub use json::ConvertToJsonError;
 
+use crate::context::{DefaultVariableResolver, VariableResolver};
 use magic::FromContext;
 
 pub mod extractors {
-    pub use crate::magic::{Arguments, Identifier, This};
-
-    pub use crate::magic::{IntoFunction, IntoResolveResult};
+    pub use crate::magic::IntoFunction;
 }
 
 #[derive(Error, Clone, Debug, PartialEq)]
@@ -50,19 +55,22 @@ pub enum ExecutionError {
     #[error("Invalid argument count: expected {expected}, got {actual}")]
     InvalidArgumentCount { expected: usize, actual: usize },
     #[error("Invalid argument type: {:?}", .target)]
-    UnsupportedTargetType { target: Value },
+    UnsupportedTargetType { target: Value<'static> },
     #[error("Method '{method}' not supported on type '{target:?}'")]
-    NotSupportedAsMethod { method: String, target: Value },
+    NotSupportedAsMethod {
+        method: String,
+        target: Value<'static>,
+    },
     /// Indicates that the script attempted to use a value as a key in a map,
     /// but the type of the value was not supported as a key.
     #[error("Unable to use value '{0:?}' as a key")]
-    UnsupportedKeyType(Value),
+    UnsupportedKeyType(Value<'static>),
     #[error("Unexpected type: got '{got}', want '{want}'")]
     UnexpectedType { got: String, want: String },
     /// Indicates that the script attempted to reference a key on a type that
     /// was missing the requested key.
     #[error("No such key: {0}")]
-    NoSuchKey(Arc<String>),
+    NoSuchKey(Arc<str>),
     /// Indicates that the script used an existing operator or function with
     /// values of one or more types for which no overload was declared.
     #[error("No such overload")]
@@ -77,23 +85,23 @@ pub enum ExecutionError {
     MissingArgumentOrTarget,
     /// Indicates that a comparison could not be performed.
     #[error("{0:?} can not be compared to {1:?}")]
-    ValuesNotComparable(Value, Value),
+    ValuesNotComparable(Value<'static>, Value<'static>),
     /// Indicates that an operator was used on a type that does not support it.
     #[error("Unsupported unary operator '{0}': {1:?}")]
-    UnsupportedUnaryOperator(&'static str, Value),
+    UnsupportedUnaryOperator(&'static str, Value<'static>),
     /// Indicates that an unsupported binary operator was applied on two values
     /// where it's unsupported, for example list + map.
     #[error("Unsupported binary operator '{0}': {1:?}, {2:?}")]
-    UnsupportedBinaryOperator(&'static str, Value, Value),
+    UnsupportedBinaryOperator(&'static str, Value<'static>, Value<'static>),
     /// Indicates that an unsupported type was used to index a map
     #[error("Cannot use value as map index: {0:?}")]
-    UnsupportedMapIndex(Value),
+    UnsupportedMapIndex(Value<'static>),
     /// Indicates that an unsupported type was used to index a list
     #[error("Cannot use value as list index: {0:?}")]
-    UnsupportedListIndex(Value),
+    UnsupportedListIndex(Value<'static>),
     /// Indicates that an unsupported type was used to index a list
     #[error("Cannot use value {0:?} to index {1:?}")]
-    UnsupportedIndex(Value, Value),
+    UnsupportedIndex(Value<'static>, Value<'static>),
     /// Indicates that a function call occurred without an [`Expression::Ident`]
     /// as the function identifier.
     #[error("Unsupported function call identifier type: {0:?}")]
@@ -106,18 +114,18 @@ pub enum ExecutionError {
     #[error("Error executing function '{function}': {message}")]
     FunctionError { function: String, message: String },
     #[error("Division by zero of {0:?}")]
-    DivisionByZero(Value),
+    DivisionByZero(Value<'static>),
     #[error("Remainder by zero of {0:?}")]
-    RemainderByZero(Value),
+    RemainderByZero(Value<'static>),
     #[error("Overflow from binary operator '{0}': {1:?}, {2:?}")]
-    Overflow(&'static str, Value, Value),
+    Overflow(&'static str, Value<'static>, Value<'static>),
     #[error("Index out of bounds: {0:?}")]
-    IndexOutOfBounds(Value),
+    IndexOutOfBounds(Value<'static>),
 }
 
 impl ExecutionError {
     pub fn no_such_key(name: &str) -> Self {
-        ExecutionError::NoSuchKey(Arc::new(name.to_string()))
+        ExecutionError::NoSuchKey(Arc::from(name))
     }
 
     pub fn undeclared_reference(name: &str) -> Self {
@@ -135,18 +143,18 @@ impl ExecutionError {
         }
     }
 
-    pub fn unsupported_target_type(target: Value) -> Self {
+    pub fn unsupported_target_type(target: Value<'static>) -> Self {
         ExecutionError::UnsupportedTargetType { target }
     }
 
-    pub fn not_supported_as_method(method: &str, target: Value) -> Self {
+    pub fn not_supported_as_method(method: &str, target: Value<'static>) -> Self {
         ExecutionError::NotSupportedAsMethod {
             method: method.to_string(),
             target,
         }
     }
 
-    pub fn unsupported_key_type(value: Value) -> Self {
+    pub fn unsupported_key_type(value: Value<'static>) -> Self {
         ExecutionError::UnsupportedKeyType(value)
     }
 
@@ -161,15 +169,43 @@ pub struct Program {
 }
 
 impl Program {
+    pub fn compile_with_optimizer<T: Optimizer + 'static>(
+        source: &str,
+        t: T,
+    ) -> Result<Program, ParseErrors> {
+        Ok(Self::compile(source)?.optimized_with(t))
+    }
     pub fn compile(source: &str) -> Result<Program, ParseErrors> {
+        Ok(Self::compile_unoptimized(source)?.optimized())
+    }
+    pub fn compile_unoptimized(source: &str) -> Result<Program, ParseErrors> {
         let parser = Parser::default();
         parser
             .parse(source)
             .map(|expression| Program { expression })
     }
 
-    pub fn execute(&self, context: &Context) -> ResolveResult {
-        Value::resolve(&self.expression, context)
+    fn optimized(self) -> Program {
+        Program {
+            expression: crate::optimize::Optimize::new().optimize(self.expression),
+        }
+    }
+    fn optimized_with<T: Optimizer + 'static>(self, t: T) -> Program {
+        Program {
+            expression: crate::optimize::Optimize::new_with_optimizer(t).optimize(self.expression),
+        }
+    }
+
+    pub fn execute_with<'a, 'vars: 'a, 'rf>(
+        &'vars self,
+        context: &'vars Context,
+        vars: &'rf dyn VariableResolver<'vars>,
+    ) -> ResolveResult<'a> {
+        Value::resolve(&self.expression, context, vars)
+    }
+
+    pub fn execute<'a>(&'a self, context: &'a Context) -> ResolveResult<'a> {
+        Value::resolve(&self.expression, context, &DefaultVariableResolver)
     }
 
     /// Returns the variables and functions referenced by the CEL program
@@ -203,19 +239,37 @@ impl TryFrom<&str> for Program {
 
 #[cfg(test)]
 mod tests {
-    use crate::context::Context;
+    use crate::context::{Context, MapResolver};
     use crate::objects::{ResolveResult, Value};
     use crate::{ExecutionError, Program};
     use std::collections::HashMap;
     use std::convert::TryInto;
 
     /// Tests the provided script and returns the result. An optional context can be provided.
-    pub(crate) fn test_script(script: &str, ctx: Option<Context>) -> ResolveResult {
+    pub(crate) fn test_script(script: &str, ctx: Option<Context>) -> ResolveResult<'_> {
         let program = match Program::compile(script) {
             Ok(p) => p,
             Err(e) => panic!("{}", e),
         };
-        program.execute(&ctx.unwrap_or_default())
+        let ctx = ctx.unwrap_or_default();
+        program.execute(&ctx).map(|v| v.as_static())
+    }
+    /// Tests the provided script and returns the result. An optional context can be provided.
+    pub(crate) fn test_script_vars(
+        script: &str,
+        vars: &[(&str, Value<'static>)],
+    ) -> ResolveResult<'static> {
+        let mut var_resolver = MapResolver::new();
+        for (k, v) in vars {
+            var_resolver.add_variable_from_value(k, v.clone());
+        }
+        let program = match Program::compile(script) {
+            Ok(p) => p,
+            Err(e) => panic!("{}", e),
+        };
+        let ctx = Context::default();
+        let v = Value::resolve(&program.expression, &ctx, &var_resolver)?;
+        Ok(v.as_static())
     }
 
     #[test]
@@ -232,11 +286,17 @@ mod tests {
     #[test]
     fn variables() {
         fn assert_output(script: &str, expected: ResolveResult) {
-            let mut ctx = Context::default();
-            ctx.add_variable_from_value("foo", HashMap::from([("bar", 1i64)]));
-            ctx.add_variable_from_value("arr", vec![1i64, 2, 3]);
-            ctx.add_variable_from_value("str", "foobar".to_string());
-            assert_eq!(test_script(script, Some(ctx)), expected);
+            assert_eq!(
+                test_script_vars(
+                    script,
+                    &[
+                        ("foo", HashMap::from([("bar", 1i64)]).into()),
+                        ("arr", vec![1i64, 2, 3].into()),
+                        ("str", "foobar".to_string().into()),
+                    ],
+                ),
+                expected
+            );
         }
 
         // Test methods
@@ -295,10 +355,11 @@ mod tests {
         ];
 
         for (name, script, error) in tests {
-            let mut ctx = Context::default();
-            ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
-            let res = test_script(script, Some(ctx));
-            assert_eq!(res, error.into(), "{name}");
+            assert_eq!(
+                test_script_vars(script, &[("foo", HashMap::from([("bar", 1)]).into())]),
+                error.into(),
+                "{name}"
+            );
         }
     }
 }

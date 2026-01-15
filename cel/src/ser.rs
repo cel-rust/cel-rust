@@ -11,6 +11,7 @@ use serde::{
 use std::{collections::HashMap, fmt::Display, iter::FromIterator, sync::Arc};
 use thiserror::Error;
 
+use crate::objects::{BytesValue, ListValue, StringValue};
 #[cfg(feature = "chrono")]
 use chrono::FixedOffset;
 #[cfg(feature = "chrono")]
@@ -200,7 +201,7 @@ impl Display for SerializationError {
 
 pub type Result<T> = std::result::Result<T, SerializationError>;
 
-pub fn to_value<T>(value: T) -> Result<Value>
+pub fn to_value<T>(value: T) -> Result<Value<'static>>
 where
     T: Serialize,
 {
@@ -208,7 +209,7 @@ where
 }
 
 impl ser::Serializer for Serializer {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     type SerializeSeq = SerializeVec;
@@ -219,78 +220,78 @@ impl ser::Serializer for Serializer {
     type SerializeStruct = SerializeMap;
     type SerializeStructVariant = SerializeStructVariant;
 
-    fn serialize_bool(self, v: bool) -> Result<Value> {
+    fn serialize_bool(self, v: bool) -> Result<Self::Ok> {
         Ok(Value::Bool(v))
     }
 
-    fn serialize_i8(self, v: i8) -> Result<Value> {
+    fn serialize_i8(self, v: i8) -> Result<Self::Ok> {
         self.serialize_i64(i64::from(v))
     }
 
-    fn serialize_i16(self, v: i16) -> Result<Value> {
+    fn serialize_i16(self, v: i16) -> Result<Self::Ok> {
         self.serialize_i64(i64::from(v))
     }
 
-    fn serialize_i32(self, v: i32) -> Result<Value> {
+    fn serialize_i32(self, v: i32) -> Result<Self::Ok> {
         self.serialize_i64(i64::from(v))
     }
 
-    fn serialize_i64(self, v: i64) -> Result<Value> {
+    fn serialize_i64(self, v: i64) -> Result<Self::Ok> {
         Ok(Value::Int(v))
     }
 
-    fn serialize_u8(self, v: u8) -> Result<Value> {
+    fn serialize_u8(self, v: u8) -> Result<Self::Ok> {
         self.serialize_u64(u64::from(v))
     }
 
-    fn serialize_u16(self, v: u16) -> Result<Value> {
+    fn serialize_u16(self, v: u16) -> Result<Self::Ok> {
         self.serialize_u64(u64::from(v))
     }
 
-    fn serialize_u32(self, v: u32) -> Result<Value> {
+    fn serialize_u32(self, v: u32) -> Result<Self::Ok> {
         self.serialize_u64(u64::from(v))
     }
 
-    fn serialize_u64(self, v: u64) -> Result<Value> {
+    fn serialize_u64(self, v: u64) -> Result<Self::Ok> {
         Ok(Value::UInt(v))
     }
 
-    fn serialize_f32(self, v: f32) -> Result<Value> {
+    fn serialize_f32(self, v: f32) -> Result<Self::Ok> {
         self.serialize_f64(f64::from(v))
     }
 
-    fn serialize_f64(self, v: f64) -> Result<Value> {
+    fn serialize_f64(self, v: f64) -> Result<Self::Ok> {
         Ok(Value::Float(v))
     }
 
-    fn serialize_char(self, v: char) -> Result<Value> {
+    fn serialize_char(self, v: char) -> Result<Self::Ok> {
         self.serialize_str(&v.to_string())
     }
 
-    fn serialize_str(self, v: &str) -> Result<Value> {
-        Ok(Value::String(Arc::new(v.to_string())))
+    fn serialize_str(self, v: &str) -> Result<Self::Ok> {
+        Ok(Value::String(StringValue::Owned(Arc::from(v))))
     }
 
-    fn serialize_bytes(self, v: &[u8]) -> Result<Value> {
-        Ok(Value::Bytes(Arc::new(v.to_vec())))
+    fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok> {
+        Ok(Value::Bytes(BytesValue::Owned(Arc::from(v))))
     }
 
-    fn serialize_none(self) -> Result<Value> {
+    fn serialize_none(self) -> Result<Self::Ok> {
         self.serialize_unit()
     }
 
-    fn serialize_some<T>(self, value: &T) -> Result<Value>
+    fn serialize_some<T>(self, value: &T) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
     {
         value.serialize(self)
     }
 
-    fn serialize_unit(self) -> Result<Value> {
+    fn serialize_unit(self) -> Result<Self::Ok> {
         Ok(Value::Null)
     }
 
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<Value> {
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok> {
         self.serialize_unit()
     }
 
@@ -299,11 +300,11 @@ impl ser::Serializer for Serializer {
         _name: &'static str,
         _variant_index: u32,
         variant: &'static str,
-    ) -> Result<Value> {
+    ) -> Result<Self::Ok> {
         self.serialize_str(variant)
     }
 
-    fn serialize_newtype_struct<T>(self, name: &'static str, value: &T) -> Result<Value>
+    fn serialize_newtype_struct<T>(self, name: &'static str, value: &T) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
     {
@@ -322,7 +323,7 @@ impl ser::Serializer for Serializer {
         _variant_index: u32,
         variant: &'static str,
         value: &T,
-    ) -> Result<Value>
+    ) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
     {
@@ -386,22 +387,23 @@ impl ser::Serializer for Serializer {
 }
 
 pub struct SerializeVec {
-    vec: Vec<Value>,
+    vec: Vec<Value<'static>>,
 }
 
+#[allow(dead_code)]
 pub struct SerializeTupleVariant {
     name: String,
-    vec: Vec<Value>,
+    vec: Vec<Value<'static>>,
 }
 
 pub struct SerializeMap {
-    map: HashMap<Key, Value>,
+    map: HashMap<Key, Value<'static>>,
     next_key: Option<Key>,
 }
 
 pub struct SerializeStructVariant {
     name: String,
-    map: HashMap<Key, Value>,
+    map: HashMap<Key, Value<'static>>,
 }
 
 #[cfg(feature = "chrono")]
@@ -412,7 +414,7 @@ struct SerializeTimestamp {
 }
 
 impl ser::SerializeSeq for SerializeVec {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
@@ -423,13 +425,13 @@ impl ser::SerializeSeq for SerializeVec {
         Ok(())
     }
 
-    fn end(self) -> Result<Value> {
-        Ok(Value::List(Arc::new(self.vec)))
+    fn end(self) -> Result<Self::Ok> {
+        Ok(Value::List(ListValue::Owned(self.vec.into())))
     }
 }
 
 impl ser::SerializeTuple for SerializeVec {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     fn serialize_element<T>(&mut self, value: &T) -> Result<()>
@@ -439,13 +441,13 @@ impl ser::SerializeTuple for SerializeVec {
         serde::ser::SerializeSeq::serialize_element(self, value)
     }
 
-    fn end(self) -> Result<Value> {
+    fn end(self) -> Result<Self::Ok> {
         serde::ser::SerializeSeq::end(self)
     }
 }
 
 impl ser::SerializeTupleStruct for SerializeVec {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
@@ -455,13 +457,13 @@ impl ser::SerializeTupleStruct for SerializeVec {
         serde::ser::SerializeSeq::serialize_element(self, value)
     }
 
-    fn end(self) -> Result<Value> {
+    fn end(self) -> Result<Self::Ok> {
         serde::ser::SerializeSeq::end(self)
     }
 }
 
 impl ser::SerializeTupleVariant for SerializeTupleVariant {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     fn serialize_field<T>(&mut self, value: &T) -> Result<()>
@@ -472,14 +474,15 @@ impl ser::SerializeTupleVariant for SerializeTupleVariant {
         Ok(())
     }
 
-    fn end(self) -> Result<Value> {
-        let map = HashMap::from_iter([(self.name, Arc::new(self.vec))]);
-        Ok(map.into())
+    fn end(self) -> Result<Self::Ok> {
+        let map: HashMap<_, _> =
+            HashMap::from_iter([(self.name, ListValue::Owned(self.vec.into()))]);
+        Ok(Value::Map(map.into()))
     }
 }
 
 impl ser::SerializeMap for SerializeMap {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     fn serialize_key<T>(&mut self, key: &T) -> Result<()>
@@ -505,13 +508,13 @@ impl ser::SerializeMap for SerializeMap {
         Ok(())
     }
 
-    fn end(self) -> Result<Value> {
+    fn end(self) -> Result<Self::Ok> {
         Ok(self.map.into())
     }
 }
 
 impl ser::SerializeStruct for SerializeMap {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
@@ -521,13 +524,13 @@ impl ser::SerializeStruct for SerializeMap {
         serde::ser::SerializeMap::serialize_entry(self, key, value)
     }
 
-    fn end(self) -> Result<Value> {
+    fn end(self) -> Result<Self::Ok> {
         serde::ser::SerializeMap::end(self)
     }
 }
 
 impl ser::SerializeStructVariant for SerializeStructVariant {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<()>
@@ -539,7 +542,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
         Ok(())
     }
 
-    fn end(self) -> Result<Value> {
+    fn end(self) -> Result<Self::Ok> {
         let map: HashMap<String, Value> = HashMap::from_iter([(self.name, self.map.into())]);
         Ok(map.into())
     }
@@ -547,7 +550,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
 
 #[cfg(feature = "chrono")]
 impl ser::SerializeStruct for SerializeTimestamp {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
     fn serialize_field<T>(
         &mut self,
@@ -659,7 +662,7 @@ impl ser::Serializer for KeySerializer {
     }
 
     fn serialize_str(self, v: &str) -> Result<Key> {
-        Ok(Key::String(Arc::new(v.to_string())))
+        Ok(Key::String(Arc::from(v)))
     }
 
     fn serialize_bytes(self, _v: &[u8]) -> Result<Key> {
@@ -699,7 +702,7 @@ impl ser::Serializer for KeySerializer {
         _variant_index: u32,
         variant: &'static str,
     ) -> Result<Key> {
-        Ok(Key::String(Arc::new(variant.to_string())))
+        Ok(Key::String(Arc::from(variant)))
     }
 
     fn serialize_newtype_struct<T>(self, _name: &'static str, value: &T) -> Result<Key>
@@ -792,7 +795,7 @@ enum TimeSerializer {
 
 #[cfg(feature = "chrono")]
 impl ser::Serializer for TimeSerializer {
-    type Ok = Value;
+    type Ok = Value<'static>;
     type Error = SerializationError;
 
     type SerializeStruct = SerializeTimestamp;
@@ -819,7 +822,7 @@ impl ser::Serializer for TimeSerializer {
         Ok(SerializeTimestamp::default())
     }
 
-    fn serialize_str(self, v: &str) -> Result<Value> {
+    fn serialize_str(self, v: &str) -> Result<Self::Ok> {
         if !matches!(self, Self::Timestamp) {
             return Err(SerializationError::SerdeError(
                 "expected Timestamp string with Timestamp marker newtype struct".to_owned(),
@@ -830,74 +833,74 @@ impl ser::Serializer for TimeSerializer {
             .into())
     }
 
-    fn serialize_bool(self, _v: bool) -> Result<Value> {
+    fn serialize_bool(self, _v: bool) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_i8(self, _v: i8) -> Result<Value> {
+    fn serialize_i8(self, _v: i8) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_i16(self, _v: i16) -> Result<Value> {
+    fn serialize_i16(self, _v: i16) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_i32(self, _v: i32) -> Result<Value> {
+    fn serialize_i32(self, _v: i32) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_i64(self, _v: i64) -> Result<Value> {
+    fn serialize_i64(self, _v: i64) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_u8(self, _v: u8) -> Result<Value> {
+    fn serialize_u8(self, _v: u8) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_u16(self, _v: u16) -> Result<Value> {
+    fn serialize_u16(self, _v: u16) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_u32(self, _v: u32) -> Result<Value> {
+    fn serialize_u32(self, _v: u32) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_u64(self, _v: u64) -> Result<Value> {
+    fn serialize_u64(self, _v: u64) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_f32(self, _v: f32) -> Result<Value> {
+    fn serialize_f32(self, _v: f32) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_f64(self, _v: f64) -> Result<Value> {
+    fn serialize_f64(self, _v: f64) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_char(self, _v: char) -> Result<Value> {
+    fn serialize_char(self, _v: char) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_bytes(self, _v: &[u8]) -> Result<Value> {
+    fn serialize_bytes(self, _v: &[u8]) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_none(self) -> Result<Value> {
+    fn serialize_none(self) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_some<T>(self, _value: &T) -> Result<Value>
+    fn serialize_some<T>(self, _value: &T) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
     {
         unreachable!()
     }
 
-    fn serialize_unit(self) -> Result<Value> {
+    fn serialize_unit(self) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_unit_struct(self, _name: &'static str) -> Result<Value> {
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<Self::Ok> {
         unreachable!()
     }
 
@@ -906,11 +909,11 @@ impl ser::Serializer for TimeSerializer {
         _name: &'static str,
         _variant_index: u32,
         _variant: &'static str,
-    ) -> Result<Value> {
+    ) -> Result<Self::Ok> {
         unreachable!()
     }
 
-    fn serialize_newtype_struct<T>(self, _name: &'static str, _value: &T) -> Result<Value>
+    fn serialize_newtype_struct<T>(self, _name: &'static str, _value: &T) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
     {
@@ -923,7 +926,7 @@ impl ser::Serializer for TimeSerializer {
         _variant_index: u32,
         _variant: &'static str,
         _value: &T,
-    ) -> Result<Value>
+    ) -> Result<Self::Ok>
     where
         T: ?Sized + Serialize,
     {
@@ -973,21 +976,23 @@ impl ser::Serializer for TimeSerializer {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "chrono")]
+    use super::{Duration, Timestamp};
+    use crate::context::MapResolver;
+    use crate::objects::{BytesValue, ListValue};
     use crate::{objects::Key, to_value, Value};
     use crate::{Context, Program};
     use serde::Serialize;
     use serde_bytes::Bytes;
     use std::{collections::HashMap, iter::FromIterator, sync::Arc};
 
-    #[cfg(feature = "chrono")]
-    use super::{Duration, Timestamp};
-
     macro_rules! primitive_test {
         ($functionName:ident, $strValue: literal, $value: expr) => {
             #[test]
             fn $functionName() {
                 let program = Program::compile($strValue).unwrap();
-                let result = program.execute(&Context::default());
+                let ctx = Context::default();
+                let result = program.execute(&ctx);
                 assert_eq!(Value::from($value), result.unwrap());
             }
         };
@@ -1045,31 +1050,31 @@ mod tests {
 
         let serialized = to_value(test).unwrap();
         let expected: Value = HashMap::from_iter([
-            (Key::String(Arc::new("bool".to_string())), Value::Bool(true)),
-            (Key::String(Arc::new("int8".to_string())), Value::Int(8)),
-            (Key::String(Arc::new("int16".to_string())), Value::Int(16)),
-            (Key::String(Arc::new("int32".to_string())), Value::Int(32)),
-            (Key::String(Arc::new("int64".to_string())), Value::Int(64)),
-            (Key::String(Arc::new("u8".to_string())), Value::UInt(8)),
-            (Key::String(Arc::new("u16".to_string())), Value::UInt(16)),
-            (Key::String(Arc::new("u32".to_string())), Value::UInt(32)),
-            (Key::String(Arc::new("u64".to_string())), Value::UInt(64)),
+            (Key::String(Arc::from("bool")), Value::Bool(true)),
+            (Key::String(Arc::from("int8")), Value::Int(8)),
+            (Key::String(Arc::from("int16")), Value::Int(16)),
+            (Key::String(Arc::from("int32")), Value::Int(32)),
+            (Key::String(Arc::from("int64")), Value::Int(64)),
+            (Key::String(Arc::from("u8")), Value::UInt(8)),
+            (Key::String(Arc::from("u16")), Value::UInt(16)),
+            (Key::String(Arc::from("u32")), Value::UInt(32)),
+            (Key::String(Arc::from("u64")), Value::UInt(64)),
             (
-                Key::String(Arc::new("f32".to_string())),
+                Key::String(Arc::from("f32")),
                 Value::Float(f64::from(0.32_f32)),
             ),
-            (Key::String(Arc::new("f64".to_string())), Value::Float(0.64)),
+            (Key::String(Arc::from("f64")), Value::Float(0.64)),
             (
-                Key::String(Arc::new("char".to_string())),
-                Value::String(Arc::new("a".to_string())),
+                Key::String(Arc::from("char")),
+                Value::String("a".to_string().into()),
             ),
             (
-                Key::String(Arc::new("string".to_string())),
-                Value::String(Arc::new("string".to_string())),
+                Key::String(Arc::from("string")),
+                Value::String("string".to_string().into()),
             ),
             (
-                Key::String(Arc::new("bytes".to_string())),
-                Value::Bytes(Arc::new(vec![1, 1, 1, 1])),
+                Key::String(Arc::from("bytes")),
+                Value::Bytes(BytesValue::Owned(vec![1, 1, 1, 1].into())),
             ),
         ])
         .into();
@@ -1077,10 +1082,11 @@ mod tests {
         // Test with CEL because iterator is not implemented for Value::Map
         let program =
             Program::compile("expected.all(key, serialized[key] == expected[key])").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("serialized", serialized).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable_from_value("serialized", serialized);
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into())
     }
 
@@ -1101,10 +1107,11 @@ mod tests {
         let unit = to_value(TestCompoundTypes::Unit).unwrap();
         let expected: Value = "Unit".into();
         let program = Program::compile("test == expected").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", unit).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable_from_value("test", unit);
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into())
     }
     #[test]
@@ -1112,10 +1119,11 @@ mod tests {
         let newtype = to_value(TestCompoundTypes::Newtype(32)).unwrap();
         let expected: Value = HashMap::from([("Newtype", Value::UInt(32))]).into();
         let program = Program::compile("test == expected").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", newtype).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable_from_value("test", newtype);
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into())
     }
     #[test]
@@ -1124,19 +1132,21 @@ mod tests {
         let wrapped = to_value(TestCompoundTypes::Wrapped(None)).unwrap();
         let expected: Value = HashMap::from([("Wrapped", Value::Null)]).into();
         let program = Program::compile("test == expected").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", wrapped).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable_from_value("test", wrapped);
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into());
 
         let wrapped = to_value(TestCompoundTypes::Wrapped(Some(8))).unwrap();
         let expected: Value = HashMap::from([("Wrapped", Value::UInt(8))]).into();
         let program = Program::compile("test == expected").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", wrapped).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable_from_value("test", wrapped);
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into())
     }
 
@@ -1146,14 +1156,15 @@ mod tests {
         let tuple = to_value(TestCompoundTypes::Tuple(12, 16)).unwrap();
         let expected: Value = HashMap::from([(
             "Tuple",
-            Value::List(Arc::new(vec![12_u64.into(), 16_u64.into()])),
+            Value::List(ListValue::Owned(vec![12_u64.into(), 16_u64.into()].into())),
         )])
         .into();
         let program = Program::compile("test == expected").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", tuple).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable_from_value("test", tuple);
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into())
     }
 
@@ -1191,10 +1202,11 @@ mod tests {
         )])
         .into();
         let program = Program::compile("expected.all(key, test[key] == expected[key])").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", test_struct).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable("test", test_struct).unwrap();
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into());
     }
 
@@ -1212,7 +1224,7 @@ mod tests {
             "Map",
             HashMap::<Key, Value>::from_iter([(
                 "Test".into(),
-                Value::Bytes(Arc::new(vec![0_u8, 0_u8, 0_u8, 0_u8])),
+                Value::Bytes(BytesValue::Owned(vec![0_u8, 0_u8, 0_u8, 0_u8].into())),
             )]),
         )])
         .into();
@@ -1318,10 +1330,11 @@ mod tests {
         assert_eq!(tests, expected);
 
         let program = Program::compile("test == expected").unwrap();
-        let mut context = Context::default();
-        context.add_variable("expected", expected).unwrap();
-        context.add_variable("test", tests).unwrap();
-        let value = program.execute(&context).unwrap();
+        let mut vars = MapResolver::new();
+        vars.add_variable_from_value("expected", expected);
+        vars.add_variable_from_value("test", tests);
+        let ctx = Context::default();
+        let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into());
     }
 

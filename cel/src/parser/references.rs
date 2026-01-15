@@ -121,6 +121,7 @@ impl IdedExpr {
                 }
             }
             Expr::Literal(_) => {}
+            Expr::Inline(_) => {}
             Expr::Map(map) => {
                 for entry in &map.entries {
                     match &entry.expr {

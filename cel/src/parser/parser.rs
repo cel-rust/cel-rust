@@ -2144,6 +2144,7 @@ ERROR: <input>:1:24: unsupported syntax '?'
                     self.push("]");
                     &format!("^#{}:{}#", expr.id, "*expr.Expr_ListExpr")
                 }
+                Expr::Inline(_val) => todo!(),
                 Expr::Literal(val) => match val {
                     CelVal::String(s) => {
                         &format!("\"{s}\"^#{}:{}#", expr.id, "*expr.Constant_StringValue")

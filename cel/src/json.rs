@@ -10,7 +10,7 @@ pub enum ConvertToJsonError<'a> {
     /// We cannot convert the CEL value to JSON. Some CEL types (like functions) are
     /// not representable in JSON.
     #[error("unable to convert value to json: {0:?}")]
-    Value(&'a Value),
+    Value(&'a Value<'a>),
 
     #[cfg(feature = "chrono")]
     /// The duration is too large to convert to nanoseconds. Any duration of 2^63
@@ -20,7 +20,7 @@ pub enum ConvertToJsonError<'a> {
     DurationOverflow(&'a Duration),
 }
 
-impl Value {
+impl<'a> Value<'a> {
     /// Converts a CEL value to a JSON value.
     ///
     /// # Example
@@ -52,7 +52,7 @@ impl Value {
             Value::Float(f) => f.into(),
             Value::String(ref s) => s.to_string().into(),
             Value::Bool(b) => b.into(),
-            Value::Bytes(ref b) => BASE64_STANDARD.encode(b.as_slice()).to_string().into(),
+            Value::Bytes(ref b) => BASE64_STANDARD.encode(b.as_ref()).to_string().into(),
             Value::Null => serde_json::Value::Null,
             #[cfg(feature = "chrono")]
             Value::Timestamp(ref dt) => dt.to_rfc3339().into(),
@@ -61,7 +61,7 @@ impl Value {
                 v.num_nanoseconds()
                     .ok_or(ConvertToJsonError::DurationOverflow(v))?,
             )),
-            Value::Opaque(ref opaque) => (**opaque).json().unwrap_or(serde_json::Value::Null),
+            Value::Opaque(ref opaque) => opaque.as_ref().json().unwrap_or(serde_json::Value::Null),
             _ => return Err(ConvertToJsonError::Value(self)),
         })
     }
@@ -69,7 +69,7 @@ impl Value {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::Map;
+    use crate::objects::{ListValue, Map};
     use crate::Value as CelValue;
     #[cfg(feature = "chrono")]
     use chrono::Duration;
@@ -86,7 +86,9 @@ mod tests {
             (json!(null), CelValue::Null),
             (
                 json!([true, null]),
-                CelValue::List(vec![CelValue::Bool(true), CelValue::Null].into()),
+                CelValue::List(ListValue::Owned(
+                    vec![CelValue::Bool(true), CelValue::Null].into(),
+                )),
             ),
             (
                 json!({"hello": "world"}),
