@@ -7,16 +7,22 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 use std::string::String as StdString;
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct String(Cow<'static, str>);
 
 impl String {
     pub fn into_inner(self) -> StdString {
-        self.0.clone().into()
+        self.clone().into()
     }
 
     pub fn inner(&self) -> &str {
         self.0.as_ref()
+    }
+}
+
+impl Clone for String {
+    fn clone(&self) -> Self {
+        Self(Cow::Owned(StdString::from(self.inner())))
     }
 }
 
@@ -152,5 +158,18 @@ mod tests {
         assert_eq!(string.as_str(), r.inner());
         assert!(std::ptr::eq(string.as_str(), r.inner()));
         assert!(std::ptr::eq(string.as_str(), r.inner()));
+    }
+
+    #[test]
+    fn test_clone() {
+        let s = {
+            let string = StdString::from("cel-rust");
+            let val = {
+                let s = string.as_ref();
+                BorrowedVal::from(s)
+            };
+            val.inner().clone()
+        };
+        assert_eq!(s, String::from("cel-rust"));
     }
 }
