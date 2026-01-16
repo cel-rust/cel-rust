@@ -1,5 +1,5 @@
 use crate::macros::{impl_conversions, impl_handler};
-use crate::objects::{BytesValue, ListValue, Opaque, OpaqueValue, StringValue};
+use crate::objects::{BytesValue, ListValue, StringValue};
 use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
 use std::sync::Arc;
 
@@ -12,22 +12,6 @@ impl_conversions!(
     bool => Value::Bool,
     ListValue<'a> => Value::List,
 );
-
-impl<'a> FromValue<'a> for Arc<dyn Opaque> {
-    fn from_value(expr: &Value<'a>) -> Result<Self, ExecutionError>
-    where
-        Self: Sized,
-    {
-        if let Value::Opaque(OpaqueValue::Arc(v)) = expr {
-            Ok(v.clone())
-        } else {
-            Err(ExecutionError::UnexpectedType {
-                got: format!("{:?}", expr),
-                want: stringify!($target_type).to_string(),
-            })
-        }
-    }
-}
 
 #[cfg(feature = "chrono")]
 impl_conversions!(

@@ -163,11 +163,10 @@ impl Optimize {
 #[cfg(test)]
 mod test {
     use crate::common::ast::{CallExpr, Expr};
-    use crate::objects::Opaque;
+    use crate::objects::{Object, ObjectValue};
     use crate::{
-        objects, Context, ExecutionError, FunctionContext, IdedExpr, Program, ResolveResult, Value,
+        Context, ExecutionError, FunctionContext, IdedExpr, Program, ResolveResult, Value,
     };
-    use std::sync::Arc;
 
     pub struct RegexOptimizer;
     impl RegexOptimizer {
@@ -189,9 +188,8 @@ mod test {
                     };
 
                     // TODO: translate regex compile failures into inlined failures
-                    let opaque = Value::Opaque(
-                        Arc::new(PrecompileRegex(regex::Regex::new(&arg).ok()?)).into(),
-                    );
+                    let opaque =
+                        Value::Object(Object::new(PrecompileRegex(regex::Regex::new(&arg).ok()?)));
                     let id_expr = IdedExpr {
                         id,
                         expr: Expr::Inline(opaque),
@@ -218,11 +216,17 @@ mod test {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Clone)]
     struct PrecompileRegex(regex::Regex);
-    impl objects::Opaque for PrecompileRegex {
-        #[inline]
-        fn runtime_type_name(&self) -> &str {
+
+    impl PartialEq for PrecompileRegex {
+        fn eq(&self, other: &Self) -> bool {
+            self.0.as_str() == other.0.as_str()
+        }
+    }
+
+    impl ObjectValue<'static> for PrecompileRegex {
+        fn type_name(&self) -> &'static str {
             "precompiled_regex"
         }
 
@@ -231,21 +235,21 @@ mod test {
             None
         }
     }
-    impl PartialEq for PrecompileRegex {
-        fn eq(&self, other: &Self) -> bool {
-            self.0.as_str() == other.0.as_str()
-        }
-    }
-    impl Eq for PrecompileRegex {}
 
     impl PrecompileRegex {
         pub fn precompiled_matches<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
-            let this: Arc<dyn Opaque> = ftx.this()?;
-            let val: Arc<str> = ftx.arg(0)?;
-            let Some(rgx) = this.downcast_ref::<Self>() else {
+            let this: Value = ftx.this()?;
+            let val: std::sync::Arc<str> = ftx.arg(0)?;
+            let Value::Object(obj) = this else {
                 return Err(ExecutionError::UnexpectedType {
-                    got: this.runtime_type_name().to_string(),
-                    want: "regex".to_string(),
+                    got: this.type_of().to_string(),
+                    want: "precompiled_regex".to_string(),
+                });
+            };
+            let Some(rgx) = obj.downcast_ref::<Self>() else {
+                return Err(ExecutionError::UnexpectedType {
+                    got: obj.type_name().to_string(),
+                    want: "precompiled_regex".to_string(),
                 });
             };
             Ok(Value::Bool(rgx.0.is_match(&val)))
@@ -271,6 +275,6 @@ mod test {
             panic!("expected optimization, got {program:?}");
         };
         assert_eq!(func_name.as_str(), "precompiled_matches");
-        assert!(matches!(t.expr, Expr::Inline(Value::Opaque(_))));
+        assert!(matches!(t.expr, Expr::Inline(Value::Object(_))));
     }
 }

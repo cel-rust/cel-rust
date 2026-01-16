@@ -7,7 +7,6 @@ use bytes::Bytes;
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 use hashbrown::Equivalent;
-use std::any::Any;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -17,9 +16,8 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 use std::ops::Deref;
 use std::ptr::NonNull;
-#[cfg(feature = "chrono")]
 use std::sync::LazyLock;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex};
 use std::{ops, slice};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
@@ -246,80 +244,15 @@ impl<K: Into<Key>, V: Into<Value<'static>>> From<hashbrown::HashMap<K, V>> for M
     }
 }
 
-/// Equality helper for [`Opaque`] values.
-///
-/// Implementors define how two values of the same runtime type compare for
-/// equality when stored as [`Value::Opaque`].
-///
-/// You normally don't implement this trait manually. It is automatically
-/// provided for any `T: Eq + PartialEq + Any + Opaque` (see the blanket impl
-/// below). The runtime will first ensure the two values have the same
-/// [`Opaque::runtime_type_name`], and only then attempt a downcast and call
-/// `Eq::eq`.
-pub trait OpaqueEq {
-    /// Compare with another [`Opaque`] erased value.
-    ///
-    /// Implementations should return `false` if `other` does not have the same
-    /// runtime type, or if it cannot be downcast to the concrete type of `self`.
-    fn opaque_eq(&self, other: &dyn Opaque) -> bool;
-}
-
-impl<T> OpaqueEq for T
-where
-    T: Eq + PartialEq + Any + Opaque,
-{
-    fn opaque_eq(&self, other: &dyn Opaque) -> bool {
-        if self.runtime_type_name() != other.runtime_type_name() {
-            return false;
-        }
-        if let Some(other) = other.downcast_ref::<T>() {
-            self.eq(other)
-        } else {
-            false
-        }
-    }
-}
-
-/// Helper trait to obtain a `&dyn Debug` view.
-///
-/// This is auto-implemented for any `T: Debug` and is used by the runtime to
-/// format [`Opaque`] values without knowing their concrete type.
-pub trait AsDebug {
-    /// Returns `self` as a `&dyn Debug` trait object.
-    fn as_debug(&self) -> &dyn Debug;
-}
-
-impl<T> AsDebug for T
-where
-    T: Debug,
-{
-    fn as_debug(&self) -> &dyn Debug {
-        self
-    }
-}
 use crate::magic::Function;
 
-pub trait StructValue<'a>: std::fmt::Debug {
-    fn type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-    fn get_member(&self, name: &str) -> Option<Value<'a>>;
-    fn resolve_function(&self, _name: &str) -> Option<&Function> {
-        None
-    }
-    #[cfg(feature = "json")]
-    fn json(&self) -> Option<serde_json::Value> {
-        None
-    }
-}
-
-/// Trait for user-defined opaque values stored inside [`Value::Opaque`].
+/// Trait for user-defined object values stored inside [`Value::Object`].
 ///
 /// Implement this trait for types that should participate in CEL evaluation as
-/// opaque/user-defined values. An opaque value:
-/// - must report a stable runtime type name via [`runtime_type_name`];
-/// - participates in equality via the blanket [`OpaqueEq`] implementation;
-/// - can be formatted via [`AsDebug`];
+/// user-defined values. An object value:
+/// - must report a stable type name via [`type_name`];
+/// - can expose members via [`get_member`];
+/// - can expose methods via [`resolve_function`];
 /// - must be thread-safe (`Send + Sync`).
 ///
 /// When the `json` feature is enabled you may optionally provide a JSON
@@ -329,37 +262,38 @@ pub trait StructValue<'a>: std::fmt::Debug {
 /// Example
 /// ```rust
 /// use std::fmt::{Debug, Formatter, Result as FmtResult};
-/// use std::sync::Arc;
-/// use cel::objects::{Opaque, Value};
+/// use cel::objects::{ObjectValue, Object, Value};
 ///
-/// #[derive(Eq, PartialEq)]
+/// #[derive(Clone, Debug, Eq, PartialEq)]
 /// struct MyId(u64);
 ///
-/// impl Debug for MyId {
-///     fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult { write!(f, "MyId({})", self.0) }
+/// impl ObjectValue<'static> for MyId {
+///     fn type_name(&self) -> &'static str { "example.MyId" }
 /// }
 ///
-/// impl Opaque for MyId {
-///     fn runtime_type_name(&self) -> &str { "example.MyId" }
-/// }
-///
-/// // Values of `MyId` can now be wrapped in `Value::Opaque` and compared.
-/// let a = Value::Opaque(Arc::new(MyId(7)));
-/// let b = Value::Opaque(Arc::new(MyId(7)));
+/// // Values of `MyId` can now be wrapped in `Value::Object` and compared.
+/// let a: Value = Object::new(MyId(7)).into();
+/// let b: Value = Object::new(MyId(7)).into();
 /// assert_eq!(a, b);
 /// ```
-pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
+pub trait ObjectValue<'a>: std::fmt::Debug + Send + Sync + 'a {
     /// Returns a stable, fully-qualified type name for this value's runtime type.
     ///
     /// This name is used to check type compatibility before attempting downcasts
     /// during equality checks and other operations. It should be stable across
     /// versions and unique within your application or library (e.g., a package
     /// qualified name like `my.pkg.Type`).
-    fn runtime_type_name(&self) -> &str;
-    fn resolve_variable(&self, _name: &str) -> Option<Value<'static>> {
+    #[inline]
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    /// Returns the value of a member/field/variable by name.
+    fn get_member(&self, _name: &str) -> Option<Value<'a>> {
         None
     }
 
+    /// Resolves a method function by name.
     fn resolve_function(&self, _name: &str) -> Option<&Function> {
         None
     }
@@ -374,14 +308,12 @@ pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
     }
 }
 
-impl dyn Opaque {
-    pub fn downcast_ref<T: Any>(&self) -> Option<&T> {
-        let any: &dyn Any = self;
-        any.downcast_ref()
-    }
-}
-
-// TODO: in their current form, Opaque must be 'static.
+// Keep StructValue as an alias for backwards compatibility during migration
+#[doc(hidden)]
+#[deprecated(since = "0.8.0", note = "Use ObjectValue instead")]
+pub trait StructValue<'a>: ObjectValue<'a> {}
+#[allow(deprecated)]
+impl<'a, T: ObjectValue<'a>> StructValue<'a> for T {}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptionalValue {
@@ -400,25 +332,23 @@ impl OptionalValue {
     }
 }
 
-impl Opaque for OptionalValue {
-    fn runtime_type_name(&self) -> &str {
+impl ObjectValue<'static> for OptionalValue {
+    fn type_name(&self) -> &'static str {
         "optional_type"
     }
 }
+
 impl<'a> TryFrom<Value<'a>> for OptionalValue {
     type Error = ExecutionError;
 
     fn try_from(value: Value<'a>) -> Result<Self, Self::Error> {
         match value {
-            Value::Opaque(opaque) if opaque.as_ref().runtime_type_name() == "optional_type" => {
-                opaque
-                    .as_ref()
-                    .downcast_ref::<OptionalValue>()
-                    .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
-                    .cloned()
-            }
-            Value::Opaque(opaque) => Err(ExecutionError::UnexpectedType {
-                got: opaque.as_ref().runtime_type_name().to_string(),
+            Value::Object(obj) if obj.type_name() == "optional_type" => obj
+                .downcast_ref::<OptionalValue>()
+                .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
+                .cloned(),
+            Value::Object(obj) => Err(ExecutionError::UnexpectedType {
+                got: obj.type_name().to_string(),
                 want: "optional_type".to_string(),
             }),
             v => Err(ExecutionError::UnexpectedType {
@@ -428,19 +358,17 @@ impl<'a> TryFrom<Value<'a>> for OptionalValue {
         }
     }
 }
+
 impl<'a, 'b: 'a> TryFrom<&'b Value<'a>> for &'b OptionalValue {
     type Error = ExecutionError;
 
     fn try_from(value: &'b Value<'a>) -> Result<Self, Self::Error> {
         match value {
-            Value::Opaque(opaque) if opaque.as_ref().runtime_type_name() == "optional_type" => {
-                opaque
-                    .as_ref()
-                    .downcast_ref::<OptionalValue>()
-                    .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
-            }
-            Value::Opaque(opaque) => Err(ExecutionError::UnexpectedType {
-                got: opaque.as_ref().runtime_type_name().to_string(),
+            Value::Object(obj) if obj.type_name() == "optional_type" => obj
+                .downcast_ref::<OptionalValue>()
+                .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast")),
+            Value::Object(obj) => Err(ExecutionError::UnexpectedType {
+                got: obj.type_name().to_string(),
                 want: "optional_type".to_string(),
             }),
             v => Err(ExecutionError::UnexpectedType {
@@ -511,26 +439,6 @@ impl<'a> StringValue<'a> {
         match self {
             StringValue::Borrowed(v) => Arc::from(*v),
             StringValue::Owned(o) => Arc::clone(o),
-        }
-    }
-}
-
-pub enum OpaqueValue<'a> {
-    Borrowed(&'a dyn Opaque),
-    Arc(Arc<dyn Opaque>),
-}
-
-impl<T: Opaque> From<Arc<T>> for OpaqueValue<'static> {
-    fn from(value: Arc<T>) -> Self {
-        Self::Arc(value)
-    }
-}
-
-impl AsRef<dyn Opaque> for OpaqueValue<'_> {
-    fn as_ref(&self) -> &dyn Opaque {
-        match self {
-            OpaqueValue::Borrowed(v) => *v,
-            OpaqueValue::Arc(v) => v.as_ref(),
         }
     }
 }
@@ -621,8 +529,8 @@ pub enum Value<'a> {
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
 
-    Opaque(OpaqueValue<'a>),
-    Struct(OpaqueBox<'a>),
+    /// User-defined object values implementing [`ObjectValue`].
+    Object(Object<'a>),
 
     String(StringValue<'a>),
     Bytes(BytesValue<'a>),
@@ -714,12 +622,7 @@ impl PartialEq for Value<'_> {
             (Value::UInt(a), Value::Float(b)) => (*a as f64) == *b,
             (Value::Float(a), Value::Int(b)) => *a == (*b as f64),
             (Value::Float(a), Value::UInt(b)) => *a == (*b as f64),
-            (Value::Opaque(a), Value::Opaque(b)) => match (a, b) {
-                (OpaqueValue::Borrowed(a), OpaqueValue::Borrowed(b)) => a.opaque_eq(*b),
-                (OpaqueValue::Borrowed(a), OpaqueValue::Arc(b)) => a.opaque_eq(b.as_ref()),
-                (OpaqueValue::Arc(a), OpaqueValue::Borrowed(b)) => a.as_ref().opaque_eq(*b),
-                (OpaqueValue::Arc(a), OpaqueValue::Arc(b)) => a.as_ref().opaque_eq(b.as_ref()),
-            },
+            (Value::Object(a), Value::Object(b)) => a.eq(b),
             (_, _) => false,
         }
     }
@@ -789,20 +692,7 @@ impl Debug for Value<'_> {
             Value::Duration(d) => write!(f, "Duration({:?})", d),
             #[cfg(feature = "chrono")]
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
-            Value::Struct(t) => write!(f, "Struct({:?})", t),
-            Value::Opaque(o) => match o {
-                OpaqueValue::Borrowed(op) => {
-                    write!(f, "Opaque<{}>({:?})", op.runtime_type_name(), op.as_debug())
-                }
-                OpaqueValue::Arc(arc) => {
-                    write!(
-                        f,
-                        "Opaque<{}>({:?})",
-                        arc.runtime_type_name(),
-                        arc.as_debug()
-                    )
-                }
-            },
+            Value::Object(obj) => write!(f, "Object<{}>({:?})", obj.type_name(), obj),
             Value::Null => write!(f, "Null"),
         }
     }
@@ -821,15 +711,11 @@ impl<'a> Clone for Value<'a> {
             Value::UInt(u) => Value::UInt(*u),
             Value::Float(f) => Value::Float(*f),
             Value::Bool(b) => Value::Bool(*b),
-            Value::Struct(b) => Value::Struct(b.clone()),
+            Value::Object(obj) => Value::Object(obj.clone()),
             #[cfg(feature = "chrono")]
             Value::Duration(d) => Value::Duration(*d),
             #[cfg(feature = "chrono")]
             Value::Timestamp(t) => Value::Timestamp(*t),
-            Value::Opaque(o) => Value::Opaque(match o {
-                OpaqueValue::Borrowed(op) => OpaqueValue::Borrowed(*op),
-                OpaqueValue::Arc(arc) => OpaqueValue::Arc(arc.clone()),
-            }),
             Value::String(s) => Value::String(match s {
                 StringValue::Borrowed(str_ref) => StringValue::Borrowed(str_ref),
                 StringValue::Owned(owned) => StringValue::Owned(owned.clone()),
@@ -872,7 +758,7 @@ pub enum ValueType {
     Bool,
     Duration,
     Timestamp,
-    Opaque,
+    Object,
     Null,
 }
 
@@ -888,7 +774,7 @@ impl Display for ValueType {
             ValueType::String => write!(f, "string"),
             ValueType::Bytes => write!(f, "bytes"),
             ValueType::Bool => write!(f, "bool"),
-            ValueType::Opaque => write!(f, "opaque"),
+            ValueType::Object => write!(f, "object"),
             ValueType::Duration => write!(f, "duration"),
             ValueType::Timestamp => write!(f, "timestamp"),
             ValueType::Null => write!(f, "null"),
@@ -907,8 +793,7 @@ impl<'a> Value<'a> {
             Value::String(_) => ValueType::String,
             Value::Bytes(_) => ValueType::Bytes,
             Value::Bool(_) => ValueType::Bool,
-            Value::Opaque(_) => ValueType::Opaque,
-            Value::Struct(_) => ValueType::Opaque,
+            Value::Object(_) => ValueType::Object,
             #[cfg(feature = "chrono")]
             Value::Duration(_) => ValueType::Duration,
             #[cfg(feature = "chrono")]
@@ -1044,9 +929,10 @@ impl<'a> From<Value<'a>> for ResolveResult<'a> {
     }
 }
 
-/// A custom vtable for our opaque values
-struct OpaqueVtable {
+/// A custom vtable for Object values
+struct ObjectVtable {
     type_name: unsafe fn(NonNull<()>) -> &'static str,
+    rust_type_name: &'static str, // For downcast comparison
     get_member: unsafe fn(NonNull<()>, &str) -> Option<Value<'static>>,
     resolve_function: unsafe fn(NonNull<()>, &str) -> Option<&Function>,
     #[cfg(feature = "json")]
@@ -1054,50 +940,99 @@ struct OpaqueVtable {
     debug: unsafe fn(NonNull<()>, &mut std::fmt::Formatter<'_>) -> std::fmt::Result,
     drop: unsafe fn(NonNull<()>),
     clone: unsafe fn(NonNull<()>) -> NonNull<()>,
+    eq: unsafe fn(NonNull<()>, NonNull<()>) -> bool,
 }
 
-/// A covariant box containing an opaque value.
+/// Global registry mapping type_name -> &'static ObjectVtable.
 ///
-/// This is covariant in 'a because:
+/// This ensures each concrete type T gets exactly one vtable that is reused
+/// across all Object instances of that type. Vtables are leaked (Box::leak)
+/// because they must live for the lifetime of the program.
+///
+/// We use `std::any::type_name::<T>()` as the key instead of `TypeId` because
+/// `TypeId::of::<T>()` requires `T: 'static`, but we want to support types with
+/// non-'static lifetimes (e.g., `ObjectValue<'a>`).
+static VTABLE_REGISTRY: LazyLock<Mutex<HashMap<&'static str, &'static ObjectVtable>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
+
+/// A covariant Arc-based container for user-defined object values.
+///
+/// This type stores values implementing [`ObjectValue`] using Arc for cheap cloning.
+/// It is covariant in 'a because:
 /// - The actual data pointer doesn't carry lifetime info (it's erased)
 /// - PhantomData<fn() -> Value<'a>> is covariant in 'a (function return types are covariant)
-pub struct OpaqueBox<'a> {
+///
+/// # Example
+/// ```rust
+/// use cel::objects::{Object, ObjectValue, Value};
+///
+/// #[derive(Clone, Debug, PartialEq)]
+/// struct MyStruct { field: String }
+///
+/// impl ObjectValue<'static> for MyStruct {
+///     fn type_name(&self) -> &'static str { "MyStruct" }
+/// }
+///
+/// let obj = Object::new(MyStruct { field: "test".into() });
+/// let value: Value = obj.into();
+/// ```
+pub struct Object<'a> {
+    // Type-erased Arc pointer - we store the raw pointer from Arc::into_raw()
+    // and manually manage the reference count via the vtable
     data: NonNull<()>,
-    vtable: &'static OpaqueVtable,
+    vtable: &'static ObjectVtable,
     // fn() -> T is covariant in T, so fn() -> Value<'a> is covariant in 'a
     _marker: PhantomData<fn() -> Value<'a>>,
 }
 
-// Safety: OpaqueBox is Send/Sync if the underlying type is
-unsafe impl<'a> Send for OpaqueBox<'a> {}
-unsafe impl<'a> Sync for OpaqueBox<'a> {}
+// Safety: Object is Send/Sync because the underlying T: Send + Sync (enforced by ObjectValue bound)
+unsafe impl<'a> Send for Object<'a> {}
+unsafe impl<'a> Sync for Object<'a> {}
 
-impl<'a> OpaqueBox<'a> {
-    /// Create a new OpaqueBox from a value implementing OpaqueValue
+impl<'a> Object<'a> {
+    /// Create a new Object from a value implementing ObjectValue
     pub fn new<T>(value: T) -> Self
     where
-        T: StructValue<'a> + Clone + 'a,
+        T: ObjectValue<'a> + Clone + PartialEq + 'a,
     {
-        let boxed = Box::new(value);
-        let ptr = NonNull::new(Box::into_raw(boxed) as *mut ()).unwrap();
+        let arc = Arc::new(value);
+        let ptr = NonNull::new(Arc::into_raw(arc) as *mut ()).unwrap();
 
-        // Create the vtable with functions specialized for type T
-        // We transmute the lifetime to 'static in the vtable, but the PhantomData
-        // ensures we only use it with the correct lifetime 'a
-        // let vtable: &'static OpaqueVtable = Self::make_vtable::<T>();
-
-        static VTAB: OnceLock<OpaqueVtable> = OnceLock::new();
-        let vtable = VTAB.get_or_init(|| Self::make_vtable::<T>());
-        OpaqueBox {
+        // Get or create the vtable for type T from the global registry
+        let vtable = Self::get_or_create_vtable::<T>();
+        Object {
             data: ptr,
             vtable,
             _marker: PhantomData,
         }
     }
 
-    fn make_vtable<T: StructValue<'a> + Clone + 'a>() -> OpaqueVtable {
+    /// Gets or creates a vtable for type T from the global registry.
+    ///
+    /// This function is thread-safe and ensures that exactly one vtable is
+    /// created per concrete type T, keyed by type_name.
+    fn get_or_create_vtable<T>() -> &'static ObjectVtable
+    where
+        T: ObjectValue<'a> + Clone + PartialEq + 'a,
+    {
+        let type_name = std::any::type_name::<T>();
+        let mut registry = VTABLE_REGISTRY.lock().unwrap();
+
+        if let Some(&vtable) = registry.get(type_name) {
+            return vtable;
+        }
+
+        // Create the vtable for this type
+        let vtable = Self::make_vtable::<T>();
+        // Leak it to get a &'static reference (vtables live for program lifetime)
+        let static_vtable: &'static ObjectVtable = Box::leak(Box::new(vtable));
+        registry.insert(type_name, static_vtable);
+        static_vtable
+    }
+
+    fn make_vtable<T: ObjectValue<'a> + Clone + PartialEq + 'a>() -> ObjectVtable {
         // These functions are safe because we only call them with the correct type T
-        unsafe fn get_member_impl<'a, T: StructValue<'a>>(
+        unsafe fn get_member_impl<'a, T: ObjectValue<'a>>(
             ptr: NonNull<()>,
             name: &str,
         ) -> Option<Value<'static>> {
@@ -1105,31 +1040,31 @@ impl<'a> OpaqueBox<'a> {
                 let value = &*(ptr.as_ptr() as *const T);
                 // Safety: We're transmuting Value<'a> to Value<'static>
                 // This is safe because:
-                // 1. The caller (OpaqueBox::get_member) will immediately cast it back to Value<'a>
-                // 2. The OpaqueBox's PhantomData ensures the correct lifetime is tracked
+                // 1. The caller (Object::get_member) will immediately cast it back to Value<'a>
+                // 2. The Object's PhantomData ensures the correct lifetime is tracked
                 std::mem::transmute(value.get_member(name))
             }
         }
-        unsafe fn resolve_function_impl<'a, T: StructValue<'a>>(
+
+        unsafe fn resolve_function_impl<'a, T: ObjectValue<'a>>(
             ptr: NonNull<()>,
             name: &str,
         ) -> Option<&Function> {
             unsafe {
                 let value = &*(ptr.as_ptr() as *const T);
-                // Safety: todo
                 std::mem::transmute(value.resolve_function(name))
             }
         }
 
         #[cfg(feature = "json")]
-        unsafe fn json_impl<'a, T: StructValue<'a>>(ptr: NonNull<()>) -> Option<serde_json::Value> {
+        unsafe fn json_impl<'a, T: ObjectValue<'a>>(ptr: NonNull<()>) -> Option<serde_json::Value> {
             unsafe {
                 let value = &*(ptr.as_ptr() as *const T);
                 value.json()
             }
         }
 
-        unsafe fn debug_impl<'a, T: StructValue<'a>>(
+        unsafe fn debug_impl<'a, T: ObjectValue<'a>>(
             ptr: NonNull<()>,
             f: &mut std::fmt::Formatter<'_>,
         ) -> std::fmt::Result {
@@ -1139,33 +1074,42 @@ impl<'a> OpaqueBox<'a> {
             }
         }
 
-        unsafe fn drop_impl<'a, T: StructValue<'a>>(ptr: NonNull<()>) {
+        unsafe fn drop_impl<T>(ptr: NonNull<()>) {
             unsafe {
-                let _ = Box::from_raw(ptr.as_ptr() as *mut T);
+                // Decrement the Arc's strong count; if it reaches zero, the value is dropped
+                Arc::decrement_strong_count(ptr.as_ptr() as *const T);
             }
         }
 
-        unsafe fn clone_impl<'a, T: StructValue<'a> + Clone>(ptr: NonNull<()>) -> NonNull<()> {
+        unsafe fn clone_impl<T>(ptr: NonNull<()>) -> NonNull<()> {
             unsafe {
-                let value = &*(ptr.as_ptr() as *const T);
-                let cloned = Box::new(value.clone());
-                NonNull::new(Box::into_raw(cloned) as *mut ()).unwrap()
+                // Increment the Arc's strong count and return the same pointer
+                Arc::increment_strong_count(ptr.as_ptr() as *const T);
+                ptr
             }
         }
 
-        unsafe fn type_name_impl<'a, T: StructValue<'a>>(ptr: NonNull<()>) -> &'static str {
+        unsafe fn type_name_impl<'a, T: ObjectValue<'a>>(ptr: NonNull<()>) -> &'static str {
             unsafe {
                 let value = &*(ptr.as_ptr() as *const T);
                 value.type_name()
             }
         }
 
-        // Leak a static vtable (one per type T)
-        // We use Box::leak to create a 'static reference
+        unsafe fn eq_impl<T: PartialEq>(a: NonNull<()>, b: NonNull<()>) -> bool {
+            unsafe {
+                let a = &*(a.as_ptr() as *const T);
+                let b = &*(b.as_ptr() as *const T);
+                a == b
+            }
+        }
+
+        // Create the vtable (one per type T, cached via OnceLock)
         unsafe {
             #[allow(clippy::missing_transmute_annotations)]
-            OpaqueVtable {
+            ObjectVtable {
                 type_name: type_name_impl::<T>,
+                rust_type_name: std::any::type_name::<T>(),
                 get_member: std::mem::transmute(
                     get_member_impl::<T> as unsafe fn(NonNull<()>, &str) -> Option<Value<'a>>,
                 ),
@@ -1180,10 +1124,17 @@ impl<'a> OpaqueBox<'a> {
                 ),
                 drop: drop_impl::<T>,
                 clone: clone_impl::<T>,
+                eq: eq_impl::<T>,
             }
         }
     }
 
+    /// Returns the type name of the contained value.
+    pub fn type_name(&self) -> &'static str {
+        unsafe { (self.vtable.type_name)(self.data) }
+    }
+
+    /// Returns a member/field value by name.
     pub fn get_member(&self, name: &str) -> Option<Value<'a>> {
         unsafe {
             // Safety: vtable.get_member returns Value<'static> but we cast to Value<'a>
@@ -1192,53 +1143,77 @@ impl<'a> OpaqueBox<'a> {
         }
     }
 
+    /// Resolves a method function by name.
     pub fn resolve_function(&self, name: &str) -> Option<&Function> {
         unsafe {
-            // Safety: vtable.get_member returns Value<'static> but we cast to Value<'a>
-            // This is sound because the actual lifetime is 'a (enforced by PhantomData)
+            // Safety: similar to get_member
             std::mem::transmute((self.vtable.resolve_function)(self.data, name))
         }
     }
 
+    /// Attempts to downcast to a concrete type.
     pub fn downcast_ref<T>(&self) -> Option<&T> {
-        unsafe {
-            let tname = std::any::type_name::<T>();
-            let concrete = (self.vtable.type_name)(self.data);
-            if tname == concrete {
-                Some(&*(self.data.as_ptr() as *const T))
-            } else {
-                None
-            }
+        let tname = std::any::type_name::<T>();
+        if tname == self.vtable.rust_type_name {
+            // Safety: We verified the type matches using the Rust type name
+            Some(unsafe { &*(self.data.as_ptr() as *const T) })
+        } else {
+            None
         }
     }
 
+    /// Returns the JSON representation if available.
     #[cfg(feature = "json")]
     pub fn json(&self) -> Option<serde_json::Value> {
         unsafe { (self.vtable.json)(self.data) }
     }
 }
 
-impl<'a> std::fmt::Debug for OpaqueBox<'a> {
+impl PartialEq for Object<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // First check if the types match
+        let self_type = unsafe { (self.vtable.type_name)(self.data) };
+        let other_type = unsafe { (other.vtable.type_name)(other.data) };
+        if self_type != other_type {
+            return false;
+        }
+        // Then compare the values using the vtable's eq function
+        unsafe { (self.vtable.eq)(self.data, other.data) }
+    }
+}
+
+impl<'a> std::fmt::Debug for Object<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         unsafe { (self.vtable.debug)(self.data, f) }
     }
 }
 
-impl<'a> Drop for OpaqueBox<'a> {
+impl<'a> Drop for Object<'a> {
     fn drop(&mut self) {
         unsafe { (self.vtable.drop)(self.data) }
     }
 }
 
-impl<'a> Clone for OpaqueBox<'a> {
+impl<'a> Clone for Object<'a> {
     fn clone(&self) -> Self {
-        OpaqueBox {
+        Object {
             data: unsafe { (self.vtable.clone)(self.data) },
             vtable: self.vtable,
             _marker: PhantomData,
         }
     }
 }
+
+impl<'a> From<Object<'a>> for Value<'a> {
+    fn from(obj: Object<'a>) -> Self {
+        Value::Object(obj)
+    }
+}
+
+// Keep OpaqueBox as a deprecated alias for backwards compatibility
+#[doc(hidden)]
+#[deprecated(since = "0.8.0", note = "Use Object instead")]
+pub type OpaqueBox<'a> = Object<'a>;
 
 impl<'a> Value<'a> {
     pub fn as_static(&self) -> Value<'static> {
@@ -1257,21 +1232,18 @@ impl<'a> Value<'a> {
             Value::UInt(u) => Value::UInt(*u),
             Value::Float(f) => Value::Float(*f),
             Value::Bool(b) => Value::Bool(*b),
-            Value::Struct(_b) => todo!(),
+            // Object values are Arc-backed, so cloning is cheap and we can transmute the lifetime
+            // Safety: Object uses Arc internally, so the cloned value is independent of 'a
+            Value::Object(obj) => {
+                let cloned = obj.clone();
+                // Safety: The Object's data is Arc-wrapped and self-contained.
+                // The PhantomData marker is only for covariance; the actual data lives in the Arc.
+                unsafe { std::mem::transmute::<Value<'a>, Value<'static>>(Value::Object(cloned)) }
+            }
             #[cfg(feature = "chrono")]
             Value::Duration(d) => Value::Duration(*d),
             #[cfg(feature = "chrono")]
             Value::Timestamp(t) => Value::Timestamp(*t),
-            Value::Opaque(o) => match o {
-                OpaqueValue::Borrowed(_op) => {
-                    // Cannot convert borrowed opaque trait object to owned without concrete type
-                    // This is a fundamental limitation - trait objects can't be cloned/moved
-                    // without knowing their concrete type. Opaque values should be Arc-wrapped
-                    // when they need to be converted to 'static lifetime.
-                    panic!("Cannot convert borrowed Opaque value to owned Value<'static>. Opaque values must be Arc-wrapped to convert to 'static lifetime.")
-                }
-                OpaqueValue::Arc(arc) => Value::Opaque(OpaqueValue::Arc(arc.clone())),
-            },
             Value::String(s) => match s {
                 StringValue::Borrowed(str_ref) => {
                     Value::String(StringValue::Owned(Arc::from(*str_ref)))
@@ -1439,11 +1411,7 @@ impl<'a> Value<'a> {
                                 is_optional = true;
                                 value = match opt_val.value() {
                                     Some(inner) => inner.clone(),
-                                    None => {
-                                        return Ok(Value::Opaque(
-                                            Arc::new(OptionalValue::none()).into(),
-                                        ))
-                                    }
+                                    None => return Ok(Object::new(OptionalValue::none()).into()),
                                 };
                             }
 
@@ -1499,10 +1467,10 @@ impl<'a> Value<'a> {
 
                             return if is_optional {
                                 Ok(match result {
-                                    Ok(val) => Value::Opaque(
-                                        Arc::new(OptionalValue::of(val.as_static())).into(),
-                                    ),
-                                    Err(_) => Value::Opaque(Arc::new(OptionalValue::none()).into()),
+                                    Ok(val) => {
+                                        Object::new(OptionalValue::of(val.as_static())).into()
+                                    }
+                                    Err(_) => Object::new(OptionalValue::none()).into(),
                                 })
                             } else {
                                 result
@@ -1522,17 +1490,17 @@ impl<'a> Value<'a> {
                             };
                             if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
                                 return match opt_val.value() {
-                                    Some(inner) => Ok(Value::Opaque(
-                                        Arc::new(OptionalValue::of(inner.clone().member(&field)?))
-                                            .into(),
-                                    )),
+                                    Some(inner) => Ok(Object::new(OptionalValue::of(
+                                        inner.clone().member(&field)?,
+                                    ))
+                                    .into()),
                                     None => Ok(operand),
                                 };
                             }
-                            return Ok(Value::Opaque(
-                                Arc::new(OptionalValue::of(operand.member(&field)?.as_static()))
-                                    .into(),
-                            ));
+                            return Ok(Object::new(OptionalValue::of(
+                                operand.member(&field)?.as_static(),
+                            ))
+                            .into());
                         }
                         _ => (),
                     }
@@ -1592,11 +1560,8 @@ impl<'a> Value<'a> {
                         }
                         let tgt = Some(resolve(target)?);
                         let of = &match tgt {
-                            Some(Value::Struct(ref ob)) => {
+                            Some(Value::Object(ref ob)) => {
                                 ob.resolve_function(call.func_name.as_str())
-                            }
-                            Some(Value::Opaque(ref ob)) => {
-                                ob.as_ref().resolve_function(call.func_name.as_str())
                             }
                             _ => None,
                         };
@@ -1801,8 +1766,7 @@ impl<'a> Value<'a> {
         // a property on self, or a method on self.
         let child = match self {
             Value::Map(m) => m.map.get(&KeyRef::String(name)).cloned(),
-            Value::Struct(ov) => ov.get_member(name.as_ref()),
-            Value::Opaque(ov) => ov.as_ref().resolve_variable(name.as_ref()),
+            Value::Object(obj) => obj.get_member(name),
             _ => None,
         };
 
@@ -2387,7 +2351,7 @@ mod tests {
 
     mod opaque {
         use crate::context::MapResolver;
-        use crate::objects::{ListValue, Map, Opaque, OpaqueValue, OptionalValue, StringValue};
+        use crate::objects::{ListValue, Map, Object, ObjectValue, OptionalValue, StringValue};
         use crate::parser::Parser;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
@@ -2395,13 +2359,13 @@ mod tests {
         use std::fmt::Debug;
         use std::sync::Arc;
 
-        #[derive(Debug, Eq, PartialEq, Serialize)]
+        #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
         struct MyStruct {
             field: String,
         }
 
-        impl Opaque for MyStruct {
-            fn runtime_type_name(&self) -> &str {
+        impl ObjectValue<'static> for MyStruct {
+            fn type_name(&self) -> &'static str {
                 "my_struct"
             }
 
@@ -2432,35 +2396,29 @@ mod tests {
             pub fn my_fn<'a>(
                 ftx: &mut FunctionContext<'a, '_>,
             ) -> Result<Value<'a>, ExecutionError> {
-                if let Some(Value::Opaque(opaque)) = &ftx.this {
-                    if opaque.as_ref().runtime_type_name() == "my_struct" {
-                        Ok(opaque
-                            .as_ref()
-                            .downcast_ref::<MyStruct>()
-                            .unwrap()
-                            .field
-                            .clone()
-                            .into())
+                if let Some(Value::Object(obj)) = &ftx.this {
+                    if obj.type_name() == "my_struct" {
+                        Ok(obj.downcast_ref::<MyStruct>().unwrap().field.clone().into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
-                            got: opaque.as_ref().runtime_type_name().to_string(),
+                            got: obj.type_name().to_string(),
                             want: "my_struct".to_string(),
                         })
                     }
                 } else {
                     Err(ExecutionError::UnexpectedType {
                         got: format!("{:?}", ftx.this),
-                        want: "Value::Opaque".to_string(),
+                        want: "Value::Object".to_string(),
                     })
                 }
             }
 
-            let value = Arc::new(MyStruct {
+            let value = MyStruct {
                 field: String::from("value"),
-            });
+            };
 
             let mut vars = MapResolver::new();
-            vars.add_variable_from_value("mine", Value::Opaque(OpaqueValue::Arc(value.clone())));
+            vars.add_variable_from_value("mine", Value::Object(Object::new(value)));
             let mut ctx = Context::default();
             ctx.add_function("myFn", my_fn);
             let prog = Program::compile("mine.myFn()").unwrap();
@@ -2472,17 +2430,17 @@ mod tests {
 
         #[test]
         fn opaque_eq() {
-            let value_1 = Arc::new(MyStruct {
+            let value_1 = MyStruct {
                 field: String::from("1"),
-            });
-            let value_2 = Arc::new(MyStruct {
+            };
+            let value_2 = MyStruct {
                 field: String::from("2"),
-            });
+            };
 
             let mut vars = MapResolver::new();
-            vars.add_variable_from_value("v1", Value::Opaque(value_1.clone().into()));
-            vars.add_variable_from_value("v1b", Value::Opaque(value_1.into()));
-            vars.add_variable_from_value("v2", Value::Opaque(value_2.into()));
+            vars.add_variable_from_value("v1", Value::Object(Object::new(value_1.clone())));
+            vars.add_variable_from_value("v1b", Value::Object(Object::new(value_1)));
+            vars.add_variable_from_value("v2", Value::Object(Object::new(value_2)));
             let ctx = Context::default();
             assert_eq!(
                 Program::compile("v2 == v1")
@@ -2506,12 +2464,12 @@ mod tests {
 
         #[test]
         fn test_value_holder_dbg() {
-            let opaque = Arc::new(MyStruct {
+            let opaque = MyStruct {
                 field: "not so opaque".to_string(),
-            });
-            let opaque = Value::Opaque(opaque.into());
+            };
+            let opaque = Value::Object(Object::new(opaque));
             assert_eq!(
-                "Opaque<my_struct>(MyStruct { field: \"not so opaque\" })",
+                "Object<my_struct>(MyStruct { field: \"not so opaque\" })",
                 format!("{:?}", opaque)
             );
         }
@@ -2519,10 +2477,10 @@ mod tests {
         #[test]
         #[cfg(feature = "json")]
         fn test_json() {
-            let value = Arc::new(MyStruct {
+            let value = MyStruct {
                 field: String::from("value"),
-            });
-            let cel_value = Value::Opaque(value.into());
+            };
+            let cel_value = Value::Object(Object::new(value));
             let mut map = serde_json::Map::new();
             map.insert(
                 "field".to_string(),
@@ -2544,7 +2502,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
+                Ok(Value::Object(Object::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -2553,9 +2511,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Opaque(
-                    Arc::new(OptionalValue::of(Value::Int(1))).into()
-                ))
+                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(1)))))
             );
 
             let expr = Parser::default()
@@ -2564,7 +2520,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
+                Ok(Value::Object(Object::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -2573,9 +2529,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Opaque(
-                    Arc::new(OptionalValue::of(Value::Int(1))).into()
-                ))
+                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(1)))))
             );
 
             let expr = Parser::default()
@@ -2618,9 +2572,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Opaque(
-                    Arc::new(OptionalValue::of(Value::Int(1))).into()
-                ))
+                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(1)))))
             );
             let expr = Parser::default()
                 .enable_optional_syntax(true)
@@ -2628,9 +2580,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Opaque(
-                    Arc::new(OptionalValue::of(Value::Int(2))).into()
-                ))
+                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(2)))))
             );
             let expr = Parser::default()
                 .enable_optional_syntax(true)
@@ -2638,7 +2588,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
+                Ok(Value::Object(Object::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -2661,12 +2611,9 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Opaque(
-                    Arc::new(OptionalValue::of(Value::String(StringValue::Owned(
-                        Arc::from("value")
-                    ))))
-                    .into()
-                ))
+                Ok(Value::Object(Object::new(OptionalValue::of(
+                    Value::String(StringValue::Owned(Arc::from("value")))
+                ))))
             );
 
             let expr = Parser::default()
@@ -2675,12 +2622,9 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Opaque(
-                    Arc::new(OptionalValue::of(Value::String(StringValue::Owned(
-                        Arc::from("value")
-                    ))))
-                    .into()
-                ))
+                Ok(Value::Object(Object::new(OptionalValue::of(
+                    Value::String(StringValue::Owned(Arc::from("value")))
+                ))))
             );
 
             let expr = Parser::default()
@@ -2689,7 +2633,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
+                Ok(Value::Object(Object::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()

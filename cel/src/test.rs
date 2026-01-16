@@ -1,12 +1,11 @@
 use crate::context::VariableResolver;
 use crate::magic::Function;
-use crate::objects::{AsDebug, OpaqueBox, StringValue, StructValue};
+use crate::objects::{Object, ObjectValue, StringValue};
 use crate::parser::Expression;
 use crate::{Context, FunctionContext, Program, Value};
 use serde::Serialize;
 use serde_json::json;
 use std::alloc::System;
-use std::any::TypeId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 
@@ -16,7 +15,7 @@ pub struct HttpRequest {
     path: String,
 }
 
-#[derive(Clone, Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Serialize)]
 pub struct RequestOpaque<'a>(&'a HttpRequest);
 
 fn custom_function() -> &'static Function {
@@ -25,13 +24,19 @@ fn custom_function() -> &'static Function {
         Box::new(|_ftx: &mut FunctionContext| Ok(Value::String(StringValue::Borrowed("YES"))))
     })
 }
-impl<'a> StructValue<'a> for RequestOpaque<'a> {
+
+impl<'a> ObjectValue<'a> for RequestOpaque<'a> {
+    fn type_name(&self) -> &'static str {
+        "request_opaque"
+    }
+
     fn resolve_function(&self, name: &str) -> Option<&Function> {
         match name {
             "custom" => Some(custom_function()),
             _ => None,
         }
     }
+
     fn get_member(&self, name: &str) -> Option<Value<'a>> {
         match name {
             "path" => Some(Value::String(self.0.path.as_str().into())),
@@ -39,6 +44,7 @@ impl<'a> StructValue<'a> for RequestOpaque<'a> {
             _ => None,
         }
     }
+
     #[cfg(feature = "json")]
     fn json(&self) -> Option<serde_json::Value> {
         serde_json::to_value(self.0).ok()
@@ -58,7 +64,7 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
         match variable {
-            "request" => Some(Value::Struct(OpaqueBox::new(RequestOpaque(self.request)))),
+            "request" => Some(Value::Object(Object::new(RequestOpaque(self.request)))),
             _ => None,
         }
     }
@@ -147,8 +153,11 @@ fn get_struct() {
     let resolver = Resolver { request: &req };
     let res = Value::resolve(&p, &pctx, &resolver).unwrap();
     dbg!(&res);
-    assert_eq!(res.json().unwrap(), json!({"method": "GET", "path": "/foo"}));
-    let Value::Struct(ob) = res else { panic!() };
+    assert_eq!(
+        res.json().unwrap(),
+        json!({"method": "GET", "path": "/foo"})
+    );
+    let Value::Object(ob) = res else { panic!() };
     let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
     assert_eq!(req.method, "GET");
 }
