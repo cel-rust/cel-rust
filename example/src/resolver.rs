@@ -36,16 +36,14 @@ fn main() {
     };
     context.set_variable_resolver(&resolver);
     let value = Value::resolve_val(&ast, &context).unwrap();
+    let value = value.downcast_ref::<CelString>().unwrap();
 
     // This should always pass
-    assert_eq!(
-        value.as_ref().downcast_ref::<CelString>(),
-        Some(&CelString::from("bar"))
-    );
+    assert_eq!(value, &CelString::from("bar"));
 
-    // But with when `foo != 'bar'`, we return a new CelString `"bar"`, the one borrowed from the AST
-    assert!(std::ptr::eq(
-        resolver.some_ref,
-        value.as_ref().downcast_ref::<CelString>().unwrap().inner()
-    ))
+    // But with `foo != 'bar'`, we return a different `"bar"` value, borrowed from the AST
+    assert!(
+        std::ptr::eq(resolver.some_ref, value.inner()),
+        "We want the same pointer here!"
+    )
 }
