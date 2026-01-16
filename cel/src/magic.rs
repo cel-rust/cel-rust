@@ -168,6 +168,13 @@ impl This {
 }
 pub struct Argument(usize);
 impl Argument {
+    pub fn load<'a>(
+        self,
+        ftx: &FunctionContext<'a, '_>,
+    ) -> Result<Value<'a>, ExecutionError> {
+        let index = self.0;
+        ftx.arg(index)
+    }
     pub fn load_value<'a, T: FromValue<'a>>(
         self,
         ftx: &FunctionContext<'a, '_>,

@@ -47,6 +47,8 @@ use magic::FromContext;
 
 pub mod extractors {
     pub use crate::magic::IntoFunction;
+    pub use crate::magic::Argument;
+    pub use crate::magic::This;
 }
 
 #[derive(Error, Clone, Debug, PartialEq)]
@@ -119,6 +121,8 @@ pub enum ExecutionError {
     RemainderByZero(Value<'static>),
     #[error("Overflow from binary operator '{0}': {1:?}, {2:?}")]
     Overflow(&'static str, Value<'static>, Value<'static>),
+    #[error("Cannot convert {1:?} to {0}")]
+    Conversion(&'static str, Value<'static>),
     #[error("Index out of bounds: {0:?}")]
     IndexOutOfBounds(Value<'static>),
 }

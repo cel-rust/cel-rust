@@ -6,14 +6,15 @@ use crate::{Context, FunctionContext, Program, Value};
 use std::alloc::System;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
+use serde::Serialize;
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
 pub struct HttpRequest {
     method: String,
     path: String,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize)]
 pub struct RequestOpaque<'a> {
     pub request: &'a HttpRequest,
 }
@@ -37,6 +38,10 @@ impl<'a> StructValue<'a> for RequestOpaque<'a> {
             "method" => Some(Value::String(self.request.method.as_str().into())),
             _ => None,
         }
+    }
+    #[cfg(feature = "json")]
+    fn json(&self) -> Option<serde_json::Value> {
+        serde_json::to_value(self).ok()
     }
 }
 
@@ -89,6 +94,7 @@ impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
         }
     }
 }
+
 fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::ResolveResult<'a> {
     let this = ftx.this.as_ref().unwrap();
     let ident = ftx.ident(0)?;
@@ -96,9 +102,7 @@ fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::Res
     let x: &'rf dyn VariableResolver<'a> = ftx.vars();
     let resolver = CompositeResolver::<'a, 'rf> {
         base: x,
-        // name: todo!(),
         name: ident,
-        // val: todo!(),
         val: this.clone(),
     };
     let v = Value::resolve(expr, ftx.ptx, &resolver)?;
@@ -107,6 +111,7 @@ fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::Res
 
 #[global_allocator]
 static GLOBAL: Allocator<System> = Allocator::system();
+
 #[test]
 fn zero_alloc() {
     let count = Arc::new(AtomicUsize::new(0));
@@ -130,6 +135,27 @@ fn zero_alloc() {
     }
     AllocationRegistry::disable_tracking();
     assert_eq!(count.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn get_struct() {
+    let count = Arc::new(AtomicUsize::new(0));
+    let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
+    let mut pctx = Context::default();
+    pctx.add_function("with", with);
+    let req = HttpRequest {
+        method: "GET".to_string(),
+        path: "/foo".to_string(),
+    };
+    let p = Program::compile("request")
+        .unwrap()
+        .optimized()
+        .expression;
+
+    let resolver = Resolver { request: &req };
+    let res = Value::resolve(&p, &pctx, &resolver).unwrap();
+    dbg!(&res);
+    dbg!(res.json());
 }
 
 #[test]

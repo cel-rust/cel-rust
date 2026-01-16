@@ -2,7 +2,7 @@
 name = "cel"
 description = "A parser and interpreter for the Common Expression Language (CEL)"
 repository = "https://github.com/cel-rust/cel-rust"
-version = "0.12.0"
+version = "0.13.0"
 authors = ["Clark McCauley <me@clarkmccauley.com>", "Alex Snaps <alex@wcgw.dev>"]
 edition = "2021"
 rust-version = "1.86.0"
@@ -22,7 +22,6 @@ bytes = { version = "1", optional = true }
 
 thiserror = "1.0"
 paste = "1.0"
-tracking-allocator = "0.4.0"
 hashbrown = "0.16.1"
 
 [dev-dependencies]
@@ -30,6 +29,7 @@ pprof = { version = "0.15", features = ["protobuf", "protobuf-codec", "criterion
 criterion = { version = "0.5.1", features = ["html_reports"] }
 serde_bytes = "0.11.14"
 dhat = { version = "0.3.3" }
+tracking-allocator = "0.4.0"
 
 [[bench]]
 name = "runtime"
@@ -41,4 +41,4 @@ bytes = ["dep:bytes"]
 json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
 chrono = ["dep:chrono"]
-dhat-heap = [ ] # if you are doing heap profiling
+dhat-heap = [] # if you are doing heap profiling
