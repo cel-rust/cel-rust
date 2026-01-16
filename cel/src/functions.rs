@@ -1,6 +1,6 @@
 use crate::context::{Context, VariableResolver};
 use crate::magic::{Argument, FromValue, This};
-use crate::objects::{BytesValue, KeyRef, Object, OptionalValue, StringValue, Value};
+use crate::objects::{BytesValue, KeyRef, ObjectValue, OptionalValue, StringValue, Value};
 use crate::parser::Expression;
 use crate::{ExecutionError, ResolveResult};
 use std::cmp::Ordering;
@@ -309,7 +309,7 @@ pub fn optional_none<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a>
     if ftx.this.is_some() || !ftx.args.is_empty() {
         return Err(ftx.error("unsupported function"));
     }
-    Ok(Object::new(OptionalValue::none()).into())
+    Ok(ObjectValue::new(OptionalValue::none()).into())
 }
 
 pub fn optional_of<'a>(ftx: &mut FunctionContext<'a, '_>, value: Argument) -> ResolveResult<'a> {
@@ -318,7 +318,7 @@ pub fn optional_of<'a>(ftx: &mut FunctionContext<'a, '_>, value: Argument) -> Re
     }
     let value: Value = value.load_value(ftx)?;
     // TODO: avoid as_static
-    Ok(Object::new(OptionalValue::of(value.as_static())).into())
+    Ok(ObjectValue::new(OptionalValue::of(value.as_static())).into())
 }
 
 pub fn optional_of_non_zero_value<'a>(
@@ -330,9 +330,9 @@ pub fn optional_of_non_zero_value<'a>(
     }
     let value: Value = value.load_value(ftx)?;
     if value.is_zero() {
-        Ok(Object::new(OptionalValue::none()).into())
+        Ok(ObjectValue::new(OptionalValue::none()).into())
     } else {
-        Ok(Object::new(OptionalValue::of(value.as_static())).into())
+        Ok(ObjectValue::new(OptionalValue::of(value.as_static())).into())
     }
 }
 

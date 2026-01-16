@@ -1,6 +1,6 @@
 use crate::context::VariableResolver;
 use crate::magic::Function;
-use crate::objects::{Object, ObjectValue, StringValue};
+use crate::objects::{ObjectValue, ObjectType, StringValue};
 use crate::parser::Expression;
 use crate::{Context, FunctionContext, Program, Value};
 use serde::Serialize;
@@ -25,7 +25,7 @@ fn custom_function() -> &'static Function {
     })
 }
 
-impl<'a> ObjectValue<'a> for RequestOpaque<'a> {
+impl<'a> ObjectType<'a> for RequestOpaque<'a> {
     fn type_name(&self) -> &'static str {
         "request_opaque"
     }
@@ -64,7 +64,7 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
         match variable {
-            "request" => Some(Value::Object(Object::new(RequestOpaque(self.request)))),
+            "request" => Some(Value::Object(ObjectValue::new(RequestOpaque(self.request)))),
             _ => None,
         }
     }

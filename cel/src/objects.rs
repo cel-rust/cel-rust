@@ -262,21 +262,21 @@ use crate::magic::Function;
 /// Example
 /// ```rust
 /// use std::fmt::{Debug, Formatter, Result as FmtResult};
-/// use cel::objects::{ObjectValue, Object, Value};
+/// use cel::objects::{ObjectType, ObjectValue, Value};
 ///
 /// #[derive(Clone, Debug, Eq, PartialEq)]
 /// struct MyId(u64);
 ///
-/// impl ObjectValue<'static> for MyId {
+/// impl ObjectType<'static> for MyId {
 ///     fn type_name(&self) -> &'static str { "example.MyId" }
 /// }
 ///
 /// // Values of `MyId` can now be wrapped in `Value::Object` and compared.
-/// let a: Value = Object::new(MyId(7)).into();
-/// let b: Value = Object::new(MyId(7)).into();
+/// let a: Value = ObjectValue::new(MyId(7)).into();
+/// let b: Value = ObjectValue::new(MyId(7)).into();
 /// assert_eq!(a, b);
 /// ```
-pub trait ObjectValue<'a>: std::fmt::Debug + Send + Sync + 'a {
+pub trait ObjectType<'a>: std::fmt::Debug + Send + Sync + 'a {
     /// Returns a stable, fully-qualified type name for this value's runtime type.
     ///
     /// This name is used to check type compatibility before attempting downcasts
@@ -308,13 +308,6 @@ pub trait ObjectValue<'a>: std::fmt::Debug + Send + Sync + 'a {
     }
 }
 
-// Keep StructValue as an alias for backwards compatibility during migration
-#[doc(hidden)]
-#[deprecated(since = "0.8.0", note = "Use ObjectValue instead")]
-pub trait StructValue<'a>: ObjectValue<'a> {}
-#[allow(deprecated)]
-impl<'a, T: ObjectValue<'a>> StructValue<'a> for T {}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptionalValue {
     value: Option<Value<'static>>,
@@ -332,7 +325,7 @@ impl OptionalValue {
     }
 }
 
-impl ObjectValue<'static> for OptionalValue {
+impl ObjectType<'static> for OptionalValue {
     fn type_name(&self) -> &'static str {
         "optional_type"
     }
@@ -529,8 +522,8 @@ pub enum Value<'a> {
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
 
-    /// User-defined object values implementing [`ObjectValue`].
-    Object(Object<'a>),
+    /// User-defined object values implementing [`ObjectType`].
+    Object(ObjectValue<'a>),
 
     String(StringValue<'a>),
     Bytes(BytesValue<'a>),
@@ -966,26 +959,26 @@ static VTABLE_REGISTRY: LazyLock<Mutex<HashMap<&'static str, &'static ObjectVtab
 
 /// A covariant Arc-based container for user-defined object values.
 ///
-/// This type stores values implementing [`ObjectValue`] using Arc for cheap cloning.
+/// This type stores values implementing [`ObjectType`] using Arc for cheap cloning.
 /// It is covariant in 'a because:
 /// - The actual data pointer doesn't carry lifetime info (it's erased)
 /// - PhantomData<fn() -> Value<'a>> is covariant in 'a (function return types are covariant)
 ///
 /// # Example
 /// ```rust
-/// use cel::objects::{Object, ObjectValue, Value};
+/// use cel::objects::{ObjectValue, ObjectType, Value};
 ///
 /// #[derive(Clone, Debug, PartialEq)]
 /// struct MyStruct { field: String }
 ///
-/// impl ObjectValue<'static> for MyStruct {
+/// impl ObjectType<'static> for MyStruct {
 ///     fn type_name(&self) -> &'static str { "MyStruct" }
 /// }
 ///
-/// let obj = Object::new(MyStruct { field: "test".into() });
+/// let obj = ObjectValue::new(MyStruct { field: "test".into() });
 /// let value: Value = obj.into();
 /// ```
-pub struct Object<'a> {
+pub struct ObjectValue<'a> {
     // Type-erased Arc pointer - we store the raw pointer from Arc::into_raw()
     // and manually manage the reference count via the vtable
     data: NonNull<()>,
@@ -995,21 +988,21 @@ pub struct Object<'a> {
 }
 
 // Safety: Object is Send/Sync because the underlying T: Send + Sync (enforced by ObjectValue bound)
-unsafe impl<'a> Send for Object<'a> {}
-unsafe impl<'a> Sync for Object<'a> {}
+unsafe impl<'a> Send for ObjectValue<'a> {}
+unsafe impl<'a> Sync for ObjectValue<'a> {}
 
-impl<'a> Object<'a> {
+impl<'a> ObjectValue<'a> {
     /// Create a new Object from a value implementing ObjectValue
     pub fn new<T>(value: T) -> Self
     where
-        T: ObjectValue<'a> + Clone + PartialEq + 'a,
+        T: ObjectType<'a> + Clone + PartialEq + 'a,
     {
         let arc = Arc::new(value);
         let ptr = NonNull::new(Arc::into_raw(arc) as *mut ()).unwrap();
 
         // Get or create the vtable for type T from the global registry
         let vtable = Self::get_or_create_vtable::<T>();
-        Object {
+        ObjectValue {
             data: ptr,
             vtable,
             _marker: PhantomData,
@@ -1022,7 +1015,7 @@ impl<'a> Object<'a> {
     /// created per concrete type T, keyed by type_name.
     fn get_or_create_vtable<T>() -> &'static ObjectVtable
     where
-        T: ObjectValue<'a> + Clone + PartialEq + 'a,
+        T: ObjectType<'a> + Clone + PartialEq + 'a,
     {
         let type_name = std::any::type_name::<T>();
         let mut registry = VTABLE_REGISTRY.lock().unwrap();
@@ -1039,9 +1032,9 @@ impl<'a> Object<'a> {
         static_vtable
     }
 
-    fn make_vtable<T: ObjectValue<'a> + Clone + PartialEq + 'a>() -> ObjectVtable {
+    fn make_vtable<T: ObjectType<'a> + Clone + PartialEq + 'a>() -> ObjectVtable {
         // These functions are safe because we only call them with the correct type T
-        unsafe fn get_member_impl<'a, T: ObjectValue<'a>>(
+        unsafe fn get_member_impl<'a, T: ObjectType<'a>>(
             ptr: NonNull<()>,
             name: &str,
         ) -> Option<Value<'static>> {
@@ -1055,7 +1048,7 @@ impl<'a> Object<'a> {
             }
         }
 
-        unsafe fn resolve_function_impl<'a, T: ObjectValue<'a>>(
+        unsafe fn resolve_function_impl<'a, T: ObjectType<'a>>(
             ptr: NonNull<()>,
             name: &str,
         ) -> Option<&Function> {
@@ -1066,14 +1059,14 @@ impl<'a> Object<'a> {
         }
 
         #[cfg(feature = "json")]
-        unsafe fn json_impl<'a, T: ObjectValue<'a>>(ptr: NonNull<()>) -> Option<serde_json::Value> {
+        unsafe fn json_impl<'a, T: ObjectType<'a>>(ptr: NonNull<()>) -> Option<serde_json::Value> {
             unsafe {
                 let value = &*(ptr.as_ptr() as *const T);
                 value.json()
             }
         }
 
-        unsafe fn debug_impl<'a, T: ObjectValue<'a>>(
+        unsafe fn debug_impl<'a, T: ObjectType<'a>>(
             ptr: NonNull<()>,
             f: &mut std::fmt::Formatter<'_>,
         ) -> std::fmt::Result {
@@ -1098,7 +1091,7 @@ impl<'a> Object<'a> {
             }
         }
 
-        unsafe fn type_name_impl<'a, T: ObjectValue<'a>>(ptr: NonNull<()>) -> &'static str {
+        unsafe fn type_name_impl<'a, T: ObjectType<'a>>(ptr: NonNull<()>) -> &'static str {
             unsafe {
                 let value = &*(ptr.as_ptr() as *const T);
                 value.type_name()
@@ -1178,7 +1171,7 @@ impl<'a> Object<'a> {
     }
 }
 
-impl PartialEq for Object<'_> {
+impl PartialEq for ObjectValue<'_> {
     fn eq(&self, other: &Self) -> bool {
         // First check if the types match
         let self_type = unsafe { (self.vtable.type_name)(self.data) };
@@ -1191,32 +1184,27 @@ impl PartialEq for Object<'_> {
     }
 }
 
-impl<'a> std::fmt::Debug for Object<'a> {
+impl<'a> std::fmt::Debug for ObjectValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         unsafe { (self.vtable.debug)(self.data, f) }
     }
 }
 
-impl<'a> Drop for Object<'a> {
+impl<'a> Drop for ObjectValue<'a> {
     fn drop(&mut self) {
         unsafe { (self.vtable.drop)(self.data) }
     }
 }
 
-impl<'a> Clone for Object<'a> {
+impl<'a> Clone for ObjectValue<'a> {
     fn clone(&self) -> Self {
-        Object {
+        ObjectValue {
             data: unsafe { (self.vtable.clone)(self.data) },
             vtable: self.vtable,
             _marker: PhantomData,
         }
     }
 }
-
-// Keep OpaqueBox as a deprecated alias for backwards compatibility
-#[doc(hidden)]
-#[deprecated(since = "0.8.0", note = "Use Object instead")]
-pub type OpaqueBox<'a> = Object<'a>;
 
 impl<'a> Value<'a> {
     pub fn as_static(&self) -> Value<'static> {
@@ -1414,7 +1402,7 @@ impl<'a> Value<'a> {
                                 is_optional = true;
                                 value = match opt_val.value() {
                                     Some(inner) => inner.clone(),
-                                    None => return Ok(Object::new(OptionalValue::none()).into()),
+                                    None => return Ok(ObjectValue::new(OptionalValue::none()).into()),
                                 };
                             }
 
@@ -1471,9 +1459,9 @@ impl<'a> Value<'a> {
                             return if is_optional {
                                 Ok(match result {
                                     Ok(val) => {
-                                        Object::new(OptionalValue::of(val.as_static())).into()
+                                        ObjectValue::new(OptionalValue::of(val.as_static())).into()
                                     }
-                                    Err(_) => Object::new(OptionalValue::none()).into(),
+                                    Err(_) => ObjectValue::new(OptionalValue::none()).into(),
                                 })
                             } else {
                                 result
@@ -1493,14 +1481,14 @@ impl<'a> Value<'a> {
                             };
                             if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
                                 return match opt_val.value() {
-                                    Some(inner) => Ok(Object::new(OptionalValue::of(
+                                    Some(inner) => Ok(ObjectValue::new(OptionalValue::of(
                                         inner.clone().member(&field)?,
                                     ))
                                     .into()),
                                     None => Ok(operand),
                                 };
                             }
-                            return Ok(Object::new(OptionalValue::of(
+                            return Ok(ObjectValue::new(OptionalValue::of(
                                 operand.member(&field)?.as_static(),
                             ))
                             .into());
@@ -2354,7 +2342,7 @@ mod tests {
 
     mod opaque {
         use crate::context::MapResolver;
-        use crate::objects::{ListValue, Map, Object, ObjectValue, OptionalValue, StringValue};
+        use crate::objects::{ListValue, Map, ObjectValue, ObjectType, OptionalValue, StringValue};
         use crate::parser::Parser;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
@@ -2367,7 +2355,7 @@ mod tests {
             field: String,
         }
 
-        impl ObjectValue<'static> for MyStruct {
+        impl ObjectType<'static> for MyStruct {
             fn type_name(&self) -> &'static str {
                 "my_struct"
             }
@@ -2421,7 +2409,7 @@ mod tests {
             };
 
             let mut vars = MapResolver::new();
-            vars.add_variable_from_value("mine", Value::Object(Object::new(value)));
+            vars.add_variable_from_value("mine", Value::Object(ObjectValue::new(value)));
             let mut ctx = Context::default();
             ctx.add_function("myFn", my_fn);
             let prog = Program::compile("mine.myFn()").unwrap();
@@ -2441,9 +2429,9 @@ mod tests {
             };
 
             let mut vars = MapResolver::new();
-            vars.add_variable_from_value("v1", Value::Object(Object::new(value_1.clone())));
-            vars.add_variable_from_value("v1b", Value::Object(Object::new(value_1)));
-            vars.add_variable_from_value("v2", Value::Object(Object::new(value_2)));
+            vars.add_variable_from_value("v1", Value::Object(ObjectValue::new(value_1.clone())));
+            vars.add_variable_from_value("v1b", Value::Object(ObjectValue::new(value_1)));
+            vars.add_variable_from_value("v2", Value::Object(ObjectValue::new(value_2)));
             let ctx = Context::default();
             assert_eq!(
                 Program::compile("v2 == v1")
@@ -2470,7 +2458,7 @@ mod tests {
             let opaque = MyStruct {
                 field: "not so opaque".to_string(),
             };
-            let opaque = Value::Object(Object::new(opaque));
+            let opaque = Value::Object(ObjectValue::new(opaque));
             assert_eq!(
                 "Object<my_struct>(MyStruct { field: \"not so opaque\" })",
                 format!("{:?}", opaque)
@@ -2483,7 +2471,7 @@ mod tests {
             let value = MyStruct {
                 field: String::from("value"),
             };
-            let cel_value = Value::Object(Object::new(value));
+            let cel_value = Value::Object(ObjectValue::new(value));
             let mut map = serde_json::Map::new();
             map.insert(
                 "field".to_string(),
@@ -2505,7 +2493,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(Object::new(OptionalValue::none())))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -2514,7 +2502,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(1)))))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::of(Value::Int(1)))))
             );
 
             let expr = Parser::default()
@@ -2523,7 +2511,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(Object::new(OptionalValue::none())))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -2532,7 +2520,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(1)))))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::of(Value::Int(1)))))
             );
 
             let expr = Parser::default()
@@ -2575,7 +2563,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(1)))))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::of(Value::Int(1)))))
             );
             let expr = Parser::default()
                 .enable_optional_syntax(true)
@@ -2583,7 +2571,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(Object::new(OptionalValue::of(Value::Int(2)))))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::of(Value::Int(2)))))
             );
             let expr = Parser::default()
                 .enable_optional_syntax(true)
@@ -2591,7 +2579,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(Object::new(OptionalValue::none())))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -2614,7 +2602,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Object(Object::new(OptionalValue::of(
+                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
                     Value::String(StringValue::Owned(Arc::from("value")))
                 ))))
             );
@@ -2625,7 +2613,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Object(Object::new(OptionalValue::of(
+                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
                     Value::String(StringValue::Owned(Arc::from("value")))
                 ))))
             );
@@ -2636,7 +2624,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Object(Object::new(OptionalValue::none())))
+                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
