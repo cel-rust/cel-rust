@@ -1,6 +1,6 @@
 use crate::common::traits::{Adder, Comparer};
 use crate::common::types::Type;
-use crate::common::value::Val;
+use crate::common::value::{BorrowedVal, Val};
 use crate::ExecutionError;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -115,37 +115,19 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
     }
 }
 
-fn leak_ref<'a, T: ?Sized>(s: *const T) -> &'a T {
-    unsafe { &*s }
-}
-
-pub struct BorrowedVal<'a, T: Val> {
-    val: Box<T>,
-    _ref: &'a (),
-}
-
-impl<'a, T: Val> BorrowedVal<'a, T> {
-    pub fn inner(&self) -> &dyn Val {
-        self.val.as_ref()
-    }
-}
-
 impl<'a> From<&'a str> for BorrowedVal<'a, String> {
     fn from(value: &'a str) -> Self {
-        let leaked: &'static str = leak_ref(value);
+        let leaked: &'static str = super::leak_ref(value);
         let val = String(Cow::Borrowed(leaked));
-        BorrowedVal {
-            _ref: &(),
-            val: Box::new(val),
-        }
+        BorrowedVal::new(val)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::StdString;
     use super::String;
-    use super::{BorrowedVal, StdString};
-    use crate::common::value::Val;
+    use crate::common::value::{BorrowedVal, Val};
 
     #[test]
     fn test_try_into_string() {
@@ -164,15 +146,11 @@ mod tests {
         let string = StdString::from("cel-rust");
         let val = {
             let s = string.as_ref();
-            let val = BorrowedVal::from(s);
-            val
+            BorrowedVal::from(s)
         };
         let r = val.inner();
-        assert_eq!(string.as_str(), val.val.inner());
-        assert!(std::ptr::eq(string.as_str(), val.val.inner()));
-        assert!(std::ptr::eq(
-            string.as_str(),
-            r.downcast_ref::<String>().unwrap().inner()
-        ));
+        assert_eq!(string.as_str(), r.inner());
+        assert!(std::ptr::eq(string.as_str(), r.inner()));
+        assert!(std::ptr::eq(string.as_str(), r.inner()));
     }
 }

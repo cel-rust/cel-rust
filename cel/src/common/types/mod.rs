@@ -233,6 +233,10 @@ impl<'a> Type<'a> {
     }
 }
 
+fn leak_ref<'a, T: ?Sized>(s: *const T) -> &'a T {
+    unsafe { &*s }
+}
+
 /// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`
 /// Will return `Result::Ok` if the type check succeeded with the actual Box to the
 /// `Box<T>`. `Result::Err` with the `Box<dyn Val>` back to the caller should the type check
