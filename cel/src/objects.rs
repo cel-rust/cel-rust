@@ -357,9 +357,10 @@ pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
         None
     }
 
-    // fn resolve_function(&self, _name: &str) -> Option<&Function> {
-    //     None
-    // }
+    fn resolve_function(&self, _name: &str) -> Option<&Function> {
+        None
+    }
+
     /// Optional JSON representation (requires the `json` feature).
     ///
     /// The default implementation returns `None`, indicating that the value
@@ -1572,6 +1573,9 @@ impl<'a> Value<'a> {
                             Some(Value::Struct(ref ob)) => {
                                 ob.resolve_function(call.func_name.as_str())
                             }
+                            Some(Value::Opaque(ref ob)) => {
+                                ob.as_ref().resolve_function(call.func_name.as_str())
+                            }
                             _ => None,
                         };
                         let Some(func) = of
@@ -1776,10 +1780,7 @@ impl<'a> Value<'a> {
         let child = match self {
             Value::Map(m) => m.map.get(&KeyRef::String(name)).cloned(),
             Value::Struct(ov) => ov.get_member(name.as_ref()),
-            Value::Opaque(ov) => match ov {
-                OpaqueValue::Borrowed(ovr) => ovr.resolve_variable(name.as_ref()),
-                OpaqueValue::Arc(ovr) => ovr.resolve_variable(name.as_ref()),
-            },
+            Value::Opaque(ov) => ov.as_ref().resolve_variable(name.as_ref()),
             _ => None,
         };
 
