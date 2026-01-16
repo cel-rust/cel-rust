@@ -8,15 +8,15 @@ use std::ops::Deref;
 use std::string::String as StdString;
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct String(StdString);
+pub struct String(Cow<'static, str>);
 
 impl String {
     pub fn into_inner(self) -> StdString {
-        self.0
+        self.0.clone().into()
     }
 
     pub fn inner(&self) -> &str {
-        &self.0
+        self.0.as_ref()
     }
 }
 
@@ -58,7 +58,7 @@ impl Adder for String {
             let mut s = StdString::with_capacity(rhs.0.len() + self.0.len());
             s.push_str(&self.0);
             s.push_str(&rhs.0);
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self(s))))
+            Ok(Cow::<dyn Val>::Owned(Box::new(Self(s.to_owned().into()))))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "add",
@@ -81,19 +81,19 @@ impl Comparer for String {
 
 impl From<StdString> for String {
     fn from(v: StdString) -> Self {
-        Self(v)
+        Self(Cow::Owned(v))
     }
 }
 
 impl From<String> for StdString {
     fn from(v: String) -> Self {
-        v.0
+        v.0.into_owned()
     }
 }
 
 impl From<&str> for String {
     fn from(value: &str) -> Self {
-        Self(StdString::from(value))
+        Self(StdString::from(value).to_owned().into())
     }
 }
 
@@ -115,10 +115,36 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
     }
 }
 
+fn leak_ref<'a, T: ?Sized>(s: *const T) -> &'a T {
+    unsafe { &*s }
+}
+
+pub struct BorrowedVal<'a, T: Val> {
+    val: Box<T>,
+    _ref: &'a (),
+}
+
+impl<'a, T: Val> BorrowedVal<'a, T> {
+    pub fn inner(&self) -> &dyn Val {
+        self.val.as_ref()
+    }
+}
+
+impl<'a> From<&'a str> for BorrowedVal<'a, String> {
+    fn from(value: &'a str) -> Self {
+        let leaked: &'static str = leak_ref(value);
+        let val = String(Cow::Borrowed(leaked));
+        BorrowedVal {
+            _ref: &(),
+            val: Box::new(val),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::StdString;
     use super::String;
+    use super::{BorrowedVal, StdString};
     use crate::common::value::Val;
 
     #[test]
@@ -131,5 +157,22 @@ mod tests {
     fn test_try_into_str() {
         let str: Box<dyn Val> = Box::new(String::from("cel-rust"));
         assert_eq!(Ok("cel-rust"), str.as_ref().try_into())
+    }
+
+    #[test]
+    fn test_str() {
+        let string = StdString::from("cel-rust");
+        let val = {
+            let s = string.as_ref();
+            let val = BorrowedVal::from(s);
+            val
+        };
+        let r = val.inner();
+        assert_eq!(string.as_str(), val.val.inner());
+        assert!(std::ptr::eq(string.as_str(), val.val.inner()));
+        assert!(std::ptr::eq(
+            string.as_str(),
+            r.downcast_ref::<String>().unwrap().inner()
+        ));
     }
 }
