@@ -60,6 +60,12 @@ impl Context {
             .insert(name.to_string(), value.into_function());
     }
 
+    pub fn add_function_direct(&mut self, name: &str, value: Function)
+    {
+        self.functions
+            .insert(name.to_string(), value);
+    }
+
     pub fn add_qualified_function<T: 'static, F>(&mut self, base: &str, name: &str, value: F)
     where
         F: IntoFunction<T> + 'static + Send + Sync,

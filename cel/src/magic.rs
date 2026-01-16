@@ -1,5 +1,5 @@
 use crate::macros::{impl_conversions, impl_handler};
-use crate::objects::{BytesValue, ListValue, StringValue};
+use crate::objects::{BytesValue, ListValue, StringValue, Object};
 use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
 use std::sync::Arc;
 
@@ -9,6 +9,7 @@ impl_conversions!(
     f64 => Value::Float,
     StringValue<'a> => Value::String,
     BytesValue<'a> => Value::Bytes,
+    Object<'a> => Value::Object,
     bool => Value::Bool,
     ListValue<'a> => Value::List,
 );

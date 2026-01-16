@@ -539,13 +539,22 @@ pub enum Value<'a> {
 }
 
 impl Value<'_> {
-    pub fn as_number(&self) -> Result<usize, ExecutionError> {
+    pub fn as_unsigned(&self) -> Result<usize, ExecutionError> {
         match self {
             Value::Int(i) => usize::try_from(*i)
                 .map_err(|_e| ExecutionError::Conversion("usize", self.as_static())),
             Value::UInt(u) => usize::try_from(*u)
                 .map_err(|_e| ExecutionError::Conversion("usize", self.as_static())),
             _ => Err(ExecutionError::Conversion("usize", self.as_static())),
+        }
+    }
+    pub fn as_signed(&self) -> Result<i64, ExecutionError> {
+        match self {
+            Value::Int(i) => i64::try_from(*i)
+                .map_err(|_e| ExecutionError::Conversion("i64", self.as_static())),
+            Value::UInt(u) => i64::try_from(*u)
+                .map_err(|_e| ExecutionError::Conversion("i64", self.as_static())),
+            _ => Err(ExecutionError::Conversion("i64", self.as_static())),
         }
     }
     pub fn as_bool(&self) -> Result<bool, ExecutionError> {
@@ -1201,12 +1210,6 @@ impl<'a> Clone for Object<'a> {
             vtable: self.vtable,
             _marker: PhantomData,
         }
-    }
-}
-
-impl<'a> From<Object<'a>> for Value<'a> {
-    fn from(obj: Object<'a>) -> Self {
-        Value::Object(obj)
     }
 }
 
