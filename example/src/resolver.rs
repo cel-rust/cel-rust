@@ -27,23 +27,30 @@ fn main() {
     // try replacing `==` with `!=`
     let expr = "foo == 'bar' ? bar : 'bar'";
 
-    let ast = parser.parse(expr).unwrap();
-    let mut context = Context::default();
-    let bar = String::from("bar");
-    let resolver = MonotonicResolver {
-        some_ref: bar.as_str(),
-        val: BorrowedVal::from(bar.as_str()),
+    let escaped_value = {
+        // lifetime scope we need to "only" deal with references
+        let ast = parser.parse(expr).unwrap();
+        let mut context = Context::default();
+        let bar = String::from("bar");
+        let resolver = MonotonicResolver {
+            some_ref: bar.as_str(),
+            val: BorrowedVal::from(bar.as_str()),
+        };
+        context.set_variable_resolver(&resolver);
+        // `value` lifetime is bound to `&ast`'s and `&context`'s
+        let value = Value::resolve_val(&ast, &context).unwrap();
+        let value = value.downcast_ref::<CelString>().unwrap();
+
+        // This should always pass
+        assert_eq!(value, &CelString::from("bar"));
+
+        // But with `foo != 'bar'`, we return a different `"bar"` value, borrowed from the AST
+        assert!(
+            std::ptr::eq(resolver.some_ref, value.inner()),
+            "We want the same pointer here!"
+        );
+        // dropping `ast` & `context`, need to claim ownership over the value now.
+        value.clone()
     };
-    context.set_variable_resolver(&resolver);
-    let value = Value::resolve_val(&ast, &context).unwrap();
-    let value = value.downcast_ref::<CelString>().unwrap();
-
-    // This should always pass
-    assert_eq!(value, &CelString::from("bar"));
-
-    // But with `foo != 'bar'`, we return a different `"bar"` value, borrowed from the AST
-    assert!(
-        std::ptr::eq(resolver.some_ref, value.inner()),
-        "We want the same pointer here!"
-    )
+    assert_eq!(escaped_value, CelString::from("bar"));
 }
