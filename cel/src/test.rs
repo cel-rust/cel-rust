@@ -1,12 +1,14 @@
 use crate::context::VariableResolver;
 use crate::magic::Function;
-use crate::objects::{OpaqueBox, StringValue, StructValue};
+use crate::objects::{AsDebug, OpaqueBox, StringValue, StructValue};
 use crate::parser::Expression;
 use crate::{Context, FunctionContext, Program, Value};
+use serde::Serialize;
+use serde_json::json;
 use std::alloc::System;
+use std::any::TypeId;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
-use serde::Serialize;
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
 pub struct HttpRequest {
@@ -15,9 +17,7 @@ pub struct HttpRequest {
 }
 
 #[derive(Clone, Debug, Serialize)]
-pub struct RequestOpaque<'a> {
-    pub request: &'a HttpRequest,
-}
+pub struct RequestOpaque<'a>(&'a HttpRequest);
 
 fn custom_function() -> &'static Function {
     static CUSTOM_FN: OnceLock<Function> = OnceLock::new();
@@ -34,14 +34,14 @@ impl<'a> StructValue<'a> for RequestOpaque<'a> {
     }
     fn get_member(&self, name: &str) -> Option<Value<'a>> {
         match name {
-            "path" => Some(Value::String(self.request.path.as_str().into())),
-            "method" => Some(Value::String(self.request.method.as_str().into())),
+            "path" => Some(Value::String(self.0.path.as_str().into())),
+            "method" => Some(Value::String(self.0.method.as_str().into())),
             _ => None,
         }
     }
     #[cfg(feature = "json")]
     fn json(&self) -> Option<serde_json::Value> {
-        serde_json::to_value(self).ok()
+        serde_json::to_value(self.0).ok()
     }
 }
 
@@ -52,18 +52,13 @@ pub struct Resolver<'a> {
 impl<'a> VariableResolver<'a> for Resolver<'a> {
     fn resolve_member(&self, expr: &str, member: &str) -> Option<Value<'a>> {
         match expr {
-            "request" => RequestOpaque {
-                request: self.request,
-            }
-            .get_member(member),
+            "request" => RequestOpaque(self.request).get_member(member),
             _ => None,
         }
     }
     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
         match variable {
-            "request" => Some(Value::Struct(OpaqueBox::new(RequestOpaque {
-                request: self.request,
-            }))),
+            "request" => Some(Value::Struct(OpaqueBox::new(RequestOpaque(self.request)))),
             _ => None,
         }
     }
@@ -147,15 +142,15 @@ fn get_struct() {
         method: "GET".to_string(),
         path: "/foo".to_string(),
     };
-    let p = Program::compile("request")
-        .unwrap()
-        .optimized()
-        .expression;
+    let p = Program::compile("request").unwrap().optimized().expression;
 
     let resolver = Resolver { request: &req };
     let res = Value::resolve(&p, &pctx, &resolver).unwrap();
     dbg!(&res);
-    dbg!(res.json());
+    assert_eq!(res.json().unwrap(), json!({"method": "GET", "path": "/foo"}));
+    let Value::Struct(ob) = res else { panic!() };
+    let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
+    assert_eq!(req.method, "GET");
 }
 
 #[test]

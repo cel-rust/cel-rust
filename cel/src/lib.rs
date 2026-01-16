@@ -46,9 +46,9 @@ use crate::context::{DefaultVariableResolver, VariableResolver};
 use magic::FromContext;
 
 pub mod extractors {
-    pub use crate::magic::IntoFunction;
-    pub use crate::magic::Function;
     pub use crate::magic::Argument;
+    pub use crate::magic::Function;
+    pub use crate::magic::IntoFunction;
     pub use crate::magic::This;
 }
 

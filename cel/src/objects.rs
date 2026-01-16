@@ -8,6 +8,7 @@ use bytes::Bytes;
 use chrono::TimeZone;
 use hashbrown::Equivalent;
 use std::any::Any;
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -20,7 +21,6 @@ use std::ptr::NonNull;
 use std::sync::LazyLock;
 use std::sync::{Arc, OnceLock};
 use std::{ops, slice};
-use std::borrow::Cow;
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -31,23 +31,23 @@ use std::borrow::Cow;
 #[cfg(feature = "chrono")]
 static MAX_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
     let naive = chrono::NaiveDate::from_ymd_opt(9999, 12, 31)
-      .unwrap()
-      .and_hms_nano_opt(23, 59, 59, 999_999_999)
-      .unwrap();
+        .unwrap()
+        .and_hms_nano_opt(23, 59, 59, 999_999_999)
+        .unwrap();
     chrono::FixedOffset::east_opt(0)
-      .unwrap()
-      .from_utc_datetime(&naive)
+        .unwrap()
+        .from_utc_datetime(&naive)
 });
 
 #[cfg(feature = "chrono")]
 static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
     let naive = chrono::NaiveDate::from_ymd_opt(1, 1, 1)
-      .unwrap()
-      .and_hms_opt(0, 0, 0)
-      .unwrap();
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
     chrono::FixedOffset::east_opt(0)
-      .unwrap()
-      .from_utc_datetime(&naive)
+        .unwrap()
+        .from_utc_datetime(&naive)
 });
 
 #[derive(Debug, PartialEq, Clone)]
@@ -64,7 +64,7 @@ impl PartialOrd for Map {
 impl Map {
     pub(crate) fn contains_key<Q>(&self, key: &Q) -> bool
     where
-      Q: Hash + Equivalent<Key> + ?Sized,
+        Q: Hash + Equivalent<Key> + ?Sized,
     {
         self.map.contains_key(key)
     }
@@ -160,7 +160,7 @@ impl From<u32> for Key {
 impl serde::Serialize for Key {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-      S: serde::Serializer,
+        S: serde::Serializer,
     {
         match self {
             Key::Int(v) => v.serialize(serializer),
@@ -266,7 +266,7 @@ pub trait OpaqueEq {
 
 impl<T> OpaqueEq for T
 where
-  T: Eq + PartialEq + Any + Opaque,
+    T: Eq + PartialEq + Any + Opaque,
 {
     fn opaque_eq(&self, other: &dyn Opaque) -> bool {
         if self.runtime_type_name() != other.runtime_type_name() {
@@ -291,7 +291,7 @@ pub trait AsDebug {
 
 impl<T> AsDebug for T
 where
-  T: Debug,
+    T: Debug,
 {
     fn as_debug(&self) -> &dyn Debug {
         self
@@ -300,6 +300,9 @@ where
 use crate::magic::Function;
 
 pub trait StructValue<'a>: std::fmt::Debug {
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
     fn get_member(&self, name: &str) -> Option<Value<'a>>;
     fn resolve_function(&self, _name: &str) -> Option<&Function> {
         None
@@ -409,10 +412,10 @@ impl<'a> TryFrom<Value<'a>> for OptionalValue {
         match value {
             Value::Opaque(opaque) if opaque.as_ref().runtime_type_name() == "optional_type" => {
                 opaque
-                  .as_ref()
-                  .downcast_ref::<OptionalValue>()
-                  .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
-                  .cloned()
+                    .as_ref()
+                    .downcast_ref::<OptionalValue>()
+                    .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
+                    .cloned()
             }
             Value::Opaque(opaque) => Err(ExecutionError::UnexpectedType {
                 got: opaque.as_ref().runtime_type_name().to_string(),
@@ -432,9 +435,9 @@ impl<'a, 'b: 'a> TryFrom<&'b Value<'a>> for &'b OptionalValue {
         match value {
             Value::Opaque(opaque) if opaque.as_ref().runtime_type_name() == "optional_type" => {
                 opaque
-                  .as_ref()
-                  .downcast_ref::<OptionalValue>()
-                  .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
+                    .as_ref()
+                    .downcast_ref::<OptionalValue>()
+                    .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
             }
             Value::Opaque(opaque) => Err(ExecutionError::UnexpectedType {
                 got: opaque.as_ref().runtime_type_name().to_string(),
@@ -630,48 +633,46 @@ pub enum Value<'a> {
 impl Value<'_> {
     pub fn as_number(&self) -> Result<usize, ExecutionError> {
         match self {
-            Value::Int(i) => usize::try_from(*i).map_err(|_e| ExecutionError::Conversion("usize", self.as_static())),
-            Value::UInt(u) => usize::try_from(*u).map_err(|_e| ExecutionError::Conversion("usize", self.as_static())),
-            _ => {
-                Err(ExecutionError::Conversion("usize", self.as_static()))
-            }
+            Value::Int(i) => usize::try_from(*i)
+                .map_err(|_e| ExecutionError::Conversion("usize", self.as_static())),
+            Value::UInt(u) => usize::try_from(*u)
+                .map_err(|_e| ExecutionError::Conversion("usize", self.as_static())),
+            _ => Err(ExecutionError::Conversion("usize", self.as_static())),
         }
     }
     pub fn as_bool(&self) -> Result<bool, ExecutionError> {
         match self {
             Value::Bool(b) => Ok(*b),
-            _ => {
-                Err(ExecutionError::Conversion("bool", self.as_static()))
-            }
+            _ => Err(ExecutionError::Conversion("bool", self.as_static())),
         }
     }
     pub fn as_bytes(&self) -> Result<&[u8], ExecutionError> {
         match self {
             Value::String(b) => Ok(b.as_ref().as_bytes()),
             Value::Bytes(b) => Ok(b.as_ref()),
-            _ => {
-                Err(ExecutionError::Conversion("bytes", self.as_static()))
-            }
+            _ => Err(ExecutionError::Conversion("bytes", self.as_static())),
         }
     }
     // Note: may allocate
     pub fn as_str(&self) -> Result<Cow<'_, str>, ExecutionError> {
         match self {
             Value::String(v) => Ok(Cow::Borrowed(v.as_ref())),
-            Value::Bool(v) => if *v {
-                Ok(Cow::Borrowed("true"))
-            } else {
-                Ok(Cow::Borrowed("false"))
+            Value::Bool(v) => {
+                if *v {
+                    Ok(Cow::Borrowed("true"))
+                } else {
+                    Ok(Cow::Borrowed("false"))
+                }
             }
             Value::Int(v) => Ok(Cow::Owned(v.to_string())),
             Value::UInt(v) => Ok(Cow::Owned(v.to_string())),
             Value::Bytes(v) => {
                 use base64::Engine;
-                Ok(Cow::Owned(base64::prelude::BASE64_STANDARD.encode(v.as_ref())))
-            },
-            _ => {
-                Err(ExecutionError::Conversion("string", self.as_static()))
+                Ok(Cow::Owned(
+                    base64::prelude::BASE64_STANDARD.encode(v.as_ref()),
+                ))
             }
+            _ => Err(ExecutionError::Conversion("string", self.as_static())),
         }
     }
 }
@@ -700,16 +701,16 @@ impl PartialEq for Value<'_> {
             (Value::Timestamp(a), Value::Timestamp(b)) => a == b,
             // Allow different numeric types to be compared without explicit casting.
             (Value::Int(a), Value::UInt(b)) => a
-              .to_owned()
-              .try_into()
-              .map(|a: u64| a == *b)
-              .unwrap_or(false),
+                .to_owned()
+                .try_into()
+                .map(|a: u64| a == *b)
+                .unwrap_or(false),
             (Value::Int(a), Value::Float(b)) => (*a as f64) == *b,
             (Value::UInt(a), Value::Int(b)) => a
-              .to_owned()
-              .try_into()
-              .map(|a: i64| a == *b)
-              .unwrap_or(false),
+                .to_owned()
+                .try_into()
+                .map(|a: i64| a == *b)
+                .unwrap_or(false),
             (Value::UInt(a), Value::Float(b)) => (*a as f64) == *b,
             (Value::Float(a), Value::Int(b)) => *a == (*b as f64),
             (Value::Float(a), Value::UInt(b)) => *a == (*b as f64),
@@ -742,18 +743,18 @@ impl PartialOrd for Value<'_> {
             // Allow different numeric types to be compared without explicit casting.
             (Value::Int(a), Value::UInt(b)) => Some(
                 a.to_owned()
-                  .try_into()
-                  .map(|a: u64| a.cmp(b))
-                  // If the i64 doesn't fit into a u64 it must be less than 0.
-                  .unwrap_or(Ordering::Less),
+                    .try_into()
+                    .map(|a: u64| a.cmp(b))
+                    // If the i64 doesn't fit into a u64 it must be less than 0.
+                    .unwrap_or(Ordering::Less),
             ),
             (Value::Int(a), Value::Float(b)) => (*a as f64).partial_cmp(b),
             (Value::UInt(a), Value::Int(b)) => Some(
                 a.to_owned()
-                  .try_into()
-                  .map(|a: i64| a.cmp(b))
-                  // If the u64 doesn't fit into a i64 it must be greater than i64::MAX.
-                  .unwrap_or(Ordering::Greater),
+                    .try_into()
+                    .map(|a: i64| a.cmp(b))
+                    // If the u64 doesn't fit into a i64 it must be greater than i64::MAX.
+                    .unwrap_or(Ordering::Greater),
             ),
             (Value::UInt(a), Value::Float(b)) => (*a as f64).partial_cmp(b),
             (Value::Float(a), Value::Int(b)) => a.partial_cmp(&(*b as f64)),
@@ -1045,6 +1046,7 @@ impl<'a> From<Value<'a>> for ResolveResult<'a> {
 
 /// A custom vtable for our opaque values
 struct OpaqueVtable {
+    type_name: unsafe fn(NonNull<()>) -> &'static str,
     get_member: unsafe fn(NonNull<()>, &str) -> Option<Value<'static>>,
     resolve_function: unsafe fn(NonNull<()>, &str) -> Option<&Function>,
     #[cfg(feature = "json")]
@@ -1074,7 +1076,7 @@ impl<'a> OpaqueBox<'a> {
     /// Create a new OpaqueBox from a value implementing OpaqueValue
     pub fn new<T>(value: T) -> Self
     where
-      T: StructValue<'a> + Clone + 'a,
+        T: StructValue<'a> + Clone + 'a,
     {
         let boxed = Box::new(value);
         let ptr = NonNull::new(Box::into_raw(boxed) as *mut ()).unwrap();
@@ -1151,11 +1153,19 @@ impl<'a> OpaqueBox<'a> {
             }
         }
 
+        unsafe fn type_name_impl<'a, T: StructValue<'a>>(ptr: NonNull<()>) -> &'static str {
+            unsafe {
+                let value = &*(ptr.as_ptr() as *const T);
+                value.type_name()
+            }
+        }
+
         // Leak a static vtable (one per type T)
         // We use Box::leak to create a 'static reference
         unsafe {
             #[allow(clippy::missing_transmute_annotations)]
             OpaqueVtable {
+                type_name: type_name_impl::<T>,
                 get_member: std::mem::transmute(
                     get_member_impl::<T> as unsafe fn(NonNull<()>, &str) -> Option<Value<'a>>,
                 ),
@@ -1166,7 +1176,7 @@ impl<'a> OpaqueBox<'a> {
                 json: json_impl::<T>,
                 debug: std::mem::transmute(
                     debug_impl::<T>
-                      as unsafe fn(NonNull<()>, &mut std::fmt::Formatter<'_>) -> std::fmt::Result,
+                        as unsafe fn(NonNull<()>, &mut std::fmt::Formatter<'_>) -> std::fmt::Result,
                 ),
                 drop: drop_impl::<T>,
                 clone: clone_impl::<T>,
@@ -1187,6 +1197,18 @@ impl<'a> OpaqueBox<'a> {
             // Safety: vtable.get_member returns Value<'static> but we cast to Value<'a>
             // This is sound because the actual lifetime is 'a (enforced by PhantomData)
             std::mem::transmute((self.vtable.resolve_function)(self.data, name))
+        }
+    }
+
+    pub fn downcast_ref<T>(&self) -> Option<&T> {
+        unsafe {
+            let tname = std::any::type_name::<T>();
+            let concrete = (self.vtable.type_name)(self.data);
+            if tname == concrete {
+                Some(&*(self.data.as_ptr() as *const T))
+            } else {
+                None
+            }
         }
     }
 
@@ -1310,13 +1332,13 @@ impl<'a> Value<'a> {
                             return Value::Bool(
                                 resolve(&call.args[0])?.eq(&resolve(&call.args[1])?),
                             )
-                              .into()
+                            .into()
                         }
                         operators::NOT_EQUALS => {
                             return Value::Bool(
                                 resolve(&call.args[0])?.ne(&resolve(&call.args[1])?),
                             )
-                              .into()
+                            .into()
                         }
                         operators::LESS => {
                             let left = resolve(&call.args[0])?;
@@ -1329,7 +1351,7 @@ impl<'a> Value<'a> {
                                     ),
                                 )? == Ordering::Less,
                             )
-                              .into();
+                            .into();
                         }
                         operators::LESS_EQUALS => {
                             let left = resolve(&call.args[0])?;
@@ -1342,7 +1364,7 @@ impl<'a> Value<'a> {
                                     ),
                                 )? != Ordering::Greater,
                             )
-                              .into();
+                            .into();
                         }
                         operators::GREATER => {
                             let left = resolve(&call.args[0])?;
@@ -1355,7 +1377,7 @@ impl<'a> Value<'a> {
                                     ),
                                 )? == Ordering::Greater,
                             )
-                              .into();
+                            .into();
                         }
                         operators::GREATER_EQUALS => {
                             let left = resolve(&call.args[0])?;
@@ -1368,7 +1390,7 @@ impl<'a> Value<'a> {
                                     ),
                                 )? != Ordering::Less,
                             )
-                              .into();
+                            .into();
                         }
                         operators::IN => {
                             let left = resolve(&call.args[0])?;
@@ -1406,7 +1428,7 @@ impl<'a> Value<'a> {
                                 let right = resolve(&call.args[1])?;
                                 Value::Bool(right.to_bool()?)
                             }
-                              .into();
+                            .into();
                         }
                         operators::INDEX | operators::OPT_INDEX => {
                             let mut value: Value<'a> = resolve(&call.args[0])?;
@@ -1445,9 +1467,9 @@ impl<'a> Value<'a> {
                                     Err(ExecutionError::NoSuchKey(idx.to_string().into()))
                                 }
                                 (Value::Map(map), Value::String(property)) => map
-                                  .get(&KeyRef::String(property.as_ref()))
-                                  .cloned()
-                                  .ok_or_else(|| ExecutionError::NoSuchKey(property.as_owned())),
+                                    .get(&KeyRef::String(property.as_ref()))
+                                    .cloned()
+                                    .ok_or_else(|| ExecutionError::NoSuchKey(property.as_owned())),
                                 (Value::Map(map), Value::Bool(property)) => {
                                     map.get(&KeyRef::Bool(property)).cloned().ok_or_else(|| {
                                         ExecutionError::NoSuchKey(property.to_string().into())
@@ -1502,14 +1524,14 @@ impl<'a> Value<'a> {
                                 return match opt_val.value() {
                                     Some(inner) => Ok(Value::Opaque(
                                         Arc::new(OptionalValue::of(inner.clone().member(&field)?))
-                                          .into(),
+                                            .into(),
                                     )),
                                     None => Ok(operand),
                                 };
                             }
                             return Ok(Value::Opaque(
                                 Arc::new(OptionalValue::of(operand.member(&field)?.as_static()))
-                                  .into(),
+                                    .into(),
                             ));
                         }
                         _ => (),
@@ -1549,7 +1571,7 @@ impl<'a> Value<'a> {
                             ));
                         };
                         let mut ctx =
-                          FunctionContext::new(&call.func_name, None, ctx, &call.args, resolver);
+                            FunctionContext::new(&call.func_name, None, ctx, &call.args, resolver);
                         (func)(&mut ctx)
                     }
                     Some(target) => {
@@ -1579,8 +1601,8 @@ impl<'a> Value<'a> {
                             _ => None,
                         };
                         let Some(func) = of
-                          .or(qualified_func)
-                          .or_else(|| ctx.get_function(call.func_name.as_str()))
+                            .or(qualified_func)
+                            .or_else(|| ctx.get_function(call.func_name.as_str()))
                         else {
                             return Err(ExecutionError::UndeclaredReference(
                                 call.func_name.clone().into(),
@@ -1632,24 +1654,24 @@ impl<'a> Value<'a> {
             }
             Expr::List(list_expr) => {
                 let list = list_expr
-                  .elements
-                  .iter()
-                  .enumerate()
-                  .map(|(idx, element)| {
-                      resolve(element).map(|value| {
-                          if list_expr.optional_indices.contains(&idx) {
-                              if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
-                                  opt_val.value().cloned().map(|v| v.as_static())
-                              } else {
-                                  Some(value)
-                              }
-                          } else {
-                              Some(value)
-                          }
-                      })
-                  })
-                  .filter_map(|r| r.transpose())
-                  .collect::<Result<Arc<_>, _>>()?;
+                    .elements
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, element)| {
+                        resolve(element).map(|value| {
+                            if list_expr.optional_indices.contains(&idx) {
+                                if let Ok(opt_val) = <&OptionalValue>::try_from(&value) {
+                                    opt_val.value().cloned().map(|v| v.as_static())
+                                } else {
+                                    Some(value)
+                                }
+                            } else {
+                                Some(value)
+                            }
+                        })
+                    })
+                    .filter_map(|r| r.transpose())
+                    .collect::<Result<Arc<_>, _>>()?;
                 Value::List(ListValue::PartiallyOwned(list)).into()
             }
             Expr::Map(map_expr) => {
@@ -1660,9 +1682,9 @@ impl<'a> Value<'a> {
                         EntryExpr::MapEntry(e) => (&e.key, &e.value, e.optional),
                     };
                     let key = resolve(k)?
-                      .as_static()
-                      .try_into()
-                      .map_err(ExecutionError::UnsupportedKeyType)?;
+                        .as_static()
+                        .try_into()
+                        .map_err(ExecutionError::UnsupportedKeyType)?;
                     let value = resolve(v)?.as_static();
 
                     if is_optional {
@@ -1695,7 +1717,7 @@ impl<'a> Value<'a> {
                                 accu.clone(),
                             );
                             if !Value::resolve(&comprehension.loop_cond, ctx, &comp_resolver)?
-                              .to_bool()?
+                                .to_bool()?
                             {
                                 break;
                             }
@@ -1715,13 +1737,13 @@ impl<'a> Value<'a> {
                                 accu.clone(),
                             );
                             if !Value::resolve(&comprehension.loop_cond, ctx, &comp_resolver)?
-                              .to_bool()?
+                                .to_bool()?
                             {
                                 break;
                             }
                             let kv = Value::from(key);
                             let with_iter =
-                              SingleVarResolver::new(&comp_resolver, &comprehension.iter_var, kv);
+                                SingleVarResolver::new(&comp_resolver, &comprehension.iter_var, kv);
                             accu = Value::resolve(&comprehension.loop_step, ctx, &with_iter)?;
                         }
                     }
@@ -1810,14 +1832,14 @@ impl<'a> ops::Add<Value<'a>> for Value<'a> {
     fn add(self, rhs: Value<'a>) -> Self::Output {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
-              .checked_add(r)
-              .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
-              .map(Value::Int),
+                .checked_add(r)
+                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
-              .checked_add(r)
-              .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
-              .map(Value::UInt),
+                .checked_add(r)
+                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l + r).into(),
 
@@ -1835,16 +1857,16 @@ impl<'a> ops::Add<Value<'a>> for Value<'a> {
             }
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Duration(r)) => l
-              .checked_add(&r)
-              .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
-              .map(Value::Duration),
+                .checked_add(&r)
+                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .map(Value::Duration),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Add, &l, &r),
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Timestamp(r)) => r
-              .checked_add_signed(l)
-              .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
-              .map(Value::Timestamp),
+                .checked_add_signed(l)
+                .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
+                .map(Value::Timestamp),
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
                 "add",
                 left.as_static(),
@@ -1861,22 +1883,22 @@ impl<'a> ops::Sub<Value<'a>> for Value<'a> {
     fn sub(self, rhs: Value) -> Self::Output {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
-              .checked_sub(r)
-              .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
-              .map(Value::Int),
+                .checked_sub(r)
+                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
-              .checked_sub(r)
-              .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
-              .map(Value::UInt),
+                .checked_sub(r)
+                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l - r).into(),
 
             #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Duration(r)) => l
-              .checked_sub(&r)
-              .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
-              .map(Value::Duration),
+                .checked_sub(&r)
+                .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
+                .map(Value::Duration),
             #[cfg(feature = "chrono")]
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Sub, &l, &r),
             #[cfg(feature = "chrono")]
@@ -1903,15 +1925,15 @@ impl<'a> ops::Div<Value<'a>> for Value<'a> {
                     Err(ExecutionError::DivisionByZero(l.into()))
                 } else {
                     l.checked_div(r)
-                      .ok_or(ExecutionError::Overflow("div", l.into(), r.into()))
-                      .map(Value::Int)
+                        .ok_or(ExecutionError::Overflow("div", l.into(), r.into()))
+                        .map(Value::Int)
                 }
             }
 
             (Value::UInt(l), Value::UInt(r)) => l
-              .checked_div(r)
-              .ok_or(ExecutionError::DivisionByZero(l.into()))
-              .map(Value::UInt),
+                .checked_div(r)
+                .ok_or(ExecutionError::DivisionByZero(l.into()))
+                .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l / r).into(),
 
@@ -1931,14 +1953,14 @@ impl<'a> ops::Mul<Value<'a>> for Value<'a> {
     fn mul(self, rhs: Value) -> Self::Output {
         match (self, rhs) {
             (Value::Int(l), Value::Int(r)) => l
-              .checked_mul(r)
-              .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
-              .map(Value::Int),
+                .checked_mul(r)
+                .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
+                .map(Value::Int),
 
             (Value::UInt(l), Value::UInt(r)) => l
-              .checked_mul(r)
-              .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
-              .map(Value::UInt),
+                .checked_mul(r)
+                .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
+                .map(Value::UInt),
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l * r).into(),
 
@@ -1962,15 +1984,15 @@ impl<'a> ops::Rem<Value<'a>> for Value<'a> {
                     Err(ExecutionError::RemainderByZero(l.into()))
                 } else {
                     l.checked_rem(r)
-                      .ok_or(ExecutionError::Overflow("rem", l.into(), r.into()))
-                      .map(Value::Int)
+                        .ok_or(ExecutionError::Overflow("rem", l.into(), r.into()))
+                        .map(Value::Int)
                 }
             }
 
             (Value::UInt(l), Value::UInt(r)) => l
-              .checked_rem(r)
-              .ok_or(ExecutionError::RemainderByZero(l.into()))
-              .map(Value::UInt),
+                .checked_rem(r)
+                .ok_or(ExecutionError::RemainderByZero(l.into()))
+                .map(Value::UInt),
 
             (left, right) => Err(ExecutionError::UnsupportedBinaryOperator(
                 "rem",
@@ -2013,11 +2035,11 @@ fn checked_op<'a>(
         TsOp::Add => lhs.checked_add_signed(*rhs),
         TsOp::Sub => lhs.checked_sub_signed(*rhs),
     }
-      .ok_or(ExecutionError::Overflow(
-          op.str(),
-          (*lhs).into(),
-          (*rhs).into(),
-      ))?;
+    .ok_or(ExecutionError::Overflow(
+        op.str(),
+        (*lhs).into(),
+        (*rhs).into(),
+    ))?;
 
     // Check for cel-spec limits
     if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
@@ -2413,12 +2435,12 @@ mod tests {
                 if let Some(Value::Opaque(opaque)) = &ftx.this {
                     if opaque.as_ref().runtime_type_name() == "my_struct" {
                         Ok(opaque
-                          .as_ref()
-                          .downcast_ref::<MyStruct>()
-                          .unwrap()
-                          .field
-                          .clone()
-                          .into())
+                            .as_ref()
+                            .downcast_ref::<MyStruct>()
+                            .unwrap()
+                            .field
+                            .clone()
+                            .into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
                             got: opaque.as_ref().runtime_type_name().to_string(),
@@ -2464,20 +2486,20 @@ mod tests {
             let ctx = Context::default();
             assert_eq!(
                 Program::compile("v2 == v1")
-                  .unwrap()
-                  .execute_with(&ctx, &vars),
+                    .unwrap()
+                    .execute_with(&ctx, &vars),
                 Ok(false.into())
             );
             assert_eq!(
                 Program::compile("v1 == v1b")
-                  .unwrap()
-                  .execute_with(&ctx, &vars),
+                    .unwrap()
+                    .execute_with(&ctx, &vars),
                 Ok(true.into())
             );
             assert_eq!(
                 Program::compile("v2 == v2")
-                  .unwrap()
-                  .execute_with(&ctx, &vars),
+                    .unwrap()
+                    .execute_with(&ctx, &vars),
                 Ok(true.into())
             );
         }
@@ -2517,18 +2539,18 @@ mod tests {
             let ctx = Context::default();
             let empty_vars = MapResolver::new();
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none()")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none()")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of(1)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of(1)")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Opaque(
@@ -2537,18 +2559,18 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.ofNonZeroValue(0)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.ofNonZeroValue(0)")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.ofNonZeroValue(1)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.ofNonZeroValue(1)")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Opaque(
@@ -2557,14 +2579,14 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of(1).value()")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).value()")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &empty_vars), Ok(Value::Int(1)));
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none().value()")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none().value()")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Err(ExecutionError::FunctionError {
@@ -2574,26 +2596,26 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of(1).hasValue()")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).hasValue()")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Bool(true))
             );
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none().hasValue()")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none().hasValue()")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Bool(false))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of(1).or(optional.of(2))")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).or(optional.of(2))")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Opaque(
@@ -2601,9 +2623,9 @@ mod tests {
                 ))
             );
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none().or(optional.of(2))")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none().or(optional.of(2))")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Opaque(
@@ -2611,78 +2633,78 @@ mod tests {
                 ))
             );
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none().or(optional.none())")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none().or(optional.none())")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of(1).orValue(5)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).orValue(5)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &empty_vars), Ok(Value::Int(1)));
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none().orValue(5)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none().orValue(5)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &empty_vars), Ok(Value::Int(5)));
 
             let mut msg_vars = MapResolver::new();
             msg_vars.add_variable_from_value("msg", HashMap::from([("field", "value")]));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("msg.?field")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("msg.?field")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
                 Ok(Value::Opaque(
                     Arc::new(OptionalValue::of(Value::String(StringValue::Owned(
                         Arc::from("value")
                     ))))
-                      .into()
+                    .into()
                 ))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of(msg).?field")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of(msg).?field")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
                 Ok(Value::Opaque(
                     Arc::new(OptionalValue::of(Value::String(StringValue::Owned(
                         Arc::from("value")
                     ))))
-                      .into()
+                    .into()
                 ))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none().?field")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none().?field")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
                 Ok(Value::Opaque(Arc::new(OptionalValue::none()).into()))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of(msg).?field.orValue('default')")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of(msg).?field.orValue('default')")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
                 Ok(Value::String(StringValue::Owned(Arc::from("value"))))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none().?field.orValue('default')")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none().?field.orValue('default')")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
                 Ok(Value::String(StringValue::Owned(Arc::from("default"))))
@@ -2694,30 +2716,30 @@ mod tests {
             map_vars.add_variable_from_value("mymap", map);
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"mymap[?"missing"].orValue(99)"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"missing"].orValue(99)"#)
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &map_vars), Ok(Value::Int(99)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"mymap[?"missing"].hasValue()"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"missing"].hasValue()"#)
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &map_vars),
                 Ok(Value::Bool(false))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"mymap[?"a"].orValue(99)"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"a"].orValue(99)"#)
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &map_vars), Ok(Value::Int(1)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"mymap[?"a"].hasValue()"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"mymap[?"a"].hasValue()"#)
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &map_vars),
                 Ok(Value::Bool(true))
@@ -2730,45 +2752,45 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("mylist[?10].orValue(99)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("mylist[?10].orValue(99)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &list_vars), Ok(Value::Int(99)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("mylist[?1].orValue(99)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("mylist[?1].orValue(99)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &list_vars), Ok(Value::Int(2)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of([1, 2, 3])[1].orValue(99)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of([1, 2, 3])[1].orValue(99)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &empty_vars), Ok(Value::Int(2)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of([1, 2, 3])[4].orValue(99)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of([1, 2, 3])[4].orValue(99)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &empty_vars), Ok(Value::Int(99)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.none()[1].orValue(99)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.none()[1].orValue(99)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &empty_vars), Ok(Value::Int(99)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("optional.of([1, 2, 3])[?1].orValue(99)")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("optional.of([1, 2, 3])[?1].orValue(99)")
+                .expect("Must parse");
             assert_eq!(Value::resolve(&expr, &ctx, &empty_vars), Ok(Value::Int(2)));
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("[1, 2, ?optional.of(3), 4]")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("[1, 2, ?optional.of(3), 4]")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::List(ListValue::Owned(
@@ -2777,9 +2799,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("[1, 2, ?optional.none(), 4]")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("[1, 2, ?optional.none(), 4]")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::List(ListValue::Owned(
@@ -2788,9 +2810,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("[?optional.of(1), ?optional.none(), ?optional.of(3)]")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("[?optional.of(1), ?optional.none(), ?optional.of(3)]")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::List(ListValue::Owned(
@@ -2799,9 +2821,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"[1, ?mymap[?"missing"], 3]"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"[1, ?mymap[?"missing"], 3]"#)
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &map_vars),
                 Ok(Value::List(ListValue::Owned(
@@ -2810,9 +2832,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"[1, ?mymap[?"a"], 3]"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"[1, ?mymap[?"a"], 3]"#)
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &map_vars),
                 Ok(Value::List(ListValue::Owned(
@@ -2821,18 +2843,18 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse("[?optional.none(), ?optional.none()]")
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse("[?optional.none(), ?optional.none()]")
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::List(ListValue::Owned(vec![].into())))
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"{"a": 1, "b": 2, ?"c": optional.of(3)}"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, "b": 2, ?"c": optional.of(3)}"#)
+                .expect("Must parse");
             let mut expected_map = hashbrown::HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             expected_map.insert("b".into(), Value::Int(2));
@@ -2845,9 +2867,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"{"a": 1, "b": 2, ?"c": optional.none()}"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, "b": 2, ?"c": optional.none()}"#)
+                .expect("Must parse");
             let mut expected_map = hashbrown::HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             expected_map.insert("b".into(), Value::Int(2));
@@ -2859,9 +2881,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"{"a": 1, ?"b": optional.none(), ?"c": optional.of(3)}"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, ?"b": optional.none(), ?"c": optional.of(3)}"#)
+                .expect("Must parse");
             let mut expected_map = hashbrown::HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             expected_map.insert("c".into(), Value::Int(3));
@@ -2873,9 +2895,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"{"a": 1, ?"b": mymap[?"missing"]}"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, ?"b": mymap[?"missing"]}"#)
+                .expect("Must parse");
             let mut expected_map = hashbrown::HashMap::new();
             expected_map.insert("a".into(), Value::Int(1));
             assert_eq!(
@@ -2886,9 +2908,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"{"x": 10, ?"y": mymap[?"a"]}"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"{"x": 10, ?"y": mymap[?"a"]}"#)
+                .expect("Must parse");
             let mut expected_map = hashbrown::HashMap::new();
             expected_map.insert("x".into(), Value::Int(10));
             expected_map.insert("y".into(), Value::Int(1));
@@ -2900,9 +2922,9 @@ mod tests {
             );
 
             let expr = Parser::default()
-              .enable_optional_syntax(true)
-              .parse(r#"{?"a": optional.none(), ?"b": optional.none()}"#)
-              .expect("Must parse");
+                .enable_optional_syntax(true)
+                .parse(r#"{?"a": optional.none(), ?"b": optional.none()}"#)
+                .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
                 Ok(Value::Map(Map {

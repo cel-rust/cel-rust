@@ -62,9 +62,7 @@ impl<'a> Value<'a> {
                     .ok_or(ConvertToJsonError::DurationOverflow(v))?,
             )),
             Value::Opaque(ref opaque) => opaque.as_ref().json().unwrap_or(serde_json::Value::Null),
-            Value::Struct(ref v) => {
-                v.json().unwrap_or(serde_json::Value::Null)
-            }
+            Value::Struct(ref v) => v.json().unwrap_or(serde_json::Value::Null),
         })
     }
 }
