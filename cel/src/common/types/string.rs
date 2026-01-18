@@ -21,6 +21,8 @@ impl String {
 }
 
 impl Clone for String {
+    // SAFETY: this explicitly allocates a new `String` with the same contents as the original on the heap
+    // as we can't _ever_ reuse the `&'static str`, or the `Cow::Borrowed`.
     fn clone(&self) -> Self {
         Self(Cow::Owned(StdString::from(self.inner())))
     }
@@ -123,9 +125,14 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
 
 impl<'a> From<&'a str> for BorrowedVal<'a, String> {
     fn from(value: &'a str) -> Self {
-        let leaked: &'static str = super::leak_ref(value);
-        let val = String(Cow::Borrowed(leaked));
-        BorrowedVal::new(val)
+        // SAFETY: BorrowedVal is retying the `'a` lifetime from the `&'a str`
+        // now, the `String`'s borrowed `leaked' reference also need to _never_
+        // escape the `String` by other means neither!
+        unsafe {
+            let leaked: &'static str = super::leak_ref(value);
+            let val = String(Cow::Borrowed(leaked));
+            BorrowedVal::new(val)
+        }
     }
 }
 

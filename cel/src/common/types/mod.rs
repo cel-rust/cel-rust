@@ -233,8 +233,8 @@ impl<'a> Type<'a> {
     }
 }
 
-fn leak_ref<'a, T: ?Sized>(s: *const T) -> &'a T {
-    unsafe { &*s }
+unsafe fn leak_ref<'a, T: ?Sized>(s: *const T) -> &'a T {
+    &*s
 }
 
 /// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`
