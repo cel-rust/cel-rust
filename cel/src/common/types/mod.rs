@@ -16,6 +16,7 @@ mod string;
 mod timestamp;
 mod uint;
 
+use crate::common::traits::TraitSet;
 use crate::common::value::Val;
 pub use bool::Bool as CelBool;
 pub use bytes::Bytes as CelBytes;
@@ -62,7 +63,7 @@ pub struct Type<'a> {
     kind: Kind,
     parameters: &'a [&'a Type<'a>],
     runtime_type_name: &'a str,
-    trait_mask: u16,
+    trait_mask: TraitSet,
 }
 
 pub const ANY_TYPE: Type = Type {
