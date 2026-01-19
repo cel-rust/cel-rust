@@ -139,7 +139,7 @@ pub fn size<'a>(ftx: &mut FunctionContext<'a, '_>, this: This) -> ResolveResult<
     let value = this.load_or_arg_value(ftx)?;
     let size = match value {
         Value::List(l) => l.len(),
-        Value::Map(m) => m.map.len(),
+        Value::Map(m) => m.len(),
         Value::String(s) => s.as_ref().len(),
         Value::Bytes(b) => b.as_ref().len(),
         value => return Err(ftx.error(format!("cannot determine the size of {value:?}"))),

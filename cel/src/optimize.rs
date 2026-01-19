@@ -2,7 +2,7 @@ use crate::common::ast::{
     CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr,
 };
-use crate::objects::{ListValue, Map};
+use crate::objects::{ListValue, MapValue};
 use crate::parser::Expression;
 use crate::{IdedExpr, Value};
 use std::sync::Arc;
@@ -143,7 +143,7 @@ impl Optimize {
                         })
                         .collect::<Result<_, Value<'static>>>();
                     match r {
-                        Ok(v) => Expr::Inline(Value::Map(Map { map: Arc::new(v) })),
+                        Ok(v) => Expr::Inline(Value::Map(MapValue::Owned(Arc::new(v)))),
                         Err(_) => Expr::Map(MapExpr { entries: ne }),
                     }
                 } else {

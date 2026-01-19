@@ -115,7 +115,7 @@ criterion_group! {
     targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark
 }
 
-const REALISTIC_EXPRESSIONS: &[(&str, &str)] = [];
+const REALISTIC_EXPRESSIONS: &[(&str, &str)] = &[];
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct HttpRequest {
     method: String,

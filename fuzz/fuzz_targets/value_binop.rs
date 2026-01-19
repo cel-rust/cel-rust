@@ -1,6 +1,6 @@
 #![no_main]
 
-use cel::objects::{BytesValue, Key, ListValue, Map, StringValue};
+use cel::objects::{BytesValue, Key, ListValue, MapValue, StringValue};
 use cel::Value;
 use chrono::TimeZone;
 use libfuzzer_sys::fuzz_target;
@@ -62,7 +62,7 @@ fn arbitrary_value(
                 for _ in 0..length {
                     map.insert(arbitrary_key(u)?, arbitrary_value(u, depth)?);
                 }
-                Value::Map(Map { map: Arc::new(map) })
+                Value::Map(MapValue::Owned(Arc::new(map)))
             }
             2u64 => Value::Int(arbitrary::Arbitrary::arbitrary(u)?),
             3u64 => Value::UInt(arbitrary::Arbitrary::arbitrary(u)?),

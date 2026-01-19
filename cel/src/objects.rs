@@ -49,34 +49,62 @@ static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock
 });
 
 #[derive(Debug, PartialEq, Clone)]
-pub struct Map {
-    pub map: Arc<hashbrown::HashMap<Key, Value<'static>>>,
+pub enum MapValue<'a> {
+    Owned(Arc<hashbrown::HashMap<Key, Value<'static>>>),
+    Borrow(Vec<Value<'a>>),
 }
 
-impl PartialOrd for Map {
+impl PartialOrd for MapValue<'_> {
     fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
         None
     }
 }
 
-impl Map {
-    pub(crate) fn contains_key<Q>(&self, key: &Q) -> bool
-    where
-        Q: Hash + Equivalent<Key> + ?Sized,
-    {
-        self.map.contains_key(key)
+impl<'a> MapValue<'a> {
+    pub fn iter_keys(&self) -> impl Iterator<Item=&Key> {
+        match self {
+            MapValue::Owned(m) => m.keys(),
+            MapValue::Borrow(m) => todo!(),
+        }
+    }
+    pub fn iter(&self) -> impl Iterator<Item=(&Key, &Value<'static>)> {
+        match self {
+            MapValue::Owned(m) => m.iter(),
+            MapValue::Borrow(m) => todo!(),
+        }
+    }
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+    pub fn len(&self) -> usize {
+        match self {
+            MapValue::Owned(m) => m.len(),
+            MapValue::Borrow(m) => 0,
+        }
+    }
+    pub fn contains_key(&self, key: &KeyRef) -> bool {
+        match self {
+            MapValue::Owned(m) => m.contains_key(key),
+            MapValue::Borrow(m) => false,
+        }
+    }
+    fn get_raw<'r>(&'r self, key: &KeyRef) -> Option<&'r Value<'a>> {
+        match self {
+            MapValue::Owned(m) => m.get(key),
+            MapValue::Borrow(m) => None,
+        }
     }
     /// Returns a reference to the value corresponding to the key. Implicitly converts between int
     /// and uint keys.
-    pub fn get<'a>(&'a self, key: &KeyRef) -> Option<&'a Value<'static>> {
-        self.map.get(key).or_else(|| match key {
+    pub fn get<'r>(&'r self, key: &KeyRef) -> Option<&'r Value<'a>> {
+        self.get_raw(key).or_else(|| match key {
             KeyRef::Int(k) => {
                 let converted = u64::try_from(*k).ok()?;
-                self.map.get(&Key::Uint(converted))
+                self.get_raw(&KeyRef::Uint(converted))
             }
             KeyRef::Uint(k) => {
                 let converted = i64::try_from(*k).ok()?;
-                self.map.get(&Key::Int(converted))
+                self.get_raw(&KeyRef::Int(converted))
             }
             _ => None,
         })
@@ -91,8 +119,14 @@ pub enum Key {
     String(Arc<str>),
 }
 
+impl<'a> PartialEq<KeyRef<'a>> for Key {
+    fn eq(&self, key: &KeyRef) -> bool {
+        &KeyRef::from(self) == key
+    }
+}
+
 /// A borrowed version of [`Key`] that avoids allocating for lookups.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum KeyRef<'a> {
     Int(i64),
     Uint(u64),
@@ -221,26 +255,22 @@ impl<'a> TryFrom<&'a Value<'a>> for KeyRef<'a> {
     }
 }
 
-impl<K: Into<Key>, V: Into<Value<'static>>> From<HashMap<K, V>> for Map {
+impl<K: Into<Key>, V: Into<Value<'static>>> From<HashMap<K, V>> for MapValue<'static> {
     fn from(map: HashMap<K, V>) -> Self {
         let mut new_map = hashbrown::HashMap::with_capacity(map.len());
         for (k, v) in map {
             new_map.insert(k.into(), v.into());
         }
-        Map {
-            map: Arc::new(new_map),
-        }
+        MapValue::Owned(Arc::new(new_map))
     }
 }
-impl<K: Into<Key>, V: Into<Value<'static>>> From<hashbrown::HashMap<K, V>> for Map {
+impl<K: Into<Key>, V: Into<Value<'static>>> From<hashbrown::HashMap<K, V>> for MapValue<'static> {
     fn from(map: hashbrown::HashMap<K, V>) -> Self {
         let mut new_map = hashbrown::HashMap::with_capacity(map.len());
         for (k, v) in map {
             new_map.insert(k.into(), v.into());
         }
-        Map {
-            map: Arc::new(new_map),
-        }
+        MapValue::Owned(Arc::new(new_map))
     }
 }
 
@@ -391,7 +421,7 @@ impl<'a> TryIntoValue<'a> for Value<'a> {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
 pub enum StringValue<'a> {
     Borrowed(&'a str),
     Owned(Arc<str>),
@@ -512,7 +542,7 @@ impl<'a> AsRef<[u8]> for BytesValue<'a> {
 
 pub enum Value<'a> {
     List(ListValue<'a>),
-    Map(Map),
+    Map(MapValue<'a>),
 
     // Atoms
     Int(i64),
@@ -814,7 +844,7 @@ impl<'a> Value<'a> {
     pub fn is_zero(&self) -> bool {
         match self {
             Value::List(v) => v.is_empty(),
-            Value::Map(v) => v.map.is_empty(),
+            Value::Map(v) => v.is_empty(),
             Value::Int(0) => true,
             Value::UInt(0) => true,
             Value::Float(f) => *f == 0.0,
@@ -950,7 +980,12 @@ impl<'a> Value<'a> {
                 )),
                 ListValue::Owned(items) => Value::List(ListValue::Owned(items.clone())),
             },
-            Value::Map(m) => Value::Map(m.clone()),
+            Value::Map(m) => match m {
+                MapValue::Owned(map) => Value::Map(MapValue::Owned(map.clone())),
+                MapValue::Borrow(b) => {
+                    todo!()
+                }
+            }
             Value::Int(i) => Value::Int(*i),
             Value::UInt(u) => Value::UInt(*u),
             Value::Float(f) => Value::Float(*f),
@@ -1328,12 +1363,8 @@ impl<'a> Value<'a> {
                 if select.test {
                     match &left {
                         Value::Map(map) => {
-                            for key in map.map.deref().keys() {
-                                if key.to_string().eq(&select.field) {
-                                    return Ok(Value::Bool(true));
-                                }
-                            }
-                            Ok(Value::Bool(false))
+                            let b = map.contains_key(&KeyRef::String(&select.field));
+                            Ok(Value::Bool(b))
                         }
                         _ => Ok(Value::Bool(false)),
                     }
@@ -1389,9 +1420,7 @@ impl<'a> Value<'a> {
                         map.insert(key, value);
                     }
                 }
-                Ok(Value::Map(Map {
-                    map: Arc::from(map),
-                }))
+                Ok(Value::Map(MapValue::Owned(Arc::from(map))))
             }
             Expr::Comprehension(comprehension) => {
                 let accu_init = resolve(&comprehension.accu_init)?;
@@ -1420,7 +1449,7 @@ impl<'a> Value<'a> {
                         }
                     }
                     Value::Map(map) => {
-                        for key in map.map.deref().keys() {
+                        for key in map.iter_keys() {
                             let comp_resolver = SingleVarResolver::new(
                                 resolver,
                                 &comprehension.accu_var,
@@ -1490,7 +1519,7 @@ impl<'a> Value<'a> {
         // This will always either be because we're trying to access
         // a property on self, or a method on self.
         let child = match self {
-            Value::Map(m) => m.map.get(&KeyRef::String(name)).cloned(),
+            Value::Map(m) => m.get(&KeyRef::String(name)).cloned(),
             Value::Object(obj) => obj.get_member(name),
             _ => None,
         };
@@ -2076,7 +2105,9 @@ mod tests {
 
     mod opaque {
         use crate::context::MapResolver;
-        use crate::objects::{ListValue, Map, ObjectType, ObjectValue, OptionalValue, StringValue};
+        use crate::objects::{
+            ListValue, MapValue, ObjectType, ObjectValue, OptionalValue, StringValue,
+        };
         use crate::parser::Parser;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
@@ -2543,9 +2574,7 @@ mod tests {
             expected_map.insert("c".into(), Value::Int(3));
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Map(Map {
-                    map: Arc::from(expected_map)
-                }))
+                Ok(Value::Map(MapValue::Owned(Arc::from(expected_map))))
             );
 
             let expr = Parser::default()
@@ -2557,9 +2586,7 @@ mod tests {
             expected_map.insert("b".into(), Value::Int(2));
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Map(Map {
-                    map: Arc::from(expected_map)
-                }))
+                Ok(Value::Map(MapValue::Owned(Arc::from(expected_map))))
             );
 
             let expr = Parser::default()
@@ -2571,9 +2598,7 @@ mod tests {
             expected_map.insert("c".into(), Value::Int(3));
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Map(Map {
-                    map: Arc::from(expected_map)
-                }))
+                Ok(Value::Map(MapValue::Owned(Arc::from(expected_map))))
             );
 
             let expr = Parser::default()
@@ -2584,9 +2609,7 @@ mod tests {
             expected_map.insert("a".into(), Value::Int(1));
             assert_eq!(
                 Value::resolve(&expr, &ctx, &map_vars),
-                Ok(Value::Map(Map {
-                    map: Arc::from(expected_map)
-                }))
+                Ok(Value::Map(MapValue::Owned(Arc::from(expected_map))))
             );
 
             let expr = Parser::default()
@@ -2598,9 +2621,7 @@ mod tests {
             expected_map.insert("y".into(), Value::Int(1));
             assert_eq!(
                 Value::resolve(&expr, &ctx, &map_vars),
-                Ok(Value::Map(Map {
-                    map: Arc::from(expected_map)
-                }))
+                Ok(Value::Map(MapValue::Owned(Arc::from(expected_map))))
             );
 
             let expr = Parser::default()
@@ -2609,9 +2630,9 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Map(Map {
-                    map: Arc::from(hashbrown::HashMap::new())
-                }))
+                Ok(Value::Map(MapValue::Owned(Arc::from(
+                    hashbrown::HashMap::new()
+                )))),
             );
         }
     }

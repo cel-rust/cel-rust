@@ -42,7 +42,7 @@ impl<'a> Value<'a> {
             ),
             Value::Map(ref map) => {
                 let mut obj = serde_json::Map::new();
-                for (k, v) in map.map.iter() {
+                for (k, v) in map.iter() {
                     obj.insert(k.to_string(), v.json()?);
                 }
                 serde_json::Value::Object(obj)
@@ -68,7 +68,7 @@ impl<'a> Value<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::{ListValue, Map};
+    use crate::objects::{ListValue, MapValue};
     use crate::Value as CelValue;
     #[cfg(feature = "chrono")]
     use chrono::Duration;
@@ -91,7 +91,7 @@ mod tests {
             ),
             (
                 json!({"hello": "world"}),
-                CelValue::Map(Map::from(HashMap::from([(
+                CelValue::Map(MapValue::from(HashMap::from([(
                     "hello".to_string(),
                     CelValue::String("world".to_string().into()),
                 )]))),
