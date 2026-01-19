@@ -1,32 +1,31 @@
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use crate::extractors::Function;
 use crate::objects::ObjectType;
 use crate::Value;
-use indexmap::map::Entry;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::sync::{Arc, LazyLock};
 
 #[linkme::distributed_slice]
 pub static REGISTERED_TYPES: [fn(&mut Registration)];
-static VTABLES: LazyLock<indexmap::IndexMap<&'static str, ObjectVtable>> = LazyLock::new(|| {
+static VTABLES: LazyLock<Box<[(&'static str, ObjectVtable)]>> = LazyLock::new(|| {
     let mut r = Registration {
-        m: indexmap::IndexMap::with_capacity(REGISTERED_TYPES.len()),
+        m: HashMap::with_capacity(REGISTERED_TYPES.len()),
     };
     for rt in REGISTERED_TYPES {
         rt(&mut r);
     }
-    r.m
+    r.m.into_iter().collect()
 });
 
 #[macro_export]
 macro_rules! register_type {
     ($type:ty) => {
-        paste::paste! {
+        $crate::register_paste::paste! {
             #[$crate::register($crate::types::object::REGISTERED_TYPES)]
-            #[allow(non_upper_case_globals)]
-            static [<REGISTER_CEL_$type>]: fn(&mut $crate::types::object::Registration) = [<register_cel_ $type>];
-            #[allow(non_snake_case)]
-            fn [<register_cel_ $type>](registration: &mut $crate::types::object::Registration) {
+            static [<REGISTER_CEL_$type:upper>]: fn(&mut $crate::types::object::Registration) = [<register_cel_ $type:lower>];
+            fn [<register_cel_ $type:lower>](registration: &mut $crate::types::object::Registration) {
                 registration.register::<$type>()
             }
         }
@@ -34,11 +33,12 @@ macro_rules! register_type {
 }
 
 fn vtable<T>() -> Option<&'static ObjectVtable> {
-    VTABLES.get(&std::any::type_name::<T>())
+    let t = std::any::type_name::<T>();
+    VTABLES.iter().find(|k| k.0 == t).map(|k| &k.1)
 }
 
 pub struct Registration {
-    m: indexmap::IndexMap<&'static str, ObjectVtable>,
+    m: HashMap<&'static str, ObjectVtable>,
 }
 impl Registration {
     pub fn register<'a, T: ObjectType<'a> + PartialEq + 'static>(&mut self) {

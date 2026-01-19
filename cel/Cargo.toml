@@ -24,7 +24,6 @@ thiserror = "1.0"
 paste = "1.0"
 hashbrown = "0.16.1"
 linkme = "0.3.35"
-indexmap = "2.13.0"
 
 [dev-dependencies]
 pprof = { version = "0.15", features = ["protobuf", "protobuf-codec", "criterion"] }

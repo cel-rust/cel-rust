@@ -39,6 +39,7 @@ mod test;
 pub mod types;
 
 pub use linkme::distributed_slice as register;
+pub use paste as register_paste;
 pub use optimize::Optimizer;
 
 #[cfg(feature = "json")]
