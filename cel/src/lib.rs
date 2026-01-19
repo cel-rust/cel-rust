@@ -36,7 +36,9 @@ mod json;
 mod optimize;
 #[cfg(test)]
 mod test;
+pub mod types;
 
+pub use linkme::distributed_slice as register;
 pub use optimize::Optimizer;
 
 #[cfg(feature = "json")]

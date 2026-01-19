@@ -1,21 +1,23 @@
 use crate::context::VariableResolver;
 use crate::magic::Function;
-use crate::objects::{ObjectValue, ObjectType, StringValue};
+use crate::objects::{ObjectType, ObjectValue, StringValue};
 use crate::parser::Expression;
 use crate::{Context, FunctionContext, Program, Value};
 use serde::Serialize;
 use serde_json::json;
 use std::alloc::System;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct HttpRequest {
     method: String,
     path: String,
+    headers: HashMap<String, String>,
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct RequestOpaque<'a>(&'a HttpRequest);
 
 fn custom_function() -> &'static Function {
@@ -24,6 +26,7 @@ fn custom_function() -> &'static Function {
         Box::new(|_ftx: &mut FunctionContext| Ok(Value::String(StringValue::Borrowed("YES"))))
     })
 }
+crate::register_type!(RequestOpaque);
 
 impl<'a> ObjectType<'a> for RequestOpaque<'a> {
     fn type_name(&self) -> &'static str {
@@ -41,6 +44,7 @@ impl<'a> ObjectType<'a> for RequestOpaque<'a> {
         match name {
             "path" => Some(Value::String(self.0.path.as_str().into())),
             "method" => Some(Value::String(self.0.method.as_str().into())),
+            "headers" => None, // TODO
             _ => None,
         }
     }
@@ -51,6 +55,7 @@ impl<'a> ObjectType<'a> for RequestOpaque<'a> {
     }
 }
 
+#[derive(Serialize)]
 pub struct Resolver<'a> {
     request: &'a HttpRequest,
 }
@@ -69,6 +74,7 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
         }
     }
 }
+
 fn execute_with_mut_request<'a>(
     ctx: &'a Context,
     expression: &'a Expression,
@@ -122,6 +128,7 @@ fn zero_alloc() {
     let req = HttpRequest {
         method: "GET".to_string(),
         path: "/foo".to_string(),
+        headers: Default::default(),
     };
     let p = Program::compile("request.path.with(p, p == '/foo' ? 'YES' : 'NO')")
         .unwrap()
@@ -147,6 +154,7 @@ fn get_struct() {
     let req = HttpRequest {
         method: "GET".to_string(),
         path: "/foo".to_string(),
+        headers: Default::default(),
     };
     let p = Program::compile("request").unwrap().optimized().expression;
 
@@ -155,7 +163,7 @@ fn get_struct() {
     dbg!(&res);
     assert_eq!(
         res.json().unwrap(),
-        json!({"method": "GET", "path": "/foo"})
+        json!({"method": "GET", "path": "/foo", "headers": {}})
     );
     let Value::Object(ob) = res else { panic!() };
     let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
@@ -169,6 +177,7 @@ fn struct_function() {
     let req = HttpRequest {
         method: "GET".to_string(),
         path: "/foo".to_string(),
+        headers: Default::default(),
     };
     let p = Program::compile("request.path.with(p, p == '/foo' ? request.custom() : 'NO')")
         .unwrap()

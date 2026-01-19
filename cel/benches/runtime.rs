@@ -2,6 +2,7 @@ use cel::context::{CompositeResolver, Context, MapResolver, VariableResolver};
 use cel::{Program, Value};
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use pprof::criterion::Output;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::hint::black_box;
 use std::marker::PhantomData;
@@ -113,6 +114,17 @@ criterion_group! {
       .with_profiler(pprof::criterion::PProfProfiler::new(100, Output::Protobuf));
     targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark
 }
+
+const REALISTIC_EXPRESSIONS: &[(&str, &str)] = [];
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct HttpRequest {
+    method: String,
+    path: String,
+    headers: HashMap<String, String>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct RequestOpaque<'a>(&'a HttpRequest);
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
