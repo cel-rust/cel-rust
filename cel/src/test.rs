@@ -160,7 +160,6 @@ fn get_struct() {
 
     let resolver = Resolver { request: &req };
     let res = Value::resolve(&p, &pctx, &resolver).unwrap();
-    dbg!(&res);
     assert_eq!(
         res.json().unwrap(),
         json!({"method": "GET", "path": "/foo", "headers": {}})

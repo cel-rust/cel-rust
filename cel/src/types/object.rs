@@ -1,8 +1,8 @@
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
 use crate::extractors::Function;
 use crate::objects::ObjectType;
 use crate::Value;
+use std::collections::hash_map::Entry;
+use std::collections::HashMap;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::sync::{Arc, LazyLock};

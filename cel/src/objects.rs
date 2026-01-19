@@ -12,7 +12,7 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::Arc;
 use std::sync::LazyLock;
@@ -51,7 +51,7 @@ static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock
 #[derive(Debug, PartialEq, Clone)]
 pub enum MapValue<'a> {
     Owned(Arc<hashbrown::HashMap<Key, Value<'static>>>),
-    Borrow(Vec<Value<'a>>),
+    Borrow(vector_map::VecMap<KeyRef<'a>, Value<'a>>),
 }
 
 impl PartialOrd for MapValue<'_> {
@@ -61,16 +61,18 @@ impl PartialOrd for MapValue<'_> {
 }
 
 impl<'a> MapValue<'a> {
-    pub fn iter_keys(&self) -> impl Iterator<Item=&Key> {
+    pub fn iter_keys(&self) -> impl Iterator<Item = KeyRef<'a>> + use<'a, '_> {
+        use itertools::Either;
         match self {
-            MapValue::Owned(m) => m.keys(),
-            MapValue::Borrow(m) => todo!(),
+            MapValue::Owned(m) => Either::Left(m.keys().map(|k| KeyRef::from(k.clone()))),
+            MapValue::Borrow(m) => Either::Right(m.keys().cloned()),
         }
     }
-    pub fn iter(&self) -> impl Iterator<Item=(&Key, &Value<'static>)> {
+    pub fn iter(&'a self) -> impl Iterator<Item = (KeyRef<'a>, &'a Value<'a>)> {
+        use itertools::Either;
         match self {
-            MapValue::Owned(m) => m.iter(),
-            MapValue::Borrow(m) => todo!(),
+            MapValue::Owned(m) => Either::Left(m.iter().map(|(k, v)| (KeyRef::from(k), v))),
+            MapValue::Borrow(m) => Either::Right(m.iter().map(|(k, v)| (k.clone(), v))),
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -79,24 +81,24 @@ impl<'a> MapValue<'a> {
     pub fn len(&self) -> usize {
         match self {
             MapValue::Owned(m) => m.len(),
-            MapValue::Borrow(m) => 0,
+            MapValue::Borrow(m) => m.len(),
         }
     }
     pub fn contains_key(&self, key: &KeyRef) -> bool {
         match self {
             MapValue::Owned(m) => m.contains_key(key),
-            MapValue::Borrow(m) => false,
+            MapValue::Borrow(m) => m.contains_key(key),
         }
     }
-    fn get_raw<'r>(&'r self, key: &KeyRef) -> Option<&'r Value<'a>> {
+    fn get_raw<'r>(&'r self, key: &KeyRef<'r>) -> Option<&'r Value<'a>> {
         match self {
             MapValue::Owned(m) => m.get(key),
-            MapValue::Borrow(m) => None,
+            MapValue::Borrow(m) => m.get(key),
         }
     }
     /// Returns a reference to the value corresponding to the key. Implicitly converts between int
     /// and uint keys.
-    pub fn get<'r>(&'r self, key: &KeyRef) -> Option<&'r Value<'a>> {
+    pub fn get<'r>(&'r self, key: &KeyRef<'r>) -> Option<&'r Value<'a>> {
         self.get_raw(key).or_else(|| match key {
             KeyRef::Int(k) => {
                 let converted = u64::try_from(*k).ok()?;
@@ -131,7 +133,7 @@ pub enum KeyRef<'a> {
     Int(i64),
     Uint(u64),
     Bool(bool),
-    String(&'a str),
+    String(StringValue<'a>),
 }
 
 impl Equivalent<Key> for KeyRef<'_> {
@@ -189,6 +191,28 @@ impl From<u32> for Key {
     }
 }
 
+impl<'a> From<KeyRef<'a>> for Value<'a> {
+    fn from(value: KeyRef<'a>) -> Self {
+        match value {
+            KeyRef::Int(v) => Value::Int(v),
+            KeyRef::Uint(v) => Value::UInt(v),
+            KeyRef::Bool(v) => Value::Bool(v),
+            KeyRef::String(v) => Value::String(v),
+        }
+    }
+}
+
+impl Display for KeyRef<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            KeyRef::Int(v) => write!(f, "{v}"),
+            KeyRef::Uint(v) => write!(f, "{v}"),
+            KeyRef::Bool(v) => write!(f, "{v}"),
+            KeyRef::String(v) => f.write_str(v.as_ref()),
+        }
+    }
+}
+
 impl serde::Serialize for Key {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -235,8 +259,18 @@ impl<'a> From<&'a Key> for KeyRef<'a> {
         match value {
             Key::Int(v) => KeyRef::Int(*v),
             Key::Uint(v) => KeyRef::Uint(*v),
-            Key::String(v) => KeyRef::String(v.as_ref()),
+            Key::String(v) => KeyRef::String(StringValue::Borrowed(v.as_ref())),
             Key::Bool(v) => KeyRef::Bool(*v),
+        }
+    }
+}
+impl From<Key> for KeyRef<'static> {
+    fn from(value: Key) -> Self {
+        match value {
+            Key::Int(v) => KeyRef::Int(v),
+            Key::Uint(v) => KeyRef::Uint(v),
+            Key::String(v) => KeyRef::String(StringValue::Owned(v.clone())),
+            Key::Bool(v) => KeyRef::Bool(v),
         }
     }
 }
@@ -248,7 +282,7 @@ impl<'a> TryFrom<&'a Value<'a>> for KeyRef<'a> {
         match value {
             Value::Int(v) => Ok(KeyRef::Int(*v)),
             Value::UInt(v) => Ok(KeyRef::Uint(*v)),
-            Value::String(v) => Ok(KeyRef::String(v.as_ref())),
+            Value::String(v) => Ok(KeyRef::String(v.as_ref().into())),
             Value::Bool(v) => Ok(KeyRef::Bool(*v)),
             _ => Err(value.clone()),
         }
@@ -421,10 +455,22 @@ impl<'a> TryIntoValue<'a> for Value<'a> {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
+#[derive(Clone, Debug, Ord, PartialOrd)]
 pub enum StringValue<'a> {
     Borrowed(&'a str),
     Owned(Arc<str>),
+}
+impl Eq for StringValue<'_> {}
+impl PartialEq for StringValue<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}
+impl Hash for StringValue<'_> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        // Hash only the string content, ignoring Borrowed vs Owned
+        self.as_ref().hash(state);
+    }
 }
 
 impl From<String> for StringValue<'static> {
@@ -985,7 +1031,7 @@ impl<'a> Value<'a> {
                 MapValue::Borrow(b) => {
                     todo!()
                 }
-            }
+            },
             Value::Int(i) => Value::Int(*i),
             Value::UInt(u) => Value::UInt(*u),
             Value::Float(f) => Value::Float(*f),
@@ -1195,7 +1241,7 @@ impl<'a> Value<'a> {
                                     Err(ExecutionError::NoSuchKey(idx.to_string().into()))
                                 }
                                 (Value::Map(map), Value::String(property)) => map
-                                    .get(&KeyRef::String(property.as_ref()))
+                                    .get(&KeyRef::String(StringValue::Borrowed(&property)))
                                     .cloned()
                                     .ok_or_else(|| ExecutionError::NoSuchKey(property.as_owned())),
                                 (Value::Map(map), Value::Bool(property)) => {
@@ -1363,7 +1409,7 @@ impl<'a> Value<'a> {
                 if select.test {
                     match &left {
                         Value::Map(map) => {
-                            let b = map.contains_key(&KeyRef::String(&select.field));
+                            let b = map.contains_key(&KeyRef::String(select.field.as_str().into()));
                             Ok(Value::Bool(b))
                         }
                         _ => Ok(Value::Bool(false)),
@@ -1519,7 +1565,7 @@ impl<'a> Value<'a> {
         // This will always either be because we're trying to access
         // a property on self, or a method on self.
         let child = match self {
-            Value::Map(m) => m.get(&KeyRef::String(name)).cloned(),
+            Value::Map(m) => m.get(&KeyRef::String(StringValue::Borrowed(name))).cloned(),
             Value::Object(obj) => obj.get_member(name),
             _ => None,
         };

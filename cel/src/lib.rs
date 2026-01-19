@@ -39,8 +39,8 @@ mod test;
 pub mod types;
 
 pub use linkme::distributed_slice as register;
-pub use paste as register_paste;
 pub use optimize::Optimizer;
+pub use paste as register_paste;
 
 #[cfg(feature = "json")]
 pub use json::ConvertToJsonError;
@@ -72,7 +72,10 @@ pub enum ExecutionError {
     #[error("Unable to use value '{0:?}' as a key")]
     UnsupportedKeyType(Value<'static>),
     #[error("Unexpected type: got '{got}', want '{want}'")]
-    UnexpectedType { got: &'static str, want: &'static str },
+    UnexpectedType {
+        got: &'static str,
+        want: &'static str,
+    },
     /// Indicates that the script attempted to reference a key on a type that
     /// was missing the requested key.
     #[error("No such key: {0}")]
