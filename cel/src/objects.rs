@@ -342,12 +342,12 @@ impl<'a> TryFrom<Value<'a>> for OptionalValue {
                 .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
                 .cloned(),
             Value::Object(obj) => Err(ExecutionError::UnexpectedType {
-                got: obj.type_name().to_string(),
-                want: "optional_type".to_string(),
+                got: obj.type_name(),
+                want: "optional_type",
             }),
             v => Err(ExecutionError::UnexpectedType {
-                got: v.type_of().to_string(),
-                want: "optional_type".to_string(),
+                got: v.type_of().as_str(),
+                want: "optional_type",
             }),
         }
     }
@@ -362,12 +362,12 @@ impl<'a, 'b: 'a> TryFrom<&'b Value<'a>> for &'b OptionalValue {
                 .downcast_ref::<OptionalValue>()
                 .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast")),
             Value::Object(obj) => Err(ExecutionError::UnexpectedType {
-                got: obj.type_name().to_string(),
-                want: "optional_type".to_string(),
+                got: obj.type_name(),
+                want: "optional_type",
             }),
             v => Err(ExecutionError::UnexpectedType {
-                got: v.type_of().to_string(),
-                want: "optional_type".to_string(),
+                got: v.type_of().as_str(),
+                want: "optional_type",
             }),
         }
     }
@@ -766,23 +766,28 @@ pub enum ValueType {
     Null,
 }
 
+impl ValueType {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            ValueType::List => "list",
+            ValueType::Map => "map",
+            ValueType::Function => "function",
+            ValueType::Int => "int",
+            ValueType::UInt => "uint",
+            ValueType::Float => "float",
+            ValueType::String => "string",
+            ValueType::Bytes => "bytes",
+            ValueType::Bool => "bool",
+            ValueType::Object => "object",
+            ValueType::Duration => "duration",
+            ValueType::Timestamp => "timestamp",
+            ValueType::Null => "null",
+        }
+    }
+}
 impl Display for ValueType {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ValueType::List => write!(f, "list"),
-            ValueType::Map => write!(f, "map"),
-            ValueType::Function => write!(f, "function"),
-            ValueType::Int => write!(f, "int"),
-            ValueType::UInt => write!(f, "uint"),
-            ValueType::Float => write!(f, "float"),
-            ValueType::String => write!(f, "string"),
-            ValueType::Bytes => write!(f, "bytes"),
-            ValueType::Bool => write!(f, "bool"),
-            ValueType::Object => write!(f, "object"),
-            ValueType::Duration => write!(f, "duration"),
-            ValueType::Timestamp => write!(f, "timestamp"),
-            ValueType::Null => write!(f, "null"),
-        }
+        f.write_str(self.as_str())
     }
 }
 
@@ -825,8 +830,8 @@ impl<'a> Value<'a> {
 
     pub fn error_expected_type(&self, expected: ValueType) -> ExecutionError {
         ExecutionError::UnexpectedType {
-            got: self.type_of().to_string(),
-            want: expected.to_string(),
+            got: self.type_of().as_str(),
+            want: expected.as_str(),
         }
     }
 }
@@ -2122,14 +2127,18 @@ mod tests {
                         Ok(obj.downcast_ref::<MyStruct>().unwrap().field.clone().into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
-                            got: obj.type_name().to_string(),
-                            want: "my_struct".to_string(),
+                            got: obj.type_name(),
+                            want: "my_struct",
                         })
                     }
                 } else {
                     Err(ExecutionError::UnexpectedType {
-                        got: format!("{:?}", ftx.this),
-                        want: "Value::Object".to_string(),
+                        got: if let Some(t) = &ftx.this {
+                            t.type_of().as_str()
+                        } else {
+                            "None"
+                        },
+                        want: "Value::Object",
                     })
                 }
             }

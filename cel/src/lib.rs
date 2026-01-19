@@ -72,7 +72,7 @@ pub enum ExecutionError {
     #[error("Unable to use value '{0:?}' as a key")]
     UnsupportedKeyType(Value<'static>),
     #[error("Unexpected type: got '{got}', want '{want}'")]
-    UnexpectedType { got: String, want: String },
+    UnexpectedType { got: &'static str, want: &'static str },
     /// Indicates that the script attempted to reference a key on a type that
     /// was missing the requested key.
     #[error("No such key: {0}")]

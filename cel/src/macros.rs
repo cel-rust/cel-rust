@@ -9,8 +9,8 @@ macro_rules! impl_conversions {
                         Ok(v.clone())
                     } else {
                         Err(ExecutionError::UnexpectedType {
-                            got: format!("{:?}", expr),
-                            want: stringify!($target_type).to_string(),
+                            got: expr.type_of().as_str(),
+                            want: stringify!($target_type),
                         })
                     }
                 }
@@ -22,8 +22,8 @@ macro_rules! impl_conversions {
                         Value::Null => Ok(None),
                         $value_variant(v) => Ok(Some(v.clone())),
                         _ => Err(ExecutionError::UnexpectedType {
-                            got: format!("{:?}", expr),
-                            want: stringify!($target_type).to_string(),
+                            got: expr.type_of().as_str(),
+                            want: stringify!($target_type),
                         }),
                     }
                 }

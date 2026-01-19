@@ -244,14 +244,14 @@ mod test {
             let val: std::sync::Arc<str> = ftx.arg(0)?;
             let Value::Object(obj) = this else {
                 return Err(ExecutionError::UnexpectedType {
-                    got: this.type_of().to_string(),
-                    want: "precompiled_regex".to_string(),
+                    got: this.type_of().as_str(),
+                    want: "precompiled_regex",
                 });
             };
             let Some(rgx) = obj.downcast_ref::<Self>() else {
                 return Err(ExecutionError::UnexpectedType {
-                    got: obj.type_name().to_string(),
-                    want: "precompiled_regex".to_string(),
+                    got: obj.type_name(),
+                    want: "precompiled_regex",
                 });
             };
             Ok(Value::Bool(rgx.0.is_match(&val)))

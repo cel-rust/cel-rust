@@ -42,6 +42,23 @@ pub enum Expr {
     Struct(StructExpr),
 }
 
+impl Expr {
+    pub fn type_name(&self) -> &'static str {
+        match self {
+            Expr::Unspecified => "unspecified",
+            Expr::Call(_) => "call",
+            Expr::Comprehension(_) => "comprehension",
+            Expr::Ident(_) => "ident",
+            Expr::List(_) => "list",
+            Expr::Literal(_) => "literal",
+            Expr::Inline(_) => "inline",
+            Expr::Map(_) => "map",
+            Expr::Select(_) => "select",
+            Expr::Struct(_) => "struct",
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum EntryExpr {
     StructField(StructFieldExpr),

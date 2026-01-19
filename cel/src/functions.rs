@@ -67,8 +67,8 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
         match &self.expr(index)?.expr {
             Expr::Ident(ident) => Ok(ident),
             expr => Err(ExecutionError::UnexpectedType {
-                got: format!("{expr:?}"),
-                want: "identifier".to_string(),
+                got: expr.type_name(),
+                want: "identifier",
             }),
         }
     }
