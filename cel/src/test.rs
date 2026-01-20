@@ -126,8 +126,8 @@ fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::Res
     Ok(v)
 }
 
-// #[global_allocator]
-// static GLOBAL: Allocator<System> = Allocator::system();
+#[global_allocator]
+static GLOBAL: Allocator<System> = Allocator::system();
 
 #[test]
 fn zero_alloc() {
@@ -144,6 +144,33 @@ fn zero_alloc() {
         .unwrap()
         .optimized()
         .expression;
+
+    let resolver = Resolver { request: &req };
+    execute_with_mut_request(&pctx, &p, &resolver);
+    AllocationRegistry::enable_tracking();
+    for _ in 0..2 {
+        execute_with_mut_request(&pctx, &p, &resolver);
+    }
+    AllocationRegistry::disable_tracking();
+    assert_eq!(count.load(Ordering::SeqCst), 0);
+}
+
+#[test]
+fn header_lookup() {
+    let count = Arc::new(AtomicUsize::new(0));
+    let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
+    let mut pctx = Context::default();
+    pctx.add_function("with", with);
+    let req = HttpRequest {
+        method: "GET".to_string(),
+        path: "/foo".to_string(),
+        headers: Default::default(),
+    };
+    let p = Program::compile("request.header.foo")
+        .unwrap()
+        .optimized()
+        .expression;
+    dbg!(&p);
 
     let resolver = Resolver { request: &req };
     execute_with_mut_request(&pctx, &p, &resolver);

@@ -159,6 +159,9 @@ pub trait VariableResolver<'a> {
     fn resolve_member(&self, _expr: &str, _member: &str) -> Option<Value<'a>> {
         None
     }
+    fn resolve_member_field(&self, _expr: &str, _member: &str, _field: &str) -> Option<Value<'a>> {
+        None
+    }
 }
 
 pub struct DefaultVariableResolver;

@@ -1,17 +1,12 @@
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
-use std::convert::{Infallible, TryFrom, TryInto};
+use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
 use std::{ops, slice};
-
-use bytes::Bytes;
-#[cfg(feature = "chrono")]
-use chrono::TimeZone;
-use hashbrown::Equivalent;
 
 use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::common::value::CelVal;
@@ -19,6 +14,13 @@ use crate::context::{Context, SingleVarResolver, VariableResolver};
 use crate::functions::FunctionContext;
 pub use crate::types::object::ObjectValue;
 use crate::{ExecutionError, Expression};
+use bytes::Bytes;
+#[cfg(feature = "chrono")]
+use chrono::TimeZone;
+use hashbrown::Equivalent;
+use serde::de::Error as DeError;
+use serde::ser::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -467,12 +469,6 @@ impl<'a, T: serde::Serialize> TryIntoValue<'a> for T {
         crate::ser::to_value(self)
     }
 }
-impl<'a> TryIntoValue<'a> for Value<'a> {
-    type Error = Infallible;
-    fn try_into_value(self) -> Result<Value<'a>, Self::Error> {
-        Ok(self)
-    }
-}
 
 #[derive(Clone, Debug, Ord, PartialOrd)]
 pub enum StringValue<'a> {
@@ -626,6 +622,27 @@ pub enum Value<'a> {
     Bytes(BytesValue<'a>),
 
     Null,
+}
+
+impl Serialize for Value<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        self.json()
+            .map_err(|e| S::Error::custom(e.to_string()))?
+            .serialize(serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Value<'static> {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let js = serde_json::Value::deserialize(deserializer)?;
+        crate::to_value(&js).map_err(|e| D::Error::custom(format!("{}", e)))
+    }
 }
 
 impl Value<'_> {
@@ -1226,6 +1243,23 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::INDEX | operators::OPT_INDEX => {
+                            match (&call.args[0].expr, &call.args[1].expr) {
+                                (Expr::Select(se), Expr::Inline(Value::String(field)))
+                                    if !se.test =>
+                                {
+                                    if let Expr::Ident(base) = &se.operand.expr {
+                                        let got = resolver.resolve_member_field(
+                                            base.as_str(),
+                                            se.field.as_str(),
+                                            field.as_ref(),
+                                        );
+                                        if let Some(g) = got {
+                                            return Ok(g);
+                                        }
+                                    }
+                                }
+                                _ => {}
+                            }
                             let mut value: Value<'a> = resolve(&call.args[0])?;
                             let idx = resolve(&call.args[1])?;
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
