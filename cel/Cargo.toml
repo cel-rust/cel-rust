@@ -26,6 +26,7 @@ hashbrown = "0.16.1"
 linkme = "0.3.35"
 vector-map = { version = "1.0.2", features = ["serde_impl"] }
 itertools = "0.14.0"
+http = "1.4.0"
 
 [dev-dependencies]
 pprof = { version = "0.15", features = ["protobuf", "protobuf-codec", "criterion"] }

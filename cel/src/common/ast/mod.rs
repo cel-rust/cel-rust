@@ -1,7 +1,7 @@
-use std::collections::BTreeMap;
-
 use crate::common::value::CelVal;
 use crate::Value;
+use std::collections::BTreeMap;
+use std::sync::Arc;
 
 pub mod operators;
 
@@ -41,6 +41,23 @@ pub enum Expr {
 
     /// StructKind represents a struct literal expression.
     Struct(StructExpr),
+    /// An expression that has been optimized
+    Optimized {
+        original: Box<IdedExpr>,
+        optimized: OptimizedExpr,
+    },
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum OptimizedExpr {
+    HeaderLookup {
+        // Request or response
+        request: bool,
+        header: http::HeaderName,
+    },
+    ClaimLookup {
+        field: Arc<str>,
+    },
 }
 
 impl Expr {
@@ -56,6 +73,7 @@ impl Expr {
             Expr::Map(_) => "map",
             Expr::Select(_) => "select",
             Expr::Struct(_) => "struct",
+            Expr::Optimized { original, .. } => original.expr.type_name(),
         }
     }
 }

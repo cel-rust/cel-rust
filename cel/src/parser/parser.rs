@@ -2096,6 +2096,7 @@ ERROR: <input>:1:24: unsupported syntax '?'
     impl DebugWriter {
         fn buffer(&mut self, expr: &IdedExpr) -> &Self {
             let e = match &expr.expr {
+                Expr::HeaderLoop {..} => "UNSPECIFIED!",
                 Expr::Unspecified => "UNSPECIFIED!",
                 Expr::Call(call) => {
                     if let Some(target) = &call.target {

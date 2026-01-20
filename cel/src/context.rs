@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use hashbrown::Equivalent;
-
+use crate::common::ast::OptimizedExpr;
 use crate::functions;
 use crate::magic::{Function, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
@@ -159,7 +159,7 @@ pub trait VariableResolver<'a> {
     fn resolve_member(&self, _expr: &str, _member: &str) -> Option<Value<'a>> {
         None
     }
-    fn resolve_member_field(&self, _expr: &str, _member: &str, _field: &str) -> Option<Value<'a>> {
+    fn resolve_direct(&self, _field: &OptimizedExpr) -> Option<Option<Value<'a>>> {
         None
     }
 }

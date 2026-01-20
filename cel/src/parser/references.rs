@@ -92,6 +92,9 @@ impl IdedExpr {
         functions: &mut HashSet<&'expr str>,
     ) {
         match &self.expr {
+            Expr::Optimized { original, ..} => {
+                original._references(variables, functions);
+            }
             Expr::Unspecified => {}
             Expr::Call(call) => {
                 functions.insert(&call.func_name);

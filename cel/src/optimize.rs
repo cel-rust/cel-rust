@@ -1,5 +1,5 @@
 use std::sync::Arc;
-
+use http::HeaderName;
 use crate::common::ast::{
     CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr,
@@ -68,7 +68,34 @@ impl Optimize {
                     func_name: c.func_name,
                 };
                 let expr = Expr::Call(call);
-                with_id(self.optimizer.optimize(&expr).unwrap_or(expr))
+                let res = self.optimizer.optimize(&expr).unwrap_or(expr);
+
+                // if let Expr::Call(call) = &res {
+                //     if call.args.len() == 2 {
+                //         match (&call.args[0].expr, &call.args[1].expr) {
+                //             (Expr::Select(se), Expr::Inline(Value::String(field)))
+                //             if !se.test =>
+                //                 {
+                //                     if let Expr::Ident(base) = &se.operand.expr {
+                //                         return with_id(Expr::HeaderLoop {
+                //                             request: true,
+                //                             header: HeaderName::from_bytes(field.as_bytes()).unwrap(),
+                //                         });
+                //                         // let got = resolver.resolve_member_field(
+                //                         //     base.as_str(),
+                //                         //     se.field.as_str(),
+                //                         //     field.as_ref(),
+                //                         // );
+                //                         // if let Some(g) = got {
+                //                         //     return Ok(g);
+                //                         // }
+                //                     }
+                //                 }
+                //             _ => {}
+                //         }
+                //     }
+                // }
+                with_id(res)
             }
             Expr::Comprehension(c) => {
                 let expr = Expr::Comprehension(Box::new(ComprehensionExpr {

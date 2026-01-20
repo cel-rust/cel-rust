@@ -8,7 +8,7 @@ use std::ops::Deref;
 use std::sync::{Arc, LazyLock};
 use std::{ops, slice};
 
-use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::ast::{operators, EntryExpr, Expr, OptimizedExpr};
 use crate::common::value::CelVal;
 use crate::context::{Context, SingleVarResolver, VariableResolver};
 use crate::functions::FunctionContext;
@@ -1114,6 +1114,24 @@ impl<'a> Value<'a> {
     ) -> ResolveResult<'a> {
         let resolve = |e| Value::resolve(e, ctx, resolver);
         match &expr.expr {
+            Expr::Optimized {
+                optimized,
+                original,
+            } => match resolver.resolve_direct(optimized) {
+                Some(Some(v)) => Ok(v),
+                Some(None) => match optimized {
+                    OptimizedExpr::HeaderLookup { request, header } => {
+                        let t = if *request { "request" } else { "response" };
+                        Err(ExecutionError::NoSuchKey(
+                            format!("{t}.headers['{header}']").into(),
+                        ))
+                    }
+                    OptimizedExpr::ClaimLookup { field } => {
+                        Err(ExecutionError::NoSuchKey(format!("jwt['{field}']").into()))
+                    }
+                },
+                None => resolve(original),
+            },
             Expr::Literal(val) => Ok(val.clone().into()),
             Expr::Inline(val) => Ok(val.clone()),
             Expr::Call(call) => {
@@ -1243,23 +1261,6 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::INDEX | operators::OPT_INDEX => {
-                            match (&call.args[0].expr, &call.args[1].expr) {
-                                (Expr::Select(se), Expr::Inline(Value::String(field)))
-                                    if !se.test =>
-                                {
-                                    if let Expr::Ident(base) = &se.operand.expr {
-                                        let got = resolver.resolve_member_field(
-                                            base.as_str(),
-                                            se.field.as_str(),
-                                            field.as_ref(),
-                                        );
-                                        if let Some(g) = got {
-                                            return Ok(g);
-                                        }
-                                    }
-                                }
-                                _ => {}
-                            }
                             let mut value: Value<'a> = resolve(&call.args[0])?;
                             let idx = resolve(&call.args[1])?;
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
