@@ -1,11 +1,12 @@
+use std::cmp::Ordering;
+use std::convert::TryInto;
+use std::sync::Arc;
+
 use crate::context::{Context, VariableResolver};
 use crate::magic::{Argument, FromValue, This};
 use crate::objects::{BytesValue, KeyRef, ObjectValue, OptionalValue, StringValue, Value};
 use crate::parser::Expression;
 use crate::{ExecutionError, ResolveResult};
-use std::cmp::Ordering;
-use std::convert::TryInto;
-use std::sync::Arc;
 
 type Result<T> = std::result::Result<T, ExecutionError>;
 
@@ -435,19 +436,21 @@ pub fn matches<'a>(
     }
 }
 
-use crate::common::ast::Expr;
 #[cfg(feature = "chrono")]
 pub use time::duration;
 #[cfg(feature = "chrono")]
 pub use time::timestamp;
 
+use crate::common::ast::Expr;
+
 #[cfg(feature = "chrono")]
 pub mod time {
+    use chrono::{Datelike, Timelike};
+
     use super::{FunctionContext, ResolveResult, Result};
     use crate::magic::{Argument, This};
     use crate::objects::StringValue;
     use crate::{ExecutionError, Value};
-    use chrono::{Datelike, Timelike};
 
     /// Duration parses the provided argument into a [`Value::Duration`] value.
     ///

@@ -3,19 +3,21 @@
 // from [serde_json](https://github.com/serde-rs/json/blob/master/src/value/ser.rs),
 // also mentioned in the [serde documentation](https://serde.rs/).
 
-use crate::{objects::Key, Value};
-use serde::{
-    ser::{self, Impossible},
-    Serialize,
-};
-use std::{collections::HashMap, fmt::Display, iter::FromIterator, sync::Arc};
-use thiserror::Error;
+use std::collections::HashMap;
+use std::fmt::Display;
+use std::iter::FromIterator;
+use std::sync::Arc;
 
-use crate::objects::{BytesValue, ListValue, StringValue};
 #[cfg(feature = "chrono")]
 use chrono::FixedOffset;
 #[cfg(feature = "chrono")]
 use serde::ser::SerializeStruct;
+use serde::ser::{self, Impossible};
+use serde::Serialize;
+use thiserror::Error;
+
+use crate::objects::{BytesValue, Key, ListValue, StringValue};
+use crate::Value;
 
 pub struct Serializer;
 pub struct KeySerializer;
@@ -976,15 +978,18 @@ impl ser::Serializer for TimeSerializer {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+    use std::iter::FromIterator;
+    use std::sync::Arc;
+
+    use serde::Serialize;
+    use serde_bytes::Bytes;
+
     #[cfg(feature = "chrono")]
     use super::{Duration, Timestamp};
     use crate::context::MapResolver;
-    use crate::objects::{BytesValue, ListValue};
-    use crate::{objects::Key, to_value, Value};
-    use crate::{Context, Program};
-    use serde::Serialize;
-    use serde_bytes::Bytes;
-    use std::{collections::HashMap, iter::FromIterator, sync::Arc};
+    use crate::objects::{BytesValue, Key, ListValue};
+    use crate::{to_value, Context, Program, Value};
 
     macro_rules! primitive_test {
         ($functionName:ident, $strValue: literal, $value: expr) => {
@@ -1001,7 +1006,7 @@ mod tests {
     primitive_test!(test_u64_zero, "0u", 0_u64);
     primitive_test!(test_i64_zero, "0", 0_i64);
     primitive_test!(test_f64_zero, "0.0", 0_f64);
-    //primitive_test!(test_f64_zero, "0.", 0_f64); this test fails
+    // primitive_test!(test_f64_zero, "0.", 0_f64); this test fails
     primitive_test!(test_bool_false, "false", false);
     primitive_test!(test_bool_true, "true", true);
     primitive_test!(test_string_empty, "\"\"", "");

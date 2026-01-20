@@ -1,12 +1,13 @@
+use std::collections::HashMap;
+use std::hint::black_box;
+use std::marker::PhantomData;
+use std::time::Duration;
+
 use cel::context::{CompositeResolver, Context, MapResolver, VariableResolver};
 use cel::{Program, Value};
 use criterion::{criterion_group, BenchmarkId, Criterion};
 use pprof::criterion::Output;
 use serde::Serialize;
-use std::collections::HashMap;
-use std::hint::black_box;
-use std::marker::PhantomData;
-use std::time::Duration;
 
 const EXPRESSIONS: [(&str, &str); 35] = [
     ("ternary_1", "(false || true) ? 1 : 2"),

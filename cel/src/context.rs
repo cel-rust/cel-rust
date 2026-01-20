@@ -1,8 +1,10 @@
+use std::collections::{BTreeMap, HashMap};
+
+use hashbrown::Equivalent;
+
 use crate::functions;
 use crate::magic::{Function, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
-use hashbrown::Equivalent;
-use std::collections::{BTreeMap, HashMap};
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.
@@ -28,7 +30,6 @@ use std::collections::{BTreeMap, HashMap};
 /// [1, 2, 3].map(x, x * 2) == [2, 4, 6]
 ///                  ↑
 /// Only in scope for the duration of the map expression
-///
 ///
 pub struct Context {
     pub functions: BTreeMap<String, Function>,
@@ -153,6 +154,7 @@ impl Default for Context {
 }
 
 pub trait VariableResolver<'a> {
+    fn all(&self) -> &[&'static str];
     fn resolve(&self, expr: &str) -> Option<Value<'a>>;
     fn resolve_member(&self, _expr: &str, _member: &str) -> Option<Value<'a>> {
         None
@@ -162,6 +164,10 @@ pub trait VariableResolver<'a> {
 pub struct DefaultVariableResolver;
 
 impl<'a> VariableResolver<'a> for DefaultVariableResolver {
+    fn all(&self) -> &'static [&'static str] {
+        &[]
+    }
+
     fn resolve(&self, _expr: &str) -> Option<Value<'a>> {
         None
     }
@@ -180,35 +186,17 @@ impl<'a, 'rf> SingleVarResolver<'a, 'rf> {
 }
 
 impl<'a, 'rf> VariableResolver<'a> for SingleVarResolver<'a, 'rf> {
+    fn all(&self) -> &[&'static str] {
+        // We do NOT add ours; this call only expects top level ones. A bit hacky!
+        self.base.all()
+    }
+
     fn resolve(&self, expr: &str) -> Option<Value<'a>> {
         if expr == self.name {
             Some(self.val.clone())
         } else {
             self.base.resolve(expr)
         }
-    }
-}
-
-pub struct CompositeResolver<'a, 'rf> {
-    primary: &'rf dyn VariableResolver<'a>,
-    fallback: &'rf dyn VariableResolver<'a>,
-}
-
-impl<'a, 'rf> CompositeResolver<'a, 'rf> {
-    pub fn new(
-        primary: &'rf dyn VariableResolver<'a>,
-        fallback: &'rf dyn VariableResolver<'a>,
-    ) -> Self {
-        CompositeResolver { primary, fallback }
-    }
-}
-
-impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
-    fn resolve(&self, expr: &str) -> Option<Value<'a>> {
-        if let Some(v) = self.primary.resolve(expr) {
-            return Some(v);
-        }
-        self.fallback.resolve(expr)
     }
 }
 
@@ -251,6 +239,10 @@ impl<'a> MapResolver<'a> {
 }
 
 impl<'a> VariableResolver<'a> for MapResolver<'a> {
+    fn all(&self) -> &[&'static str] {
+        todo!()
+    }
+
     fn resolve(&self, expr: &str) -> Option<Value<'a>> {
         self.variables.get(expr).cloned()
     }

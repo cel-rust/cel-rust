@@ -1,8 +1,9 @@
-use crate::common::types;
-use crate::common::types::Type;
 use std::any::Any;
 use std::fmt::Debug;
 use std::time::{Duration, SystemTime};
+
+use crate::common::types;
+use crate::common::types::Type;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum CelVal {

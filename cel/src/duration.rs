@@ -211,8 +211,9 @@ fn format_int(buf: &mut [u8], mut v: u64) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use crate::duration::{format_duration, parse_duration};
     use chrono::Duration;
+
+    use crate::duration::{format_duration, parse_duration};
 
     fn assert_duration(input: &str, expected: Duration) {
         let (_, duration) = parse_duration(input).unwrap();

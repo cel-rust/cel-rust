@@ -1,14 +1,16 @@
+use std::alloc::System;
+use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
+
+use serde::Serialize;
+use serde_json::json;
+
 use crate::context::VariableResolver;
 use crate::magic::Function;
 use crate::objects::{ObjectType, ObjectValue, StringValue};
 use crate::parser::Expression;
 use crate::{Context, FunctionContext, Program, Value};
-use serde::Serialize;
-use serde_json::json;
-use std::alloc::System;
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, OnceLock};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct HttpRequest {
@@ -73,6 +75,10 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
             _ => None,
         }
     }
+
+    fn all(&self) -> &[&'static str] {
+        &["request"]
+    }
 }
 
 fn execute_with_mut_request<'a>(
@@ -93,6 +99,10 @@ struct CompositeResolver<'a, 'rf> {
 }
 
 impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
+    fn all(&self) -> &[&'static str] {
+        self.base.all()
+    }
+
     fn resolve(&self, expr: &str) -> Option<Value<'a>> {
         if expr == self.name {
             Some(self.val.clone())
@@ -116,8 +126,8 @@ fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::Res
     Ok(v)
 }
 
-#[global_allocator]
-static GLOBAL: Allocator<System> = Allocator::system();
+// #[global_allocator]
+// static GLOBAL: Allocator<System> = Allocator::system();
 
 #[test]
 fn zero_alloc() {

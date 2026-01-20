@@ -1,12 +1,3 @@
-use crate::common::ast::{operators, EntryExpr, Expr};
-use crate::common::value::CelVal;
-use crate::context::{Context, SingleVarResolver, VariableResolver};
-use crate::functions::FunctionContext;
-use crate::{ExecutionError, Expression};
-use bytes::Bytes;
-#[cfg(feature = "chrono")]
-use chrono::TimeZone;
-use hashbrown::Equivalent;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -14,11 +5,20 @@ use std::convert::{Infallible, TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::ops::Deref;
-use std::sync::Arc;
-use std::sync::LazyLock;
+use std::sync::{Arc, LazyLock};
 use std::{ops, slice};
 
+use bytes::Bytes;
+#[cfg(feature = "chrono")]
+use chrono::TimeZone;
+use hashbrown::Equivalent;
+
+use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::value::CelVal;
+use crate::context::{Context, SingleVarResolver, VariableResolver};
+use crate::functions::FunctionContext;
 pub use crate::types::object::ObjectValue;
+use crate::{ExecutionError, Expression};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -73,6 +73,15 @@ impl<'a> MapValue<'a> {
         match self {
             MapValue::Owned(m) => Either::Left(m.iter().map(|(k, v)| (KeyRef::from(k), v))),
             MapValue::Borrow(m) => Either::Right(m.iter().map(|(k, v)| (k.clone(), v))),
+        }
+    }
+    pub fn iter_owned(&'a self) -> impl Iterator<Item = (Key, Value<'static>)> + use<'a> {
+        use itertools::Either;
+        match self {
+            MapValue::Owned(m) => Either::Left(m.iter().map(|(k, v)| (k.clone(), v.clone()))),
+            MapValue::Borrow(m) => {
+                Either::Right(m.iter().map(|(k, v)| (Key::from(k), v.as_static())))
+            }
         }
     }
     pub fn is_empty(&self) -> bool {
@@ -191,6 +200,16 @@ impl From<u32> for Key {
     }
 }
 
+impl<'a> From<&KeyRef<'a>> for Key {
+    fn from(value: &KeyRef<'a>) -> Self {
+        match value {
+            KeyRef::Int(v) => Key::Int(*v),
+            KeyRef::Uint(v) => Key::Uint(*v),
+            KeyRef::Bool(v) => Key::Bool(*v),
+            KeyRef::String(v) => Key::String(v.as_owned()),
+        }
+    }
+}
 impl<'a> From<KeyRef<'a>> for Value<'a> {
     fn from(value: KeyRef<'a>) -> Self {
         match value {
@@ -1028,8 +1047,8 @@ impl<'a> Value<'a> {
             },
             Value::Map(m) => match m {
                 MapValue::Owned(map) => Value::Map(MapValue::Owned(map.clone())),
-                MapValue::Borrow(b) => {
-                    todo!()
+                MapValue::Borrow(_) => {
+                    Value::Map(MapValue::Owned(Arc::new(m.iter_owned().collect())))
                 }
             },
             Value::Int(i) => Value::Int(*i),
@@ -1768,7 +1787,6 @@ impl<'a> ops::Rem<Value<'a>> for Value<'a> {
 }
 
 /// Op represents a binary arithmetic operation supported on a timestamp
-///
 #[cfg(feature = "chrono")]
 enum TsOp {
     Add,
@@ -1819,12 +1837,13 @@ fn checked_op<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::context::{MapResolver, VariableResolver};
-    use crate::objects::{ListValue, StringValue, Value};
-    use crate::parser::Expression;
-    use crate::{objects::Key, Context, ExecutionError, Program};
     use std::collections::HashMap;
     use std::sync::Arc;
+
+    use crate::context::{MapResolver, VariableResolver};
+    use crate::objects::{Key, ListValue, StringValue, Value};
+    use crate::parser::Expression;
+    use crate::{Context, ExecutionError, Program};
 
     #[test]
     fn test_indexed_map_access() {
@@ -2096,6 +2115,9 @@ mod tests {
     }
 
     impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
+        fn all(&self) -> &[&'static str] {
+            self.base.all()
+        }
         fn resolve(&self, expr: &str) -> Option<Value<'a>> {
             if expr == self.name {
                 Some(self.val.clone())
@@ -2150,16 +2172,18 @@ mod tests {
     }
 
     mod opaque {
+        use std::collections::HashMap;
+        use std::fmt::Debug;
+        use std::sync::Arc;
+
+        use serde::Serialize;
+
         use crate::context::MapResolver;
         use crate::objects::{
             ListValue, MapValue, ObjectType, ObjectValue, OptionalValue, StringValue,
         };
         use crate::parser::Parser;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
-        use serde::Serialize;
-        use std::collections::HashMap;
-        use std::fmt::Debug;
-        use std::sync::Arc;
 
         #[derive(Debug, Clone, Eq, PartialEq, Serialize)]
         struct MyStruct {

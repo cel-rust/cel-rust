@@ -1,11 +1,12 @@
 #![no_main]
 
+use std::hint::black_box;
+use std::sync::Arc;
+
 use cel::objects::{BytesValue, Key, ListValue, MapValue, StringValue};
 use cel::Value;
 use chrono::TimeZone;
 use libfuzzer_sys::fuzz_target;
-use std::hint::black_box;
-use std::sync::Arc;
 
 #[derive(Debug, arbitrary::Arbitrary)]
 enum BinOp {

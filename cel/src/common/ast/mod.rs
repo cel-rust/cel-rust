@@ -1,6 +1,7 @@
+use std::collections::BTreeMap;
+
 use crate::common::value::CelVal;
 use crate::Value;
-use std::collections::BTreeMap;
 
 pub mod operators;
 

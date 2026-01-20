@@ -1,8 +1,9 @@
-use crate::Value;
 use base64::prelude::*;
 #[cfg(feature = "chrono")]
 use chrono::Duration;
 use thiserror::Error;
+
+use crate::Value;
 
 #[derive(Debug, Clone, Error)]
 #[error("unable to convert value to json: {0:?}")]
@@ -41,9 +42,9 @@ impl<'a> Value<'a> {
                     .collect::<Result<Vec<_>, _>>()?,
             ),
             Value::Map(ref map) => {
-                let mut obj = serde_json::Map::new();
+                let mut obj = serde_json::Map::with_capacity(map.len());
                 for (k, v) in map.iter() {
-                    obj.insert(k.to_string(), v.json()?);
+                    obj.insert(k.to_string(), v.json().unwrap_or(serde_json::Value::Null));
                 }
                 serde_json::Value::Object(obj)
             }
@@ -68,12 +69,14 @@ impl<'a> Value<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::objects::{ListValue, MapValue};
-    use crate::Value as CelValue;
+    use std::collections::HashMap;
+
     #[cfg(feature = "chrono")]
     use chrono::Duration;
     use serde_json::json;
-    use std::collections::HashMap;
+
+    use crate::objects::{ListValue, MapValue};
+    use crate::Value as CelValue;
 
     #[test]
     fn test_cel_value_to_json() {

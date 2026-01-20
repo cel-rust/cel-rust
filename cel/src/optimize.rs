@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use crate::common::ast::{
     CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryExpr, ListExpr, MapEntryExpr, MapExpr,
     SelectExpr,
@@ -5,7 +7,6 @@ use crate::common::ast::{
 use crate::objects::{ListValue, MapValue};
 use crate::parser::Expression;
 use crate::{IdedExpr, Value};
-use std::sync::Arc;
 
 fn is_lit(e: &Expr) -> bool {
     matches!(e, Expr::Literal(_) | Expr::Inline(_) | Expr::Map(_))

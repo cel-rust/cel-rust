@@ -1,7 +1,8 @@
+use std::sync::Arc;
+
 use crate::macros::{impl_conversions, impl_handler};
 use crate::objects::{BytesValue, ListValue, ObjectValue, StringValue};
 use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
-use std::sync::Arc;
 
 impl_conversions!(
     i64 => Value::Int,
@@ -131,6 +132,9 @@ pub struct This;
 impl This {
     pub fn load<'a>(self, ftx: &FunctionContext<'a, '_>) -> Result<Value<'a>, ExecutionError> {
         ftx.this()
+    }
+    pub fn load2<'a, 'b>(self, ftx: &'b FunctionContext<'a, '_>) -> Option<&'b Value<'a>> {
+        ftx.this.as_ref()
     }
     pub fn load_value<'a, T: FromValue<'a>>(
         self,
