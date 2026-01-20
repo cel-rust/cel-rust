@@ -1,12 +1,12 @@
-use std::sync::Arc;
-use http::HeaderName;
 use crate::common::ast::{
     CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryExpr, ListExpr, MapEntryExpr, MapExpr,
-    SelectExpr,
+    OptimizedExpr, SelectExpr, operators,
 };
 use crate::objects::{ListValue, MapValue};
 use crate::parser::Expression;
 use crate::{IdedExpr, Value};
+use http::HeaderName;
+use std::sync::Arc;
 
 fn is_lit(e: &Expr) -> bool {
     matches!(e, Expr::Literal(_) | Expr::Inline(_) | Expr::Map(_))
@@ -54,7 +54,7 @@ impl Optimize {
     pub fn optimize(&self, expr: Expression) -> Expression {
         let id = expr.id;
         let with_id = |expr: Expr| Expression { id, expr };
-        match expr.expr {
+        let res = match expr.expr {
             Expr::Call(c) => {
                 let target = c.target.map(|t| Box::new(self.optimize(*t)));
                 let args = c
@@ -69,32 +69,6 @@ impl Optimize {
                 };
                 let expr = Expr::Call(call);
                 let res = self.optimizer.optimize(&expr).unwrap_or(expr);
-
-                // if let Expr::Call(call) = &res {
-                //     if call.args.len() == 2 {
-                //         match (&call.args[0].expr, &call.args[1].expr) {
-                //             (Expr::Select(se), Expr::Inline(Value::String(field)))
-                //             if !se.test =>
-                //                 {
-                //                     if let Expr::Ident(base) = &se.operand.expr {
-                //                         return with_id(Expr::HeaderLoop {
-                //                             request: true,
-                //                             header: HeaderName::from_bytes(field.as_bytes()).unwrap(),
-                //                         });
-                //                         // let got = resolver.resolve_member_field(
-                //                         //     base.as_str(),
-                //                         //     se.field.as_str(),
-                //                         //     field.as_ref(),
-                //                         // );
-                //                         // if let Some(g) = got {
-                //                         //     return Ok(g);
-                //                         // }
-                //                     }
-                //                 }
-                //             _ => {}
-                //         }
-                //     }
-                // }
                 with_id(res)
             }
             Expr::Comprehension(c) => {
@@ -184,7 +158,56 @@ impl Optimize {
                 with_id(self.optimizer.optimize(&expr).unwrap_or(expr))
             }
             expr => with_id(self.optimizer.optimize(&expr).unwrap_or(expr)),
+        };
+
+        // Specialize `request.header[value]`
+        if let Expr::Call(call) = &res.expr
+            && call.args.len() == 2
+            && call.func_name == operators::INDEX
+            && let Expr::Select(se) = &call.args[0].expr
+            && let Expr::Inline(Value::String(field)) = &call.args[1].expr
+            && !se.test
+            && let Expr::Ident(base) = &se.operand.expr
+            && (base == "request" || base == "response")
+            && se.field == "headers"
+            && let Ok(header) = HeaderName::from_bytes(field.as_bytes())
+        {
+            let request = base == "request";
+            return with_id(Expr::Optimized {
+                original: Box::new(res),
+                optimized: OptimizedExpr::HeaderLookup { request, header },
+            });
         }
+
+        // Specialize `jwt[value]`
+        if let Expr::Call(call) = &res.expr
+            && call.args.len() == 2
+            && call.func_name == operators::INDEX
+            && let Expr::Ident(base) = &call.args[0].expr
+            && base == "jwt"
+            && let Expr::Inline(Value::String(field)) = &call.args[1].expr
+        {
+            let field = Arc::from(field.as_ref());
+            return with_id(Expr::Optimized {
+                original: Box::new(res),
+                optimized: OptimizedExpr::ClaimLookup { field },
+            });
+        }
+
+        // Specialize `jwt.value`
+        if let Expr::Select(se) = &res.expr
+          && let Expr::Ident(base) = &se.operand.expr
+          && base == "jwt"
+          && !se.test
+        {
+            let field = Arc::from(se.field.as_ref());
+            return with_id(Expr::Optimized {
+                original: Box::new(res),
+                optimized: OptimizedExpr::ClaimLookup { field },
+            });
+        }
+
+        res
     }
 }
 

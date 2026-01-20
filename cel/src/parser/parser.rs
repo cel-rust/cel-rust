@@ -4,7 +4,7 @@ use crate::common::ast::{
     SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
 use crate::common::value::CelVal;
-use crate::parser::gen::{
+use crate::parser::r#gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType,
     CalcContext, CalcContextAttrs, ConditionalAndContext, ConditionalOrContext,
     ConstantLiteralContext, ConstantLiteralContextAttrs, CreateListContext, CreateMessageContext,
@@ -16,7 +16,7 @@ use crate::parser::gen::{
     PrimaryExprContext, PrimaryExprContextAttrs, RelationContext, RelationContextAttrs,
     SelectContext, SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
 };
-use crate::parser::{gen, macros, parse};
+use crate::parser::{r#gen, macros, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
 use antlr4rust::error_listener::ErrorListener;
 use antlr4rust::errors::ANTLRError;
@@ -197,7 +197,7 @@ impl Parser {
     pub fn parse(mut self, source: &str) -> Result<IdedExpr, ParseErrors> {
         let parse_errors = Rc::new(RefCell::new(Vec::<ParseError>::new()));
         let stream = InputStream::new(source);
-        let mut lexer = gen::CELLexer::new(stream);
+        let mut lexer = r#gen::CELLexer::new(stream);
         lexer.remove_error_listeners();
         lexer.add_error_listener(Box::new(ParserErrorListener {
             parse_errors: parse_errors.clone(),
@@ -206,7 +206,7 @@ impl Parser {
         // todo! might want to avoid this cloning here...
         self.helper.source_info.source = source.into();
 
-        let mut prsr = gen::CELParser::new(CommonTokenStream::new(lexer));
+        let mut prsr = r#gen::CELParser::new(CommonTokenStream::new(lexer));
         prsr.remove_error_listeners();
         prsr.add_error_listener(Box::new(ParserErrorListener {
             parse_errors: parse_errors.clone(),
@@ -464,7 +464,7 @@ impl Default for Parser {
 }
 
 impl ParseTreeVisitorCompat<'_> for Parser {
-    type Node = gen::CELParserContextType;
+    type Node = r#gen::CELParserContextType;
     type Return = IdedExpr;
     fn temp_result(&mut self) -> &mut Self::Return {
         &mut self.ast.expr
@@ -481,7 +481,7 @@ impl ParseTreeVisitorCompat<'_> for Parser {
     }
 }
 
-impl gen::CELVisitorCompat<'_> for Parser {
+impl r#gen::CELVisitorCompat<'_> for Parser {
     fn visit_start(&mut self, ctx: &StartContext<'_>) -> Self::Return {
         match &ctx.expr() {
             None => self.report_error::<ParseError, _>(
@@ -2096,7 +2096,7 @@ ERROR: <input>:1:24: unsupported syntax '?'
     impl DebugWriter {
         fn buffer(&mut self, expr: &IdedExpr) -> &Self {
             let e = match &expr.expr {
-                Expr::HeaderLoop {..} => "UNSPECIFIED!",
+                Expr::Optimized {  ..} => "optimized",
                 Expr::Unspecified => "UNSPECIFIED!",
                 Expr::Call(call) => {
                     if let Some(target) = &call.target {

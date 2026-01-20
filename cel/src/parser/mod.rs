@@ -1,6 +1,6 @@
 #![allow(clippy::module_inception)]
 #[allow(clippy::all)]
-mod gen;
+mod r#gen;
 
 pub mod references;
 

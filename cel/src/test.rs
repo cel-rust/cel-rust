@@ -166,7 +166,12 @@ fn header_lookup() {
         path: "/foo".to_string(),
         headers: Default::default(),
     };
-    let p = Program::compile("request.header.foo")
+    let p = Program::compile("jwt.sub")
+        .unwrap()
+        .optimized()
+        .expression;
+    dbg!(&p);
+    let p = Program::compile("jwt['sub']")
         .unwrap()
         .optimized()
         .expression;
