@@ -2,7 +2,7 @@
 
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
-use quote::quote;
+use quote::{ToTokens, quote};
 use syn::{
     Attribute, Data, DeriveInput, Fields, FieldsNamed, Lit, Meta, MetaNameValue, parse_macro_input,
 };
@@ -22,6 +22,27 @@ use syn::{
 ///
 /// - `#[dynamic(skip)]` - Skip this field in the generated implementation
 /// - `#[dynamic(rename = "name")]` - Use a different name for this field in CEL
+/// - `#[dynamic(with = "function")]` - Transform the field value using a helper function before
+///   passing to `maybe_materialize`. The function receives `&self.field` (note: if the field
+///   is already a reference like `&'a T`, the function receives `&&'a T`) and should return
+///   a reference to something that implements `DynamicType + DynamicValueVtable`.
+///   
+///   **Important**: Due to type inference limitations, you should use a named helper function
+///   with explicit lifetime annotations rather than inline closures.
+///   
+///   Example:
+///   ```rust,ignore
+///   // Define a helper function with explicit lifetimes
+///   fn extract_claims<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
+///       &c.0
+///   }
+///   
+///   #[derive(DynamicType)]
+///   pub struct HttpRequest<'a> {
+///       #[dynamic(with = "extract_claims")]
+///       claims: &'a Claims,
+///   }
+///   ```
 ///
 /// # Example
 ///
@@ -34,6 +55,22 @@ use syn::{
 ///     path: &'a str,
 ///     #[dynamic(skip)]
 ///     internal_id: u64,
+/// }
+///
+/// // Using with attribute for newtype wrappers:
+/// #[derive(Clone, Debug)]
+/// pub struct Claims(serde_json::Value);
+///
+/// // Helper function to extract the inner value
+/// fn extract_claims<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
+///     &c.0
+/// }
+///
+/// #[derive(DynamicType)]
+/// pub struct HttpRequestRef<'a> {
+///     method: &'a str,
+///     #[dynamic(with = "extract_claims")]
+///     claims: &'a Claims,
 /// }
 ///
 /// // Inside the cel crate itself:
@@ -89,7 +126,8 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
             let ty = &f.ty;
             // Check if the type is a reference type
             let is_ref = matches!(ty, syn::Type::Reference(_));
-            (ident, name, is_ref)
+            let with_expr = get_field_with_expr(&f.attrs);
+            (ident, name, ty, is_ref, with_expr)
         })
         .collect();
 
@@ -98,13 +136,36 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     // Generate materialize body
     let materialize_inserts: TokenStream2 = processed_fields
         .iter()
-        .map(|(ident, name, _is_ref)| {
-            // Always pass a reference to maybe_materialize
-            quote! {
-                m.insert(
-                    #crate_path::objects::KeyRef::from(#name),
-                    #crate_path::types::dynamic::maybe_materialize(&self.#ident),
-                );
+        .map(|(ident, name, _ty, _is_ref, with_expr)| {
+            if let Some(expr_str) = with_expr {
+                // Parse the closure expression as a proper Expr for better diagnostics
+                let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
+                    Ok(expr) => expr,
+                    Err(e) => {
+                        return syn::Error::new(
+                            proc_macro2::Span::call_site(),
+                            format!("Failed to parse `with` expression `{}`: {}", expr_str, e)
+                        )
+                        .to_compile_error();
+                    }
+                };
+                // Convert the parsed expression to tokens
+                let expr_tokens = parsed_expr.to_token_stream();
+                // Call the closure and let maybe_materialize handle the result
+                quote! {
+                    m.insert(
+                        #crate_path::objects::KeyRef::from(#name),
+                        #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(&self.#ident)),
+                    );
+                }
+            } else {
+                // Always pass a reference to maybe_materialize
+                quote! {
+                    m.insert(
+                        #crate_path::objects::KeyRef::from(#name),
+                        #crate_path::types::dynamic::maybe_materialize(&self.#ident),
+                    );
+                }
             }
         })
         .collect();
@@ -112,10 +173,64 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     // Generate field match arms
     let field_arms: TokenStream2 = processed_fields
         .iter()
-        .map(|(ident, name, _is_ref)| {
-            // Always pass a reference to maybe_materialize
-            quote! {
-                #name => #crate_path::types::dynamic::maybe_materialize(&self.#ident),
+        .map(|(ident, name, _ty, _is_ref, with_expr)| {
+            if let Some(expr_str) = with_expr {
+                // Parse the closure expression as a proper Expr for better diagnostics
+                let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
+                    Ok(expr) => expr,
+                    Err(e) => {
+                        return syn::Error::new(
+                            proc_macro2::Span::call_site(),
+                            format!("Failed to parse `with` expression `{}`: {}", expr_str, e)
+                        )
+                        .to_compile_error();
+                    }
+                };
+                // Convert the parsed expression to tokens
+                let expr_tokens = parsed_expr.to_token_stream();
+                // Call the closure and let maybe_materialize handle the result
+                quote! {
+                    #name => #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(&self.#ident)),
+                }
+            } else {
+                // Always pass a reference to maybe_materialize
+                quote! {
+                    #name => #crate_path::types::dynamic::maybe_materialize(&self.#ident),
+                }
+            }
+        })
+        .collect();
+
+    // Generate field match arms
+    let field_arms: TokenStream2 = processed_fields
+        .iter()
+        .map(|(ident, name, ty, _is_ref, with_expr)| {
+            if let Some(expr_str) = with_expr {
+                // Parse the closure expression as a proper Expr for better diagnostics
+                let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
+                    Ok(expr) => expr,
+                    Err(e) => {
+                        return syn::Error::new(
+                            proc_macro2::Span::call_site(),
+                            format!("Failed to parse `with` expression `{}`: {}", expr_str, e),
+                        )
+                        .to_compile_error();
+                    }
+                };
+                // Convert the parsed expression to tokens
+                let expr_tokens = parsed_expr.to_token_stream();
+                // Generate code with explicit type annotation for better type inference
+                quote! {
+                    #name => {
+                        let __field_ref: &#ty = &self.#ident;
+                        #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(__field_ref))
+                    },
+                }
+            } else {
+                // Always pass a reference to maybe_materialize
+                quote! {
+                    #name => #crate_path::types::dynamic::maybe_materialize(&self.#ident),
+                }
             }
         })
         .collect();
@@ -287,6 +402,29 @@ fn get_struct_crate_path(attrs: &[Attribute]) -> Option<String> {
             })) = attr.parse_args::<Meta>()
             {
                 if path.is_ident("crate") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Get the `with` expression for a field (closure to transform the value)
+fn get_field_with_expr(attrs: &[Attribute]) -> Option<String> {
+    for attr in attrs {
+        if attr.path().is_ident("dynamic") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("with") {
                     return Some(lit_str.value());
                 }
             }

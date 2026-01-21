@@ -25,7 +25,7 @@ pub struct HttpRequest {
     method: String,
     path: String,
     headers: HashMap<String, String>,
-    claims: serde_json::Value,
+    claims: Claims,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -129,88 +129,29 @@ impl<'a> DynamicType for &'a serde_json::Value {
     }
 }
 crate::impl_dynamic_vtable!(&serde_json::Value);
-impl<'a> ::cel::types::dynamic::DynamicType for &'a HttpRequestRef<'a> {
-    fn materialize(&self) -> ::cel::Value<'_> {
-        let mut m = ::vector_map::VecMap::with_capacity(4usize);
-        m.insert(
-            ::cel::objects::KeyRef::from("method"),
-            ::cel::types::dynamic::maybe_materialize(&self.method),
-        );
-        m.insert(
-            ::cel::objects::KeyRef::from("path"),
-            ::cel::types::dynamic::maybe_materialize(&self.path),
-        );
-        m.insert(
-            ::cel::objects::KeyRef::from("headers"),
-            ::cel::types::dynamic::maybe_materialize(&self.headers),
-        );
-        m.insert(
-            ::cel::objects::KeyRef::from("claims"),
-            ::cel::types::dynamic::maybe_materialize(&self.claims),
-        );
-        ::cel::Value::Map(::cel::objects::MapValue::Borrow(m))
-    }
-    fn field(&self, field: &str) -> ::core::option::Option<::cel::Value<'_>> {
-        ::core::option::Option::Some(match field {
-            "method" => ::cel::types::dynamic::maybe_materialize(&self.method),
-            "path" => ::cel::types::dynamic::maybe_materialize(&self.path),
-            "headers" => ::cel::types::dynamic::maybe_materialize(&self.headers),
-            "claims" => ::cel::types::dynamic::maybe_materialize(&self.claims),
-            _ => return ::core::option::Option::None,
-        })
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Claims(serde_json::Value);
+
+// Implement Default for Claims to allow easy initialization in tests
+impl Default for Claims {
+    fn default() -> Self {
+        Claims(serde_json::Value::Object(Default::default()))
     }
 }
-impl ::cel::types::dynamic::DynamicValueVtable for &'_ HttpRequestRef<'_> {
-    fn vtable() -> &'static ::cel::types::dynamic::Vtable {
-        use ::std::sync::OnceLock;
-        static VTABLE: OnceLock<::cel::types::dynamic::Vtable> = OnceLock::new();
-        VTABLE.get_or_init(|| {
-            unsafe fn materialize_impl(ptr: *const ()) -> ::cel::Value<'static> {
-                unsafe {
-                    let this = &*(ptr as *const HttpRequestRef<'_>);
-                    ::std::mem::transmute(
-                        <HttpRequestRef<'_> as ::cel::types::dynamic::DynamicType>::materialize(
-                            this,
-                        ),
-                    )
-                }
-            }
-            unsafe fn field_impl(
-                ptr: *const (),
-                field: &str,
-            ) -> ::core::option::Option<::cel::Value<'static>> {
-                unsafe {
-                    let this = &*(ptr as *const HttpRequestRef<'_>);
-                    ::std::mem::transmute(
-                        <HttpRequestRef<'_> as ::cel::types::dynamic::DynamicType>::field(
-                            this, field,
-                        ),
-                    )
-                }
-            }
-            unsafe fn debug_impl(
-                ptr: *const (),
-                f: &mut ::std::fmt::Formatter<'_>,
-            ) -> ::std::fmt::Result {
-                unsafe {
-                    let this = &*(ptr as *const HttpRequestRef<'_>);
-                    ::std::fmt::Debug::fmt(this, f)
-                }
-            }
-            ::cel::types::dynamic::Vtable {
-                materialize: materialize_impl,
-                field: field_impl,
-                debug: debug_impl,
-            }
-        })
-    }
+
+// Helper function to extract the inner value from Claims
+fn claims_inner<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
+    &c.0
 }
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, DynamicType)]
 pub struct HttpRequestRef<'a> {
     method: &'a str,
     path: &'a str,
     headers: &'a HashMap<String, String>,
-    claims: &'a serde_json::Value,
+    #[dynamic(with = "claims_inner")]
+    claims: &'a Claims,
 }
 #[derive(Debug, Clone)]
 pub struct DynResolverRef<'a> {
@@ -234,12 +175,12 @@ impl<'a> VariableResolver<'a> for DynResolverRef<'a> {
 
     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
         self.rf.field(variable)
-                // match variable {
-                //     "request" => Some(Value::Dynamic(crate::types::dynamic::DynamicValue::new(
-                //         &self.rf.request,
-                //     ))),
-                //     _ => None,
-                // }
+        // match variable {
+        //     "request" => Some(Value::Dynamic(crate::types::dynamic::DynamicValue::new(
+        //         &self.rf.request,
+        //     ))),
+        //     _ => None,
+        // }
     }
 }
 impl<'a> DynResolver<'a> {
@@ -448,7 +389,7 @@ fn dyn_val() {
     let mut pctx = Context::default();
     pctx.add_function("with", with);
     let headers = HashMap::new();
-    let claims = json!({"sub": "me@example.com"});
+    let claims = Claims(json!({"sub": "me@example.com"}));
     let p = Program::compile("request.claims").unwrap();
     let req = HttpRequest {
         method: "GET".to_string(),
@@ -473,6 +414,44 @@ fn dyn_val() {
     // let Value::Dynamic(_ob) = res else { panic!() };
     // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
     // assert_eq!(req.method, "GET");
+}
+
+#[test]
+fn test_dynamic_with_attribute() {
+    let pctx = Context::default();
+    let headers = HashMap::new();
+    let claims = Claims(json!({"sub": "user@example.com", "role": "admin"}));
+
+    let req = HttpRequest {
+        method: "GET".to_string(),
+        path: "/api/data".to_string(),
+        headers,
+        claims,
+    };
+
+    let resolver = DynResolver::new_from_request(&req);
+
+    // Test accessing claims field which should use the with attribute
+    let claims_val = resolver.request.field("claims").unwrap();
+
+    // The with attribute transforms &Claims to &serde_json::Value via |c| &c.0
+    // So we should be able to access the inner value directly
+    let dv = match claims_val {
+        Value::Dynamic(dv) => dv,
+        _ => panic!("Expected dynamic value for claims"),
+    };
+
+    // Access a field in the transformed value
+    let sub_val = dv.field("sub").unwrap();
+    assert_eq!(sub_val.json().unwrap(), json!("user@example.com"));
+
+    let role_val = dv.field("role").unwrap();
+    assert_eq!(role_val.json().unwrap(), json!("admin"));
+
+    // Test via CEL expression
+    let p = Program::compile("request.claims.sub").unwrap();
+    let res = resolver.eval(&pctx, &p.expression);
+    assert_eq!(res.json().unwrap(), json!("user@example.com"));
 }
 
 use cel_derive::DynamicType;
@@ -520,7 +499,6 @@ use ouroboros::self_referencing;
 use rental::rental;
 use self_cell::self_cell;
 use yoke::Yoke;
-
 
 // self_cell!(
 // struct Bundle2<T> { // make this not 'static so Bundle<YRef<'a>> works!

@@ -39,6 +39,9 @@ pub struct MyData<'a> {
 
 - `#[dynamic(skip)]` - Skip this field in the generated implementation. The field will not be accessible from CEL expressions.
 - `#[dynamic(rename = "new_name")]` - Use a different name for this field when accessed from CEL expressions.
+- `#[dynamic(with = "function")]` - Transform the field value using a helper function before passing to `maybe_materialize`. The function receives a reference to the field (note: if the field is already a reference like `&'a T`, the function receives `&&'a T`) and should return a reference to a type that implements `DynamicType + DynamicValueVtable`. Useful for newtype wrappers or extracting inner values.
+
+  **Important**: Due to type inference limitations, you must use a named helper function with explicit lifetime annotations rather than inline closures.
 
 ## Example
 
@@ -55,6 +58,33 @@ pub struct HttpRequest<'a> {
     internal_timestamp: u64,
 }
 ```
+
+### Using `with` attribute for newtype wrappers
+
+```rust
+use cel::DynamicType;
+
+// Newtype wrapper around serde_json::Value
+#[derive(Clone, Debug)]
+pub struct Claims(pub serde_json::Value);
+
+// Helper function to extract the inner value from Claims
+// Note: the function receives &&Claims because claims field is &'a Claims
+fn extract_claims<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
+    &c.0
+}
+
+#[derive(DynamicType)]
+pub struct HttpRequestRef<'a> {
+    method: &'a str,
+    path: &'a str,
+    // Extract the inner serde_json::Value from the Claims newtype
+    #[dynamic(with = "extract_claims")]
+    claims: &'a Claims,
+}
+```
+
+In this example, the `with` attribute uses a helper function to extract the inner `serde_json::Value` from the `Claims` newtype wrapper. The function receives `&&'a Claims` (a reference to the `&'a Claims` field) and returns `&serde_json::Value`. The explicit lifetime annotations are necessary for the compiler to properly infer the types.
 
 ### Using inside the cel crate
 
