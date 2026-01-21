@@ -15,7 +15,7 @@ impl_conversions!(
     ListValue<'a> => Value::List,
 );
 
-#[cfg(feature = "chrono")]
+
 impl_conversions!(
     chrono::Duration => Value::Duration,
     chrono::DateTime<chrono::FixedOffset> => Value::Timestamp,

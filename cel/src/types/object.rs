@@ -1,12 +1,11 @@
-use std::collections::hash_map::Entry;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 use std::sync::{Arc, LazyLock};
 
-use crate::extractors::Function;
-use crate::objects::ObjectType;
 use crate::Value;
+use crate::extractors::Function;
 
 #[linkme::distributed_slice]
 pub static REGISTERED_TYPES: [fn(&mut Registration)];
@@ -19,6 +18,67 @@ static VTABLES: LazyLock<Box<[(&'static str, ObjectVtable)]>> = LazyLock::new(||
     }
     r.m.into_iter().collect()
 });
+
+/// Trait for user-defined object values stored inside [`Value::Object`].
+///
+/// Implement this trait for types that should participate in CEL evaluation as
+/// user-defined values. An object value:
+/// - must report a stable type name via [`type_name`];
+/// - can expose members via [`get_member`];
+/// - can expose methods via [`resolve_function`];
+/// - must be thread-safe (`Send + Sync`).
+///
+/// When the `json` feature is enabled you may optionally provide a JSON
+/// representation for diagnostics, logging or interop. Returning `None` keeps the
+/// value non-serializable for JSON.
+///
+/// Example
+/// ```rust
+/// use std::fmt::{Debug, Formatter, Result as FmtResult};
+/// use cel::objects::{ObjectType, ObjectValue, Value};
+///
+/// #[derive(Clone, Debug, Eq, PartialEq)]
+/// struct MyId(u64);
+///
+/// impl ObjectType<'static> for MyId {
+///     fn type_name(&self) -> &'static str { "example.MyId" }
+/// }
+///
+/// // Values of `MyId` can now be wrapped in `Value::Object` and compared.
+/// let a: Value = ObjectValue::new(MyId(7)).into();
+/// let b: Value = ObjectValue::new(MyId(7)).into();
+/// assert_eq!(a, b);
+/// ```
+pub trait ObjectType<'a>: std::fmt::Debug + Send + Sync + 'a {
+    /// Returns a stable, fully-qualified type name for this value's runtime type.
+    ///
+    /// This name is used to check type compatibility before attempting downcasts
+    /// during equality checks and other operations. It should be stable across
+    /// versions and unique within your application or library (e.g., a package
+    /// qualified name like `my.pkg.Type`).
+    #[inline]
+    fn type_name(&self) -> &'static str {
+        std::any::type_name::<Self>()
+    }
+
+    /// Returns the value of a member/field/variable by name.
+    fn get_member(&self, _name: &str) -> Option<Value<'a>> {
+        None
+    }
+
+    /// Resolves a method function by name.
+    fn resolve_function(&self, _name: &str) -> Option<&Function> {
+        None
+    }
+
+    /// Optional JSON representation (requires the `json` feature).
+    ///
+    /// The default implementation returns `None`, indicating that the value
+    /// cannot be represented as JSON.
+    fn json(&self) -> Option<serde_json::Value> {
+        None
+    }
+}
 
 #[macro_export]
 macro_rules! register_type {
@@ -145,7 +205,7 @@ impl<'a> ObjectValue<'a> {
     }
 
     /// Returns the JSON representation if available.
-    #[cfg(feature = "json")]
+
     pub fn json(&self) -> Option<serde_json::Value> {
         unsafe { (self.vtable.json)(self.data) }
     }
@@ -192,7 +252,7 @@ struct ObjectVtable {
     rust_type_name: &'static str, // For downcast comparison
     get_member: unsafe fn(NonNull<()>, &str) -> Option<Value<'static>>,
     resolve_function: unsafe fn(NonNull<()>, &str) -> Option<&Function>,
-    #[cfg(feature = "json")]
+
     json: unsafe fn(NonNull<()>) -> Option<serde_json::Value>,
     debug: unsafe fn(NonNull<()>, &mut std::fmt::Formatter<'_>) -> std::fmt::Result,
     drop: unsafe fn(NonNull<()>),
@@ -226,7 +286,6 @@ fn make_vtable<'a, T: ObjectType<'a> + PartialEq + 'a>() -> ObjectVtable {
         }
     }
 
-    #[cfg(feature = "json")]
     unsafe fn json_impl<'a, T: ObjectType<'a>>(ptr: NonNull<()>) -> Option<serde_json::Value> {
         unsafe {
             let value = &*(ptr.as_ptr() as *const T);
@@ -286,7 +345,7 @@ fn make_vtable<'a, T: ObjectType<'a> + PartialEq + 'a>() -> ObjectVtable {
             resolve_function: std::mem::transmute(
                 resolve_function_impl::<T> as unsafe fn(NonNull<()>, &str) -> Option<&Function>,
             ),
-            #[cfg(feature = "json")]
+
             json: json_impl::<T>,
             debug: std::mem::transmute(
                 debug_impl::<T>

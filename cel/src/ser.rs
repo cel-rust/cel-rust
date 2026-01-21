@@ -8,9 +8,9 @@ use std::fmt::Display;
 use std::iter::FromIterator;
 use std::sync::Arc;
 
-#[cfg(feature = "chrono")]
+
 use chrono::FixedOffset;
-#[cfg(feature = "chrono")]
+
 use serde::ser::SerializeStruct;
 use serde::ser::{self, Impossible};
 use serde::Serialize;
@@ -52,11 +52,11 @@ pub struct KeySerializer;
 /// let value = program.execute(&context).unwrap();
 /// assert_eq!(value, true.into());
 /// ```
-#[cfg(feature = "chrono")]
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Duration(pub chrono::Duration);
 
-#[cfg(feature = "chrono")]
+
 impl Duration {
     // Since serde can't natively represent durations, we serialize a special
     // newtype to indicate we want to rebuild the duration in the result, while
@@ -67,21 +67,21 @@ impl Duration {
     const NANOS_FIELD: &str = "nanos";
 }
 
-#[cfg(feature = "chrono")]
+
 impl From<Duration> for chrono::Duration {
     fn from(value: Duration) -> Self {
         value.0
     }
 }
 
-#[cfg(feature = "chrono")]
+
 impl From<chrono::Duration> for Duration {
     fn from(value: chrono::Duration) -> Self {
         Self(value)
     }
 }
 
-#[cfg(feature = "chrono")]
+
 impl ser::Serialize for Duration {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -141,11 +141,11 @@ impl ser::Serialize for Duration {
 /// let value = program.execute(&context).unwrap();
 /// assert_eq!(value, true.into());
 /// ```
-#[cfg(feature = "chrono")]
+
 #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Timestamp(pub chrono::DateTime<FixedOffset>);
 
-#[cfg(feature = "chrono")]
+
 impl Timestamp {
     // Since serde can't natively represent timestamps, we serialize a special
     // newtype to indicate we want to rebuild the timestamp in the result,
@@ -153,21 +153,21 @@ impl Timestamp {
     const NAME: &str = "$__cel_private_Timestamp";
 }
 
-#[cfg(feature = "chrono")]
+
 impl From<Timestamp> for chrono::DateTime<FixedOffset> {
     fn from(value: Timestamp) -> Self {
         value.0
     }
 }
 
-#[cfg(feature = "chrono")]
+
 impl From<chrono::DateTime<FixedOffset>> for Timestamp {
     fn from(value: chrono::DateTime<FixedOffset>) -> Self {
         Self(value)
     }
 }
 
-#[cfg(feature = "chrono")]
+
 impl ser::Serialize for Timestamp {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
@@ -311,9 +311,9 @@ impl ser::Serializer for Serializer {
         T: ?Sized + Serialize,
     {
         match name {
-            #[cfg(feature = "chrono")]
+
             Duration::NAME => value.serialize(TimeSerializer::Duration),
-            #[cfg(feature = "chrono")]
+
             Timestamp::NAME => value.serialize(TimeSerializer::Timestamp),
             _ => value.serialize(self),
         }
@@ -408,7 +408,7 @@ pub struct SerializeStructVariant {
     map: HashMap<Key, Value<'static>>,
 }
 
-#[cfg(feature = "chrono")]
+
 #[derive(Debug, Default)]
 struct SerializeTimestamp {
     secs: i64,
@@ -550,7 +550,7 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
     }
 }
 
-#[cfg(feature = "chrono")]
+
 impl ser::SerializeStruct for SerializeTimestamp {
     type Ok = Value<'static>;
     type Error = SerializationError;
@@ -788,14 +788,14 @@ impl ser::Serializer for KeySerializer {
     }
 }
 
-#[cfg(feature = "chrono")]
+
 #[derive(Debug)]
 enum TimeSerializer {
     Duration,
     Timestamp,
 }
 
-#[cfg(feature = "chrono")]
+
 impl ser::Serializer for TimeSerializer {
     type Ok = Value<'static>;
     type Error = SerializationError;
@@ -985,7 +985,7 @@ mod tests {
     use serde::Serialize;
     use serde_bytes::Bytes;
 
-    #[cfg(feature = "chrono")]
+
     use super::{Duration, Timestamp};
     use crate::context::MapResolver;
     use crate::objects::{BytesValue, Key, ListValue};
@@ -1236,14 +1236,14 @@ mod tests {
         assert_eq!(map, expected)
     }
 
-    #[cfg(feature = "chrono")]
+
     #[derive(Serialize)]
     struct TestTimeTypes {
         dur: Duration,
         ts: Timestamp,
     }
 
-    #[cfg(feature = "chrono")]
+
     #[test]
     fn test_time_types() {
         use chrono::FixedOffset;
@@ -1343,8 +1343,8 @@ mod tests {
         assert_eq!(value, true.into());
     }
 
-    #[cfg(feature = "chrono")]
-    #[cfg(feature = "json")]
+
+
     #[test]
     fn test_time_json() {
         use chrono::FixedOffset;

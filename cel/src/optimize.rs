@@ -283,7 +283,7 @@ mod test {
             "precompiled_regex"
         }
 
-        #[cfg(feature = "json")]
+
         fn json(&self) -> Option<serde_json::Value> {
             None
         }

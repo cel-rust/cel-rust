@@ -227,9 +227,9 @@ pub fn string<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
     let this = ftx.this_or_arg_value()?;
     Ok(match this {
         Value::String(v) => Value::String(v.clone()),
-        #[cfg(feature = "chrono")]
+
         Value::Timestamp(t) => Value::String(t.to_rfc3339().into()),
-        #[cfg(feature = "chrono")]
+
         Value::Duration(v) => Value::String(crate::duration::format_duration(&v).into()),
         Value::Int(v) => Value::String(v.to_string().into()),
         Value::UInt(v) => Value::String(v.to_string().into()),
@@ -422,7 +422,7 @@ pub fn ends_with<'a>(
 /// ```cel
 /// "abc".matches("^[a-z]*$") == true
 /// ```
-#[cfg(feature = "regex")]
+
 pub fn matches<'a>(
     ftx: &mut FunctionContext<'a, '_>,
     this: This,
@@ -436,14 +436,14 @@ pub fn matches<'a>(
     }
 }
 
-#[cfg(feature = "chrono")]
+
 pub use time::duration;
-#[cfg(feature = "chrono")]
+
 pub use time::timestamp;
 
 use crate::common::ast::Expr;
 
-#[cfg(feature = "chrono")]
+
 pub mod time {
     use chrono::{Datelike, Timelike};
 
@@ -834,7 +834,7 @@ mod tests {
         .for_each(assert_script);
     }
 
-    #[cfg(feature = "chrono")]
+
     #[test]
     fn test_timestamp() {
         [(
@@ -936,7 +936,7 @@ mod tests {
         .for_each(assert_error)
     }
 
-    #[cfg(feature = "chrono")]
+
     #[test]
     fn test_duration() {
         [
@@ -983,7 +983,7 @@ mod tests {
         .for_each(assert_script);
     }
 
-    #[cfg(feature = "chrono")]
+
     #[test]
     fn test_timestamp_variable() {
         let ts: chrono::DateTime<chrono::FixedOffset> =
@@ -997,7 +997,7 @@ mod tests {
         assert_eq!(result, true.into());
     }
 
-    #[cfg(feature = "chrono")]
+
     #[test]
     fn test_chrono_string() {
         [
@@ -1025,7 +1025,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "regex")]
+
     #[test]
     fn test_matches() {
         let tests = vec![
@@ -1045,7 +1045,7 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "regex")]
+
     #[test]
     fn test_matches_err() {
         assert_eq!(

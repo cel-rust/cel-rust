@@ -129,11 +129,9 @@ impl Default for Context {
         ctx.add_function("hasValue", functions::optional_has_value);
         ctx.add_function("or", functions::optional_or_optional);
         ctx.add_function("orValue", functions::optional_or_value);
-
-        #[cfg(feature = "regex")]
+        
         ctx.add_function("matches", functions::matches);
-        //
-        #[cfg(feature = "chrono")]
+
         {
             ctx.add_function("duration", functions::duration);
             ctx.add_function("timestamp", functions::timestamp);

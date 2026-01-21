@@ -23,22 +23,22 @@ mod magic;
 pub mod objects;
 mod resolvers;
 
-#[cfg(feature = "chrono")]
+
 mod duration;
-#[cfg(feature = "chrono")]
+
 pub use ser::{Duration, Timestamp};
 
 mod ser;
 pub use ser::{to_value, SerializationError};
 
-#[cfg(feature = "json")]
+
 mod json;
 mod optimize;
 #[cfg(test)]
 mod test;
 pub mod types;
 
-#[cfg(feature = "json")]
+
 pub use json::ConvertToJsonError;
 pub use linkme::distributed_slice as register;
 use magic::FromContext;

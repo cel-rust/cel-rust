@@ -51,7 +51,7 @@ impl<'a> ObjectType<'a> for RequestOpaque<'a> {
         }
     }
 
-    #[cfg(feature = "json")]
+
     fn json(&self) -> Option<serde_json::Value> {
         serde_json::to_value(self.0).ok()
     }

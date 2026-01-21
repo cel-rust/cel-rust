@@ -2,181 +2,26 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::convert::{TryFrom, TryInto};
 use std::fmt::{Debug, Display, Formatter};
-use std::hash::{Hash, Hasher};
+use std::ops;
 use std::ops::Deref;
-use std::sync::{Arc, LazyLock};
-use std::{ops, slice};
+use std::sync::Arc;
 
-use crate::common::ast::{operators, EntryExpr, Expr, OptimizedExpr};
+use crate::common::ast::{EntryExpr, Expr, OptimizedExpr, operators};
 use crate::common::value::CelVal;
 use crate::context::{Context, SingleVarResolver, VariableResolver};
 use crate::functions::FunctionContext;
-pub use crate::types::object::ObjectValue;
+pub use crate::types::bytes::BytesValue;
+pub use crate::types::list::ListValue;
+pub use crate::types::map::{Key, KeyRef, MapValue};
+pub use crate::types::object::{ObjectType, ObjectValue};
+pub use crate::types::optional::OptionalValue;
+pub use crate::types::string::StringValue;
 use crate::{ExecutionError, Expression};
-pub use crate::types::map::{MapValue, Key, KeyRef};
-use bytes::Bytes;
-#[cfg(feature = "chrono")]
-use chrono::TimeZone;
+
+use crate::types::time::{TsOp, checked_op};
 use serde::de::Error as DeError;
 use serde::ser::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-/// Timestamp values are limited to the range of values which can be serialized as a string:
-/// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
-/// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
-/// we need to perform our own spec-compliant overflow checks.
-///
-/// https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow
-#[cfg(feature = "chrono")]
-static MAX_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
-    let naive = chrono::NaiveDate::from_ymd_opt(9999, 12, 31)
-        .unwrap()
-        .and_hms_nano_opt(23, 59, 59, 999_999_999)
-        .unwrap();
-    chrono::FixedOffset::east_opt(0)
-        .unwrap()
-        .from_utc_datetime(&naive)
-});
-
-#[cfg(feature = "chrono")]
-static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
-    let naive = chrono::NaiveDate::from_ymd_opt(1, 1, 1)
-        .unwrap()
-        .and_hms_opt(0, 0, 0)
-        .unwrap();
-    chrono::FixedOffset::east_opt(0)
-        .unwrap()
-        .from_utc_datetime(&naive)
-});
-
-use crate::magic::Function;
-
-/// Trait for user-defined object values stored inside [`Value::Object`].
-///
-/// Implement this trait for types that should participate in CEL evaluation as
-/// user-defined values. An object value:
-/// - must report a stable type name via [`type_name`];
-/// - can expose members via [`get_member`];
-/// - can expose methods via [`resolve_function`];
-/// - must be thread-safe (`Send + Sync`).
-///
-/// When the `json` feature is enabled you may optionally provide a JSON
-/// representation for diagnostics, logging or interop. Returning `None` keeps the
-/// value non-serializable for JSON.
-///
-/// Example
-/// ```rust
-/// use std::fmt::{Debug, Formatter, Result as FmtResult};
-/// use cel::objects::{ObjectType, ObjectValue, Value};
-///
-/// #[derive(Clone, Debug, Eq, PartialEq)]
-/// struct MyId(u64);
-///
-/// impl ObjectType<'static> for MyId {
-///     fn type_name(&self) -> &'static str { "example.MyId" }
-/// }
-///
-/// // Values of `MyId` can now be wrapped in `Value::Object` and compared.
-/// let a: Value = ObjectValue::new(MyId(7)).into();
-/// let b: Value = ObjectValue::new(MyId(7)).into();
-/// assert_eq!(a, b);
-/// ```
-pub trait ObjectType<'a>: std::fmt::Debug + Send + Sync + 'a {
-    /// Returns a stable, fully-qualified type name for this value's runtime type.
-    ///
-    /// This name is used to check type compatibility before attempting downcasts
-    /// during equality checks and other operations. It should be stable across
-    /// versions and unique within your application or library (e.g., a package
-    /// qualified name like `my.pkg.Type`).
-    #[inline]
-    fn type_name(&self) -> &'static str {
-        std::any::type_name::<Self>()
-    }
-
-    /// Returns the value of a member/field/variable by name.
-    fn get_member(&self, _name: &str) -> Option<Value<'a>> {
-        None
-    }
-
-    /// Resolves a method function by name.
-    fn resolve_function(&self, _name: &str) -> Option<&Function> {
-        None
-    }
-
-    /// Optional JSON representation (requires the `json` feature).
-    ///
-    /// The default implementation returns `None`, indicating that the value
-    /// cannot be represented as JSON.
-    #[cfg(feature = "json")]
-    fn json(&self) -> Option<serde_json::Value> {
-        None
-    }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub struct OptionalValue {
-    value: Option<Value<'static>>,
-}
-crate::register_type!(OptionalValue);
-
-impl OptionalValue {
-    pub fn of(value: Value<'static>) -> Self {
-        OptionalValue { value: Some(value) }
-    }
-    pub fn none() -> Self {
-        OptionalValue { value: None }
-    }
-    pub fn value(&self) -> Option<&Value<'static>> {
-        self.value.as_ref()
-    }
-}
-
-impl ObjectType<'static> for OptionalValue {
-    fn type_name(&self) -> &'static str {
-        "optional_type"
-    }
-}
-
-impl<'a> TryFrom<Value<'a>> for OptionalValue {
-    type Error = ExecutionError;
-
-    fn try_from(value: Value<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Value::Object(obj) if obj.type_name() == "optional_type" => obj
-                .downcast_ref::<OptionalValue>()
-                .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast"))
-                .cloned(),
-            Value::Object(obj) => Err(ExecutionError::UnexpectedType {
-                got: obj.type_name(),
-                want: "optional_type",
-            }),
-            v => Err(ExecutionError::UnexpectedType {
-                got: v.type_of().as_str(),
-                want: "optional_type",
-            }),
-        }
-    }
-}
-
-impl<'a, 'b: 'a> TryFrom<&'b Value<'a>> for &'b OptionalValue {
-    type Error = ExecutionError;
-
-    fn try_from(value: &'b Value<'a>) -> Result<Self, Self::Error> {
-        match value {
-            Value::Object(obj) if obj.type_name() == "optional_type" => obj
-                .downcast_ref::<OptionalValue>()
-                .ok_or_else(|| ExecutionError::function_error("optional", "failed to downcast")),
-            Value::Object(obj) => Err(ExecutionError::UnexpectedType {
-                got: obj.type_name(),
-                want: "optional_type",
-            }),
-            v => Err(ExecutionError::UnexpectedType {
-                got: v.type_of().as_str(),
-                want: "optional_type",
-            }),
-        }
-    }
-}
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -190,137 +35,6 @@ impl<'a, T: serde::Serialize> TryIntoValue<'a> for T {
     }
 }
 
-#[derive(Clone, Debug, Ord, PartialOrd)]
-pub enum StringValue<'a> {
-    Borrowed(&'a str),
-    Owned(Arc<str>),
-}
-impl Eq for StringValue<'_> {}
-impl PartialEq for StringValue<'_> {
-    fn eq(&self, other: &Self) -> bool {
-        self.as_ref() == other.as_ref()
-    }
-}
-impl Hash for StringValue<'_> {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        // Hash only the string content, ignoring Borrowed vs Owned
-        self.as_ref().hash(state);
-    }
-}
-
-impl From<String> for StringValue<'static> {
-    fn from(v: String) -> Self {
-        StringValue::Owned(v.into())
-    }
-}
-
-impl<'a> From<&'a str> for StringValue<'a> {
-    fn from(v: &'a str) -> Self {
-        StringValue::Borrowed(v)
-    }
-}
-
-impl From<Arc<str>> for StringValue<'static> {
-    fn from(v: Arc<str>) -> Self {
-        StringValue::Owned(v)
-    }
-}
-impl<'a> Deref for StringValue<'a> {
-    type Target = str;
-    fn deref(&self) -> &str {
-        self.as_ref()
-    }
-}
-impl AsRef<str> for StringValue<'_> {
-    fn as_ref(&self) -> &str {
-        match self {
-            StringValue::Borrowed(s) => s,
-            StringValue::Owned(s) => s.as_ref(),
-        }
-    }
-}
-impl<'a> StringValue<'a> {
-    pub fn as_owned(&self) -> Arc<str> {
-        match self {
-            StringValue::Borrowed(v) => Arc::from(*v),
-            StringValue::Owned(o) => Arc::clone(o),
-        }
-    }
-}
-
-#[derive(Debug)]
-pub enum ListValue<'a> {
-    Borrowed(&'a [Value<'a>]),
-    PartiallyOwned(Arc<[Value<'a>]>),
-    Owned(Arc<[Value<'static>]>),
-}
-
-impl From<Arc<[Value<'static>]>> for ListValue<'static> {
-    fn from(v: Arc<[Value<'static>]>) -> Self {
-        ListValue::Owned(v)
-    }
-}
-
-impl<'a> Clone for ListValue<'a> {
-    fn clone(&self) -> Self {
-        match self {
-            ListValue::Borrowed(items) => ListValue::Borrowed(items),
-            ListValue::PartiallyOwned(items) => ListValue::PartiallyOwned(items.clone()),
-            ListValue::Owned(items) => ListValue::Owned(items.clone()),
-        }
-    }
-}
-
-impl<'a> AsRef<[Value<'a>]> for ListValue<'a> {
-    fn as_ref(&self) -> &[Value<'a>] {
-        match self {
-            ListValue::Borrowed(a) => a,
-            ListValue::PartiallyOwned(a) => a.as_ref(),
-            ListValue::Owned(a) => a.as_ref(),
-        }
-    }
-}
-
-impl<'a> ListValue<'a> {
-    pub fn is_empty(&self) -> bool {
-        self.len() == 0
-    }
-
-    pub fn len(&self) -> usize {
-        match self {
-            ListValue::Borrowed(items) => items.len(),
-            ListValue::PartiallyOwned(items) => items.len(),
-            ListValue::Owned(items) => items.len(),
-        }
-    }
-
-    pub fn iter(&'a self) -> slice::Iter<'a, Value<'a>> {
-        self.as_ref().iter()
-    }
-}
-
-#[derive(Clone, Debug)]
-pub enum BytesValue<'a> {
-    Borrowed(&'a [u8]),
-    Owned(Arc<[u8]>),
-    Bytes(Bytes),
-}
-
-impl From<Arc<[u8]>> for BytesValue<'static> {
-    fn from(v: Arc<[u8]>) -> Self {
-        BytesValue::Owned(v)
-    }
-}
-impl<'a> AsRef<[u8]> for BytesValue<'a> {
-    fn as_ref(&self) -> &[u8] {
-        match self {
-            BytesValue::Borrowed(b) => b,
-            BytesValue::Owned(v) => v.as_ref(),
-            BytesValue::Bytes(b) => b.as_ref(),
-        }
-    }
-}
-
 pub enum Value<'a> {
     List(ListValue<'a>),
     Map(MapValue<'a>),
@@ -330,9 +44,9 @@ pub enum Value<'a> {
     UInt(u64),
     Float(f64),
     Bool(bool),
-    #[cfg(feature = "chrono")]
+
     Duration(chrono::Duration),
-    #[cfg(feature = "chrono")]
+
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
 
     /// User-defined object values implementing [`ObjectType`].
@@ -439,9 +153,9 @@ impl PartialEq for Value<'_> {
             (Value::Bytes(a), Value::Bytes(b)) => a.as_ref() == b.as_ref(),
             (Value::Bool(a), Value::Bool(b)) => a == b,
             (Value::Null, Value::Null) => true,
-            #[cfg(feature = "chrono")]
+
             (Value::Duration(a), Value::Duration(b)) => a == b,
-            #[cfg(feature = "chrono")]
+
             (Value::Timestamp(a), Value::Timestamp(b)) => a == b,
             // Allow different numeric types to be compared without explicit casting.
             (Value::Int(a), Value::UInt(b)) => a
@@ -475,9 +189,9 @@ impl PartialOrd for Value<'_> {
             (Value::String(a), Value::String(b)) => Some(a.as_ref().cmp(b.as_ref())),
             (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
             (Value::Null, Value::Null) => Some(Ordering::Equal),
-            #[cfg(feature = "chrono")]
+
             (Value::Duration(a), Value::Duration(b)) => Some(a.cmp(b)),
-            #[cfg(feature = "chrono")]
+
             (Value::Timestamp(a), Value::Timestamp(b)) => Some(a.cmp(b)),
             // Allow different numeric types to be compared without explicit casting.
             (Value::Int(a), Value::UInt(b)) => Some(
@@ -524,9 +238,9 @@ impl Debug for Value<'_> {
             Value::String(s) => write!(f, "String({:?})", s.as_ref()),
             Value::Bytes(b) => write!(f, "Bytes({:?})", b.as_ref()),
             Value::Bool(b) => write!(f, "Bool({:?})", b),
-            #[cfg(feature = "chrono")]
+
             Value::Duration(d) => write!(f, "Duration({:?})", d),
-            #[cfg(feature = "chrono")]
+
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Object(obj) => write!(f, "Object<{}>({:?})", obj.type_name(), obj),
             Value::Null => write!(f, "Null"),
@@ -548,9 +262,9 @@ impl<'a> Clone for Value<'a> {
             Value::Float(f) => Value::Float(*f),
             Value::Bool(b) => Value::Bool(*b),
             Value::Object(obj) => Value::Object(obj.clone()),
-            #[cfg(feature = "chrono")]
+
             Value::Duration(d) => Value::Duration(*d),
-            #[cfg(feature = "chrono")]
+
             Value::Timestamp(t) => Value::Timestamp(*t),
             Value::String(s) => Value::String(match s {
                 StringValue::Borrowed(str_ref) => StringValue::Borrowed(str_ref),
@@ -635,9 +349,9 @@ impl<'a> Value<'a> {
             Value::Bytes(_) => ValueType::Bytes,
             Value::Bool(_) => ValueType::Bool,
             Value::Object(_) => ValueType::Object,
-            #[cfg(feature = "chrono")]
+
             Value::Duration(_) => ValueType::Duration,
-            #[cfg(feature = "chrono")]
+
             Value::Timestamp(_) => ValueType::Timestamp,
             Value::Null => ValueType::Null,
         }
@@ -653,7 +367,7 @@ impl<'a> Value<'a> {
             Value::String(v) => v.is_empty(),
             Value::Bytes(v) => v.as_ref().is_empty(),
             Value::Bool(false) => true,
-            #[cfg(feature = "chrono")]
+
             Value::Duration(v) => v.is_zero(),
             Value::Null => true,
             _ => false,
@@ -682,7 +396,6 @@ impl From<Vec<u8>> for Value<'static> {
     }
 }
 
-#[cfg(feature = "bytes")]
 // Convert Bytes to Value
 impl From<::bytes::Bytes> for Value<'static> {
     fn from(v: ::bytes::Bytes) -> Self {
@@ -690,7 +403,6 @@ impl From<::bytes::Bytes> for Value<'static> {
     }
 }
 
-#[cfg(feature = "bytes")]
 // Convert &Bytes to Value
 impl From<&::bytes::Bytes> for Value<'static> {
     fn from(v: &::bytes::Bytes) -> Self {
@@ -765,9 +477,9 @@ impl<'a> Value<'a> {
                 // The PhantomData marker is only for covariance; the actual data lives in the Arc.
                 unsafe { std::mem::transmute::<Value<'a>, Value<'static>>(Value::Object(cloned)) }
             }
-            #[cfg(feature = "chrono")]
+
             Value::Duration(d) => Value::Duration(*d),
-            #[cfg(feature = "chrono")]
+
             Value::Timestamp(t) => Value::Timestamp(*t),
             Value::String(s) => match s {
                 StringValue::Borrowed(str_ref) => {
@@ -783,13 +495,6 @@ impl<'a> Value<'a> {
             Value::Null => Value::Null,
         }
     }
-    // pub fn resolve_all(expr: &'a [Expression], ctx: &'a Context) -> ResolveResult<'a> {
-    //     let mut res = Vec::with_capacity(expr.len());
-    //     for expr in expr {
-    //         res.push(Value::resolve(expr, ctx)?);
-    //     }
-    //     Ok(Value::List(ListValue::Owned(Arc::new(res))))
-    // }
 
     #[inline(always)]
     pub fn resolve<'vars: 'a, 'rf>(
@@ -832,28 +537,28 @@ impl<'a> Value<'a> {
                     match call.func_name.as_str() {
                         operators::ADD => return resolve(&call.args[0])? + resolve(&call.args[1])?,
                         operators::SUBSTRACT => {
-                            return resolve(&call.args[0])? - resolve(&call.args[1])?
+                            return resolve(&call.args[0])? - resolve(&call.args[1])?;
                         }
                         operators::DIVIDE => {
-                            return resolve(&call.args[0])? / resolve(&call.args[1])?
+                            return resolve(&call.args[0])? / resolve(&call.args[1])?;
                         }
                         operators::MULTIPLY => {
-                            return resolve(&call.args[0])? * resolve(&call.args[1])?
+                            return resolve(&call.args[0])? * resolve(&call.args[1])?;
                         }
                         operators::MODULO => {
-                            return resolve(&call.args[0])? % resolve(&call.args[1])?
+                            return resolve(&call.args[0])? % resolve(&call.args[1])?;
                         }
                         operators::EQUALS => {
                             return Value::Bool(
                                 resolve(&call.args[0])?.eq(&resolve(&call.args[1])?),
                             )
-                            .into()
+                            .into();
                         }
                         operators::NOT_EQUALS => {
                             return Value::Bool(
                                 resolve(&call.args[0])?.ne(&resolve(&call.args[1])?),
                             )
-                            .into()
+                            .into();
                         }
                         operators::LESS => {
                             let left = resolve(&call.args[0])?;
@@ -912,10 +617,10 @@ impl<'a> Value<'a> {
                             let right = resolve(&call.args[1])?;
                             match (left, right) {
                                 (Value::String(l), Value::String(r)) => {
-                                    return Value::Bool(r.as_ref().contains(l.as_ref())).into()
+                                    return Value::Bool(r.as_ref().contains(l.as_ref())).into();
                                 }
                                 (any, Value::List(v)) => {
-                                    return Value::Bool(v.as_ref().contains(&any)).into()
+                                    return Value::Bool(v.as_ref().contains(&any)).into();
                                 }
                                 (any, Value::Map(m)) => match KeyRef::try_from(&any) {
                                     Ok(key) => return Value::Bool(m.contains_key(&key)).into(),
@@ -955,7 +660,7 @@ impl<'a> Value<'a> {
                                 value = match opt_val.value() {
                                     Some(inner) => inner.clone(),
                                     None => {
-                                        return Ok(ObjectValue::new(OptionalValue::none()).into())
+                                        return Ok(ObjectValue::new(OptionalValue::none()).into());
                                     }
                                 };
                             }
@@ -1030,7 +735,7 @@ impl<'a> Value<'a> {
                                     return Err(ExecutionError::function_error(
                                         "_?._",
                                         "field must be string",
-                                    ))
+                                    ));
                                 }
                             };
                             if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
@@ -1064,13 +769,13 @@ impl<'a> Value<'a> {
                                     "minus",
                                     value.as_static(),
                                 )),
-                            }
+                            };
                         }
                         operators::NOT_STRICTLY_FALSE => {
                             return match resolve(&call.args[0])? {
                                 Value::Bool(b) => Ok(Value::Bool(b)),
                                 _ => Ok(Value::Bool(true)),
-                            }
+                            };
                         }
                         _ => (),
                     }
@@ -1292,14 +997,6 @@ impl<'a> Value<'a> {
         }
     }
 
-    // >> a(b)
-    // Member(Ident("a"),
-    //        FunctionCall([Ident("b")]))
-    // >> a.b(c)
-    // Member(Member(Ident("a"),
-    //               Attribute("b")),
-    //        FunctionCall([Ident("c")]))
-
     fn member(self, name: &str) -> ResolveResult<'a> {
         // This will always either be because we're trying to access
         // a property on self, or a method on self.
@@ -1358,14 +1055,14 @@ impl<'a> ops::Add<Value<'a>> for Value<'a> {
                 res.push_str(r.as_ref());
                 Ok(Value::String(res.into()))
             }
-            #[cfg(feature = "chrono")]
+
             (Value::Duration(l), Value::Duration(r)) => l
                 .checked_add(&r)
                 .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
                 .map(Value::Duration),
-            #[cfg(feature = "chrono")]
+
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Add, &l, &r),
-            #[cfg(feature = "chrono")]
+
             (Value::Duration(l), Value::Timestamp(r)) => r
                 .checked_add_signed(l)
                 .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
@@ -1397,14 +1094,13 @@ impl<'a> ops::Sub<Value<'a>> for Value<'a> {
 
             (Value::Float(l), Value::Float(r)) => Value::Float(l - r).into(),
 
-            #[cfg(feature = "chrono")]
             (Value::Duration(l), Value::Duration(r)) => l
                 .checked_sub(&r)
                 .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
                 .map(Value::Duration),
-            #[cfg(feature = "chrono")]
+
             (Value::Timestamp(l), Value::Duration(r)) => checked_op(TsOp::Sub, &l, &r),
-            #[cfg(feature = "chrono")]
+
             (Value::Timestamp(l), Value::Timestamp(r)) => {
                 Value::Duration(l.signed_duration_since(r)).into()
             }
@@ -1507,53 +1203,6 @@ impl<'a> ops::Rem<Value<'a>> for Value<'a> {
 }
 
 /// Op represents a binary arithmetic operation supported on a timestamp
-#[cfg(feature = "chrono")]
-enum TsOp {
-    Add,
-    Sub,
-}
-
-#[cfg(feature = "chrono")]
-impl TsOp {
-    fn str(&self) -> &'static str {
-        match self {
-            TsOp::Add => "add",
-            TsOp::Sub => "sub",
-        }
-    }
-}
-
-/// Performs a checked arithmetic operation [`TsOp`] on a timestamp and a duration and ensures that
-/// the resulting timestamp does not overflow the data type internal limits, as well as the timestamp
-/// limits defined in the cel-spec. See [`MAX_TIMESTAMP`] and [`MIN_TIMESTAMP`] for more details.
-#[cfg(feature = "chrono")]
-fn checked_op<'a>(
-    op: TsOp,
-    lhs: &chrono::DateTime<chrono::FixedOffset>,
-    rhs: &chrono::Duration,
-) -> ResolveResult<'a> {
-    // Add lhs and rhs together, checking for data type overflow
-    let result = match op {
-        TsOp::Add => lhs.checked_add_signed(*rhs),
-        TsOp::Sub => lhs.checked_sub_signed(*rhs),
-    }
-    .ok_or(ExecutionError::Overflow(
-        op.str(),
-        (*lhs).into(),
-        (*rhs).into(),
-    ))?;
-
-    // Check for cel-spec limits
-    if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
-        Err(ExecutionError::Overflow(
-            op.str(),
-            (*lhs).into(),
-            (*rhs).into(),
-        ))
-    } else {
-        Value::Timestamp(result).into()
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -1916,7 +1565,6 @@ mod tests {
                 "my_struct"
             }
 
-            #[cfg(feature = "json")]
             fn json(&self) -> Option<serde_json::Value> {
                 Some(serde_json::to_value(self).unwrap())
             }
@@ -1932,7 +1580,7 @@ mod tests {
         //         "reference"
         //     }
         //
-        //     #[cfg(feature = "json")]
+        //
         //     fn json(&self) -> Option<serde_json::Value> {
         //         Some(serde_json::to_value(self).unwrap())
         //     }
@@ -2026,7 +1674,7 @@ mod tests {
         }
 
         #[test]
-        #[cfg(feature = "json")]
+
         fn test_json() {
             let value = MyStruct {
                 field: String::from("value"),
