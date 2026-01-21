@@ -12,17 +12,35 @@ pub trait DynamicValueVtable {
     fn vtable() -> &'static Vtable;
 }
 
-pub trait DynamicType: std::fmt::Debug + Send + Sync {
+pub fn maybe_materialize<T: DynamicType + DynamicValueVtable>(t: &T) -> Value<'_> {
+    if t.auto_materialize() {
+        t.materialize()
+    } else {
+        Value::Dynamic(DynamicValue::new(t))
+    }
+}
+
+pub fn always_materialize(t: Value) -> Value {
+    if let Value::Dynamic(d) = t {
+        d.materialize()
+    } else {
+        t
+    }
+}
+
+pub trait DynamicType: DynamicValueVtable + std::fmt::Debug + Send + Sync {
     // If the value can be freely converted to a Value, do so.
     // This is anything but list/map
-    fn maybe_materialize(&self) -> Option<Value<'_>> {
-        None
+    fn auto_materialize(&self) -> bool {
+        false
     }
 
     // Convert this dynamic value into a proper value
     fn materialize(&self) -> Value<'_>;
 
-    fn field(&self, field: &str) -> Option<Value<'_>>;
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        None
+    }
 }
 
 pub struct DynamicValue<'a> {

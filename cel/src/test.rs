@@ -11,7 +11,7 @@ use crate::magic::Function;
 use crate::objects::{KeyRef, MapValue, ObjectType, ObjectValue, StringValue};
 use crate::parser::Expression;
 use crate::types::dynamic::{DynamicType, DynamicValueVtable, Vtable};
-use crate::{Context, FunctionContext, Program, Value};
+use crate::{to_value, types, Context, FunctionContext, Program, Value};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct HttpRequest {
@@ -81,32 +81,104 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
 }
 
+impl<'a> DynamicValueVtable for &'a str {
+    fn vtable() -> &'static Vtable {
+        todo!()
+    }
+}
+impl<'a> DynamicType for &'a str {
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self)
+    }
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+}
+
+impl DynamicValueVtable for serde_json::Value {
+        fn vtable() -> &'static Vtable {
+            static VTABLE: OnceLock<Vtable> = OnceLock::new();
+            VTABLE.get_or_init(|| {
+                unsafe fn materialize_impl(ptr: *const ()) -> Value<'static> {
+                    unsafe {
+                        let this = &*(ptr as *const serde_json::Value);
+                        std::mem::transmute(this.materialize())
+                    }
+                }
+
+                unsafe fn field_impl(ptr: *const (), field: &str) -> Option<Value<'static>> {
+                    unsafe {
+                        let this = &*(ptr as *const serde_json::Value);
+                        std::mem::transmute(this.field(field))
+                    }
+                }
+
+                unsafe fn debug_impl(
+                    ptr: *const (),
+                    f: &mut std::fmt::Formatter<'_>,
+                ) -> std::fmt::Result {
+                    unsafe {
+                        let this = &*(ptr as *const serde_json::Value);
+                        std::fmt::Debug::fmt(this, f)
+                    }
+                }
+
+                Vtable {
+                    materialize: materialize_impl,
+                    field: field_impl,
+                    debug: debug_impl,
+                }
+            })
+    }
+}
+impl<'a> DynamicType for serde_json::Value {
+    fn materialize(&self) -> Value<'_> {
+        to_value(self).unwrap()
+    }
+    fn auto_materialize(&self) -> bool {
+        false
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        match self {
+            serde_json::Value::Object(m) => {
+                let v = m.get(field)?;
+                Some(types::dynamic::maybe_materialize(v))
+            }
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct HttpRequestRef<'a> {
     method: &'a str,
     path: &'a str,
     headers: &'a HashMap<String, String>,
+    claims: &'a serde_json::Value
 }
 
 impl DynamicType for HttpRequestRef<'_> {
     fn materialize(&self) -> Value<'_> {
         let mut m = vector_map::VecMap::with_capacity(3);
-        m.insert(KeyRef::from("method"), Value::from(self.method));
-        m.insert(KeyRef::from("path"), Value::from(self.path));
-        m.insert(
-            KeyRef::from("headers"),
-            Value::from_iter(self.headers.iter()),
-        );
+        m.insert(KeyRef::from("method"), types::dynamic::maybe_materialize(&self.method));
+        m.insert(KeyRef::from("path"), types::dynamic::maybe_materialize(&self.path));
+        // m.insert(
+        //     KeyRef::from("headers"),
+        //     Value::from_iter(self.headers.iter()),
+        // );
+        m.insert(KeyRef::from("claims"), types::dynamic::maybe_materialize(self.claims));
         Value::Map(MapValue::Borrow(m))
     }
 
     fn field(&self, field: &str) -> Option<Value<'_>> {
-        match field {
-            "method" => Some(Value::from(self.method)),
-            "path" => Some(Value::from(self.path)),
-            "headers" => Some(Value::from_iter(self.headers.iter())),
-            _ => None,
-        }
+        Some(match field {
+            "method" => types::dynamic::maybe_materialize(&self.method),
+            "path" => types::dynamic::maybe_materialize(&self.path),
+            // "headers" => types::dynamic::maybe_materialize(&self.headers),
+            "claims" => types::dynamic::maybe_materialize(self.claims),
+            _ => return None,
+        })
     }
 }
 
@@ -383,16 +455,17 @@ fn dyn_val() {
         method: "GET",
         path: "/foo",
         headers: &Default::default(),
+        claims: &json!({"sub": "me@example.com"}),
     };
-    let p = Program::compile("request.method").unwrap().optimized().expression;
+    let p = Program::compile("request.claims.sub + 'hi'").unwrap().optimized().expression;
 
-    AllocationRegistry::enable_tracking();
+    // AllocationRegistry::enable_tracking();
     let resolver = DynResolver { request: req };
     let res = Value::resolve(&p, &pctx, &resolver).unwrap();
-    AllocationRegistry::disable_tracking();
+    // AllocationRegistry::disable_tracking();
     assert_eq!(
         res.json().unwrap(),
-        json!("GET")
+        json!("me@example.com")
     );
     // let Value::Dynamic(_ob) = res else { panic!() };
     // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;

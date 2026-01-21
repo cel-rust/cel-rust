@@ -22,7 +22,7 @@ pub use crate::types::object::{ObjectType, ObjectValue};
 pub use crate::types::optional::OptionalValue;
 pub use crate::types::string::StringValue;
 use crate::types::time::{TsOp, checked_op};
-use crate::{ExecutionError, Expression};
+use crate::{types, ExecutionError, Expression};
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -1012,12 +1012,13 @@ impl<'a> Value<'a> {
     }
 }
 
+
 impl<'a> ops::Add<Value<'a>> for Value<'a> {
     type Output = ResolveResult<'a>;
 
     #[inline(always)]
     fn add(self, rhs: Value<'a>) -> Self::Output {
-        match (self, rhs) {
+        match (types::dynamic::always_materialize(self), types::dynamic::always_materialize(rhs)) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_add(r)
                 .ok_or(ExecutionError::Overflow("add", l.into(), r.into()))
