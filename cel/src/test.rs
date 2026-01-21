@@ -98,25 +98,6 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
 }
 
-impl<'a> DynamicType for serde_json::Value {
-    fn materialize(&self) -> Value<'_> {
-        to_value(self).unwrap()
-    }
-    fn auto_materialize(&self) -> bool {
-        false
-    }
-
-    fn field(&self, field: &str) -> Option<Value<'_>> {
-        match self {
-            serde_json::Value::Object(m) => {
-                let v = m.get(field)?;
-                Some(types::dynamic::maybe_materialize(v))
-            }
-            _ => None,
-        }
-    }
-}
-crate::impl_dynamic_vtable!(serde_json::Value);
 
 // Also implement for &serde_json::Value so we can use it as a reference in structs
 impl<'a> DynamicType for &'a serde_json::Value {
@@ -202,7 +183,7 @@ pub struct DynResolverRef<'a> {
 }
 #[derive(Debug, Clone, Serialize, DynamicType)]
 pub struct DynResolver<'a> {
-    request: HttpRequestRef<'a>,
+    request: Option<HttpRequestRef<'a>>,
 }
 impl<'a> DynResolver<'a> {
     pub fn eval(&'a self, ctx: &'a Context, expr: &'a Expression) -> Value<'a> {
@@ -229,12 +210,12 @@ impl<'a> VariableResolver<'a> for DynResolverRef<'a> {
 impl<'a> DynResolver<'a> {
     pub fn new_from_request(req: &'a Http2Request) -> Self {
         Self {
-            request: HttpRequestRef {
+            request: Some(HttpRequestRef {
                 method: &req.method,
                 path: req.path.as_str(),
                 headers: &req.headers,
                 claims: &req.claims,
-            },
+            }),
         }
     }
 }
@@ -542,6 +523,94 @@ fn test_dynamic_with_value_attribute() {
     let p = Program::compile("request.method").unwrap();
     let res = resolver.eval(&pctx, &p.expression);
     assert_eq!(res.json().unwrap(), json!("POST"));
+}
+
+#[test]
+fn test_option_dynamic_type() {
+    // Test Option<T> where T: DynamicType
+    use crate::types::dynamic::{DynamicType, maybe_materialize};
+
+    // Test Some(value)
+    let some_string: Option<String> = Some("hello".to_string());
+    assert!(some_string.auto_materialize());
+    let val = some_string.materialize();
+    assert_eq!(val, Value::String("hello".into()));
+
+    // Test via maybe_materialize
+    let val2 = maybe_materialize(&some_string);
+    assert_eq!(val2, Value::String("hello".into()));
+
+    // Test None
+    let none_string: Option<String> = None;
+    assert!(none_string.auto_materialize()); // None should auto-materialize
+    let val = none_string.materialize();
+    assert_eq!(val, Value::Null);
+
+    // Test with non-auto-materializing type (HashMap)
+    let some_map: Option<std::collections::HashMap<String, String>> = Some({
+        let mut m = std::collections::HashMap::new();
+        m.insert("key".to_string(), "value".to_string());
+        m
+    });
+    assert!(!some_map.auto_materialize()); // Should not auto-materialize because HashMap doesn't
+
+    // Test field access on Some
+    let val = some_map.field("key").unwrap();
+    assert_eq!(val, Value::String("value".into()));
+
+    // Test field access on None
+    let none_map: Option<std::collections::HashMap<String, String>> = None;
+    assert!(none_map.field("key").is_none());
+}
+
+#[test]
+fn test_option_in_derived_struct() {
+    // Test Option<T> fields in a derived struct
+    use crate::types::dynamic::DynamicType;
+
+    #[derive(Debug, DynamicType)]
+    struct MyStruct<'a> {
+        required: &'a str,
+        optional: Option<i64>,
+    }
+
+    let with_value = MyStruct {
+        required: "test",
+        optional: Some(42),
+    };
+
+    // Materialize the struct
+    let materialized = with_value.materialize();
+    if let Value::Map(map) = materialized {
+        // Check required field
+        let req = map.get(&KeyRef::from("required")).unwrap();
+        assert_eq!(req, &Value::String("test".into()));
+
+        // Check optional field with Some value
+        let opt = map.get(&KeyRef::from("optional")).unwrap();
+        assert_eq!(opt, &Value::Int(42));
+    } else {
+        panic!("Expected Map");
+    }
+
+    let without_value = MyStruct {
+        required: "test2",
+        optional: None,
+    };
+
+    // Materialize the struct with None
+    let materialized = without_value.materialize();
+    if let Value::Map(map) = materialized {
+        // Check required field
+        let req = map.get(&KeyRef::from("required")).unwrap();
+        assert_eq!(req, &Value::String("test2".into()));
+
+        // Check optional field with None value
+        let opt = map.get(&KeyRef::from("optional")).unwrap();
+        assert_eq!(opt, &Value::Null);
+    } else {
+        panic!("Expected Map");
+    }
 }
 
 use cel_derive::DynamicType;

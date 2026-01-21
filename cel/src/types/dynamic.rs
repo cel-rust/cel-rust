@@ -1,4 +1,5 @@
 use crate::Value;
+use cel::{to_value, types};
 use std::marker::PhantomData;
 use std::ptr::NonNull;
 
@@ -322,6 +323,29 @@ impl DynamicType for &std::collections::HashMap<String, String> {
 }
 impl_dynamic_vtable!(&std::collections::HashMap<String, String>);
 
+impl DynamicType for &http::HeaderMap {
+    fn auto_materialize(&self) -> bool {
+        false // Maps are complex, don't auto-materialize
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        let mut map = vector_map::VecMap::with_capacity(self.len());
+        for (k, v) in self.iter() {
+            if let Ok(s) = str::from_utf8(v.as_bytes()) {
+                map.insert(crate::objects::KeyRef::from(k.as_str()), Value::from(s));
+            }
+        }
+        Value::Map(crate::objects::MapValue::Borrow(map))
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        // TODO: do not implicitly drop invalid utf8
+        self.get(field)
+            .and_then(|v| Some(Value::from(str::from_utf8(v.as_bytes()).ok()?)))
+    }
+}
+impl_dynamic_vtable!(&http::HeaderMap);
+
 // Vec<String> - materializes to List value
 impl DynamicType for Vec<String> {
     fn auto_materialize(&self) -> bool {
@@ -347,3 +371,109 @@ impl DynamicType for &[String] {
     }
 }
 impl_dynamic_vtable!(&[String]);
+
+// Option<T> - materializes to inner value or Null
+// This is impossible to implement outside the crate, since it requires a foreign implementation on Option!
+impl<T: DynamicType> DynamicType for Option<T>
+where
+    Option<T>: DynamicValueVtable,
+{
+    fn auto_materialize(&self) -> bool {
+        match self {
+            Some(v) => v.auto_materialize(),
+            None => true, // Null should auto-materialize
+        }
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        match self {
+            Some(v) => v.materialize(),
+            None => Value::Null,
+        }
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        match self {
+            Some(v) => v.field(field),
+            None => None,
+        }
+    }
+}
+
+// // Generic vtable implementation for Option<T>
+// // Each concrete Option<T> gets its own static vtable instance
+// impl<T: DynamicType> DynamicValueVtable for Option<T> {
+//     fn vtable() -> &'static Vtable {
+//         use std::sync::OnceLock;
+//
+//         // Helper functions that can capture the type T in their mangled names
+//         unsafe fn materialize_impl<T: DynamicType>(ptr: *const ()) -> Value<'static> {
+//             unsafe {
+//                 let this = &*(ptr as *const Option<T>);
+//                 ::std::mem::transmute(<Option<T> as DynamicType>::materialize(this))
+//             }
+//         }
+//
+//         unsafe fn field_impl<T: DynamicType>(
+//             ptr: *const (),
+//             field: &str,
+//         ) -> ::core::option::Option<Value<'static>> {
+//             unsafe {
+//                 let this = &*(ptr as *const Option<T>);
+//                 ::std::mem::transmute(<Option<T> as DynamicType>::field(this, field))
+//             }
+//         }
+//
+//         unsafe fn debug_impl<T: DynamicType>(
+//             ptr: *const (),
+//             f: &mut ::std::fmt::Formatter<'_>,
+//         ) -> ::std::fmt::Result {
+//             unsafe {
+//                 let this = &*(ptr as *const Option<T>);
+//                 ::std::fmt::Debug::fmt(this, f)
+//             }
+//         }
+//
+//         // Each monomorphization of Option<T> gets its own static
+//         static VTABLE: OnceLock<Vtable> = OnceLock::new();
+//         VTABLE.get_or_init(|| Vtable {
+//             materialize: materialize_impl::<T>,
+//             field: field_impl::<T>,
+//             debug: debug_impl::<T>,
+//         })
+//     }
+// }
+
+impl<'a> DynamicType for serde_json::Value {
+    fn materialize(&self) -> Value<'_> {
+        to_value(self).unwrap()
+    }
+    fn auto_materialize(&self) -> bool {
+        false
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        match self {
+            serde_json::Value::Object(m) => {
+                let v = m.get(field)?;
+                Some(types::dynamic::maybe_materialize(v))
+            }
+            _ => None,
+        }
+    }
+}
+crate::impl_dynamic_vtable!(serde_json::Value);
+impl<'a> DynamicType for serde_json::Map<String, serde_json::Value> {
+    fn materialize(&self) -> Value<'_> {
+        to_value(self).unwrap()
+    }
+    fn auto_materialize(&self) -> bool {
+        false
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        let v = self.get(field)?;
+        Some(types::dynamic::maybe_materialize(v))
+    }
+}
+crate::impl_dynamic_vtable!(serde_json::Map<String, serde_json::Value>);
