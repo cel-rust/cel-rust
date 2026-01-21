@@ -15,6 +15,7 @@ use crate::common::value::CelVal;
 use crate::context::{Context, SingleVarResolver, VariableResolver};
 use crate::functions::FunctionContext;
 pub use crate::types::bytes::BytesValue;
+use crate::types::dynamic::DynamicValue as DynamicWrapper;
 pub use crate::types::list::ListValue;
 pub use crate::types::map::{Key, KeyRef, MapValue};
 pub use crate::types::object::{ObjectType, ObjectValue};
@@ -22,7 +23,6 @@ pub use crate::types::optional::OptionalValue;
 pub use crate::types::string::StringValue;
 use crate::types::time::{TsOp, checked_op};
 use crate::{ExecutionError, Expression};
-use crate::types::dynamic::DynamicValue;
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -51,7 +51,7 @@ pub enum Value<'a> {
 
     /// User-defined object values implementing [`ObjectType`].
     Object(ObjectValue<'a>),
-    Dynamic(&'a dyn DynamicValue<'a>),
+    Dynamic(DynamicWrapper<'a>),
 
     String(StringValue<'a>),
     Bytes(BytesValue<'a>),
@@ -493,9 +493,7 @@ impl<'a> Value<'a> {
                 // The PhantomData marker is only for covariance; the actual data lives in the Arc.
                 unsafe { std::mem::transmute::<Value<'a>, Value<'static>>(Value::Object(cloned)) }
             }
-            Value::Dynamic(d) => {
-                d.materialize().as_static()
-            }
+            Value::Dynamic(d) => d.materialize().as_static(),
 
             Value::Duration(d) => Value::Duration(*d),
 
@@ -991,6 +989,7 @@ impl<'a> Value<'a> {
         let child = match self {
             Value::Map(m) => m.get(&KeyRef::String(StringValue::Borrowed(name))).cloned(),
             Value::Object(obj) => obj.get_member(name),
+            Value::Dynamic(d) => d.field(name),
             _ => None,
         };
 

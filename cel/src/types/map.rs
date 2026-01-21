@@ -104,9 +104,9 @@ impl<K: Into<Key>, V: Into<Value<'static>>> From<hashbrown::HashMap<K, V>> for M
 
 impl<'a, K: Into<KeyRef<'a>>, V: Into<Value<'a>>> FromIterator<(K, V)> for Value<'a> {
     fn from_iter<T: IntoIterator<Item = (K, V)>>(map: T) -> Self {
-        Value::Map(MapValue::Borrow(vector_map::VecMap::from_iter(map.into_iter().map(|(k, v)| {
-            (k.into(), v.into())
-        }))))
+        Value::Map(MapValue::Borrow(vector_map::VecMap::from_iter(
+            map.into_iter().map(|(k, v)| (k.into(), v.into())),
+        )))
     }
 }
 

@@ -61,8 +61,12 @@ impl<'a> Value<'a> {
                     .ok_or(ConvertToJsonError::DurationOverflow(v))?,
             )),
             Value::Object(ref obj) => obj.json().unwrap_or(serde_json::Value::Null),
-            Value::Dynamic(obj) => erased_serde::serialize(obj, serde_json::value::Serializer)
-                .map_err(|e| ConvertToJsonError::Value(self))?,
+            Value::Dynamic(ref d) => {
+                let materialized = d.materialize();
+                materialized
+                    .json()
+                    .map_err(|_| ConvertToJsonError::Value(self))?
+            }
         })
     }
 }

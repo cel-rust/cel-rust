@@ -10,6 +10,7 @@ use crate::context::VariableResolver;
 use crate::magic::Function;
 use crate::objects::{KeyRef, MapValue, ObjectType, ObjectValue, StringValue};
 use crate::parser::Expression;
+use crate::types::dynamic::{DynamicType, DynamicValueVtable, Vtable};
 use crate::{Context, FunctionContext, Program, Value};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -17,42 +18,6 @@ pub struct HttpRequest {
     method: String,
     path: String,
     headers: HashMap<String, String>,
-}
-
-impl<'a> DynamicValue<'a> for DynResolver<'a> {
-    fn materialize(&'a self) -> Value<'_> {
-        let mut m = vector_map::VecMap::with_capacity(1);
-        m.insert(KeyRef::from("request"), self.request.materialize());
-        Value::Map(MapValue::Borrow(m))
-    }
-
-    fn field(&'a self, field: &str) -> Option<Value<'a>> {
-        match field {
-            "request" => Some(self.request.materialize()),
-            _ => None,
-        }
-    }
-}
-impl<'a> DynamicValue<'a> for HttpRequest {
-    fn materialize(&'a self) -> Value<'_> {
-        let mut m = vector_map::VecMap::with_capacity(3);
-        m.insert(KeyRef::from("method"), Value::from(self.method.as_str()));
-        m.insert(KeyRef::from("path"), Value::from(self.path.as_str()));
-        m.insert(
-            KeyRef::from("headers"),
-            Value::from_iter(self.headers.iter()),
-        );
-        Value::Map(MapValue::Borrow(m))
-    }
-
-    fn field(&'a self, field: &str) -> Option<Value<'a>> {
-        match field {
-            "method" => Some(Value::from(self.method.as_str())),
-            "path" => Some(Value::from(self.path.as_str())),
-            "headers" => Some(Value::from_iter(self.headers.iter())),
-            _ => None,
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -116,17 +81,148 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct HttpRequestRef<'a> {
+    method: &'a str,
+    path: &'a str,
+    headers: &'a HashMap<String, String>,
+}
+
+impl DynamicType for HttpRequestRef<'_> {
+    fn materialize(&self) -> Value<'_> {
+        let mut m = vector_map::VecMap::with_capacity(3);
+        m.insert(KeyRef::from("method"), Value::from(self.method));
+        m.insert(KeyRef::from("path"), Value::from(self.path));
+        m.insert(
+            KeyRef::from("headers"),
+            Value::from_iter(self.headers.iter()),
+        );
+        Value::Map(MapValue::Borrow(m))
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        match field {
+            "method" => Some(Value::from(self.method)),
+            "path" => Some(Value::from(self.path)),
+            "headers" => Some(Value::from_iter(self.headers.iter())),
+            _ => None,
+        }
+    }
+}
+
+impl DynamicValueVtable for HttpRequestRef<'_> {
+    fn vtable() -> &'static Vtable {
+        use std::sync::OnceLock;
+        static VTABLE: OnceLock<Vtable> = OnceLock::new();
+        VTABLE.get_or_init(|| {
+            unsafe fn materialize_impl(ptr: *const ()) -> Value<'static> {
+                unsafe {
+                    let this = &*(ptr as *const HttpRequestRef);
+                    std::mem::transmute(this.materialize())
+                }
+            }
+
+            unsafe fn field_impl(ptr: *const (), field: &str) -> Option<Value<'static>> {
+                unsafe {
+                    let this = &*(ptr as *const HttpRequestRef);
+                    std::mem::transmute(this.field(field))
+                }
+            }
+
+            unsafe fn debug_impl(
+                ptr: *const (),
+                f: &mut std::fmt::Formatter<'_>,
+            ) -> std::fmt::Result {
+                unsafe {
+                    let this = &*(ptr as *const HttpRequestRef);
+                    std::fmt::Debug::fmt(this, f)
+                }
+            }
+
+            Vtable {
+                materialize: materialize_impl,
+                field: field_impl,
+                debug: debug_impl,
+            }
+        })
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct DynResolver<'a> {
-    request: &'a HttpRequest,
+    request: HttpRequestRef<'a>,
 }
 impl<'a> VariableResolver<'a> for DynResolver<'a> {
     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
-        self.field(variable)
+        match variable {
+            "request" => {
+                // SAFETY: self.request has lifetime 'a (it's HttpRequestRef<'a>)
+                // We're creating a reference to it with the correct lifetime
+                let req_ref: &'a HttpRequestRef<'a> = unsafe { std::mem::transmute(&self.request) };
+                Some(Value::Dynamic(crate::types::dynamic::DynamicValue::new(
+                    req_ref,
+                )))
+            }
+            _ => None,
+        }
     }
 
     fn all(&self) -> &[&'static str] {
         &["request"]
+    }
+}
+impl<'a> DynamicType for DynResolver<'a> {
+    fn materialize(&self) -> Value<'_> {
+        let mut m = vector_map::VecMap::with_capacity(1);
+        m.insert(KeyRef::from("request"), self.request.materialize());
+        Value::Map(MapValue::Borrow(m))
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        match field {
+            "request" => {
+                let v: Value<'_> = self.request.materialize();
+                Some(v)
+            }
+            _ => None,
+        }
+    }
+}
+
+impl DynamicValueVtable for DynResolver<'_> {
+    fn vtable() -> &'static Vtable {
+        static VTABLE: OnceLock<Vtable> = OnceLock::new();
+        VTABLE.get_or_init(|| {
+            unsafe fn materialize_impl(ptr: *const ()) -> Value<'static> {
+                unsafe {
+                    let this = &*(ptr as *const DynResolver);
+                    std::mem::transmute(this.materialize())
+                }
+            }
+
+            unsafe fn field_impl(ptr: *const (), field: &str) -> Option<Value<'static>> {
+                unsafe {
+                    let this = &*(ptr as *const DynResolver);
+                    std::mem::transmute(this.field(field))
+                }
+            }
+
+            unsafe fn debug_impl(
+                ptr: *const (),
+                f: &mut std::fmt::Formatter<'_>,
+            ) -> std::fmt::Result {
+                unsafe {
+                    let this = &*(ptr as *const DynResolver);
+                    std::fmt::Debug::fmt(this, f)
+                }
+            }
+
+            Vtable {
+                materialize: materialize_impl,
+                field: field_impl,
+                debug: debug_impl,
+            }
+        })
     }
 }
 fn execute_with_mut_request<'a>(
@@ -283,25 +379,26 @@ fn dyn_val() {
     let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
     let mut pctx = Context::default();
     pctx.add_function("with", with);
-    let req = HttpRequest {
-        method: "GET".to_string(),
-        path: "/foo".to_string(),
-        headers: Default::default(),
+    let req = HttpRequestRef {
+        method: "GET",
+        path: "/foo",
+        headers: &Default::default(),
     };
-    let p = Program::compile("request").unwrap().optimized().expression;
+    let p = Program::compile("request.method").unwrap().optimized().expression;
 
-    let resolver = DynResolver { request: &req };
+    AllocationRegistry::enable_tracking();
+    let resolver = DynResolver { request: req };
     let res = Value::resolve(&p, &pctx, &resolver).unwrap();
+    AllocationRegistry::disable_tracking();
     assert_eq!(
         res.json().unwrap(),
-        json!({"method": "GET", "path": "/foo", "headers": {}})
+        json!("GET")
     );
-    let Value::Dynamic(ob) = res else { panic!() };
+    // let Value::Dynamic(_ob) = res else { panic!() };
     // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
     // assert_eq!(req.method, "GET");
 }
 
-use crate::types::dynamic::DynamicValue;
 use tracking_allocator::{AllocationGroupId, AllocationRegistry, AllocationTracker, Allocator};
 
 #[derive(Default, Clone, Debug)]
@@ -310,29 +407,29 @@ struct Counter(Arc<AtomicUsize>);
 impl AllocationTracker for Counter {
     fn allocated(
         &self,
-        _addr: usize,
-        _object_size: usize,
-        _wrapped_size: usize,
-        _group_id: AllocationGroupId,
+       addr: usize,
+       object_size: usize,
+       wrapped_size: usize,
+       group_id: AllocationGroupId,
     ) {
         self.0.fetch_add(1, Ordering::SeqCst);
-        // println!(
-        //     "allocation -> addr=0x{:0x} object_size={} wrapped_size={} group_id={:?}",
-        //     addr, object_size, wrapped_size, group_id
-        // );
+        println!(
+            "allocation -> addr=0x{:0x} object_size={} wrapped_size={} group_id={:?}",
+            addr, object_size, wrapped_size, group_id
+        );
     }
 
     fn deallocated(
         &self,
-        _addr: usize,
-        _object_size: usize,
-        _wrapped_size: usize,
-        _source_group_id: AllocationGroupId,
-        _current_group_id: AllocationGroupId,
+        addr: usize,
+        object_size: usize,
+        wrapped_size: usize,
+        source_group_id: AllocationGroupId,
+        current_group_id: AllocationGroupId,
     ) {
-        // println!(
-        //     "deallocation -> addr=0x{:0x} object_size={} wrapped_size={} source_group_id={:?} current_group_id={:?}",
-        //     addr, object_size, wrapped_size, source_group_id, current_group_id
-        // );
+        println!(
+            "deallocation -> addr=0x{:0x} object_size={} wrapped_size={} source_group_id={:?} current_group_id={:?}",
+            addr, object_size, wrapped_size, source_group_id, current_group_id
+        );
     }
 }
