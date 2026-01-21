@@ -1,5 +1,5 @@
 [workspace]
-members = ["cel", "fuzz"]
+members = ["cel", "cel-derive", "fuzz"]
 resolver = "2"
 
 [profile.bench]

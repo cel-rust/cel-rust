@@ -38,7 +38,7 @@ pub trait DynamicType: DynamicValueVtable + std::fmt::Debug + Send + Sync {
     // Convert this dynamic value into a proper value
     fn materialize(&self) -> Value<'_>;
 
-    fn field(&self, field: &str) -> Option<Value<'_>> {
+    fn field(&self, _field: &str) -> Option<Value<'_>> {
         None
     }
 }
@@ -99,3 +99,167 @@ impl<'a> std::fmt::Debug for DynamicValue<'a> {
 // Safety: DynamicValue is Send/Sync if the underlying type is Send + Sync (enforced by trait bound)
 unsafe impl<'a> Send for DynamicValue<'a> {}
 unsafe impl<'a> Sync for DynamicValue<'a> {}
+
+/// Implement DynamicValueVtable for a type that already implements DynamicType.
+/// Use this for foreign types where you can't use #[derive(DynamicType)].
+///
+/// # Example
+///
+/// ```ignore
+/// impl DynamicType for &str {
+///     fn materialize(&self) -> Value<'_> {
+///         Value::from(*self)
+///     }
+///     fn auto_materialize(&self) -> bool {
+///         true
+///     }
+/// }
+/// impl_dynamic_vtable!(&str);
+/// ```
+#[macro_export]
+macro_rules! impl_dynamic_vtable {
+    ($ty:ty) => {
+        impl $crate::types::dynamic::DynamicValueVtable for $ty {
+            fn vtable() -> &'static $crate::types::dynamic::Vtable {
+                use std::sync::OnceLock;
+                static VTABLE: OnceLock<$crate::types::dynamic::Vtable> = OnceLock::new();
+                VTABLE.get_or_init(|| {
+                    unsafe fn materialize_impl(ptr: *const ()) -> $crate::Value<'static> {
+                        unsafe {
+                            let this = &*(ptr as *const $ty);
+                            ::std::mem::transmute(
+                                <$ty as $crate::types::dynamic::DynamicType>::materialize(this),
+                            )
+                        }
+                    }
+
+                    unsafe fn field_impl(
+                        ptr: *const (),
+                        field: &str,
+                    ) -> ::core::option::Option<$crate::Value<'static>> {
+                        unsafe {
+                            let this = &*(ptr as *const $ty);
+                            ::std::mem::transmute(
+                                <$ty as $crate::types::dynamic::DynamicType>::field(this, field),
+                            )
+                        }
+                    }
+
+                    unsafe fn debug_impl(
+                        ptr: *const (),
+                        f: &mut ::std::fmt::Formatter<'_>,
+                    ) -> ::std::fmt::Result {
+                        unsafe {
+                            let this = &*(ptr as *const $ty);
+                            ::std::fmt::Debug::fmt(this, f)
+                        }
+                    }
+
+                    $crate::types::dynamic::Vtable {
+                        materialize: materialize_impl,
+                        field: field_impl,
+                        debug: debug_impl,
+                    }
+                })
+            }
+        }
+    };
+}
+
+// Primitive type implementations
+
+// &str - auto-materializes to String value
+impl DynamicType for &str {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self)
+    }
+}
+impl_dynamic_vtable!(&str);
+
+// String - auto-materializes to String value
+impl DynamicType for String {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(self.as_str())
+    }
+}
+impl_dynamic_vtable!(String);
+
+// bool - auto-materializes to Bool value
+impl DynamicType for bool {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self)
+    }
+}
+impl_dynamic_vtable!(bool);
+
+// i64 - auto-materializes to Int value
+impl DynamicType for i64 {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self)
+    }
+}
+impl_dynamic_vtable!(i64);
+
+// u64 - auto-materializes to Int value (as i64)
+impl DynamicType for u64 {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self as i64)
+    }
+}
+impl_dynamic_vtable!(u64);
+
+// i32 - auto-materializes to Int value
+impl DynamicType for i32 {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self as i64)
+    }
+}
+impl_dynamic_vtable!(i32);
+
+// u32 - auto-materializes to Int value
+impl DynamicType for u32 {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self as i64)
+    }
+}
+impl_dynamic_vtable!(u32);
+
+// f64 - auto-materializes to Float value
+impl DynamicType for f64 {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self)
+    }
+}
+impl_dynamic_vtable!(f64);

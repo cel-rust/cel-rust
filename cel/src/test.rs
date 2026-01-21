@@ -11,7 +11,7 @@ use crate::magic::Function;
 use crate::objects::{KeyRef, MapValue, ObjectType, ObjectValue, StringValue};
 use crate::parser::Expression;
 use crate::types::dynamic::{DynamicType, DynamicValueVtable, Vtable};
-use crate::{to_value, types, Context, FunctionContext, Program, Value};
+use crate::{Context, FunctionContext, Program, Value, to_value, types};
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct HttpRequest {
@@ -81,56 +81,6 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
 }
 
-impl<'a> DynamicValueVtable for &'a str {
-    fn vtable() -> &'static Vtable {
-        todo!()
-    }
-}
-impl<'a> DynamicType for &'a str {
-    fn materialize(&self) -> Value<'_> {
-        Value::from(*self)
-    }
-    fn auto_materialize(&self) -> bool {
-        true
-    }
-}
-
-impl DynamicValueVtable for serde_json::Value {
-        fn vtable() -> &'static Vtable {
-            static VTABLE: OnceLock<Vtable> = OnceLock::new();
-            VTABLE.get_or_init(|| {
-                unsafe fn materialize_impl(ptr: *const ()) -> Value<'static> {
-                    unsafe {
-                        let this = &*(ptr as *const serde_json::Value);
-                        std::mem::transmute(this.materialize())
-                    }
-                }
-
-                unsafe fn field_impl(ptr: *const (), field: &str) -> Option<Value<'static>> {
-                    unsafe {
-                        let this = &*(ptr as *const serde_json::Value);
-                        std::mem::transmute(this.field(field))
-                    }
-                }
-
-                unsafe fn debug_impl(
-                    ptr: *const (),
-                    f: &mut std::fmt::Formatter<'_>,
-                ) -> std::fmt::Result {
-                    unsafe {
-                        let this = &*(ptr as *const serde_json::Value);
-                        std::fmt::Debug::fmt(this, f)
-                    }
-                }
-
-                Vtable {
-                    materialize: materialize_impl,
-                    field: field_impl,
-                    debug: debug_impl,
-                }
-            })
-    }
-}
 impl<'a> DynamicType for serde_json::Value {
     fn materialize(&self) -> Value<'_> {
         to_value(self).unwrap()
@@ -149,75 +99,16 @@ impl<'a> DynamicType for serde_json::Value {
         }
     }
 }
+crate::impl_dynamic_vtable!(serde_json::Value);
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+#[derive(DynamicType)]
 pub struct HttpRequestRef<'a> {
     method: &'a str,
     path: &'a str,
+    #[allow(dead_code)]
     headers: &'a HashMap<String, String>,
-    claims: &'a serde_json::Value
-}
-
-impl DynamicType for HttpRequestRef<'_> {
-    fn materialize(&self) -> Value<'_> {
-        let mut m = vector_map::VecMap::with_capacity(3);
-        m.insert(KeyRef::from("method"), types::dynamic::maybe_materialize(&self.method));
-        m.insert(KeyRef::from("path"), types::dynamic::maybe_materialize(&self.path));
-        // m.insert(
-        //     KeyRef::from("headers"),
-        //     Value::from_iter(self.headers.iter()),
-        // );
-        m.insert(KeyRef::from("claims"), types::dynamic::maybe_materialize(self.claims));
-        Value::Map(MapValue::Borrow(m))
-    }
-
-    fn field(&self, field: &str) -> Option<Value<'_>> {
-        Some(match field {
-            "method" => types::dynamic::maybe_materialize(&self.method),
-            "path" => types::dynamic::maybe_materialize(&self.path),
-            // "headers" => types::dynamic::maybe_materialize(&self.headers),
-            "claims" => types::dynamic::maybe_materialize(self.claims),
-            _ => return None,
-        })
-    }
-}
-
-impl DynamicValueVtable for HttpRequestRef<'_> {
-    fn vtable() -> &'static Vtable {
-        use std::sync::OnceLock;
-        static VTABLE: OnceLock<Vtable> = OnceLock::new();
-        VTABLE.get_or_init(|| {
-            unsafe fn materialize_impl(ptr: *const ()) -> Value<'static> {
-                unsafe {
-                    let this = &*(ptr as *const HttpRequestRef);
-                    std::mem::transmute(this.materialize())
-                }
-            }
-
-            unsafe fn field_impl(ptr: *const (), field: &str) -> Option<Value<'static>> {
-                unsafe {
-                    let this = &*(ptr as *const HttpRequestRef);
-                    std::mem::transmute(this.field(field))
-                }
-            }
-
-            unsafe fn debug_impl(
-                ptr: *const (),
-                f: &mut std::fmt::Formatter<'_>,
-            ) -> std::fmt::Result {
-                unsafe {
-                    let this = &*(ptr as *const HttpRequestRef);
-                    std::fmt::Debug::fmt(this, f)
-                }
-            }
-
-            Vtable {
-                materialize: materialize_impl,
-                field: field_impl,
-                debug: debug_impl,
-            }
-        })
-    }
+    claims: &'a serde_json::Value,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -457,22 +348,21 @@ fn dyn_val() {
         headers: &Default::default(),
         claims: &json!({"sub": "me@example.com"}),
     };
-    let p = Program::compile("request.claims.sub + 'hi'").unwrap().optimized().expression;
+    let p = Program::compile("request.claims.sub")
+        .unwrap();
 
-    // AllocationRegistry::enable_tracking();
+    AllocationRegistry::enable_tracking();
     let resolver = DynResolver { request: req };
-    let res = Value::resolve(&p, &pctx, &resolver).unwrap();
-    // AllocationRegistry::disable_tracking();
-    assert_eq!(
-        res.json().unwrap(),
-        json!("me@example.com")
-    );
+    let res = Value::resolve(&p.expression, &pctx, &resolver).unwrap();
+    AllocationRegistry::disable_tracking();
+    assert_eq!(res.json().unwrap(), json!("me@example.com"));
     // let Value::Dynamic(_ob) = res else { panic!() };
     // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
     // assert_eq!(req.method, "GET");
 }
 
 use tracking_allocator::{AllocationGroupId, AllocationRegistry, AllocationTracker, Allocator};
+use cel_derive::DynamicType;
 
 #[derive(Default, Clone, Debug)]
 struct Counter(Arc<AtomicUsize>);
@@ -480,10 +370,10 @@ struct Counter(Arc<AtomicUsize>);
 impl AllocationTracker for Counter {
     fn allocated(
         &self,
-       addr: usize,
-       object_size: usize,
-       wrapped_size: usize,
-       group_id: AllocationGroupId,
+        addr: usize,
+        object_size: usize,
+        wrapped_size: usize,
+        group_id: AllocationGroupId,
     ) {
         self.0.fetch_add(1, Ordering::SeqCst);
         println!(

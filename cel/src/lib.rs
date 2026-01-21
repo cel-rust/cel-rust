@@ -1,4 +1,5 @@
 extern crate core;
+extern crate self as cel;
 
 use std::convert::TryFrom;
 use std::sync::Arc;
@@ -41,6 +42,9 @@ pub use linkme::distributed_slice as register;
 use magic::FromContext;
 pub use optimize::Optimizer;
 pub use paste as register_paste;
+
+// Re-export the DynamicType derive macro
+pub use cel_derive::DynamicType;
 
 use crate::context::{DefaultVariableResolver, VariableResolver};
 
