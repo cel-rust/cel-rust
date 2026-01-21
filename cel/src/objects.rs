@@ -22,6 +22,7 @@ pub use crate::types::optional::OptionalValue;
 pub use crate::types::string::StringValue;
 use crate::types::time::{TsOp, checked_op};
 use crate::{ExecutionError, Expression};
+use crate::types::dynamic::DynamicValue;
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -50,6 +51,7 @@ pub enum Value<'a> {
 
     /// User-defined object values implementing [`ObjectType`].
     Object(ObjectValue<'a>),
+    Dynamic(&'a dyn DynamicValue<'a>),
 
     String(StringValue<'a>),
     Bytes(BytesValue<'a>),
@@ -242,6 +244,7 @@ impl Debug for Value<'_> {
 
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Object(obj) => write!(f, "Object<{}>({:?})", obj.type_name(), obj),
+            Value::Dynamic(obj) => write!(f, "Dynamic({:?})", obj),
             Value::Null => write!(f, "Null"),
         }
     }
@@ -261,6 +264,7 @@ impl<'a> Clone for Value<'a> {
             Value::Float(f) => Value::Float(*f),
             Value::Bool(b) => Value::Bool(*b),
             Value::Object(obj) => Value::Object(obj.clone()),
+            Value::Dynamic(obj) => Value::Dynamic(obj.clone()),
 
             Value::Duration(d) => Value::Duration(*d),
 
@@ -348,6 +352,7 @@ impl<'a> Value<'a> {
             Value::Bytes(_) => ValueType::Bytes,
             Value::Bool(_) => ValueType::Bool,
             Value::Object(_) => ValueType::Object,
+            Value::Dynamic(_) => ValueType::Object,
 
             Value::Duration(_) => ValueType::Duration,
 
@@ -410,15 +415,27 @@ impl From<&::bytes::Bytes> for Value<'static> {
 }
 
 // Convert String to Value
+impl From<Arc<str>> for Value<'static> {
+    fn from(v: Arc<str>) -> Self {
+        Value::String(StringValue::Owned(v))
+    }
+}
+
 impl From<String> for Value<'static> {
     fn from(v: String) -> Self {
         Value::String(StringValue::Owned(Arc::from(v.as_ref())))
     }
 }
 
-impl From<&str> for Value<'static> {
-    fn from(v: &str) -> Self {
-        Value::String(StringValue::Owned(Arc::from(v)))
+impl<'a> From<&'a str> for Value<'a> {
+    fn from(v: &'a str) -> Self {
+        Value::String(StringValue::Borrowed(v))
+    }
+}
+
+impl<'a> From<&'a String> for Value<'a> {
+    fn from(v: &'a String) -> Self {
+        Value::String(StringValue::Borrowed(v))
     }
 }
 
@@ -475,6 +492,9 @@ impl<'a> Value<'a> {
                 // Safety: The Object's data is Arc-wrapped and self-contained.
                 // The PhantomData marker is only for covariance; the actual data lives in the Arc.
                 unsafe { std::mem::transmute::<Value<'a>, Value<'static>>(Value::Object(cloned)) }
+            }
+            Value::Dynamic(d) => {
+                d.materialize().as_static()
             }
 
             Value::Duration(d) => Value::Duration(*d),
@@ -1351,25 +1371,6 @@ mod tests {
         let ctx = Context::default();
         let result = program.execute_with(&ctx, &vars);
         assert_eq!(result, Ok(Value::Int(2.into())));
-    }
-
-    #[test]
-    fn reference_to_value() {
-        let test = "example".to_string();
-        let direct: Value = test.as_str().into();
-        assert_eq!(
-            direct,
-            Value::String(StringValue::Owned(Arc::from("example")))
-        );
-
-        let vec = vec![test.as_str()];
-        let indirect: Value = vec.into();
-        assert_eq!(
-            indirect,
-            Value::List(ListValue::Owned(
-                vec![Value::String(StringValue::Owned(Arc::from("example")))].into()
-            ))
-        );
     }
 
     #[test]

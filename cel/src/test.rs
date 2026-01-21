@@ -8,7 +8,7 @@ use serde_json::json;
 
 use crate::context::VariableResolver;
 use crate::magic::Function;
-use crate::objects::{ObjectType, ObjectValue, StringValue};
+use crate::objects::{KeyRef, MapValue, ObjectType, ObjectValue, StringValue};
 use crate::parser::Expression;
 use crate::{Context, FunctionContext, Program, Value};
 
@@ -17,6 +17,42 @@ pub struct HttpRequest {
     method: String,
     path: String,
     headers: HashMap<String, String>,
+}
+
+impl<'a> DynamicValue<'a> for DynResolver<'a> {
+    fn materialize(&'a self) -> Value<'_> {
+        let mut m = vector_map::VecMap::with_capacity(1);
+        m.insert(KeyRef::from("request"), self.request.materialize());
+        Value::Map(MapValue::Borrow(m))
+    }
+
+    fn field(&'a self, field: &str) -> Option<Value<'a>> {
+        match field {
+            "request" => Some(self.request.materialize()),
+            _ => None,
+        }
+    }
+}
+impl<'a> DynamicValue<'a> for HttpRequest {
+    fn materialize(&'a self) -> Value<'_> {
+        let mut m = vector_map::VecMap::with_capacity(3);
+        m.insert(KeyRef::from("method"), Value::from(self.method.as_str()));
+        m.insert(KeyRef::from("path"), Value::from(self.path.as_str()));
+        m.insert(
+            KeyRef::from("headers"),
+            Value::from_iter(self.headers.iter()),
+        );
+        Value::Map(MapValue::Borrow(m))
+    }
+
+    fn field(&'a self, field: &str) -> Option<Value<'a>> {
+        match field {
+            "method" => Some(Value::from(self.method.as_str())),
+            "path" => Some(Value::from(self.path.as_str())),
+            "headers" => Some(Value::from_iter(self.headers.iter())),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
@@ -80,6 +116,19 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
 }
 
+#[derive(Debug, Serialize)]
+pub struct DynResolver<'a> {
+    request: &'a HttpRequest,
+}
+impl<'a> VariableResolver<'a> for DynResolver<'a> {
+    fn resolve(&self, variable: &str) -> Option<Value<'a>> {
+        self.field(variable)
+    }
+
+    fn all(&self) -> &[&'static str] {
+        &["request"]
+    }
+}
 fn execute_with_mut_request<'a>(
     ctx: &'a Context,
     expression: &'a Expression,
@@ -228,6 +277,31 @@ fn struct_function() {
     }
 }
 
+#[test]
+fn dyn_val() {
+    let count = Arc::new(AtomicUsize::new(0));
+    let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
+    let mut pctx = Context::default();
+    pctx.add_function("with", with);
+    let req = HttpRequest {
+        method: "GET".to_string(),
+        path: "/foo".to_string(),
+        headers: Default::default(),
+    };
+    let p = Program::compile("request").unwrap().optimized().expression;
+
+    let resolver = DynResolver { request: &req };
+    let res = Value::resolve(&p, &pctx, &resolver).unwrap();
+    assert_eq!(
+        res.json().unwrap(),
+        json!({"method": "GET", "path": "/foo", "headers": {}})
+    );
+    let Value::Dynamic(ob) = res else { panic!() };
+    // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
+    // assert_eq!(req.method, "GET");
+}
+
+use crate::types::dynamic::DynamicValue;
 use tracking_allocator::{AllocationGroupId, AllocationRegistry, AllocationTracker, Allocator};
 
 #[derive(Default, Clone, Debug)]

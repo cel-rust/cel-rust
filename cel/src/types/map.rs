@@ -102,6 +102,14 @@ impl<K: Into<Key>, V: Into<Value<'static>>> From<hashbrown::HashMap<K, V>> for M
     }
 }
 
+impl<'a, K: Into<KeyRef<'a>>, V: Into<Value<'a>>> FromIterator<(K, V)> for Value<'a> {
+    fn from_iter<T: IntoIterator<Item = (K, V)>>(map: T) -> Self {
+        Value::Map(MapValue::Borrow(vector_map::VecMap::from_iter(map.into_iter().map(|(k, v)| {
+            (k.into(), v.into())
+        }))))
+    }
+}
+
 // Convert HashMap<K, V> to Value
 impl<K: Into<Key>, V: Into<Value<'static>>> From<HashMap<K, V>> for Value<'static> {
     fn from(v: HashMap<K, V>) -> Self {
@@ -263,6 +271,19 @@ impl<'a> From<&'a Key> for KeyRef<'a> {
         }
     }
 }
+
+impl<'a> From<&'a str> for KeyRef<'a> {
+    fn from(value: &'a str) -> Self {
+        KeyRef::String(StringValue::Borrowed(value))
+    }
+}
+
+impl<'a> From<&'a String> for KeyRef<'a> {
+    fn from(value: &'a String) -> Self {
+        KeyRef::String(StringValue::Borrowed(value))
+    }
+}
+
 impl From<Key> for KeyRef<'static> {
     fn from(value: Key) -> Self {
         match value {
