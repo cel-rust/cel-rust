@@ -263,3 +263,77 @@ impl DynamicType for f64 {
     }
 }
 impl_dynamic_vtable!(f64);
+
+// Collection types - these do NOT auto-materialize since they're complex structures
+
+// HashMap<String, String> - materializes to Map value
+impl DynamicType for std::collections::HashMap<String, String> {
+    fn auto_materialize(&self) -> bool {
+        false // Maps are complex, don't auto-materialize
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        let mut map = vector_map::VecMap::with_capacity(self.len());
+        for (k, v) in self.iter() {
+            map.insert(
+                crate::objects::KeyRef::from(k.as_str()),
+                Value::from(v.as_str()),
+            );
+        }
+        Value::Map(crate::objects::MapValue::Borrow(map))
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        self.get(field).map(|v| Value::from(v.as_str()))
+    }
+}
+impl_dynamic_vtable!(std::collections::HashMap<String, String>);
+
+// &HashMap<String, String> - reference to HashMap
+impl DynamicType for &std::collections::HashMap<String, String> {
+    fn auto_materialize(&self) -> bool {
+        false
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        let mut map = vector_map::VecMap::with_capacity(self.len());
+        for (k, v) in self.iter() {
+            map.insert(
+                crate::objects::KeyRef::from(k.as_str()),
+                Value::from(v.as_str()),
+            );
+        }
+        Value::Map(crate::objects::MapValue::Borrow(map))
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        self.get(field).map(|v| Value::from(v.as_str()))
+    }
+}
+impl_dynamic_vtable!(&std::collections::HashMap<String, String>);
+
+// Vec<String> - materializes to List value
+impl DynamicType for Vec<String> {
+    fn auto_materialize(&self) -> bool {
+        false // Lists are complex, don't auto-materialize
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        let items: Vec<Value<'static>> = self.iter().map(|s| Value::from(s.clone())).collect();
+        Value::List(crate::objects::ListValue::Owned(items.into()))
+    }
+}
+impl_dynamic_vtable!(Vec<String>);
+
+// &[String] - slice of Strings
+impl DynamicType for &[String] {
+    fn auto_materialize(&self) -> bool {
+        false
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        let items: Vec<Value<'static>> = self.iter().map(|s| Value::from(s.clone())).collect();
+        Value::List(crate::objects::ListValue::Owned(items.into()))
+    }
+}
+impl_dynamic_vtable!(&[String]);

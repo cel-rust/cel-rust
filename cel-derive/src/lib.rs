@@ -14,6 +14,9 @@ use syn::{
 /// ## Struct-level attributes
 ///
 /// - `#[dynamic(auto_materialize)]` - Override `auto_materialize()` to return `true`
+/// - `#[dynamic(crate = "path")]` - Specify the path to the cel crate (default: `::cel`)
+///   - Use `#[dynamic(crate = "crate")]` when using this derive inside the cel crate itself
+///   - Use `#[dynamic(crate = "::cel")]` or omit for external usage
 ///
 /// ## Field-level attributes
 ///
@@ -32,6 +35,13 @@ use syn::{
 ///     #[dynamic(skip)]
 ///     internal_id: u64,
 /// }
+///
+/// // Inside the cel crate itself:
+/// #[derive(DynamicType)]
+/// #[dynamic(crate = "crate")]
+/// pub struct InternalType {
+///     field: String,
+/// }
 /// ```
 #[proc_macro_derive(DynamicType, attributes(dynamic))]
 pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
@@ -40,6 +50,14 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
 
     // Parse struct-level attributes
     let auto_materialize = has_struct_attr(&input.attrs, "auto_materialize");
+    let crate_path_str = get_struct_crate_path(&input.attrs);
+
+    // Generate crate path - use custom path if specified, otherwise default to ::cel
+    let crate_path: TokenStream2 = if let Some(path) = crate_path_str {
+        path.parse().unwrap()
+    } else {
+        quote! { ::cel }
+    };
 
     // Get fields
     let fields = match &input.data {
@@ -68,25 +86,20 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
         .map(|f| {
             let ident = f.ident.as_ref().unwrap();
             let name = get_field_rename(&f.attrs).unwrap_or_else(|| ident.to_string());
-            (ident, name)
+            let ty = &f.ty;
+            // Check if the type is a reference type
+            let is_ref = matches!(ty, syn::Type::Reference(_));
+            (ident, name, is_ref)
         })
         .collect();
 
     let field_count = processed_fields.len();
 
-    // Generate a flexible crate reference that works both inside and outside the cel crate
-    // Users inside the cel crate should use: `extern crate self as cel;` at module level
-    // Users outside will use the normal `::cel` path
-    let crate_path = quote! { ::cel };
-
-    // Alternative: we could make this configurable via attribute
-    // #[dynamic(crate = "crate")] or #[dynamic(crate = "::cel")]
-    // For now, we'll just use ::cel
-
     // Generate materialize body
     let materialize_inserts: TokenStream2 = processed_fields
         .iter()
-        .map(|(ident, name)| {
+        .map(|(ident, name, _is_ref)| {
+            // Always pass a reference to maybe_materialize
             quote! {
                 m.insert(
                     #crate_path::objects::KeyRef::from(#name),
@@ -99,7 +112,8 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     // Generate field match arms
     let field_arms: TokenStream2 = processed_fields
         .iter()
-        .map(|(ident, name)| {
+        .map(|(ident, name, _is_ref)| {
+            // Always pass a reference to maybe_materialize
             quote! {
                 #name => #crate_path::types::dynamic::maybe_materialize(&self.#ident),
             }
@@ -140,9 +154,9 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
         quote! { <#(#params),*> }
     };
 
-    // For the unsafe casts in the vtable, we need the bare type name
-    // We'll use the original name with original generics for the cast
-    let bare_name_with_generics = quote! { #name #ty_generics };
+    // For the unsafe casts in the vtable, we need the same type as in vtable_ty_params
+    // Use the same pattern with '_ for all lifetimes
+    let bare_name_with_generics = quote! { #name #vtable_ty_params };
 
     let generated = quote! {
         impl #impl_generics #crate_path::types::dynamic::DynamicType for #name #ty_generics #where_clause {
@@ -250,6 +264,29 @@ fn get_field_rename(attrs: &[Attribute]) -> Option<String> {
             })) = attr.parse_args::<Meta>()
             {
                 if path.is_ident("rename") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+    None
+}
+
+/// Get the crate path from struct-level attributes
+fn get_struct_crate_path(attrs: &[Attribute]) -> Option<String> {
+    for attr in attrs {
+        if attr.path().is_ident("dynamic") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("crate") {
                     return Some(lit_str.value());
                 }
             }

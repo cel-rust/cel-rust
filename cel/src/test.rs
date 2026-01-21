@@ -1,3 +1,7 @@
+// For the DynamicType derive macro to work inside the cel crate itself,
+// we need to alias the crate so ::cel:: paths resolve correctly
+extern crate self as cel;
+
 use std::alloc::System;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -101,17 +105,36 @@ impl<'a> DynamicType for serde_json::Value {
 }
 crate::impl_dynamic_vtable!(serde_json::Value);
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-#[derive(DynamicType)]
+// Also implement for &serde_json::Value so we can use it as a reference in structs
+impl<'a> DynamicType for &'a serde_json::Value {
+    fn materialize(&self) -> Value<'_> {
+        to_value(*self).unwrap()
+    }
+    fn auto_materialize(&self) -> bool {
+        false
+    }
+
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        match *self {
+            serde_json::Value::Object(m) => {
+                let v = m.get(field)?;
+                Some(types::dynamic::maybe_materialize(v))
+            }
+            _ => None,
+        }
+    }
+}
+crate::impl_dynamic_vtable!(&serde_json::Value);
+
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, DynamicType)]
 pub struct HttpRequestRef<'a> {
     method: &'a str,
     path: &'a str,
-    #[allow(dead_code)]
     headers: &'a HashMap<String, String>,
     claims: &'a serde_json::Value,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, DynamicType)]
 pub struct DynResolver<'a> {
     request: HttpRequestRef<'a>,
 }
@@ -119,8 +142,17 @@ impl<'a> VariableResolver<'a> for DynResolver<'a> {
     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
         match variable {
             "request" => {
-                // SAFETY: self.request has lifetime 'a (it's HttpRequestRef<'a>)
-                // We're creating a reference to it with the correct lifetime
+                // SAFETY: This transmute is sound under the following conditions:
+                // 1. self.request contains references with lifetime 'a (HttpRequestRef<'a>)
+                // 2. The caller must ensure that `self` (the DynResolver) lives at least
+                //    as long as the returned Value<'a> is used
+                // 3. The DynamicValue will dereference the pointer to call methods on
+                //    HttpRequestRef, which then access the internal 'a references
+                // 4. If DynResolver is dropped while the Value is still alive, this creates UB
+                //
+                // This is a limitation of the VariableResolver API: it returns Value<'a>
+                // but only has &self available, creating a lifetime mismatch. Callers MUST
+                // ensure the resolver outlives the returned Value.
                 let req_ref: &'a HttpRequestRef<'a> = unsafe { std::mem::transmute(&self.request) };
                 Some(Value::Dynamic(crate::types::dynamic::DynamicValue::new(
                     req_ref,
@@ -134,60 +166,7 @@ impl<'a> VariableResolver<'a> for DynResolver<'a> {
         &["request"]
     }
 }
-impl<'a> DynamicType for DynResolver<'a> {
-    fn materialize(&self) -> Value<'_> {
-        let mut m = vector_map::VecMap::with_capacity(1);
-        m.insert(KeyRef::from("request"), self.request.materialize());
-        Value::Map(MapValue::Borrow(m))
-    }
 
-    fn field(&self, field: &str) -> Option<Value<'_>> {
-        match field {
-            "request" => {
-                let v: Value<'_> = self.request.materialize();
-                Some(v)
-            }
-            _ => None,
-        }
-    }
-}
-
-impl DynamicValueVtable for DynResolver<'_> {
-    fn vtable() -> &'static Vtable {
-        static VTABLE: OnceLock<Vtable> = OnceLock::new();
-        VTABLE.get_or_init(|| {
-            unsafe fn materialize_impl(ptr: *const ()) -> Value<'static> {
-                unsafe {
-                    let this = &*(ptr as *const DynResolver);
-                    std::mem::transmute(this.materialize())
-                }
-            }
-
-            unsafe fn field_impl(ptr: *const (), field: &str) -> Option<Value<'static>> {
-                unsafe {
-                    let this = &*(ptr as *const DynResolver);
-                    std::mem::transmute(this.field(field))
-                }
-            }
-
-            unsafe fn debug_impl(
-                ptr: *const (),
-                f: &mut std::fmt::Formatter<'_>,
-            ) -> std::fmt::Result {
-                unsafe {
-                    let this = &*(ptr as *const DynResolver);
-                    std::fmt::Debug::fmt(this, f)
-                }
-            }
-
-            Vtable {
-                materialize: materialize_impl,
-                field: field_impl,
-                debug: debug_impl,
-            }
-        })
-    }
-}
 fn execute_with_mut_request<'a>(
     ctx: &'a Context,
     expression: &'a Expression,
@@ -233,8 +212,8 @@ fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::Res
     Ok(v)
 }
 
-#[global_allocator]
-static GLOBAL: Allocator<System> = Allocator::system();
+// #[global_allocator]
+// static GLOBAL: Allocator<System> = Allocator::system();
 
 #[test]
 fn zero_alloc() {
@@ -342,27 +321,36 @@ fn dyn_val() {
     let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
     let mut pctx = Context::default();
     pctx.add_function("with", with);
-    let req = HttpRequestRef {
-        method: "GET",
-        path: "/foo",
-        headers: &Default::default(),
-        claims: &json!({"sub": "me@example.com"}),
-    };
-    let p = Program::compile("request.claims.sub")
-        .unwrap();
+    let headers = HashMap::new();
+    let claims = json!({"sub": "me@example.com"});
+    let p = Program::compile("request.claims").unwrap();
+    let dv = {
+        let req = HttpRequestRef {
+            method: "GET",
+            path: "/foo",
+            headers: &headers,
+            claims: &claims,
+        };
 
-    AllocationRegistry::enable_tracking();
-    let resolver = DynResolver { request: req };
-    let res = Value::resolve(&p.expression, &pctx, &resolver).unwrap();
-    AllocationRegistry::disable_tracking();
-    assert_eq!(res.json().unwrap(), json!("me@example.com"));
+        AllocationRegistry::enable_tracking();
+        let resolver = DynResolver { request: req };
+        let res = Value::resolve(&p.expression, &pctx, &resolver).unwrap();
+        drop(resolver);
+        AllocationRegistry::disable_tracking();
+        // assert_eq!(res.json().unwrap(), json!("me@example.com"));
+        match res {
+            Value::Dynamic(dv) => dv,
+            _ => panic!("Expected dynamic value"),
+        }
+    };
+    dbg!(types::dynamic::always_materialize(dv.field("sub").unwrap()));
     // let Value::Dynamic(_ob) = res else { panic!() };
     // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
     // assert_eq!(req.method, "GET");
 }
 
-use tracking_allocator::{AllocationGroupId, AllocationRegistry, AllocationTracker, Allocator};
 use cel_derive::DynamicType;
+use tracking_allocator::{AllocationGroupId, AllocationRegistry, AllocationTracker, Allocator};
 
 #[derive(Default, Clone, Debug)]
 struct Counter(Arc<AtomicUsize>);

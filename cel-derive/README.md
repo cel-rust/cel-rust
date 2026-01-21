@@ -30,6 +30,10 @@ pub struct MyData<'a> {
 ### Struct-level attributes
 
 - `#[dynamic(auto_materialize)]` - Override `auto_materialize()` to return `true`. This is typically used for primitive-like types that should always be eagerly converted to CEL values.
+- `#[dynamic(crate = "path")]` - Specify the path to the `cel` crate. Useful when using this derive macro inside the `cel` crate itself or when the crate is re-exported under a different name.
+  - Use `#[dynamic(crate = "crate")]` when deriving inside the cel crate itself
+  - Use `#[dynamic(crate = "::cel")]` or omit for normal external usage
+  - Use `#[dynamic(crate = "::my_crate::cel")]` if cel is re-exported from another crate
 
 ### Field-level attributes
 
@@ -49,6 +53,29 @@ pub struct HttpRequest<'a> {
     status_code: i32,
     #[dynamic(skip)]
     internal_timestamp: u64,
+}
+```
+
+### Using inside the cel crate
+
+When using `#[derive(DynamicType)]` inside the `cel` crate itself, you need to either:
+
+1. Use the `crate` attribute:
+```rust
+#[derive(DynamicType)]
+#[dynamic(crate = "crate")]
+pub struct InternalType {
+    field: String,
+}
+```
+
+2. Or add an extern crate alias at the module level:
+```rust
+extern crate self as cel;
+
+#[derive(DynamicType)]
+pub struct InternalType {
+    field: String,
 }
 ```
 
