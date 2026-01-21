@@ -165,6 +165,16 @@ macro_rules! impl_dynamic_vtable {
         }
     };
 }
+impl DynamicType for Value<'_> {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        self.clone()
+    }
+}
+impl_dynamic_vtable!(Value<'_>);
 
 // Primitive type implementations
 
@@ -247,7 +257,7 @@ impl DynamicType for u32 {
     }
 
     fn materialize(&self) -> Value<'_> {
-        Value::from(*self as i64)
+        Value::from(*self as u64)
     }
 }
 impl_dynamic_vtable!(u32);

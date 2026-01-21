@@ -4,13 +4,14 @@ extern crate self as cel;
 
 use std::alloc::System;
 use std::collections::HashMap;
+use std::fmt::Display;
 use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 use serde_json::json;
 
 use crate::context::VariableResolver;
@@ -23,6 +24,14 @@ use crate::{Context, FunctionContext, Program, Value, to_value, types};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct HttpRequest {
     method: String,
+    path: String,
+    headers: HashMap<String, String>,
+    claims: Claims,
+}
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
+pub struct Http2Request {
+    #[serde(serialize_with = "ser_display")]
+    method: http::Method,
     path: String,
     headers: HashMap<String, String>,
     claims: Claims,
@@ -130,6 +139,21 @@ impl<'a> DynamicType for &'a serde_json::Value {
 }
 crate::impl_dynamic_vtable!(&serde_json::Value);
 
+// Implement DynamicType for &String to support using String references in structs
+// This pattern works for any type that can be converted to a CEL-compatible type
+// For example, you could do the same for &http::Method:
+//   impl DynamicType for &http::Method { ... }
+impl<'a> DynamicType for &'a String {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(self.as_str())
+    }
+}
+crate::impl_dynamic_vtable!(&String);
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Claims(serde_json::Value);
 
@@ -145,13 +169,32 @@ fn claims_inner<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
     &c.0
 }
 
+// Generic helper to convert any AsRef<str> to &str
+// Works with http::Method, String, and other AsRef<str> types
+fn method2<'a, T: AsRef<str>>(c: &'a &'a T) -> Value<'a> {
+    Value::String(c.as_ref().into())
+}
+
+// Helper function specifically for http::Method that returns Value directly
+fn method_to_value<'a>(m: &'a &'a http::Method) -> Value<'a> {
+    Value::String(m.as_str().into())
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, DynamicType)]
 pub struct HttpRequestRef<'a> {
-    method: &'a str,
+    // Use with_value to convert http::Method to Value directly
+    #[dynamic(with_value = "method2")]
+    #[serde(serialize_with = "ser_display")]
+    method: &'a http::Method,
     path: &'a str,
     headers: &'a HashMap<String, String>,
+    // Use with to unwrap the Claims newtype
     #[dynamic(with = "claims_inner")]
     claims: &'a Claims,
+}
+
+pub fn ser_display<S: Serializer, T: Display>(t: &T, serializer: S) -> Result<S::Ok, S::Error> {
+    serializer.serialize_str(&t.to_string())
 }
 #[derive(Debug, Clone)]
 pub struct DynResolverRef<'a> {
@@ -184,10 +227,10 @@ impl<'a> VariableResolver<'a> for DynResolverRef<'a> {
     }
 }
 impl<'a> DynResolver<'a> {
-    pub fn new_from_request(req: &'a HttpRequest) -> Self {
+    pub fn new_from_request(req: &'a Http2Request) -> Self {
         Self {
             request: HttpRequestRef {
-                method: req.method.as_str(),
+                method: &req.method,
                 path: req.path.as_str(),
                 headers: &req.headers,
                 claims: &req.claims,
@@ -390,9 +433,9 @@ fn dyn_val() {
     pctx.add_function("with", with);
     let headers = HashMap::new();
     let claims = Claims(json!({"sub": "me@example.com"}));
-    let p = Program::compile("request.claims").unwrap();
-    let req = HttpRequest {
-        method: "GET".to_string(),
+    let p = Program::compile("request.claims.sub + request.method + request.path").unwrap();
+    let req = Http2Request {
+        method: http::Method::GET,
         path: "/foo".to_string(),
         headers,
         claims,
@@ -404,12 +447,12 @@ fn dyn_val() {
     // let resolver2 = DynResolverRef { rf: &resolver };
     // let res = Value::resolve(&p.expression, &pctx, &resolver2).unwrap();
     AllocationRegistry::disable_tracking();
-    // assert_eq!(res.json().unwrap(), json!("me@example.com"));
-    let dv = match res {
-        Value::Dynamic(dv) => dv,
-        _ => panic!("Expected dynamic value"),
-    };
-    dbg!(types::dynamic::always_materialize(dv.field("sub").unwrap()));
+    assert_eq!(res.json().unwrap(), json!("me@example.comGET/foo"));
+    // let dv = match res {
+    //     Value::Dynamic(dv) => dv,
+    //     _ => panic!("Expected dynamic value"),
+    // };
+    // dbg!(types::dynamic::always_materialize(dv.field("sub").unwrap()));
     // drop(resolver);
     // let Value::Dynamic(_ob) = res else { panic!() };
     // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
@@ -422,8 +465,8 @@ fn test_dynamic_with_attribute() {
     let headers = HashMap::new();
     let claims = Claims(json!({"sub": "user@example.com", "role": "admin"}));
 
-    let req = HttpRequest {
-        method: "GET".to_string(),
+    let req = Http2Request {
+        method: http::Method::GET,
         path: "/api/data".to_string(),
         headers,
         claims,
@@ -452,6 +495,53 @@ fn test_dynamic_with_attribute() {
     let p = Program::compile("request.claims.sub").unwrap();
     let res = resolver.eval(&pctx, &p.expression);
     assert_eq!(res.json().unwrap(), json!("user@example.com"));
+}
+
+#[test]
+fn test_dynamic_with_value_attribute() {
+    // Test the with_value attribute which directly returns Value
+    let pctx = Context::default();
+    let headers = HashMap::new();
+    let claims = Claims(json!({"sub": "user@example.com"}));
+
+    let req = Http2Request {
+        method: http::Method::POST,
+        path: "/api/users".to_string(),
+        headers,
+        claims,
+    };
+
+    let resolver = DynResolver::new_from_request(&req);
+
+    // Test accessing method field which uses with_value attribute
+    let method_val = resolver.request.field("method").unwrap();
+
+    // with_value should return Value::String directly
+    match method_val {
+        Value::String(s) => {
+            assert_eq!(s.as_ref(), "POST");
+        }
+        _ => panic!("Expected String value for method, got {:?}", method_val),
+    }
+
+    // Test via materialize
+    let materialized = resolver.request.materialize();
+    if let Value::Map(map) = materialized {
+        let method_from_map = map.get(&KeyRef::from("method")).unwrap();
+        match method_from_map {
+            Value::String(s) => {
+                assert_eq!(s.as_ref(), "POST");
+            }
+            _ => panic!("Expected String value in map"),
+        }
+    } else {
+        panic!("Expected Map from materialize");
+    }
+
+    // Test via CEL expression
+    let p = Program::compile("request.method").unwrap();
+    let res = resolver.eval(&pctx, &p.expression);
+    assert_eq!(res.json().unwrap(), json!("POST"));
 }
 
 use cel_derive::DynamicType;
@@ -489,87 +579,3 @@ impl AllocationTracker for Counter {
         );
     }
 }
-struct Y {
-    bar: String,
-}
-struct YRef<'a> {
-    bar: &'a str,
-}
-use ouroboros::self_referencing;
-use rental::rental;
-use self_cell::self_cell;
-use yoke::Yoke;
-
-// self_cell!(
-// struct Bundle2<T> { // make this not 'static so Bundle<YRef<'a>> works!
-//     owned: T,
-//     #[covariant]
-//     rf: &'this T
-// }
-//     );
-// struct Bundle<'a, O, B> {
-//     owned: &'a O,
-//     rf: B,
-// }
-//
-// impl<'a, O, B> Bundle<'a, O, B> {
-//     pub fn get_ref<'b>(&'b self) -> &'a B { // MUST be 'a , not 'b
-//         &self.rf
-//     }
-// }
-//
-// struct X<'a> {
-//     y: Bundle<'a, Y, YRef<'a>>,
-// }
-// impl<'a> X<'a> {
-//     fn new(y: &'a Y) -> X<'a> {
-//         X {
-//             y: Bundle {
-//                 owned: y,
-//                 rf: YRef { bar: &y.bar }
-//             }
-//         }
-//     }
-// }
-// impl<'a> X<'a> {
-//     fn new(y: &'a Y) -> X<'a> {
-//         let yr = YRef { bar: &y.bar };
-//         let y = Yoke::<&YRef, YRef>::attach_to_cart(yr, |d| d);
-//         X {
-//             y: YandYRef::new(yr, |yr| yr)
-//         }
-//     }
-// }
-// self_cell!(
-//     struct YandYRef<'a> { // make this not 'static so Bundle<YRef<'a>> works!
-//         owner: YRef<'a>,
-//         #[covariant]
-//         dependent: YRef,
-//     }
-//     impl {}
-// );
-//
-// struct X<'a> {
-//     y: YandYRef<'a>
-// }
-// impl<'a> X<'a> {
-//     fn new(y: &'a Y) -> X<'a> {
-//         let yr = YRef { bar: &y.bar };
-//         X {
-//             y: YandYRef::new(yr, |yr| yr)
-//         }
-//     }
-// }
-// struct X<'a> {
-//     y: Bundle<YRef<'a>>
-// }
-// impl<'a> X<'a> {
-//     fn new(y: &'a Y) -> X<'a> {
-//         X {
-//             y: BundleBuilder{
-//                 owned: YRef { bar: &y.bar },
-//                 rf_builder: |owned| owned,
-//             }.build(),
-//         }
-//     }
-// }
