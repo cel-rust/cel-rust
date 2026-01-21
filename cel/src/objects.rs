@@ -543,11 +543,11 @@ impl<'a> Value<'a> {
             Expr::Inline(val) => Ok(val.clone()),
             Expr::Call(call) => {
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
-                    let cond = Value::resolve(&call.args[0], ctx, resolver)?;
+                    let cond = resolve(&call.args[0])?;
                     return if cond.to_bool()? {
-                        Value::resolve(&call.args[1], ctx, resolver)
+                        resolve(&call.args[1])
                     } else {
-                        Value::resolve(&call.args[2], ctx, resolver)
+                        resolve(&call.args[2])
                     };
                 }
                 if call.args.len() == 2 {
@@ -866,7 +866,7 @@ impl<'a> Value<'a> {
                         }
                     }
                 }
-                let left: Value<'a> = Value::resolve(left_op, ctx, resolver)?;
+                let left: Value<'a> = resolve(left_op)?;
                 if select.test {
                     match &left {
                         Value::Map(map) => {
@@ -933,50 +933,50 @@ impl<'a> Value<'a> {
                 let accu_init = resolve(&comprehension.accu_init)?;
                 let iter = resolve(&comprehension.iter_range)?;
                 let mut accu = accu_init;
-
-                match iter {
-                    Value::List(items) => {
-                        for item in items.as_ref() {
-                            let comp_resolver = SingleVarResolver::new(
-                                resolver,
-                                &comprehension.accu_var,
-                                accu.clone(),
-                            );
-                            if !Value::resolve(&comprehension.loop_cond, ctx, &comp_resolver)?
-                                .to_bool()?
-                            {
-                                break;
-                            }
-                            let with_iter = SingleVarResolver::new(
-                                &comp_resolver,
-                                &comprehension.iter_var,
-                                item.clone(),
-                            );
-                            accu = Value::resolve(&comprehension.loop_step, ctx, &with_iter)?;
-                        }
-                    }
-                    Value::Map(map) => {
-                        for key in map.iter_keys() {
-                            let comp_resolver = SingleVarResolver::new(
-                                resolver,
-                                &comprehension.accu_var,
-                                accu.clone(),
-                            );
-                            if !Value::resolve(&comprehension.loop_cond, ctx, &comp_resolver)?
-                                .to_bool()?
-                            {
-                                break;
-                            }
-                            let kv = Value::from(key);
-                            let with_iter =
-                                SingleVarResolver::new(&comp_resolver, &comprehension.iter_var, kv);
-                            accu = Value::resolve(&comprehension.loop_step, ctx, &with_iter)?;
-                        }
-                    }
-                    t => todo!("Support {t:?}"),
-                }
-                let comp_resolver = SingleVarResolver::new(resolver, &comprehension.accu_var, accu);
-                Value::resolve(&comprehension.result, ctx, &comp_resolver)
+                todo!()
+                // match iter {
+                //     Value::List(items) => {
+                //         for item in items.as_ref() {
+                //             let comp_resolver = SingleVarResolver::new(
+                //                 resolver,
+                //                 &comprehension.accu_var,
+                //                 accu.clone(),
+                //             );
+                //             if !Value::resolve(&comprehension.loop_cond, ctx, &comp_resolver)?
+                //                 .to_bool()?
+                //             {
+                //                 break;
+                //             }
+                //             let with_iter = SingleVarResolver::new(
+                //                 &comp_resolver,
+                //                 &comprehension.iter_var,
+                //                 item.clone(),
+                //             );
+                //             accu = Value::resolve(&comprehension.loop_step, ctx, &with_iter)?;
+                //         }
+                //     }
+                //     Value::Map(map) => {
+                //         for key in map.iter_keys() {
+                //             let comp_resolver = SingleVarResolver::new(
+                //                 resolver,
+                //                 &comprehension.accu_var,
+                //                 accu.clone(),
+                //             );
+                //             if !Value::resolve(&comprehension.loop_cond, ctx, &comp_resolver)?
+                //                 .to_bool()?
+                //             {
+                //                 break;
+                //             }
+                //             let kv = Value::from(key);
+                //             let with_iter =
+                //                 SingleVarResolver::new(&comp_resolver, &comprehension.iter_var, kv);
+                //             accu = Value::resolve(&comprehension.loop_step, ctx, &with_iter)?;
+                //         }
+                //     }
+                //     t => todo!("Support {t:?}"),
+                // }
+                // let comp_resolver = SingleVarResolver::new(resolver, &comprehension.accu_var, accu);
+                // Value::resolve(&comprehension.result, ctx, &comp_resolver)
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),

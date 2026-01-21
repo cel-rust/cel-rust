@@ -29,6 +29,10 @@ itertools = "0.14.0"
 http = "1.4.0"
 erased-serde = "0.4.9"
 cel-derive = { path = "../cel-derive" }
+ouroboros = "0.18.5"
+self_cell = "1.2.2"
+yoke = "0.8.1"
+rental = "0.5.6"
 
 [dev-dependencies]
 pprof = { version = "0.15", features = ["protobuf", "protobuf-codec", "criterion"] }
