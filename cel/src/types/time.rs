@@ -1,5 +1,7 @@
 use std::sync::LazyLock;
+
 use chrono::TimeZone;
+
 use crate::{ExecutionError, ResolveResult, Value};
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
@@ -11,29 +13,28 @@ use crate::{ExecutionError, ResolveResult, Value};
 
 static MAX_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
     let naive = chrono::NaiveDate::from_ymd_opt(9999, 12, 31)
-      .unwrap()
-      .and_hms_nano_opt(23, 59, 59, 999_999_999)
-      .unwrap();
+        .unwrap()
+        .and_hms_nano_opt(23, 59, 59, 999_999_999)
+        .unwrap();
     chrono::FixedOffset::east_opt(0)
-      .unwrap()
-      .from_utc_datetime(&naive)
+        .unwrap()
+        .from_utc_datetime(&naive)
 });
 
 static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
     let naive = chrono::NaiveDate::from_ymd_opt(1, 1, 1)
-      .unwrap()
-      .and_hms_opt(0, 0, 0)
-      .unwrap();
+        .unwrap()
+        .and_hms_opt(0, 0, 0)
+        .unwrap();
     chrono::FixedOffset::east_opt(0)
-      .unwrap()
-      .from_utc_datetime(&naive)
+        .unwrap()
+        .from_utc_datetime(&naive)
 });
 
 pub(crate) enum TsOp {
     Add,
     Sub,
 }
-
 
 impl TsOp {
     fn str(&self) -> &'static str {
@@ -58,11 +59,11 @@ pub(crate) fn checked_op<'a>(
         TsOp::Add => lhs.checked_add_signed(*rhs),
         TsOp::Sub => lhs.checked_sub_signed(*rhs),
     }
-      .ok_or(ExecutionError::Overflow(
-          op.str(),
-          (*lhs).into(),
-          (*rhs).into(),
-      ))?;
+    .ok_or(ExecutionError::Overflow(
+        op.str(),
+        (*lhs).into(),
+        (*rhs).into(),
+    ))?;
 
     // Check for cel-spec limits
     if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {

@@ -15,7 +15,6 @@ impl_conversions!(
     ListValue<'a> => Value::List,
 );
 
-
 impl_conversions!(
     chrono::Duration => Value::Duration,
     chrono::DateTime<chrono::FixedOffset> => Value::Timestamp,

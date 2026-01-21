@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use http::HeaderName;
+
 use crate::common::ast::{
     CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryExpr, ListExpr, MapEntryExpr, MapExpr,
     OptimizedExpr, SelectExpr, operators,
@@ -5,8 +9,6 @@ use crate::common::ast::{
 use crate::objects::{ListValue, MapValue};
 use crate::parser::Expression;
 use crate::{IdedExpr, Value};
-use http::HeaderName;
-use std::sync::Arc;
 
 fn is_lit(e: &Expr) -> bool {
     matches!(e, Expr::Literal(_) | Expr::Inline(_) | Expr::Map(_))
@@ -196,9 +198,9 @@ impl Optimize {
 
         // Specialize `jwt.value`
         if let Expr::Select(se) = &res.expr
-          && let Expr::Ident(base) = &se.operand.expr
-          && base == "jwt"
-          && !se.test
+            && let Expr::Ident(base) = &se.operand.expr
+            && base == "jwt"
+            && !se.test
         {
             let field = Arc::from(se.field.as_ref());
             return with_id(Expr::Optimized {
@@ -282,7 +284,6 @@ mod test {
         fn type_name(&self) -> &'static str {
             "precompiled_regex"
         }
-
 
         fn json(&self) -> Option<serde_json::Value> {
             None

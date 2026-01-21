@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use hashbrown::Equivalent;
+
 use crate::common::ast::OptimizedExpr;
 use crate::functions;
 use crate::magic::{Function, IntoFunction};
@@ -30,7 +31,6 @@ use crate::objects::{TryIntoValue, Value};
 /// [1, 2, 3].map(x, x * 2) == [2, 4, 6]
 ///                  ↑
 /// Only in scope for the duration of the map expression
-///
 pub struct Context {
     pub functions: BTreeMap<String, Function>,
     pub qualified_functions: hashbrown::HashMap<(String, String), Function>,
@@ -129,7 +129,7 @@ impl Default for Context {
         ctx.add_function("hasValue", functions::optional_has_value);
         ctx.add_function("or", functions::optional_or_optional);
         ctx.add_function("orValue", functions::optional_or_value);
-        
+
         ctx.add_function("matches", functions::matches);
 
         {

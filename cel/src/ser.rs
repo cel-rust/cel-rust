@@ -8,16 +8,13 @@ use std::fmt::Display;
 use std::iter::FromIterator;
 use std::sync::Arc;
 
-
 use chrono::FixedOffset;
-
-use serde::ser::SerializeStruct;
-use serde::ser::{self, Impossible};
 use serde::Serialize;
+use serde::ser::{self, Impossible, SerializeStruct};
 use thiserror::Error;
 
-use crate::objects::{BytesValue, Key, ListValue, StringValue};
 use crate::Value;
+use crate::objects::{BytesValue, Key, ListValue, StringValue};
 
 pub struct Serializer;
 pub struct KeySerializer;
@@ -56,7 +53,6 @@ pub struct KeySerializer;
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Duration(pub chrono::Duration);
 
-
 impl Duration {
     // Since serde can't natively represent durations, we serialize a special
     // newtype to indicate we want to rebuild the duration in the result, while
@@ -67,20 +63,17 @@ impl Duration {
     const NANOS_FIELD: &str = "nanos";
 }
 
-
 impl From<Duration> for chrono::Duration {
     fn from(value: Duration) -> Self {
         value.0
     }
 }
 
-
 impl From<chrono::Duration> for Duration {
     fn from(value: chrono::Duration) -> Self {
         Self(value)
     }
 }
-
 
 impl ser::Serialize for Duration {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -145,7 +138,6 @@ impl ser::Serialize for Duration {
 #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Timestamp(pub chrono::DateTime<FixedOffset>);
 
-
 impl Timestamp {
     // Since serde can't natively represent timestamps, we serialize a special
     // newtype to indicate we want to rebuild the timestamp in the result,
@@ -153,20 +145,17 @@ impl Timestamp {
     const NAME: &str = "$__cel_private_Timestamp";
 }
 
-
 impl From<Timestamp> for chrono::DateTime<FixedOffset> {
     fn from(value: Timestamp) -> Self {
         value.0
     }
 }
 
-
 impl From<chrono::DateTime<FixedOffset>> for Timestamp {
     fn from(value: chrono::DateTime<FixedOffset>) -> Self {
         Self(value)
     }
 }
-
 
 impl ser::Serialize for Timestamp {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
@@ -311,7 +300,6 @@ impl ser::Serializer for Serializer {
         T: ?Sized + Serialize,
     {
         match name {
-
             Duration::NAME => value.serialize(TimeSerializer::Duration),
 
             Timestamp::NAME => value.serialize(TimeSerializer::Timestamp),
@@ -407,7 +395,6 @@ pub struct SerializeStructVariant {
     name: String,
     map: HashMap<Key, Value<'static>>,
 }
-
 
 #[derive(Debug, Default)]
 struct SerializeTimestamp {
@@ -549,7 +536,6 @@ impl ser::SerializeStructVariant for SerializeStructVariant {
         Ok(map.into())
     }
 }
-
 
 impl ser::SerializeStruct for SerializeTimestamp {
     type Ok = Value<'static>;
@@ -788,13 +774,11 @@ impl ser::Serializer for KeySerializer {
     }
 }
 
-
 #[derive(Debug)]
 enum TimeSerializer {
     Duration,
     Timestamp,
 }
-
 
 impl ser::Serializer for TimeSerializer {
     type Ok = Value<'static>;
@@ -985,11 +969,10 @@ mod tests {
     use serde::Serialize;
     use serde_bytes::Bytes;
 
-
     use super::{Duration, Timestamp};
     use crate::context::MapResolver;
     use crate::objects::{BytesValue, Key, ListValue};
-    use crate::{to_value, Context, Program, Value};
+    use crate::{Context, Program, Value, to_value};
 
     macro_rules! primitive_test {
         ($functionName:ident, $strValue: literal, $value: expr) => {
@@ -1236,13 +1219,11 @@ mod tests {
         assert_eq!(map, expected)
     }
 
-
     #[derive(Serialize)]
     struct TestTimeTypes {
         dur: Duration,
         ts: Timestamp,
     }
-
 
     #[test]
     fn test_time_types() {
@@ -1342,8 +1323,6 @@ mod tests {
         let value = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(value, true.into());
     }
-
-
 
     #[test]
     fn test_time_json() {

@@ -1,4 +1,4 @@
-use crate::common::ast::{operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr};
+use crate::common::ast::{CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr, operators};
 use crate::common::value::CelVal::{Boolean, Int};
 use crate::parser::{MacroExprHelper, ParseError};
 

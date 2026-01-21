@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use cel::context::{CompositeResolver, Context, MapResolver, VariableResolver};
 use cel::{Program, Value};
-use criterion::{criterion_group, BenchmarkId, Criterion};
+use criterion::{BenchmarkId, Criterion, criterion_group};
 use pprof::criterion::Output;
 use serde::Serialize;
 
@@ -40,10 +40,13 @@ const EXPRESSIONS: [(&str, &str); 35] = [
     ("max negative", "max(-1, 0, 1)"),
     ("max float", "max(-1.0, 0.0, 1.0)"),
     ("duration", "duration('1s')"),
-    ("timestamp", "timestamp('2023-05-28T00:00:00Z')"), // ("complex", "Account{user_id: 123}.user_id == 123"),
+    ("timestamp", "timestamp('2023-05-28T00:00:00Z')"), /* ("complex", "Account{user_id: 123}.user_id == 123"), */
     ("variable resolver", "banana"),
     ("variable hashmap", "apple"),
-    ("stress", "true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true"),
+    (
+        "stress",
+        "true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true",
+    ),
     ("regex", "'abc'.matches('^[a-z]*$')"),
 ];
 

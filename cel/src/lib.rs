@@ -23,21 +23,18 @@ mod magic;
 pub mod objects;
 mod resolvers;
 
-
 mod duration;
 
 pub use ser::{Duration, Timestamp};
 
 mod ser;
-pub use ser::{to_value, SerializationError};
-
+pub use ser::{SerializationError, to_value};
 
 mod json;
 mod optimize;
 #[cfg(test)]
 mod test;
 pub mod types;
-
 
 pub use json::ConvertToJsonError;
 pub use linkme::distributed_slice as register;

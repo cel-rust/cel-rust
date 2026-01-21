@@ -92,7 +92,7 @@ impl IdedExpr {
         functions: &mut HashSet<&'expr str>,
     ) {
         match &self.expr {
-            Expr::Optimized { original, ..} => {
+            Expr::Optimized { original, .. } => {
                 original._references(variables, functions);
             }
             Expr::Unspecified => {}

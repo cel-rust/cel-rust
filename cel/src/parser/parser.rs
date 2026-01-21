@@ -1,7 +1,26 @@
+use std::cell::RefCell;
+use std::error::Error;
+use std::fmt::Display;
+use std::mem;
+use std::ops::Deref;
+use std::rc::Rc;
+use std::sync::Arc;
+
+use antlr4rust::common_token_stream::CommonTokenStream;
+use antlr4rust::error_listener::ErrorListener;
+use antlr4rust::errors::ANTLRError;
+use antlr4rust::parser::ParserNodeType;
+use antlr4rust::parser_rule_context::ParserRuleContext;
+use antlr4rust::recognizer::Recognizer;
+use antlr4rust::token::{CommonToken, Token};
+use antlr4rust::token_factory::TokenFactory;
+use antlr4rust::tree::{ParseTree, ParseTreeListener, ParseTreeVisitorCompat, VisitChildren};
+use antlr4rust::{InputStream, Parser as AntlrParser};
+
 use crate::common::ast;
 use crate::common::ast::{
-    operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, MapEntryExpr, MapExpr,
-    SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
+    CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, MapEntryExpr, MapExpr,
+    SelectExpr, SourceInfo, StructExpr, StructFieldExpr, operators,
 };
 use crate::common::value::CelVal;
 use crate::parser::r#gen::{
@@ -17,23 +36,6 @@ use crate::parser::r#gen::{
     SelectContext, SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
 };
 use crate::parser::{r#gen, macros, parse};
-use antlr4rust::common_token_stream::CommonTokenStream;
-use antlr4rust::error_listener::ErrorListener;
-use antlr4rust::errors::ANTLRError;
-use antlr4rust::parser::ParserNodeType;
-use antlr4rust::parser_rule_context::ParserRuleContext;
-use antlr4rust::recognizer::Recognizer;
-use antlr4rust::token::{CommonToken, Token};
-use antlr4rust::token_factory::TokenFactory;
-use antlr4rust::tree::{ParseTree, ParseTreeListener, ParseTreeVisitorCompat, VisitChildren};
-use antlr4rust::{InputStream, Parser as AntlrParser};
-use std::cell::RefCell;
-use std::error::Error;
-use std::fmt::Display;
-use std::mem;
-use std::ops::Deref;
-use std::rc::Rc;
-use std::sync::Arc;
 
 pub struct MacroExprHelper<'a> {
     helper: &'a mut ParserHelper,
@@ -471,7 +473,7 @@ impl ParseTreeVisitorCompat<'_> for Parser {
     }
 
     fn visit(&mut self, node: &<Self::Node as ParserNodeType<'_>>::Type) -> Self::Return {
-        //println!("{node:?}");
+        // println!("{node:?}");
         self.visit_node(node);
         mem::take(self.temp_result())
     }
@@ -1153,10 +1155,11 @@ impl LogicManager {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::common::ast::{ComprehensionExpr, EntryExpr, Expr};
-    use crate::IdedExpr;
     use std::iter;
+
+    use super::*;
+    use crate::IdedExpr;
+    use crate::common::ast::{ComprehensionExpr, EntryExpr, Expr};
 
     #[derive(Default)]
     struct TestInfo {
@@ -1246,10 +1249,12 @@ mod tests {
             );
         }
         assert!(Parser::new().max_recursion_depth(0).parse("1 + 1").is_ok());
-        assert!(Parser::new()
-            .max_recursion_depth(0)
-            .parse("(1 + 1)")
-            .is_err());
+        assert!(
+            Parser::new()
+                .max_recursion_depth(0)
+                .parse("(1 + 1)")
+                .is_err()
+        );
     }
 
     #[test]
@@ -2096,7 +2101,7 @@ ERROR: <input>:1:24: unsupported syntax '?'
     impl DebugWriter {
         fn buffer(&mut self, expr: &IdedExpr) -> &Self {
             let e = match &expr.expr {
-                Expr::Optimized {  ..} => "optimized",
+                Expr::Optimized { .. } => "optimized",
                 Expr::Unspecified => "UNSPECIFIED!",
                 Expr::Call(call) => {
                     if let Some(target) = &call.target {

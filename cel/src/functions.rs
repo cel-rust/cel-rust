@@ -436,13 +436,9 @@ pub fn matches<'a>(
     }
 }
 
-
-pub use time::duration;
-
-pub use time::timestamp;
+pub use time::{duration, timestamp};
 
 use crate::common::ast::Expr;
-
 
 pub mod time {
     use chrono::{Datelike, Timelike};
@@ -834,7 +830,6 @@ mod tests {
         .for_each(assert_script);
     }
 
-
     #[test]
     fn test_timestamp() {
         [(
@@ -936,7 +931,6 @@ mod tests {
         .for_each(assert_error)
     }
 
-
     #[test]
     fn test_duration() {
         [
@@ -983,7 +977,6 @@ mod tests {
         .for_each(assert_script);
     }
 
-
     #[test]
     fn test_timestamp_variable() {
         let ts: chrono::DateTime<chrono::FixedOffset> =
@@ -996,7 +989,6 @@ mod tests {
         let result = program.execute_with(&ctx, &vars).unwrap();
         assert_eq!(result, true.into());
     }
-
 
     #[test]
     fn test_chrono_string() {
@@ -1025,7 +1017,6 @@ mod tests {
         }
     }
 
-
     #[test]
     fn test_matches() {
         let tests = vec![
@@ -1044,7 +1035,6 @@ mod tests {
             );
         }
     }
-
 
     #[test]
     fn test_matches_err() {

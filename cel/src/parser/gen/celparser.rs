@@ -6,30 +6,6 @@
 #![allow(unused_imports)]
 #![allow(unused_mut)]
 #![allow(unused_braces)]
-use super::cellistener::*;
-use super::celvisitor::*;
-use antlr4rust::atn::{ATN, INVALID_ALT};
-use antlr4rust::atn_deserializer::ATNDeserializer;
-use antlr4rust::dfa::DFA;
-use antlr4rust::error_strategy::{DefaultErrorStrategy, ErrorStrategy};
-use antlr4rust::errors::*;
-use antlr4rust::int_stream::EOF;
-use antlr4rust::parser::{BaseParser, Parser, ParserNodeType, ParserRecog};
-use antlr4rust::parser_atn_simulator::ParserATNSimulator;
-use antlr4rust::parser_rule_context::{cast, cast_mut, BaseParserRuleContext, ParserRuleContext};
-use antlr4rust::recognizer::{Actions, Recognizer};
-use antlr4rust::rule_context::{BaseRuleContext, CustomRuleContext, RuleContext};
-use antlr4rust::token::{OwningToken, Token, TOKEN_EOF};
-use antlr4rust::token_factory::{CommonTokenFactory, TokenAware, TokenFactory};
-use antlr4rust::token_stream::TokenStream;
-use antlr4rust::tree::*;
-use antlr4rust::vocabulary::{Vocabulary, VocabularyImpl};
-use antlr4rust::PredictionContextCache;
-use antlr4rust::TokenSource;
-
-use antlr4rust::lazy_static;
-use antlr4rust::{TidAble, TidExt};
-
 use std::any::{Any, TypeId};
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
@@ -38,6 +14,27 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
+
+use antlr4rust::atn::{ATN, INVALID_ALT};
+use antlr4rust::atn_deserializer::ATNDeserializer;
+use antlr4rust::dfa::DFA;
+use antlr4rust::error_strategy::{DefaultErrorStrategy, ErrorStrategy};
+use antlr4rust::errors::*;
+use antlr4rust::int_stream::EOF;
+use antlr4rust::parser::{BaseParser, Parser, ParserNodeType, ParserRecog};
+use antlr4rust::parser_atn_simulator::ParserATNSimulator;
+use antlr4rust::parser_rule_context::{BaseParserRuleContext, ParserRuleContext, cast, cast_mut};
+use antlr4rust::recognizer::{Actions, Recognizer};
+use antlr4rust::rule_context::{BaseRuleContext, CustomRuleContext, RuleContext};
+use antlr4rust::token::{OwningToken, TOKEN_EOF, Token};
+use antlr4rust::token_factory::{CommonTokenFactory, TokenAware, TokenFactory};
+use antlr4rust::token_stream::TokenStream;
+use antlr4rust::tree::*;
+use antlr4rust::vocabulary::{Vocabulary, VocabularyImpl};
+use antlr4rust::{PredictionContextCache, TidAble, TidExt, TokenSource, lazy_static};
+
+use super::cellistener::*;
+use super::celvisitor::*;
 
 pub const CEL_EQUALS: i32 = 1;
 pub const CEL_NOT_EQUALS: i32 = 2;
@@ -463,7 +460,7 @@ impl<'input> CustomRuleContext<'input> for StartContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_start
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_start }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_start }
 }
 antlr4rust::tid! {StartContextExt<'a>}
 
@@ -516,10 +513,10 @@ where
         recog.base.enter_rule(_localctx.clone(), 0, RULE_start);
         let mut _localctx: Rc<StartContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule expr*/
+                // InvokeRule expr
                 recog.base.set_state(34);
                 let tmp = recog.expr()?;
                 cast_mut::<_, StartContext>(&mut _localctx).e = Some(tmp.clone());
@@ -584,7 +581,7 @@ impl<'input> CustomRuleContext<'input> for ExprContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_expr
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_expr }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_expr }
 }
 antlr4rust::tid! {ExprContextExt<'a>}
 
@@ -661,10 +658,10 @@ where
         let mut _localctx: Rc<ExprContextAll> = _localctx;
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule conditionalOr*/
+                // InvokeRule conditionalOr
                 recog.base.set_state(37);
                 let tmp = recog.conditionalOr()?;
                 cast_mut::<_, ExprContext>(&mut _localctx).e = Some(tmp.clone());
@@ -680,7 +677,7 @@ where
                             .match_token(CEL_QUESTIONMARK, &mut recog.err_handler)?;
                         cast_mut::<_, ExprContext>(&mut _localctx).op = Some(tmp.clone());
 
-                        /*InvokeRule conditionalOr*/
+                        // InvokeRule conditionalOr
                         recog.base.set_state(39);
                         let tmp = recog.conditionalOr()?;
                         cast_mut::<_, ExprContext>(&mut _localctx).e1 = Some(tmp.clone());
@@ -688,7 +685,7 @@ where
                         recog.base.set_state(40);
                         recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
 
-                        /*InvokeRule expr*/
+                        // InvokeRule expr
                         recog.base.set_state(41);
                         let tmp = recog.expr()?;
                         cast_mut::<_, ExprContext>(&mut _localctx).e2 = Some(tmp.clone());
@@ -754,7 +751,7 @@ impl<'input> CustomRuleContext<'input> for ConditionalOrContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_conditionalOr
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_conditionalOr }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_conditionalOr }
 }
 antlr4rust::tid! {ConditionalOrContextExt<'a>}
 
@@ -828,10 +825,10 @@ where
         let mut _localctx: Rc<ConditionalOrContextAll> = _localctx;
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule conditionalAnd*/
+                // InvokeRule conditionalAnd
                 recog.base.set_state(45);
                 let tmp = recog.conditionalAnd()?;
                 cast_mut::<_, ConditionalOrContext>(&mut _localctx).e = Some(tmp.clone());
@@ -857,7 +854,7 @@ where
                                 .ops
                                 .push(temp);
 
-                            /*InvokeRule conditionalAnd*/
+                            // InvokeRule conditionalAnd
                             recog.base.set_state(47);
                             let tmp = recog.conditionalAnd()?;
                             cast_mut::<_, ConditionalOrContext>(&mut _localctx).conditionalAnd =
@@ -936,7 +933,7 @@ impl<'input> CustomRuleContext<'input> for ConditionalAndContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_conditionalAnd
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_conditionalAnd }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_conditionalAnd }
 }
 antlr4rust::tid! {ConditionalAndContextExt<'a>}
 
@@ -1010,10 +1007,10 @@ where
         let mut _localctx: Rc<ConditionalAndContextAll> = _localctx;
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule relation*/
+                // InvokeRule relation
                 recog.base.set_state(53);
                 let tmp = recog.relation_rec(0)?;
                 cast_mut::<_, ConditionalAndContext>(&mut _localctx).e = Some(tmp.clone());
@@ -1039,7 +1036,7 @@ where
                                 .ops
                                 .push(temp);
 
-                            /*InvokeRule relation*/
+                            // InvokeRule relation
                             recog.base.set_state(55);
                             let tmp = recog.relation_rec(0)?;
                             cast_mut::<_, ConditionalAndContext>(&mut _localctx).relation =
@@ -1113,7 +1110,7 @@ impl<'input> CustomRuleContext<'input> for RelationContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_relation
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_relation }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_relation }
 }
 antlr4rust::tid! {RelationContextExt<'a>}
 
@@ -1237,11 +1234,11 @@ where
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: i32;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
                 {
-                    /*InvokeRule calc*/
+                    // InvokeRule calc
                     recog.base.set_state(62);
                     recog.calc_rec(0)?;
                 }
@@ -1256,7 +1253,7 @@ where
                         _prevctx = _localctx.clone();
                         {
                             {
-                                /*recRuleAltStartAction*/
+                                // recRuleAltStartAction
                                 let mut tmp =
                                     RelationContextExt::new(_parentctx.clone(), _parentState);
                                 recog.push_new_recursion_context(
@@ -1292,7 +1289,7 @@ where
                                     recog.err_handler.report_match(&mut recog.base);
                                     recog.base.consume(&mut recog.err_handler);
                                 }
-                                /*InvokeRule relation*/
+                                // InvokeRule relation
                                 recog.base.set_state(66);
                                 recog.relation_rec(2)?;
                             }
@@ -1357,7 +1354,7 @@ impl<'input> CustomRuleContext<'input> for CalcContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_calc
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_calc }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_calc }
 }
 antlr4rust::tid! {CalcContextExt<'a>}
 
@@ -1465,11 +1462,11 @@ where
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: i32;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
                 {
-                    /*InvokeRule unary*/
+                    // InvokeRule unary
                     recog.base.set_state(73);
                     recog.unary()?;
                 }
@@ -1488,7 +1485,7 @@ where
                             match recog.interpreter.adaptive_predict(4, &mut recog.base)? {
                                 1 => {
                                     {
-                                        /*recRuleAltStartAction*/
+                                        // recRuleAltStartAction
                                         let mut tmp =
                                             CalcContextExt::new(_parentctx.clone(), _parentState);
                                         recog.push_new_recursion_context(
@@ -1529,14 +1526,14 @@ where
                                             recog.err_handler.report_match(&mut recog.base);
                                             recog.base.consume(&mut recog.err_handler);
                                         }
-                                        /*InvokeRule calc*/
+                                        // InvokeRule calc
                                         recog.base.set_state(77);
                                         recog.calc_rec(3)?;
                                     }
                                 }
                                 2 => {
                                     {
-                                        /*recRuleAltStartAction*/
+                                        // recRuleAltStartAction
                                         let mut tmp =
                                             CalcContextExt::new(_parentctx.clone(), _parentState);
                                         recog.push_new_recursion_context(
@@ -1574,7 +1571,7 @@ where
                                             recog.err_handler.report_match(&mut recog.base);
                                             recog.base.consume(&mut recog.err_handler);
                                         }
-                                        /*InvokeRule calc*/
+                                        // InvokeRule calc
                                         recog.base.set_state(80);
                                         recog.calc_rec(2)?;
                                     }
@@ -1664,7 +1661,7 @@ impl<'input> CustomRuleContext<'input> for UnaryContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_unary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_unary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_unary }
 }
 antlr4rust::tid! {UnaryContextExt<'a>}
 
@@ -1754,7 +1751,7 @@ impl<'input> CustomRuleContext<'input> for LogicalNotContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_unary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_unary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_unary }
 }
 
 impl<'input> Borrow<UnaryContextExt<'input>> for LogicalNotContext<'input> {
@@ -1833,7 +1830,7 @@ impl<'input> CustomRuleContext<'input> for MemberExprContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_unary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_unary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_unary }
 }
 
 impl<'input> Borrow<UnaryContextExt<'input>> for MemberExprContext<'input> {
@@ -1927,7 +1924,7 @@ impl<'input> CustomRuleContext<'input> for NegateContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_unary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_unary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_unary }
 }
 
 impl<'input> Borrow<UnaryContextExt<'input>> for NegateContext<'input> {
@@ -1980,7 +1977,7 @@ where
                     recog.base.enter_outer_alt(Some(tmp.clone()), 1)?;
                     _localctx = tmp;
                     {
-                        /*InvokeRule member*/
+                        // InvokeRule member
                         recog.base.set_state(86);
                         recog.member_rec(0)?;
                     }
@@ -2031,7 +2028,7 @@ where
                                 break;
                             }
                         }
-                        /*InvokeRule member*/
+                        // InvokeRule member
                         recog.base.set_state(92);
                         recog.member_rec(0)?;
                     }
@@ -2086,7 +2083,7 @@ where
                                 break;
                             }
                         }
-                        /*InvokeRule member*/
+                        // InvokeRule member
                         recog.base.set_state(98);
                         recog.member_rec(0)?;
                     }
@@ -2171,7 +2168,7 @@ impl<'input> CustomRuleContext<'input> for MemberContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_member
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_member }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_member }
 }
 antlr4rust::tid! {MemberContextExt<'a>}
 
@@ -2286,7 +2283,7 @@ impl<'input> CustomRuleContext<'input> for MemberCallContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_member
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_member }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_member }
 }
 
 impl<'input> Borrow<MemberContextExt<'input>> for MemberCallContext<'input> {
@@ -2392,7 +2389,7 @@ impl<'input> CustomRuleContext<'input> for SelectContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_member
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_member }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_member }
 }
 
 impl<'input> Borrow<MemberContextExt<'input>> for SelectContext<'input> {
@@ -2472,7 +2469,7 @@ impl<'input> CustomRuleContext<'input> for PrimaryExprContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_member
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_member }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_member }
 }
 
 impl<'input> Borrow<MemberContextExt<'input>> for PrimaryExprContext<'input> {
@@ -2582,7 +2579,7 @@ impl<'input> CustomRuleContext<'input> for IndexContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_member
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_member }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_member }
 }
 
 impl<'input> Borrow<MemberContextExt<'input>> for IndexContext<'input> {
@@ -2637,7 +2634,7 @@ where
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: i32;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
                 {
@@ -2646,7 +2643,7 @@ where
                     _localctx = tmp;
                     _prevctx = _localctx.clone();
 
-                    /*InvokeRule primary*/
+                    // InvokeRule primary
                     recog.base.set_state(102);
                     recog.primary()?;
                 }
@@ -2665,7 +2662,7 @@ where
                             match recog.interpreter.adaptive_predict(12, &mut recog.base)? {
                                 1 => {
                                     {
-                                        /*recRuleLabeledAltStartAction*/
+                                        // recRuleLabeledAltStartAction
                                         let mut tmp =
                                             SelectContextExt::new(&**MemberContextExt::new(
                                                 _parentctx.clone(),
@@ -2720,7 +2717,7 @@ where
                                             }
                                         }
 
-                                        /*InvokeRule escapeIdent*/
+                                        // InvokeRule escapeIdent
                                         recog.base.set_state(109);
                                         let tmp = recog.escapeIdent()?;
                                         if let MemberContextAll::SelectContext(ctx) =
@@ -2734,7 +2731,7 @@ where
                                 }
                                 2 => {
                                     {
-                                        /*recRuleLabeledAltStartAction*/
+                                        // recRuleLabeledAltStartAction
                                         let mut tmp =
                                             MemberCallContextExt::new(&**MemberContextExt::new(
                                                 _parentctx.clone(),
@@ -2800,7 +2797,7 @@ where
                                             && ((1usize << (_la - 10)) & 132580181) != 0
                                         {
                                             {
-                                                /*InvokeRule exprList*/
+                                                // InvokeRule exprList
                                                 recog.base.set_state(114);
                                                 let tmp = recog.exprList()?;
                                                 if let MemberContextAll::MemberCallContext(ctx) =
@@ -2821,7 +2818,7 @@ where
                                 }
                                 3 => {
                                     {
-                                        /*recRuleLabeledAltStartAction*/
+                                        // recRuleLabeledAltStartAction
                                         let mut tmp =
                                             IndexContextExt::new(&**MemberContextExt::new(
                                                 _parentctx.clone(),
@@ -2876,7 +2873,7 @@ where
                                             }
                                         }
 
-                                        /*InvokeRule expr*/
+                                        // InvokeRule expr
                                         recog.base.set_state(123);
                                         let tmp = recog.expr()?;
                                         if let MemberContextAll::IndexContext(ctx) =
@@ -2986,7 +2983,7 @@ impl<'input> CustomRuleContext<'input> for PrimaryContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 antlr4rust::tid! {PrimaryContextExt<'a>}
 
@@ -3085,7 +3082,7 @@ impl<'input> CustomRuleContext<'input> for CreateListContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 
 impl<'input> Borrow<PrimaryContextExt<'input>> for CreateListContext<'input> {
@@ -3176,7 +3173,7 @@ impl<'input> CustomRuleContext<'input> for IdentContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 
 impl<'input> Borrow<PrimaryContextExt<'input>> for IdentContext<'input> {
@@ -3282,7 +3279,7 @@ impl<'input> CustomRuleContext<'input> for CreateStructContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 
 impl<'input> Borrow<PrimaryContextExt<'input>> for CreateStructContext<'input> {
@@ -3362,7 +3359,7 @@ impl<'input> CustomRuleContext<'input> for ConstantLiteralContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 
 impl<'input> Borrow<PrimaryContextExt<'input>> for ConstantLiteralContext<'input> {
@@ -3456,7 +3453,7 @@ impl<'input> CustomRuleContext<'input> for NestedContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 
 impl<'input> Borrow<PrimaryContextExt<'input>> for NestedContext<'input> {
@@ -3596,7 +3593,7 @@ impl<'input> CustomRuleContext<'input> for CreateMessageContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 
 impl<'input> Borrow<PrimaryContextExt<'input>> for CreateMessageContext<'input> {
@@ -3716,7 +3713,7 @@ impl<'input> CustomRuleContext<'input> for GlobalCallContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_primary
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_primary }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_primary }
 }
 
 impl<'input> Borrow<PrimaryContextExt<'input>> for GlobalCallContext<'input> {
@@ -3854,7 +3851,7 @@ where
                                 && ((1usize << (_la - 10)) & 132580181) != 0
                             {
                                 {
-                                    /*InvokeRule exprList*/
+                                    // InvokeRule exprList
                                     recog.base.set_state(140);
                                     let tmp = recog.exprList()?;
                                     if let PrimaryContextAll::GlobalCallContext(ctx) =
@@ -3880,7 +3877,7 @@ where
                         recog.base.set_state(144);
                         recog.base.match_token(CEL_LPAREN, &mut recog.err_handler)?;
 
-                        /*InvokeRule expr*/
+                        // InvokeRule expr
                         recog.base.set_state(145);
                         let tmp = recog.expr()?;
                         if let PrimaryContextAll::NestedContext(ctx) =
@@ -3917,7 +3914,7 @@ where
                         _la = recog.base.input.la(1);
                         if ((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0 {
                             {
-                                /*InvokeRule listInit*/
+                                // InvokeRule listInit
                                 recog.base.set_state(149);
                                 let tmp = recog.listInit()?;
                                 if let PrimaryContextAll::CreateListContext(ctx) =
@@ -3966,7 +3963,7 @@ where
                         _la = recog.base.input.la(1);
                         if ((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0 {
                             {
-                                /*InvokeRule mapInitializerList*/
+                                // InvokeRule mapInitializerList
                                 recog.base.set_state(157);
                                 let tmp = recog.mapInitializerList()?;
                                 if let PrimaryContextAll::CreateStructContext(ctx) =
@@ -4120,7 +4117,7 @@ where
                         _la = recog.base.input.la(1);
                         if ((_la - 20) & !0x3f) == 0 && ((1usize << (_la - 20)) & 196609) != 0 {
                             {
-                                /*InvokeRule field_initializer_list*/
+                                // InvokeRule field_initializer_list
                                 recog.base.set_state(176);
                                 let tmp = recog.field_initializer_list()?;
                                 if let PrimaryContextAll::CreateMessageContext(ctx) =
@@ -4152,7 +4149,7 @@ where
                     recog.base.enter_outer_alt(Some(tmp.clone()), 7)?;
                     _localctx = tmp;
                     {
-                        /*InvokeRule literal*/
+                        // InvokeRule literal
                         recog.base.set_state(183);
                         recog.literal()?;
                     }
@@ -4215,7 +4212,7 @@ impl<'input> CustomRuleContext<'input> for ExprListContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_exprList
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_exprList }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_exprList }
 }
 antlr4rust::tid! {ExprListContextExt<'a>}
 
@@ -4283,10 +4280,10 @@ where
         let mut _localctx: Rc<ExprListContextAll> = _localctx;
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule expr*/
+                // InvokeRule expr
                 recog.base.set_state(186);
                 let tmp = recog.expr()?;
                 cast_mut::<_, ExprListContext>(&mut _localctx).expr = Some(tmp.clone());
@@ -4306,7 +4303,7 @@ where
                             recog.base.set_state(187);
                             recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
-                            /*InvokeRule expr*/
+                            // InvokeRule expr
                             recog.base.set_state(188);
                             let tmp = recog.expr()?;
                             cast_mut::<_, ExprListContext>(&mut _localctx).expr = Some(tmp.clone());
@@ -4378,7 +4375,7 @@ impl<'input> CustomRuleContext<'input> for ListInitContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_listInit
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_listInit }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_listInit }
 }
 antlr4rust::tid! {ListInitContextExt<'a>}
 
@@ -4446,10 +4443,10 @@ where
         let mut _localctx: Rc<ListInitContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: i32;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule optExpr*/
+                // InvokeRule optExpr
                 recog.base.set_state(194);
                 let tmp = recog.optExpr()?;
                 cast_mut::<_, ListInitContext>(&mut _localctx).optExpr = Some(tmp.clone());
@@ -4472,7 +4469,7 @@ where
                                 recog.base.set_state(195);
                                 recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
-                                /*InvokeRule optExpr*/
+                                // InvokeRule optExpr
                                 recog.base.set_state(196);
                                 let tmp = recog.optExpr()?;
                                 cast_mut::<_, ListInitContext>(&mut _localctx).optExpr =
@@ -4555,7 +4552,7 @@ impl<'input> CustomRuleContext<'input> for Field_initializer_listContextExt<'inp
     fn get_rule_index(&self) -> usize {
         RULE_field_initializer_list
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_field_initializer_list }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_field_initializer_list }
 }
 antlr4rust::tid! {Field_initializer_listContextExt<'a>}
 
@@ -4659,10 +4656,10 @@ where
         let mut _localctx: Rc<Field_initializer_listContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: i32;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule optField*/
+                // InvokeRule optField
                 recog.base.set_state(202);
                 let tmp = recog.optField()?;
                 cast_mut::<_, Field_initializer_listContext>(&mut _localctx).optField =
@@ -4689,7 +4686,7 @@ where
                     .cols
                     .push(temp);
 
-                /*InvokeRule expr*/
+                // InvokeRule expr
                 recog.base.set_state(204);
                 let tmp = recog.expr()?;
                 cast_mut::<_, Field_initializer_listContext>(&mut _localctx).expr =
@@ -4713,7 +4710,7 @@ where
                                 recog.base.set_state(205);
                                 recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
-                                /*InvokeRule optField*/
+                                // InvokeRule optField
                                 recog.base.set_state(206);
                                 let tmp = recog.optField()?;
                                 cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
@@ -4743,7 +4740,7 @@ where
                                     .cols
                                     .push(temp);
 
-                                /*InvokeRule expr*/
+                                // InvokeRule expr
                                 recog.base.set_state(208);
                                 let tmp = recog.expr()?;
                                 cast_mut::<_, Field_initializer_listContext>(&mut _localctx).expr =
@@ -4819,7 +4816,7 @@ impl<'input> CustomRuleContext<'input> for OptFieldContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_optField
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_optField }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_optField }
 }
 antlr4rust::tid! {OptFieldContextExt<'a>}
 
@@ -4873,7 +4870,7 @@ where
         let mut _localctx: Rc<OptFieldContextAll> = _localctx;
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
                 recog.base.set_state(216);
@@ -4889,7 +4886,7 @@ where
                     }
                 }
 
-                /*InvokeRule escapeIdent*/
+                // InvokeRule escapeIdent
                 recog.base.set_state(218);
                 recog.escapeIdent()?;
             }
@@ -4953,7 +4950,7 @@ impl<'input> CustomRuleContext<'input> for MapInitializerListContextExt<'input> 
     fn get_rule_index(&self) -> usize {
         RULE_mapInitializerList
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_mapInitializerList }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_mapInitializerList }
 }
 antlr4rust::tid! {MapInitializerListContextExt<'a>}
 
@@ -5057,10 +5054,10 @@ where
         let mut _localctx: Rc<MapInitializerListContextAll> = _localctx;
         let result: Result<(), ANTLRError> = (|| {
             let mut _alt: i32;
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
-                /*InvokeRule optExpr*/
+                // InvokeRule optExpr
                 recog.base.set_state(220);
                 let tmp = recog.optExpr()?;
                 cast_mut::<_, MapInitializerListContext>(&mut _localctx).optExpr =
@@ -5086,7 +5083,7 @@ where
                     .cols
                     .push(temp);
 
-                /*InvokeRule expr*/
+                // InvokeRule expr
                 recog.base.set_state(222);
                 let tmp = recog.expr()?;
                 cast_mut::<_, MapInitializerListContext>(&mut _localctx).expr = Some(tmp.clone());
@@ -5109,7 +5106,7 @@ where
                                 recog.base.set_state(223);
                                 recog.base.match_token(CEL_COMMA, &mut recog.err_handler)?;
 
-                                /*InvokeRule optExpr*/
+                                // InvokeRule optExpr
                                 recog.base.set_state(224);
                                 let tmp = recog.optExpr()?;
                                 cast_mut::<_, MapInitializerListContext>(&mut _localctx).optExpr =
@@ -5137,7 +5134,7 @@ where
                                     .cols
                                     .push(temp);
 
-                                /*InvokeRule expr*/
+                                // InvokeRule expr
                                 recog.base.set_state(226);
                                 let tmp = recog.expr()?;
                                 cast_mut::<_, MapInitializerListContext>(&mut _localctx).expr =
@@ -5231,7 +5228,7 @@ impl<'input> CustomRuleContext<'input> for EscapeIdentContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_escapeIdent
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_escapeIdent }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_escapeIdent }
 }
 antlr4rust::tid! {EscapeIdentContextExt<'a>}
 
@@ -5308,7 +5305,7 @@ impl<'input> CustomRuleContext<'input> for EscapedIdentifierContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_escapeIdent
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_escapeIdent }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_escapeIdent }
 }
 
 impl<'input> Borrow<EscapeIdentContextExt<'input>> for EscapedIdentifierContext<'input> {
@@ -5390,7 +5387,7 @@ impl<'input> CustomRuleContext<'input> for SimpleIdentifierContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_escapeIdent
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_escapeIdent }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_escapeIdent }
 }
 
 impl<'input> Borrow<EscapeIdentContextExt<'input>> for SimpleIdentifierContext<'input> {
@@ -5534,7 +5531,7 @@ impl<'input> CustomRuleContext<'input> for OptExprContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_optExpr
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_optExpr }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_optExpr }
 }
 antlr4rust::tid! {OptExprContextExt<'a>}
 
@@ -5589,7 +5586,7 @@ where
         let mut _localctx: Rc<OptExprContextAll> = _localctx;
         let mut _la: i32 = -1;
         let result: Result<(), ANTLRError> = (|| {
-            //recog.base.enter_outer_alt(_localctx.clone(), 1)?;
+            // recog.base.enter_outer_alt(_localctx.clone(), 1)?;
             recog.base.enter_outer_alt(None, 1)?;
             {
                 recog.base.set_state(238);
@@ -5605,7 +5602,7 @@ where
                     }
                 }
 
-                /*InvokeRule expr*/
+                // InvokeRule expr
                 recog.base.set_state(240);
                 let tmp = recog.expr()?;
                 cast_mut::<_, OptExprContext>(&mut _localctx).e = Some(tmp.clone());
@@ -5695,7 +5692,7 @@ impl<'input> CustomRuleContext<'input> for LiteralContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 antlr4rust::tid! {LiteralContextExt<'a>}
 
@@ -5771,7 +5768,7 @@ impl<'input> CustomRuleContext<'input> for BytesContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for BytesContext<'input> {
@@ -5852,7 +5849,7 @@ impl<'input> CustomRuleContext<'input> for UintContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for UintContext<'input> {
@@ -5933,7 +5930,7 @@ impl<'input> CustomRuleContext<'input> for NullContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for NullContext<'input> {
@@ -6014,7 +6011,7 @@ impl<'input> CustomRuleContext<'input> for BoolFalseContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for BoolFalseContext<'input> {
@@ -6095,7 +6092,7 @@ impl<'input> CustomRuleContext<'input> for StringContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for StringContext<'input> {
@@ -6185,7 +6182,7 @@ impl<'input> CustomRuleContext<'input> for DoubleContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for DoubleContext<'input> {
@@ -6267,7 +6264,7 @@ impl<'input> CustomRuleContext<'input> for BoolTrueContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for BoolTrueContext<'input> {
@@ -6357,7 +6354,7 @@ impl<'input> CustomRuleContext<'input> for IntContextExt<'input> {
     fn get_rule_index(&self) -> usize {
         RULE_literal
     }
-    //fn type_rule_index() -> usize where Self: Sized { RULE_literal }
+    // fn type_rule_index() -> usize where Self: Sized { RULE_literal }
 }
 
 impl<'input> Borrow<LiteralContextExt<'input>> for IntContext<'input> {

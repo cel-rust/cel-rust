@@ -2,9 +2,11 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+
 use hashbrown::Equivalent;
-use crate::objects::{StringValue};
+
 use crate::Value;
+use crate::objects::StringValue;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum MapValue<'a> {
@@ -167,7 +169,7 @@ impl<'a> PartialEq<KeyRef<'a>> for Key {
 impl serde::Serialize for Key {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
-      S: serde::Serializer,
+        S: serde::Serializer,
     {
         match self {
             Key::Int(v) => v.serialize(serializer),

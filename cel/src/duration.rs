@@ -1,11 +1,11 @@
 use chrono::Duration;
+use nom::IResult;
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::char;
 use nom::combinator::{map, opt};
 use nom::multi::many1;
 use nom::number::complete::double;
-use nom::IResult;
 
 // Constants representing time units in nanoseconds
 const SECOND: u64 = 1_000_000_000;

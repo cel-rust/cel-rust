@@ -399,7 +399,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_bytes, parse_string, ParseSequenceError};
+    use super::{ParseSequenceError, parse_bytes, parse_string};
 
     #[test]
     fn single_quotes_interprets_escapes() {

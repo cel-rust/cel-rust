@@ -6,6 +6,10 @@ use std::ops;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use serde::de::Error as DeError;
+use serde::ser::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::common::ast::{EntryExpr, Expr, OptimizedExpr, operators};
 use crate::common::value::CelVal;
 use crate::context::{Context, SingleVarResolver, VariableResolver};
@@ -16,12 +20,8 @@ pub use crate::types::map::{Key, KeyRef, MapValue};
 pub use crate::types::object::{ObjectType, ObjectValue};
 pub use crate::types::optional::OptionalValue;
 pub use crate::types::string::StringValue;
-use crate::{ExecutionError, Expression};
-
 use crate::types::time::{TsOp, checked_op};
-use serde::de::Error as DeError;
-use serde::ser::Error;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use crate::{ExecutionError, Expression};
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -46,7 +46,6 @@ pub enum Value<'a> {
     Bool(bool),
 
     Duration(chrono::Duration),
-
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
 
     /// User-defined object values implementing [`ObjectType`].
@@ -961,37 +960,6 @@ impl<'a> Value<'a> {
                 let comp_resolver = SingleVarResolver::new(resolver, &comprehension.accu_var, accu);
                 Value::resolve(&comprehension.result, ctx, &comp_resolver)
             }
-            //     let accu_init = Value::resolve(&comprehension.accu_init, ctx)?;
-            //     let iter = Value::resolve(&comprehension.iter_range, ctx)?;
-            //     let mut ctx = ctx.new_inner_scope();
-            //     ctx.add_variable(&comprehension.accu_var, accu_init)
-            //         .expect("Failed to add accu variable");
-            //
-            //     match iter {
-            //         Value::List(items) => {
-            //             for item in items.as_ref() {
-            //                 if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
-            //                     break;
-            //                 }
-            //                 ctx.add_variable_from_value(&comprehension.iter_var, item.clone());
-            //                 let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
-            //                 ctx.add_variable_from_value(&comprehension.accu_var, accu);
-            //             }
-            //         }
-            //         // Value::Map(map) => {
-            //         //     for key in map.map.deref().keys() {
-            //         //         if !Value::resolve(&comprehension.loop_cond, &ctx)?.to_bool()? {
-            //         //             break;
-            //         //         }
-            //         //         ctx.add_variable_from_value(&comprehension.iter_var, key.clone());
-            //         //         let accu = Value::resolve(&comprehension.loop_step, &ctx)?;
-            //         //         ctx.add_variable_from_value(&comprehension.accu_var, accu);
-            //         //     }
-            //         // }
-            //         t => todo!("Support {t:?}"),
-            //     }
-            //     Value::resolve(&comprehension.result, &ctx)
-            // }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
         }
