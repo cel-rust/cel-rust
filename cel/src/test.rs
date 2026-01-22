@@ -94,42 +94,6 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
 }
 
-// Also implement for &serde_json::Value so we can use it as a reference in structs
-impl<'a> DynamicType for &'a serde_json::Value {
-    fn materialize(&self) -> Value<'_> {
-        to_value(*self).unwrap()
-    }
-    fn auto_materialize(&self) -> bool {
-        false
-    }
-
-    fn field(&self, field: &str) -> Option<Value<'_>> {
-        match *self {
-            serde_json::Value::Object(m) => {
-                let v = m.get(field)?;
-                Some(types::dynamic::maybe_materialize(v))
-            }
-            _ => None,
-        }
-    }
-}
-crate::impl_dynamic_vtable!(&serde_json::Value);
-
-// Implement DynamicType for &String to support using String references in structs
-// This pattern works for any type that can be converted to a CEL-compatible type
-// For example, you could do the same for &http::Method:
-//   impl DynamicType for &http::Method { ... }
-impl<'a> DynamicType for &'a String {
-    fn auto_materialize(&self) -> bool {
-        true
-    }
-
-    fn materialize(&self) -> Value<'_> {
-        Value::from(self.as_str())
-    }
-}
-crate::impl_dynamic_vtable!(&String);
-
 #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct Claims(serde_json::Value);
 
@@ -147,19 +111,14 @@ fn claims_inner<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
 
 // Generic helper to convert any AsRef<str> to &str
 // Works with http::Method, String, and other AsRef<str> types
-fn method2<'a, T: AsRef<str>>(c: &'a &'a T) -> Value<'a> {
+fn as_str<'a, T: AsRef<str>>(c: &'a &'a T) -> Value<'a> {
     Value::String(c.as_ref().into())
-}
-
-// Helper function specifically for http::Method that returns Value directly
-fn method_to_value<'a>(m: &'a &'a http::Method) -> Value<'a> {
-    Value::String(m.as_str().into())
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, DynamicType)]
 pub struct HttpRequestRef<'a> {
     // Use with_value to convert http::Method to Value directly
-    #[dynamic(with_value = "method2")]
+    #[dynamic(with_value = "as_str")]
     #[serde(serialize_with = "ser_display")]
     method: &'a http::Method,
     path: &'a str,
@@ -172,6 +131,7 @@ pub struct HttpRequestRef<'a> {
 pub fn ser_display<S: Serializer, T: Display>(t: &T, serializer: S) -> Result<S::Ok, S::Error> {
     serializer.serialize_str(&t.to_string())
 }
+
 #[derive(Debug, Clone)]
 pub struct DynResolverRef<'a> {
     rf: &'a DynResolver<'a>,
@@ -353,8 +313,7 @@ fn struct_function() {
     }
 }
 
-#[test]
-fn dyn_val() {
+fn run(expr: &str, req: Http2Request, f: impl FnOnce(Value)) {
     let count = Arc::new(AtomicUsize::new(0));
     let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
     let mut pctx = Context::default();
@@ -362,32 +321,32 @@ fn dyn_val() {
     let headers = HashMap::from([("k".to_string(), "v".to_string())]);
     let claims = Claims(json!({"sub": "me@example.com"}));
     let p = Program::compile(
-        "request.claims.sub + request.method + request.path + request.headers['k']",
+       expr,
     )
-    .unwrap();
-    let req = Http2Request {
-        method: http::Method::GET,
-        path: "/foo".to_string(),
-        headers,
-        claims,
-    };
-
+      .unwrap();
     AllocationRegistry::enable_tracking();
     let resolver = DynResolver::new_from_request(&req);
     let res = resolver.eval(&pctx, &p.expression);
-    // let resolver2 = DynResolverRef { rf: &resolver };
-    // let res = Value::resolve(&p.expression, &pctx, &resolver2).unwrap();
     AllocationRegistry::disable_tracking();
-    assert_eq!(res.json().unwrap(), json!("me@example.comGET/foov"));
-    // let dv = match res {
-    //     Value::Dynamic(dv) => dv,
-    //     _ => panic!("Expected dynamic value"),
-    // };
-    // dbg!(types::dynamic::always_materialize(dv.field("sub").unwrap()));
-    // drop(resolver);
-    // let Value::Dynamic(_ob) = res else { panic!() };
-    // let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
-    // assert_eq!(req.method, "GET");
+    f(res);
+}
+
+#[test]
+fn dyn_val() {
+    let headers = HashMap::from([("k".to_string(), "v".to_string())]);
+    let claims = Claims(json!({"sub": "me@example.com"}));
+    run(
+        "request.claims.sub + request.method + request.path + request.headers['k']",
+        Http2Request {
+            method: http::Method::GET,
+            path: "/foo".to_string(),
+            headers,
+            claims,
+        },
+        |res| {
+            assert_eq!(res.json().unwrap(), json!("me@example.comGET/foov"));
+        }
+    );
 }
 
 #[test]
