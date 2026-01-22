@@ -152,7 +152,6 @@ impl Default for Context {
 }
 
 pub trait VariableResolver<'a> {
-    fn all(&self) -> &[&'static str];
     fn resolve(&self, expr: &str) -> Option<Value<'a>>;
     fn resolve_member(&self, _expr: &str, _member: &str) -> Option<Value<'a>> {
         None
@@ -165,10 +164,6 @@ pub trait VariableResolver<'a> {
 pub struct DefaultVariableResolver;
 
 impl<'a> VariableResolver<'a> for DefaultVariableResolver {
-    fn all(&self) -> &'static [&'static str] {
-        &[]
-    }
-
     fn resolve(&self, _expr: &str) -> Option<Value<'a>> {
         None
     }
@@ -187,11 +182,6 @@ impl<'a, 'rf> SingleVarResolver<'a, 'rf> {
 }
 
 impl<'a, 'rf> VariableResolver<'a> for SingleVarResolver<'a, 'rf> {
-    fn all(&self) -> &[&'static str] {
-        // We do NOT add ours; this call only expects top level ones. A bit hacky!
-        self.base.all()
-    }
-
     fn resolve(&self, expr: &str) -> Option<Value<'a>> {
         if expr == self.name {
             Some(self.val.clone())
@@ -240,10 +230,6 @@ impl<'a> MapResolver<'a> {
 }
 
 impl<'a> VariableResolver<'a> for MapResolver<'a> {
-    fn all(&self) -> &[&'static str] {
-        todo!()
-    }
-
     fn resolve(&self, expr: &str) -> Option<Value<'a>> {
         self.variables.get(expr).cloned()
     }

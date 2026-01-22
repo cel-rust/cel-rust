@@ -92,10 +92,6 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
             _ => None,
         }
     }
-
-    fn all(&self) -> &[&'static str] {
-        &["request"]
-    }
 }
 
 // Also implement for &serde_json::Value so we can use it as a reference in structs
@@ -192,18 +188,8 @@ impl<'a> DynResolver<'a> {
     }
 }
 impl<'a> VariableResolver<'a> for DynResolverRef<'a> {
-    fn all(&self) -> &[&'static str] {
-        todo!()
-    }
-
     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
         self.rf.field(variable)
-        // match variable {
-        //     "request" => Some(Value::Dynamic(crate::types::dynamic::DynamicValue::new(
-        //         &self.rf.request,
-        //     ))),
-        //     _ => None,
-        // }
     }
 }
 impl<'a> DynResolver<'a> {
@@ -218,40 +204,6 @@ impl<'a> DynResolver<'a> {
         }
     }
 }
-// impl<'a> VariableResolver<'a> for DynResolver<'a> {
-//     fn resolve(&self, variable: &str) -> Option<Value<'a>> {
-//         match variable {
-//             "request" => Some(Value::Dynamic(crate::types::dynamic::DynamicValue::new(
-//                 self.request,
-//             ))),
-//             _ => None,
-//         }
-//         // match variable {
-//         //     "request" => {
-//         //         // SAFETY: This transmute is sound under the following conditions:
-//         //         // 1. self.request contains references with lifetime 'a (HttpRequestRef<'a>)
-//         //         // 2. The caller must ensure that `self` (the DynResolver) lives at least
-//         //         //    as long as the returned Value<'a> is used
-//         //         // 3. The DynamicValue will dereference the pointer to call methods on
-//         //         //    HttpRequestRef, which then access the internal 'a references
-//         //         // 4. If DynResolver is dropped while the Value is still alive, this creates UB
-//         //         //
-//         //         // This is a limitation of the VariableResolver API: it returns Value<'a>
-//         //         // but only has &self available, creating a lifetime mismatch. Callers MUST
-//         //         // ensure the resolver outlives the returned Value.
-//         //         let req_ref: &'a HttpRequestRef<'a> = unsafe { std::mem::transmute(&self.request) };
-//         //         Some(Value::Dynamic(crate::types::dynamic::DynamicValue::new(
-//         //             req_ref,
-//         //         )))
-//         //     }
-//         //     _ => None,
-//         // }
-//     }
-//
-//     fn all(&self) -> &[&'static str] {
-//         &["request"]
-//     }
-// }
 
 fn execute_with_mut_request<'a>(
     ctx: &'a Context,
@@ -271,10 +223,6 @@ struct CompositeResolver<'a, 'rf> {
 }
 
 impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
-    fn all(&self) -> &[&'static str] {
-        self.base.all()
-    }
-
     fn resolve(&self, expr: &str) -> Option<Value<'a>> {
         if expr == self.name {
             Some(self.val.clone())
@@ -411,9 +359,12 @@ fn dyn_val() {
     let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
     let mut pctx = Context::default();
     pctx.add_function("with", with);
-    let headers = HashMap::new();
+    let headers = HashMap::from([("k".to_string(), "v".to_string())]);
     let claims = Claims(json!({"sub": "me@example.com"}));
-    let p = Program::compile("request.claims.sub + request.method + request.path").unwrap();
+    let p = Program::compile(
+        "request.claims.sub + request.method + request.path + request.headers['k']",
+    )
+    .unwrap();
     let req = Http2Request {
         method: http::Method::GET,
         path: "/foo".to_string(),
@@ -427,7 +378,7 @@ fn dyn_val() {
     // let resolver2 = DynResolverRef { rf: &resolver };
     // let res = Value::resolve(&p.expression, &pctx, &resolver2).unwrap();
     AllocationRegistry::disable_tracking();
-    assert_eq!(res.json().unwrap(), json!("me@example.comGET/foo"));
+    assert_eq!(res.json().unwrap(), json!("me@example.comGET/foov"));
     // let dv = match res {
     //     Value::Dynamic(dv) => dv,
     //     _ => panic!("Expected dynamic value"),

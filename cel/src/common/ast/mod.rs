@@ -56,9 +56,6 @@ pub enum OptimizedExpr {
         request: bool,
         header: http::HeaderName,
     },
-    ClaimLookup {
-        field: Arc<str>,
-    },
 }
 
 impl Expr {

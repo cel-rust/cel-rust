@@ -6,10 +6,6 @@ use std::ops;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use serde::de::Error as DeError;
-use serde::ser::Error;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
 use crate::common::ast::{EntryExpr, Expr, OptimizedExpr, operators};
 use crate::common::value::CelVal;
 use crate::context::{Context, SingleVarResolver, VariableResolver};
@@ -23,6 +19,10 @@ pub use crate::types::optional::OptionalValue;
 pub use crate::types::string::StringValue;
 use crate::types::time::{TsOp, checked_op};
 use crate::{ExecutionError, Expression, types};
+use cel::types::dynamic;
+use serde::de::Error as DeError;
+use serde::ser::Error;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -681,8 +681,16 @@ impl<'a> Value<'a> {
                                     }
                                 };
                             }
+                            if let Value::Dynamic(d) = &value
+                                && let Value::String(k) = idx
+                            {
+                                let result = d.field(k.as_ref()).ok_or_else(|| {
+                                    ExecutionError::NoSuchKey(Arc::from(k.as_ref()))
+                                });
+                                return Self::maybe_optional(is_optional, result);
+                            };
 
-                            let result = match (&value, idx) {
+                            let result = match (dynamic::always_materialize(value), idx) {
                                 (Value::List(items), Value::Int(idx)) => {
                                     if idx >= 0 && (idx as usize) < items.len() {
                                         let x: Value<'a> = items.as_ref()[idx as usize].clone();
@@ -732,16 +740,7 @@ impl<'a> Value<'a> {
                                 ))?,
                             };
 
-                            return if is_optional {
-                                Ok(match result {
-                                    Ok(val) => {
-                                        ObjectValue::new(OptionalValue::of(val.as_static())).into()
-                                    }
-                                    Err(_) => ObjectValue::new(OptionalValue::none()).into(),
-                                })
-                            } else {
-                                result
-                            };
+                            return Self::maybe_optional(is_optional, result);
                         }
                         operators::OPT_SELECT => {
                             let operand = resolve(&call.args[0])?;
@@ -980,6 +979,17 @@ impl<'a> Value<'a> {
             }
             Expr::Struct(_) => todo!("Support structs!"),
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
+        }
+    }
+
+    fn maybe_optional(is_optional: bool, result: Result<Value, ExecutionError>) -> ResolveResult {
+        if is_optional {
+            Ok(match result {
+                Ok(val) => ObjectValue::new(OptionalValue::of(val.as_static())).into(),
+                Err(_) => ObjectValue::new(OptionalValue::none()).into(),
+            })
+        } else {
+            result
         }
     }
 
@@ -1455,9 +1465,6 @@ mod tests {
     }
 
     impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
-        fn all(&self) -> &[&'static str] {
-            self.base.all()
-        }
         fn resolve(&self, expr: &str) -> Option<Value<'a>> {
             if expr == self.name {
                 Some(self.val.clone())

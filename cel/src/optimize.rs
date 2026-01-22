@@ -181,34 +181,6 @@ impl Optimize {
             });
         }
 
-        // Specialize `jwt[value]`
-        if let Expr::Call(call) = &res.expr
-            && call.args.len() == 2
-            && call.func_name == operators::INDEX
-            && let Expr::Ident(base) = &call.args[0].expr
-            && base == "jwt"
-            && let Expr::Inline(Value::String(field)) = &call.args[1].expr
-        {
-            let field = Arc::from(field.as_ref());
-            return with_id(Expr::Optimized {
-                original: Box::new(res),
-                optimized: OptimizedExpr::ClaimLookup { field },
-            });
-        }
-
-        // Specialize `jwt.value`
-        if let Expr::Select(se) = &res.expr
-            && let Expr::Ident(base) = &se.operand.expr
-            && base == "jwt"
-            && !se.test
-        {
-            let field = Arc::from(se.field.as_ref());
-            return with_id(Expr::Optimized {
-                original: Box::new(res),
-                optimized: OptimizedExpr::ClaimLookup { field },
-            });
-        }
-
         res
     }
 }
