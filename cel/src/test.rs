@@ -277,29 +277,35 @@ mod alloc {
     static GLOBAL: Allocator<System> = Allocator::system();
 
     // Global allocation tracking
-    static GLOBAL_ALLOC_COUNTER: OnceLock<Counter> = OnceLock::new();
+    static GLOBAL_ALLOC_COUNTER: OnceLock<(Counter, Mutex<()>)> = OnceLock::new();
 
     // TODO: this is actually not sound since things outside of the current thread can be allocating outside of a
     // count_allocations call..
     pub fn count_allocations<T>(f: impl FnOnce() -> T) -> (T, usize) {
-        let c = GLOBAL_ALLOC_COUNTER.get_or_init(|| {
+        let (c, mu) = GLOBAL_ALLOC_COUNTER.get_or_init(|| {
             let counter = Arc::new(Mutex::new(HashMap::new()));
             let c = Counter(counter);
             let _ = AllocationRegistry::set_global_tracker(c.clone());
-            // AllocationRegistry::enable_tracking();
-            c
+            AllocationRegistry::enable_tracking();
+            let mu = Mutex::new(());
+          (c, mu)
         });
-        let mut local_token =
-            AllocationGroupToken::register().expect("failed to register allocation group");
+        let mut local_token = {
+            // Work around https://github.com/tobz/tracking-allocator/issues/12
+            let _guard = c.0.lock().unwrap_or_else(|e| e.into_inner());
+            AllocationGroupToken::register().expect("failed to register allocation group")
+        };
 
         // Now, get an allocation guard from our token.  This guard ensures the allocation group is marked as the current
         // allocation group, so that our allocations are properly associated.
         let id = local_token.id();
+        // To ensure our enable+disable below is not racy. A bit gross but oh well
+        let _guard = mu.lock().unwrap_or_else(|e| e.into_inner());
         {
-            AllocationRegistry::disable_tracking();
             let mut m = c.0.lock().unwrap_or_else(|e| e.into_inner());
+            AllocationRegistry::disable_tracking();
             m.insert(id.clone(), 0);
-            // AllocationRegistry::enable_tracking();
+            AllocationRegistry::enable_tracking();
         }
         let local_guard = local_token.enter();
         let res = f();
@@ -328,10 +334,10 @@ mod alloc {
                 let mut m = self.0.lock().unwrap_or_else(|e| e.into_inner());
                 m.get_mut(&group_id).map(|m| *m += 1);
             };
-            eprintln!(
-                "allocation -> addr=0x{:0x} object_size={} wrapped_size={} group_id={:?}",
-                addr, object_size, wrapped_size, group_id
-            );
+            // eprintln!(
+            //     "allocation -> addr=0x{:0x} object_size={} wrapped_size={} group_id={:?}",
+            //     addr, object_size, wrapped_size, group_id
+            // );
         }
 
         fn deallocated(
@@ -342,10 +348,10 @@ mod alloc {
             source_group_id: AllocationGroupId,
             current_group_id: AllocationGroupId,
         ) {
-            eprintln!(
-                "deallocation -> addr=0x{:0x} object_size={} wrapped_size={} source_group_id={:?} current_group_id={:?}",
-                addr, object_size, wrapped_size, source_group_id, current_group_id
-            );
+            // eprintln!(
+            //     "deallocation -> addr=0x{:0x} object_size={} wrapped_size={} source_group_id={:?} current_group_id={:?}",
+            //     addr, object_size, wrapped_size, source_group_id, current_group_id
+            // );
         }
     }
 }
@@ -396,7 +402,7 @@ fn dynamic_value_complex() {
         },
     );
     // This should be 1 allocation, but an inefficiency
-    assert_eq!(allocs, 0);
+    assert_eq!(allocs, 2);
 }
 
 #[test]
