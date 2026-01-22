@@ -98,7 +98,6 @@ impl<'a> VariableResolver<'a> for Resolver<'a> {
     }
 }
 
-
 // Also implement for &serde_json::Value so we can use it as a reference in structs
 impl<'a> DynamicType for &'a serde_json::Value {
     fn materialize(&self) -> Value<'_> {
@@ -456,7 +455,13 @@ fn test_dynamic_with_attribute() {
     let resolver = DynResolver::new_from_request(&req);
 
     // Test accessing claims field which should use the with attribute
-    let claims_val = resolver.request.field("claims").unwrap();
+    // Access through the derived DynResolver struct, not directly on the Option
+    let request_val = resolver.field("request").unwrap();
+    let request_dv = match request_val {
+        Value::Dynamic(dv) => dv,
+        _ => panic!("Expected dynamic value for request"),
+    };
+    let claims_val = request_dv.field("claims").unwrap();
 
     // The with attribute transforms &Claims to &serde_json::Value via |c| &c.0
     // So we should be able to access the inner value directly
@@ -495,7 +500,13 @@ fn test_dynamic_with_value_attribute() {
     let resolver = DynResolver::new_from_request(&req);
 
     // Test accessing method field which uses with_value attribute
-    let method_val = resolver.request.field("method").unwrap();
+    // Access through the derived DynResolver struct
+    let request_val = resolver.field("request").unwrap();
+    let request_dv = match request_val {
+        Value::Dynamic(dv) => dv,
+        _ => panic!("Expected dynamic value for request"),
+    };
+    let method_val = request_dv.field("method").unwrap();
 
     // with_value should return Value::String directly
     match method_val {
@@ -506,14 +517,21 @@ fn test_dynamic_with_value_attribute() {
     }
 
     // Test via materialize
-    let materialized = resolver.request.materialize();
+    let materialized = resolver.materialize();
     if let Value::Map(map) = materialized {
-        let method_from_map = map.get(&KeyRef::from("method")).unwrap();
-        match method_from_map {
-            Value::String(s) => {
-                assert_eq!(s.as_ref(), "POST");
+        // Get the request field (which is an Option<HttpRequestRef>)
+        let request_val = map.get(&KeyRef::from("request")).unwrap();
+        // Since it's Some, it should be a Map
+        if let Value::Map(request_map) = request_val {
+            let method_from_map = request_map.get(&KeyRef::from("method")).unwrap();
+            match method_from_map {
+                Value::String(s) => {
+                    assert_eq!(s.as_ref(), "POST");
+                }
+                _ => panic!("Expected String value in map"),
             }
-            _ => panic!("Expected String value in map"),
+        } else {
+            panic!("Expected Map for request field");
         }
     } else {
         panic!("Expected Map from materialize");
@@ -527,23 +545,20 @@ fn test_dynamic_with_value_attribute() {
 
 #[test]
 fn test_option_dynamic_type() {
-    // Test Option<T> where T: DynamicType
-    use crate::types::dynamic::{DynamicType, maybe_materialize};
+    // Test Option<T> fields via maybe_materialize_optional
+    // Note: Option<T> does NOT implement DynamicValueVtable directly to avoid the static vtable issue.
+    // Instead, when using #[derive(DynamicType)] on a struct with Option<T> fields,
+    // the derive macro will automatically use maybe_materialize_optional for those fields.
+    use crate::types::dynamic::{DynamicType, maybe_materialize_optional};
 
     // Test Some(value)
     let some_string: Option<String> = Some("hello".to_string());
-    assert!(some_string.auto_materialize());
-    let val = some_string.materialize();
+    let val = maybe_materialize_optional(&some_string);
     assert_eq!(val, Value::String("hello".into()));
-
-    // Test via maybe_materialize
-    let val2 = maybe_materialize(&some_string);
-    assert_eq!(val2, Value::String("hello".into()));
 
     // Test None
     let none_string: Option<String> = None;
-    assert!(none_string.auto_materialize()); // None should auto-materialize
-    let val = none_string.materialize();
+    let val = maybe_materialize_optional(&none_string);
     assert_eq!(val, Value::Null);
 
     // Test with non-auto-materializing type (HashMap)
@@ -552,15 +567,22 @@ fn test_option_dynamic_type() {
         m.insert("key".to_string(), "value".to_string());
         m
     });
-    assert!(!some_map.auto_materialize()); // Should not auto-materialize because HashMap doesn't
 
-    // Test field access on Some
-    let val = some_map.field("key").unwrap();
-    assert_eq!(val, Value::String("value".into()));
+    let val = maybe_materialize_optional(&some_map);
+    // The Some(HashMap) should materialize to a Dynamic value since HashMap doesn't auto-materialize
+    match val {
+        Value::Dynamic(dv) => {
+            // Can access fields through the dynamic value
+            let field_val = dv.field("key").unwrap();
+            assert_eq!(field_val, Value::String("value".into()));
+        }
+        _ => panic!("Expected Dynamic value for HashMap"),
+    }
 
-    // Test field access on None
+    // Test None for HashMap
     let none_map: Option<std::collections::HashMap<String, String>> = None;
-    assert!(none_map.field("key").is_none());
+    let val = maybe_materialize_optional(&none_map);
+    assert_eq!(val, Value::Null);
 }
 
 #[test]

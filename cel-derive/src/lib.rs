@@ -143,6 +143,8 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
             let ty = &f.ty;
             // Check if the type is a reference type
             let is_ref = matches!(ty, syn::Type::Reference(_));
+            // Check if the type is Option<T>
+            let is_option = is_option_type(ty);
             let with_expr = get_field_with_expr(&f.attrs);
             let with_value_expr = get_field_with_value_expr(&f.attrs);
 
@@ -154,7 +156,15 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 ));
             }
 
-            Ok((ident, name, ty, is_ref, with_expr, with_value_expr))
+            Ok((
+                ident,
+                name,
+                ty,
+                is_ref,
+                is_option,
+                with_expr,
+                with_value_expr,
+            ))
         })
         .collect();
 
@@ -168,7 +178,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     // Generate materialize body
     let materialize_inserts: TokenStream2 = processed_fields
         .iter()
-        .map(|(ident, name, _ty, _is_ref, with_expr, with_value_expr)| {
+        .map(|(ident, name, _ty, _is_ref, is_option, with_expr, with_value_expr)| {
             if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
@@ -211,6 +221,14 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                         #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(&self.#ident)),
                     );
                 }
+            } else if *is_option {
+                // For Option<T> types, use maybe_materialize_optional
+                quote! {
+                    m.insert(
+                        #crate_path::objects::KeyRef::from(#name),
+                        #crate_path::types::dynamic::maybe_materialize_optional(&self.#ident),
+                    );
+                }
             } else {
                 // Always pass a reference to maybe_materialize
                 quote! {
@@ -226,7 +244,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     // Generate field match arms
     let field_arms: TokenStream2 = processed_fields
         .iter()
-        .map(|(ident, name, ty, _is_ref, with_expr, with_value_expr)| {
+        .map(|(ident, name, ty, _is_ref, is_option, with_expr, with_value_expr)| {
             if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
@@ -268,6 +286,11 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                         let __field_ref: &#ty = &self.#ident;
                         #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(__field_ref))
                     },
+                }
+            } else if *is_option {
+                // For Option<T> types, use maybe_materialize_optional
+                quote! {
+                    #name => #crate_path::types::dynamic::maybe_materialize_optional(&self.#ident),
                 }
             } else {
                 // Always pass a reference to maybe_materialize
@@ -497,4 +520,21 @@ fn get_field_with_value_expr(attrs: &[Attribute]) -> Option<String> {
         }
     }
     None
+}
+
+/// Check if a type is Option<T> and return true if so
+/// Handles: Option<T>, std::option::Option<T>, ::std::option::Option<T>, core::option::Option<T>
+fn is_option_type(ty: &syn::Type) -> bool {
+    if let syn::Type::Path(type_path) = ty {
+        let segments = &type_path.path.segments;
+        // Check for Option or ::std::option::Option or core::option::Option
+        if let Some(last_segment) = segments.last() {
+            if last_segment.ident == "Option" {
+                if let syn::PathArguments::AngleBracketed(_) = &last_segment.arguments {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }

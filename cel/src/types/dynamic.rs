@@ -13,6 +13,12 @@ pub trait DynamicValueVtable {
     fn vtable() -> &'static Vtable;
 }
 
+pub fn maybe_materialize_optional<T: DynamicType + DynamicValueVtable>(t: &Option<T>) -> Value<'_> {
+    match t {
+        Some(v) => maybe_materialize(v),
+        None => Value::Null,
+    }
+}
 pub fn maybe_materialize<T: DynamicType + DynamicValueVtable>(t: &T) -> Value<'_> {
     if t.auto_materialize() {
         t.materialize()
@@ -29,7 +35,7 @@ pub fn always_materialize(t: Value) -> Value {
     }
 }
 
-pub trait DynamicType: DynamicValueVtable + std::fmt::Debug + Send + Sync {
+pub trait DynamicType: std::fmt::Debug + Send + Sync {
     // If the value can be freely converted to a Value, do so.
     // This is anything but list/map
     fn auto_materialize(&self) -> bool {
@@ -373,32 +379,39 @@ impl DynamicType for &[String] {
 impl_dynamic_vtable!(&[String]);
 
 // Option<T> - materializes to inner value or Null
-// This is impossible to implement outside the crate, since it requires a foreign implementation on Option!
-impl<T: DynamicType> DynamicType for Option<T>
-where
-    Option<T>: DynamicValueVtable,
-{
-    fn auto_materialize(&self) -> bool {
-        match self {
-            Some(v) => v.auto_materialize(),
-            None => true, // Null should auto-materialize
-        }
-    }
-
-    fn materialize(&self) -> Value<'_> {
-        match self {
-            Some(v) => v.materialize(),
-            None => Value::Null,
-        }
-    }
-
-    fn field(&self, field: &str) -> Option<Value<'_>> {
-        match self {
-            Some(v) => v.field(field),
-            None => None,
-        }
-    }
-}
+// NOTE: We do NOT implement DynamicType or DynamicValueVtable for Option<T> directly
+// because that would require a blanket DynamicValueVtable impl which is impossible
+// (the static OnceLock would be shared across all T, causing UB).
+//
+// Instead, when using #[derive(DynamicType)] on structs with Option<T> fields,
+// the derive macro automatically detects Option fields and uses maybe_materialize_optional
+// instead of maybe_materialize, which handles the Option wrapping correctly.
+//
+// impl<T: DynamicType> DynamicType for Option<T>
+// where
+//     Option<T>: DynamicValueVtable,
+// {
+//     fn auto_materialize(&self) -> bool {
+//         match self {
+//             Some(v) => v.auto_materialize(),
+//             None => true, // Null should auto-materialize
+//         }
+//     }
+//
+//     fn materialize(&self) -> Value<'_> {
+//         match self {
+//             Some(v) => v.materialize(),
+//             None => Value::Null,
+//         }
+//     }
+//
+//     fn field(&self, field: &str) -> Option<Value<'_>> {
+//         match self {
+//             Some(v) => v.field(field),
+//             None => None,
+//         }
+//     }
+// }
 
 // // Generic vtable implementation for Option<T>
 // // Each concrete Option<T> gets its own static vtable instance
