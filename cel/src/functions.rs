@@ -25,12 +25,10 @@ pub struct FunctionContext<'vars, 'rf> {
     pub variables: &'rf dyn VariableResolver<'vars>,
 }
 
-impl<'vars, 'rf> FunctionContext<'vars, 'rf> {
+impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
     pub fn vars(&self) -> &'rf dyn VariableResolver<'vars> {
         self.variables
     }
-}
-impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
     pub fn this<T: FromValue<'a>>(&self) -> Result<T> {
         if let Some(ref this) = self.this {
             Ok(T::from_value(this)?)

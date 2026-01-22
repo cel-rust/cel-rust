@@ -3,7 +3,6 @@ use crate::common::value::CelVal;
 use crate::context::{Context, SingleVarResolver, VariableResolver};
 use crate::functions::FunctionContext;
 pub use crate::types::bytes::BytesValue;
-use crate::types::dynamic::DynamicValue as DynamicWrapper;
 pub use crate::types::list::ListValue;
 pub use crate::types::map::{Key, KeyRef, MapValue};
 pub use crate::types::opaque::{Opaque, OpaqueValue};
@@ -1173,7 +1172,7 @@ mod tests {
     use std::collections::HashMap;
 
     use crate::context::{MapResolver, VariableResolver};
-    use crate::objects::{Key, ListValue, StringValue, Value};
+    use crate::objects::{Key, ListValue, Value};
     use crate::parser::Expression;
     use crate::{Context, ExecutionError, Program};
 
@@ -1445,9 +1444,8 @@ mod tests {
             let this = ftx.this.as_ref().unwrap();
             let ident = ftx.ident(0)?;
             let expr: &'a Expression = ftx.expr(1)?;
-            let x: &'rf dyn VariableResolver<'a> = ftx.vars();
             let resolver = CompositeResolver::<'a, 'rf> {
-                base: x,
+                base: ftx.variables,
                 name: ident,
                 val: this.clone(),
             };

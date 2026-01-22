@@ -22,7 +22,6 @@ pub use parser::{ParseError, ParseErrors};
 pub mod functions;
 mod magic;
 pub mod objects;
-mod resolvers;
 
 mod duration;
 
