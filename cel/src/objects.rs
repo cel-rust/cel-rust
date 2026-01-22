@@ -22,6 +22,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops;
 use std::ops::Deref;
 use std::sync::Arc;
+use cel::types::dynamic::DynamicValue;
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -51,7 +52,7 @@ pub enum Value<'a> {
 
     /// User-defined object values implementing [`Opaque`].
     Object(OpaqueValue),
-    Dynamic(DynamicWrapper<'a>),
+    Dynamic(DynamicValue<'a>),
 
     String(StringValue<'a>),
     Bytes(BytesValue<'a>),
@@ -648,12 +649,14 @@ impl<'a> Value<'a> {
                             if let Value::Dynamic(d) = &value
                                 && let Value::String(k) = idx
                             {
+                                // TODO: in the future, if required, we could allow lookup of int for a list
                                 let result = d.field(k.as_ref()).ok_or_else(|| {
                                     ExecutionError::NoSuchKey(Arc::from(k.as_ref()))
                                 });
                                 return Self::maybe_optional(is_optional, result);
                             };
 
+                            // Since we already established we cannot use dynamic, materialize
                             let result = match (dynamic::always_materialize(value), idx) {
                                 (Value::List(items), Value::Int(idx)) => {
                                     if idx >= 0 && (idx as usize) < items.len() {

@@ -12,6 +12,8 @@ use crate::{Context, Program, Value};
 use cel::test::data::OwnedRequest;
 use serde::{Serialize, Serializer};
 use serde_json::json;
+use cel::context;
+use cel::types::dynamic::DynamicValue;
 
 mod optimizer {
     use crate::common::ast::{CallExpr, Expr};
@@ -441,4 +443,12 @@ fn opaque() {
         true,
     );
     assert_eq!(allocs, 0);
+}
+
+#[test]
+fn dynamic_ops() {
+    let ctx = Context::default();
+    let expr = Program::compile("a + a - a / a * a").unwrap();
+    let resolver = context::SingleVarResolver::new(&context::DefaultVariableResolver, "a", Value::Dynamic(DynamicValue::new(&1)));
+    let v = Value::resolve(&expr.expression,&ctx, &resolver).unwrap();
 }
