@@ -11,6 +11,7 @@ pub use crate::types::string::StringValue;
 use crate::types::time::{TsOp, checked_op};
 use crate::{ExecutionError, Expression, types};
 use cel::types::dynamic;
+use cel::types::dynamic::DynamicValue;
 use serde::de::Error as DeError;
 use serde::ser::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -21,7 +22,6 @@ use std::fmt::{Debug, Display, Formatter};
 use std::ops;
 use std::ops::Deref;
 use std::sync::Arc;
-use cel::types::dynamic::DynamicValue;
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -80,6 +80,14 @@ impl<'de> Deserialize<'de> for Value<'static> {
     }
 }
 
+impl<'a> Value<'a> {
+    pub fn maybe_materialize(&self) -> Value<'_> {
+        types::dynamic::maybe_materialize(self)
+    }
+    pub fn always_materialize(self) -> Value<'a> {
+        types::dynamic::always_materialize(self)
+    }
+}
 impl Value<'_> {
     pub fn as_unsigned(&self) -> Result<usize, ExecutionError> {
         match self {
@@ -142,7 +150,11 @@ fn _assert_covariant<'short>(v: Value<'static>) -> Value<'short> {
 
 impl PartialEq for Value<'_> {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
+        // Materialize Dynamic values before comparison
+        let self_mat = dynamic::always_materialize(self.clone());
+        let other_mat = dynamic::always_materialize(other.clone());
+
+        match (&self_mat, &other_mat) {
             (Value::Map(a), Value::Map(b)) => a == b,
             (Value::List(a), Value::List(b)) => {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| a == b)
@@ -183,7 +195,11 @@ impl Eq for Value<'_> {}
 
 impl PartialOrd for Value<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        match (self, other) {
+        // Materialize Dynamic values before comparison
+        let self_mat = dynamic::always_materialize(self.clone());
+        let other_mat = dynamic::always_materialize(other.clone());
+
+        match (&self_mat, &other_mat) {
             (Value::Int(a), Value::Int(b)) => Some(a.cmp(b)),
             (Value::UInt(a), Value::UInt(b)) => Some(a.cmp(b)),
             (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
@@ -530,20 +546,18 @@ impl<'a> Value<'a> {
                             return resolve(&call.args[0])? % resolve(&call.args[1])?;
                         }
                         operators::EQUALS => {
-                            return Value::Bool(
-                                resolve(&call.args[0])?.eq(&resolve(&call.args[1])?),
-                            )
-                            .into();
+                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
+                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            return Value::Bool(left.eq(&right)).into();
                         }
                         operators::NOT_EQUALS => {
-                            return Value::Bool(
-                                resolve(&call.args[0])?.ne(&resolve(&call.args[1])?),
-                            )
-                            .into();
+                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
+                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            return Value::Bool(left.ne(&right)).into();
                         }
                         operators::LESS => {
-                            let left = resolve(&call.args[0])?;
-                            let right = resolve(&call.args[1])?;
+                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
+                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -555,8 +569,8 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::LESS_EQUALS => {
-                            let left = resolve(&call.args[0])?;
-                            let right = resolve(&call.args[1])?;
+                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
+                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -568,8 +582,8 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::GREATER => {
-                            let left = resolve(&call.args[0])?;
-                            let right = resolve(&call.args[1])?;
+                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
+                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -581,8 +595,8 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::GREATER_EQUALS => {
-                            let left = resolve(&call.args[0])?;
-                            let right = resolve(&call.args[1])?;
+                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
+                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -744,7 +758,7 @@ impl<'a> Value<'a> {
                             return Ok(Value::Bool(!expr.to_bool()?));
                         }
                         operators::NEGATE => {
-                            return match resolve(&call.args[0])? {
+                            return match dynamic::always_materialize(resolve(&call.args[0])?) {
                                 Value::Int(i) => Ok(Value::Int(-i)),
                                 Value::Float(f) => Ok(Value::Float(-f)),
                                 value => Err(ExecutionError::UnsupportedUnaryOperator(
@@ -978,8 +992,8 @@ impl<'a> Value<'a> {
 
     #[inline(always)]
     fn to_bool(&self) -> Result<bool, ExecutionError> {
-        match self {
-            Value::Bool(v) => Ok(*v),
+        match dynamic::always_materialize(self.clone()) {
+            Value::Bool(v) => Ok(v),
             _ => Err(ExecutionError::NoSuchOverload),
         }
     }
@@ -1044,7 +1058,10 @@ impl<'a> ops::Sub<Value<'a>> for Value<'a> {
 
     #[inline(always)]
     fn sub(self, rhs: Value) -> Self::Output {
-        match (self, rhs) {
+        match (
+            types::dynamic::always_materialize(self),
+            types::dynamic::always_materialize(rhs),
+        ) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_sub(r)
                 .ok_or(ExecutionError::Overflow("sub", l.into(), r.into()))
@@ -1081,7 +1098,10 @@ impl<'a> ops::Div<Value<'a>> for Value<'a> {
 
     #[inline(always)]
     fn div(self, rhs: Value) -> Self::Output {
-        match (self, rhs) {
+        match (
+            types::dynamic::always_materialize(self),
+            types::dynamic::always_materialize(rhs),
+        ) {
             (Value::Int(l), Value::Int(r)) => {
                 if r == 0 {
                     Err(ExecutionError::DivisionByZero(l.into()))
@@ -1113,7 +1133,10 @@ impl<'a> ops::Mul<Value<'a>> for Value<'a> {
 
     #[inline(always)]
     fn mul(self, rhs: Value) -> Self::Output {
-        match (self, rhs) {
+        match (
+            types::dynamic::always_materialize(self),
+            types::dynamic::always_materialize(rhs),
+        ) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_mul(r)
                 .ok_or(ExecutionError::Overflow("mul", l.into(), r.into()))
@@ -1140,7 +1163,10 @@ impl<'a> ops::Rem<Value<'a>> for Value<'a> {
 
     #[inline(always)]
     fn rem(self, rhs: Value) -> Self::Output {
-        match (self, rhs) {
+        match (
+            types::dynamic::always_materialize(self),
+            types::dynamic::always_materialize(rhs),
+        ) {
             (Value::Int(l), Value::Int(r)) => {
                 if r == 0 {
                     Err(ExecutionError::RemainderByZero(l.into()))

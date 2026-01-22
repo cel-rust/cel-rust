@@ -9,11 +9,11 @@ use crate::context::VariableResolver;
 use crate::objects::{KeyRef, Opaque};
 use crate::types::dynamic::DynamicType;
 use crate::{Context, Program, Value};
+use cel::context;
 use cel::test::data::OwnedRequest;
+use cel::types::dynamic::DynamicValue;
 use serde::{Serialize, Serializer};
 use serde_json::json;
-use cel::context;
-use cel::types::dynamic::DynamicValue;
 
 mod optimizer {
     use crate::common::ast::{CallExpr, Expr};
@@ -327,11 +327,11 @@ mod alloc {
     }
 }
 
-fn run_with_allocation_count(expr: &str, req: OwnedRequest, f: impl FnOnce(Value)) -> usize {
-    run_with_allocation_count_and_optimizer(expr, req, f, false)
+fn run(expr: &str, req: OwnedRequest, f: impl FnOnce(Value)) -> usize {
+    run_with_optimizer(expr, req, f, false)
 }
 
-fn run_with_allocation_count_and_optimizer(
+fn run_with_optimizer(
     expr: &str,
     req: OwnedRequest,
     f: impl FnOnce(Value),
@@ -356,7 +356,7 @@ fn run_with_allocation_count_and_optimizer(
 fn dynamic_value_complex() {
     let headers = HashMap::from([("k".to_string(), "v".to_string())]);
     let claims = data::Claims(json!({"sub": "me@example.com"}));
-    let allocs = run_with_allocation_count(
+    let allocs = run(
         "[request.claims.sub, request.method, request.path, request.headers['k']]",
         OwnedRequest {
             method: http::Method::GET,
@@ -379,7 +379,7 @@ fn dynamic_value_complex() {
 #[test]
 fn dynamic_value_end_to_end() {
     let claims = data::Claims(json!({"sub": "me@example.com"}));
-    let allocs = run_with_allocation_count(
+    let allocs = run(
         "request.claims",
         OwnedRequest {
             method: http::Method::GET,
@@ -405,13 +405,13 @@ fn dynamic_value_header() {
         headers,
         claims: Default::default(),
     };
-    let allocs = run_with_allocation_count("request.headers['k']", req.clone(), |res| {
+    let allocs = run("request.headers['k']", req.clone(), |res| {
         // Should be materialized
         assert!(matches!(&res, Value::String(l)), "{res:?}");
         assert_eq!(res.json().unwrap(), json!("v"));
     });
     assert_eq!(allocs, 0);
-    let allocs = run_with_allocation_count("request.headers", req, |res| {
+    let allocs = run("request.headers", req, |res| {
         // Should NOT be materialized
         assert!(matches!(&res, Value::Dynamic(l)), "{res:?}");
         assert_eq!(res.json().unwrap(), json!({"k": "v"}));
@@ -421,7 +421,7 @@ fn dynamic_value_header() {
 
 #[test]
 fn opaque() {
-    let allocs = run_with_allocation_count_and_optimizer(
+    let allocs = run_with_optimizer(
         "ip('1.2.3.4')",
         OwnedRequest::default(),
         |res| {
@@ -434,7 +434,7 @@ fn opaque() {
         true,
     );
     assert_eq!(allocs, 0);
-    let allocs = run_with_allocation_count_and_optimizer(
+    let allocs = run_with_optimizer(
         "ip('1.2.3.4').family()",
         OwnedRequest::default(),
         |res| {
@@ -449,6 +449,21 @@ fn opaque() {
 fn dynamic_ops() {
     let ctx = Context::default();
     let expr = Program::compile("a + a - a / a * a").unwrap();
-    let resolver = context::SingleVarResolver::new(&context::DefaultVariableResolver, "a", Value::Dynamic(DynamicValue::new(&1)));
-    let v = Value::resolve(&expr.expression,&ctx, &resolver).unwrap();
+    let resolver = context::SingleVarResolver::new(
+        &context::DefaultVariableResolver,
+        "a",
+        Value::Dynamic(DynamicValue::new(&1)),
+    );
+    let v = Value::resolve(&expr.expression, &ctx, &resolver).unwrap();
+    run("request.size()", OwnedRequest::default(), |res| {
+        assert_eq!(res.json().unwrap(), json!(4));
+    });
+}
+
+#[test]
+fn invalid_functions() {
+    let ctx = Context::default();
+    let expr = Program::compile("size('1', 2, 3)").unwrap();
+    let resolver = context::DefaultVariableResolver;
+    assert!(Value::resolve(&expr.expression, &ctx, &resolver).is_err())
 }

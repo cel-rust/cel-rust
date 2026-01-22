@@ -6,6 +6,7 @@ use crate::context::{Context, VariableResolver};
 use crate::magic::{Argument, FromValue, This};
 use crate::objects::{BytesValue, KeyRef, OpaqueValue, OptionalValue, StringValue, Value};
 use crate::parser::Expression;
+use crate::types::dynamic;
 use crate::{ExecutionError, ResolveResult};
 
 type Result<T> = std::result::Result<T, ExecutionError>;
@@ -43,10 +44,10 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
         }
     }
     pub fn this_value(&self) -> Result<Value<'a>> {
-        self.this()
+        self.this::<Value>().map(|v| v.always_materialize())
     }
     pub fn this_or_arg_value(&self) -> Result<Value<'a>> {
-        self.this_or_arg()
+        self.this_or_arg::<Value>().map(|v| v.always_materialize())
     }
     pub fn value(&self, index: usize) -> Result<Value<'a>> {
         let arg = self
@@ -56,12 +57,14 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
                 index + 1,
                 self.args.len(),
             ))?;
-        Value::resolve(arg, self.ptx, self.variables)
+        Value::resolve(arg, self.ptx, self.variables).map(|v| v.always_materialize())
     }
+
     pub fn arg<T: FromValue<'a>>(&self, index: usize) -> Result<T> {
         let v = self.value(index)?;
         T::from_value(&v)
     }
+
     pub fn ident(&self, index: usize) -> Result<&'a str> {
         match &self.expr(index)?.expr {
             Expr::Ident(ident) => Ok(ident),
@@ -75,7 +78,7 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
     pub fn value_iter(&self) -> impl Iterator<Item = Result<Value<'a>>> + use<'a, '_, 'vars> {
         self.args
             .iter()
-            .map(|e| Value::resolve(e, self.ptx, self.variables))
+            .map(|e| Value::resolve(e, self.ptx, self.variables).map(|v| v.always_materialize()))
     }
 
     pub fn expr_iter(&self) -> impl Iterator<Item = &'a Expression> + use<'a, 'vars> {

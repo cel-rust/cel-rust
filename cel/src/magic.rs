@@ -128,12 +128,10 @@ pub(crate) trait FromContext<'a, 'rf> {
 /// }
 /// ```
 pub struct This;
+
 impl This {
     pub fn load<'a>(self, ftx: &FunctionContext<'a, '_>) -> Result<Value<'a>, ExecutionError> {
         ftx.this()
-    }
-    pub fn load2<'a, 'b>(self, ftx: &'b FunctionContext<'a, '_>) -> Option<&'b Value<'a>> {
-        ftx.this.as_ref()
     }
     pub fn load_value<'a, T: FromValue<'a>>(
         self,
@@ -154,6 +152,7 @@ impl This {
         ftx.this_or_arg()
     }
 }
+
 pub struct Argument(usize);
 impl Argument {
     pub fn load<'a>(self, ftx: &FunctionContext<'a, '_>) -> Result<Value<'a>, ExecutionError> {

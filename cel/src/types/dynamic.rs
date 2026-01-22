@@ -15,7 +15,7 @@ pub fn maybe_materialize<T: DynamicType>(t: &T) -> Value<'_> {
     }
 }
 
-pub fn always_materialize(t: Value) -> Value {
+pub fn always_materialize<'a>(t: Value<'a>) -> Value<'a> {
     if let Value::Dynamic(d) = t {
         d.materialize()
     } else {

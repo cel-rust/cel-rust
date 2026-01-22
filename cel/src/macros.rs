@@ -7,6 +7,17 @@ macro_rules! impl_conversions {
                 fn from_value(expr: &Value<'a>) -> Result<Self, ExecutionError> {
                     if let $value_variant(v) = expr {
                         Ok(v.clone())
+                    } else if let Value::Dynamic(d) = expr {
+                        // Try to materialize and extract
+                        let materialized = d.materialize();
+                        if let $value_variant(v) = materialized {
+                            Ok(v.clone())
+                        } else {
+                            Err(ExecutionError::UnexpectedType {
+                                got: materialized.type_of().as_str(),
+                                want: stringify!($target_type),
+                            })
+                        }
                     } else {
                         Err(ExecutionError::UnexpectedType {
                             got: expr.type_of().as_str(),
@@ -21,6 +32,17 @@ macro_rules! impl_conversions {
                     match expr {
                         Value::Null => Ok(None),
                         $value_variant(v) => Ok(Some(v.clone())),
+                        Value::Dynamic(d) => {
+                            let materialized = d.materialize();
+                            match materialized {
+                                Value::Null => Ok(None),
+                                $value_variant(v) => Ok(Some(v.clone())),
+                                _ => Err(ExecutionError::UnexpectedType {
+                                    got: materialized.type_of().as_str(),
+                                    want: stringify!($target_type),
+                                }),
+                            }
+                        }
                         _ => Err(ExecutionError::UnexpectedType {
                             got: expr.type_of().as_str(),
                             want: stringify!($target_type),
