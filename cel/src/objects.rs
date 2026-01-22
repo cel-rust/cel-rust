@@ -1,11 +1,3 @@
-use std::borrow::Cow;
-use std::cmp::Ordering;
-use std::convert::{TryFrom, TryInto};
-use std::fmt::{Debug, Display, Formatter};
-use std::ops;
-use std::ops::Deref;
-use std::sync::Arc;
-
 use crate::common::ast::{EntryExpr, Expr, OptimizedExpr, operators};
 use crate::common::value::CelVal;
 use crate::context::{Context, SingleVarResolver, VariableResolver};
@@ -14,7 +6,7 @@ pub use crate::types::bytes::BytesValue;
 use crate::types::dynamic::DynamicValue as DynamicWrapper;
 pub use crate::types::list::ListValue;
 pub use crate::types::map::{Key, KeyRef, MapValue};
-pub use crate::types::object::{ObjectType, ObjectValue};
+pub use crate::types::opaque::{Opaque, OpaqueValue};
 pub use crate::types::optional::OptionalValue;
 pub use crate::types::string::StringValue;
 use crate::types::time::{TsOp, checked_op};
@@ -23,6 +15,13 @@ use cel::types::dynamic;
 use serde::de::Error as DeError;
 use serde::ser::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::borrow::Cow;
+use std::cmp::Ordering;
+use std::convert::{TryFrom, TryInto};
+use std::fmt::{Debug, Display, Formatter};
+use std::ops;
+use std::ops::Deref;
+use std::sync::Arc;
 
 pub trait TryIntoValue<'a> {
     type Error: std::error::Error + 'static + Send + Sync;
@@ -36,6 +35,7 @@ impl<'a, T: serde::Serialize> TryIntoValue<'a> for T {
     }
 }
 
+#[derive(Clone)]
 pub enum Value<'a> {
     List(ListValue<'a>),
     Map(MapValue<'a>),
@@ -49,8 +49,8 @@ pub enum Value<'a> {
     Duration(chrono::Duration),
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
 
-    /// User-defined object values implementing [`ObjectType`].
-    Object(ObjectValue<'a>),
+    /// User-defined object values implementing [`Opaque`].
+    Object(OpaqueValue),
     Dynamic(DynamicWrapper<'a>),
 
     String(StringValue<'a>),
@@ -246,39 +246,6 @@ impl Debug for Value<'_> {
             Value::Object(obj) => write!(f, "Object<{}>({:?})", obj.type_name(), obj),
             Value::Dynamic(obj) => write!(f, "Dynamic({:?})", obj),
             Value::Null => write!(f, "Null"),
-        }
-    }
-}
-
-impl<'a> Clone for Value<'a> {
-    fn clone(&self) -> Self {
-        match self {
-            Value::List(l) => Value::List(match l {
-                ListValue::Borrowed(items) => ListValue::Borrowed(items),
-                ListValue::PartiallyOwned(items) => ListValue::PartiallyOwned(items.clone()),
-                ListValue::Owned(items) => ListValue::Owned(items.clone()),
-            }),
-            Value::Map(m) => Value::Map(m.clone()),
-            Value::Int(i) => Value::Int(*i),
-            Value::UInt(u) => Value::UInt(*u),
-            Value::Float(f) => Value::Float(*f),
-            Value::Bool(b) => Value::Bool(*b),
-            Value::Object(obj) => Value::Object(obj.clone()),
-            Value::Dynamic(obj) => Value::Dynamic(obj.clone()),
-
-            Value::Duration(d) => Value::Duration(*d),
-
-            Value::Timestamp(t) => Value::Timestamp(*t),
-            Value::String(s) => Value::String(match s {
-                StringValue::Borrowed(str_ref) => StringValue::Borrowed(str_ref),
-                StringValue::Owned(owned) => StringValue::Owned(owned.clone()),
-            }),
-            Value::Bytes(b) => Value::Bytes(match b {
-                BytesValue::Borrowed(bytes) => BytesValue::Borrowed(bytes),
-                BytesValue::Owned(vec) => BytesValue::Owned(vec.clone()),
-                BytesValue::Bytes(bytes) => BytesValue::Bytes(bytes.clone()),
-            }),
-            Value::Null => Value::Null,
         }
     }
 }
@@ -674,7 +641,7 @@ impl<'a> Value<'a> {
                                 value = match opt_val.value() {
                                     Some(inner) => inner.clone(),
                                     None => {
-                                        return Ok(ObjectValue::new(OptionalValue::none()).into());
+                                        return Ok(OpaqueValue::new(OptionalValue::none()).into());
                                     }
                                 };
                             }
@@ -753,14 +720,14 @@ impl<'a> Value<'a> {
                             };
                             if let Ok(opt_val) = <&OptionalValue>::try_from(&operand) {
                                 return match opt_val.value() {
-                                    Some(inner) => Ok(ObjectValue::new(OptionalValue::of(
+                                    Some(inner) => Ok(OpaqueValue::new(OptionalValue::of(
                                         inner.clone().member(&field)?,
                                     ))
                                     .into()),
                                     None => Ok(operand),
                                 };
                             }
-                            return Ok(ObjectValue::new(OptionalValue::of(
+                            return Ok(OpaqueValue::new(OptionalValue::of(
                                 operand.member(&field)?.as_static(),
                             ))
                             .into());
@@ -981,8 +948,8 @@ impl<'a> Value<'a> {
     fn maybe_optional(is_optional: bool, result: Result<Value, ExecutionError>) -> ResolveResult {
         if is_optional {
             Ok(match result {
-                Ok(val) => ObjectValue::new(OptionalValue::of(val.as_static())).into(),
-                Err(_) => ObjectValue::new(OptionalValue::none()).into(),
+                Ok(val) => OpaqueValue::new(OptionalValue::of(val.as_static())).into(),
+                Err(_) => OpaqueValue::new(OptionalValue::none()).into(),
             })
         } else {
             result
@@ -994,7 +961,6 @@ impl<'a> Value<'a> {
         // a property on self, or a method on self.
         let child = match self {
             Value::Map(m) => m.get(&KeyRef::String(StringValue::Borrowed(name))).cloned(),
-            Value::Object(obj) => obj.get_member(name),
             Value::Dynamic(d) => d.field(name),
             _ => None,
         };
@@ -1203,7 +1169,6 @@ impl<'a> ops::Rem<Value<'a>> for Value<'a> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
-    use std::sync::Arc;
 
     use crate::context::{MapResolver, VariableResolver};
     use crate::objects::{Key, ListValue, StringValue, Value};
@@ -1523,7 +1488,7 @@ mod tests {
 
         use crate::context::MapResolver;
         use crate::objects::{
-            ListValue, MapValue, ObjectType, ObjectValue, OptionalValue, StringValue,
+            ListValue, MapValue, Opaque, OpaqueValue, OptionalValue, StringValue,
         };
         use crate::parser::Parser;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
@@ -1532,9 +1497,8 @@ mod tests {
         struct MyStruct {
             field: String,
         }
-        crate::register_type!(MyStruct);
 
-        impl ObjectType<'static> for MyStruct {
+        impl Opaque for MyStruct {
             fn type_name(&self) -> &'static str {
                 "my_struct"
             }
@@ -1591,7 +1555,7 @@ mod tests {
             };
 
             let mut vars = MapResolver::new();
-            vars.add_variable_from_value("mine", Value::Object(ObjectValue::new(value)));
+            vars.add_variable_from_value("mine", Value::Object(OpaqueValue::new(value)));
             let mut ctx = Context::default();
             ctx.add_function("myFn", my_fn);
             let prog = Program::compile("mine.myFn()").unwrap();
@@ -1611,9 +1575,9 @@ mod tests {
             };
 
             let mut vars = MapResolver::new();
-            vars.add_variable_from_value("v1", Value::Object(ObjectValue::new(value_1.clone())));
-            vars.add_variable_from_value("v1b", Value::Object(ObjectValue::new(value_1)));
-            vars.add_variable_from_value("v2", Value::Object(ObjectValue::new(value_2)));
+            vars.add_variable_from_value("v1", Value::Object(OpaqueValue::new(value_1.clone())));
+            vars.add_variable_from_value("v1b", Value::Object(OpaqueValue::new(value_1)));
+            vars.add_variable_from_value("v2", Value::Object(OpaqueValue::new(value_2)));
             let ctx = Context::default();
             assert_eq!(
                 Program::compile("v2 == v1")
@@ -1640,7 +1604,7 @@ mod tests {
             let opaque = MyStruct {
                 field: "not so opaque".to_string(),
             };
-            let opaque = Value::Object(ObjectValue::new(opaque));
+            let opaque = Value::Object(OpaqueValue::new(opaque));
             assert_eq!(
                 "Object<my_struct>(MyStruct { field: \"not so opaque\" })",
                 format!("{:?}", opaque)
@@ -1653,7 +1617,7 @@ mod tests {
             let value = MyStruct {
                 field: String::from("value"),
             };
-            let cel_value = Value::Object(ObjectValue::new(value));
+            let cel_value = Value::Object(OpaqueValue::new(value));
             let mut map = serde_json::Map::new();
             map.insert(
                 "field".to_string(),
@@ -1675,7 +1639,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -1684,7 +1648,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::of(
                     Value::Int(1)
                 ))))
             );
@@ -1695,7 +1659,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -1704,7 +1668,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::of(
                     Value::Int(1)
                 ))))
             );
@@ -1749,7 +1713,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::of(
                     Value::Int(1)
                 ))))
             );
@@ -1759,7 +1723,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::of(
                     Value::Int(2)
                 ))))
             );
@@ -1769,7 +1733,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &empty_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()
@@ -1792,7 +1756,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::of(
                     Value::String(StringValue::Owned(Arc::from("value")))
                 ))))
             );
@@ -1803,7 +1767,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::of(
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::of(
                     Value::String(StringValue::Owned(Arc::from("value")))
                 ))))
             );
@@ -1814,7 +1778,7 @@ mod tests {
                 .expect("Must parse");
             assert_eq!(
                 Value::resolve(&expr, &ctx, &msg_vars),
-                Ok(Value::Object(ObjectValue::new(OptionalValue::none())))
+                Ok(Value::Object(OpaqueValue::new(OptionalValue::none())))
             );
 
             let expr = Parser::default()

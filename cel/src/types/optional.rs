@@ -1,11 +1,10 @@
-use crate::objects::ObjectType;
+use crate::objects::Opaque;
 use crate::{ExecutionError, Value};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptionalValue {
     value: Option<Value<'static>>,
 }
-crate::register_type!(OptionalValue);
 
 impl OptionalValue {
     pub fn of(value: Value<'static>) -> Self {
@@ -19,9 +18,16 @@ impl OptionalValue {
     }
 }
 
-impl ObjectType<'static> for OptionalValue {
+impl Opaque for OptionalValue {
     fn type_name(&self) -> &'static str {
         "optional_type"
+    }
+    fn json(&self) -> Option<serde_json::Value> {
+        match self.value.as_ref() {
+            // TODO: or exclude it?
+            None => Some(serde_json::Value::Null),
+            Some(v) => v.json().ok(),
+        }
     }
 }
 

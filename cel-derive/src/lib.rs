@@ -314,29 +314,6 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
-    // For the vtable impl, we'll use <'_> to work with any lifetime
-    // Build a custom type parameters list with all lifetimes replaced by '_
-    let vtable_ty_params = if generics.params.is_empty() {
-        quote! {}
-    } else {
-        let params = generics.params.iter().map(|param| match param {
-            syn::GenericParam::Lifetime(_) => quote! { '_ },
-            syn::GenericParam::Type(ty) => {
-                let ident = &ty.ident;
-                quote! { #ident }
-            }
-            syn::GenericParam::Const(c) => {
-                let ident = &c.ident;
-                quote! { #ident }
-            }
-        });
-        quote! { <#(#params),*> }
-    };
-
-    // For the unsafe casts in the vtable, we need the same type as in vtable_ty_params
-    // Use the same pattern with '_ for all lifetimes
-    let bare_name_with_generics = quote! { #name #vtable_ty_params };
-
     let generated = quote! {
         impl #impl_generics #crate_path::types::dynamic::DynamicType for #name #ty_generics #where_clause {
             #auto_materialize_impl

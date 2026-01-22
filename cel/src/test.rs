@@ -2,620 +2,431 @@
 // we need to alias the crate so ::cel:: paths resolve correctly
 extern crate self as cel;
 
-use std::alloc::System;
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::marker::PhantomPinned;
-use std::pin::Pin;
-use std::ptr::NonNull;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex, OnceLock};
 
+use crate::context::VariableResolver;
+use crate::objects::{KeyRef, Opaque};
+use crate::types::dynamic::DynamicType;
+use crate::{Context, Program, Value};
+use cel::test::data::OwnedRequest;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
-use crate::context::VariableResolver;
-use crate::magic::Function;
-use crate::objects::{KeyRef, MapValue, ObjectType, ObjectValue, StringValue};
-use crate::parser::Expression;
-use crate::types::dynamic::DynamicType;
-use crate::{Context, FunctionContext, Program, Value, to_value, types};
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct HttpRequest {
-    method: String,
-    path: String,
-    headers: HashMap<String, String>,
-    claims: Claims,
-}
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct Http2Request {
-    #[serde(serialize_with = "ser_display")]
-    method: http::Method,
-    path: String,
-    headers: HashMap<String, String>,
-    claims: Claims,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
-pub struct RequestOpaque<'a>(&'a HttpRequest);
-
-fn custom_function() -> &'static Function {
-    static CUSTOM_FN: OnceLock<Function> = OnceLock::new();
-    CUSTOM_FN.get_or_init(|| {
-        Box::new(|_ftx: &mut FunctionContext| Ok(Value::String(StringValue::Borrowed("YES"))))
-    })
-}
-crate::register_type!(RequestOpaque);
-
-impl<'a> ObjectType<'a> for RequestOpaque<'a> {
-    fn type_name(&self) -> &'static str {
-        "request_opaque"
-    }
-
-    fn resolve_function(&self, name: &str) -> Option<&Function> {
-        match name {
-            "custom" => Some(custom_function()),
+mod optimizer {
+    use std::net;
+    use std::str::FromStr;
+    use cel::{IdedExpr, Value};
+    use cel::objects::OpaqueValue;
+    use crate::common::ast::{CallExpr, Expr};
+    fn expr_as_value(e: IdedExpr) -> Option<Value<'static>> {
+        match e.expr {
+            Expr::Literal(l) => Some(Value::from(l)),
+            Expr::Inline(l) => Some(l),
             _ => None,
         }
     }
-
-    fn get_member(&self, name: &str) -> Option<Value<'a>> {
-        match name {
-            "path" => Some(Value::String(self.0.path.as_str().into())),
-            "method" => Some(Value::String(self.0.method.as_str().into())),
-            "headers" => None, // TODO
-            _ => None,
+    pub struct OpaqueOptimizer;
+    impl OpaqueOptimizer {
+        fn specialize_call(&self, c: &CallExpr) -> Option<Expr> {
+            match c.func_name.as_str() {
+                "ip" if c.args.len() == 1 && c.target.is_none() => {
+                    let arg = c.args.iter().next()?.clone();
+                    let Value::String(arg) = expr_as_value(arg)? else {
+                        return None;
+                    };
+                    let parsed = super::data::IP(net::IpAddr::from_str(&arg).ok()?);
+                    Some(Expr::Inline(Value::Object(OpaqueValue::new(parsed))))
+                },
+                _ => None,
+            }
+        }
+    }
+    impl cel::Optimizer for OpaqueOptimizer {
+        fn optimize(&self, expr: &Expr) -> Option<Expr> {
+            match expr {
+                Expr::Call(c) => self.specialize_call(c),
+                _ => None,
+            }
         }
     }
 
-    fn json(&self) -> Option<serde_json::Value> {
-        serde_json::to_value(self.0).ok()
+}
+
+mod data {
+    use crate::Value;
+    use cel::context::VariableResolver;
+    use cel::extractors::Function;
+    use cel::objects::{OpaqueValue, ValueType};
+    use cel::parser::Expression;
+    use cel::types::dynamic::DynamicType;
+    use cel::{Context, ExecutionError, FunctionContext, ResolveResult};
+    use cel_derive::DynamicType;
+    use serde::{Serialize, Serializer};
+    use std::collections::HashMap;
+    use std::fmt::Display;
+    use std::net;
+    use std::sync::LazyLock;
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct OwnedRequest {
+        pub method: http::Method,
+        pub path: String,
+        pub headers: HashMap<String, String>,
+        pub claims: Claims,
     }
-}
-
-#[derive(Serialize)]
-pub struct Resolver<'a> {
-    request: &'a HttpRequest,
-}
-
-impl<'a> VariableResolver<'a> for Resolver<'a> {
-    fn resolve(&self, variable: &str) -> Option<Value<'a>> {
-        match variable {
-            "request" => Some(Value::Object(ObjectValue::new(RequestOpaque(self.request)))),
-            "jwt" => Some(types::dynamic::maybe_materialize(&self.request.claims)),
-            _ => None,
+    impl Default for OwnedRequest {
+        fn default() -> Self {
+            Self {
+                method: http::Method::GET,
+                path: "/".to_string(),
+                headers: Default::default(),
+                claims: Default::default(),
+            }
         }
     }
-}
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Claims(serde_json::Value);
+    #[derive(Clone, Debug, PartialEq, Eq, Serialize, DynamicType)]
+    pub struct HttpRequestRef<'a> {
+        // Use with_value to convert http::Method to Value directly
+        #[dynamic(with_value = "as_str")]
+        #[serde(serialize_with = "ser_display")]
+        method: &'a http::Method,
+        path: &'a str,
+        headers: &'a HashMap<String, String>,
+        // Use with to unwrap the Claims newtype
+        #[dynamic(with = "claims_inner")]
+        claims: &'a Claims,
+    }
 
-impl serde::Serialize for Claims {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    // Generic helper to convert any AsRef<str> to &str
+    // Works with http::Method, String, and other AsRef<str> types
+    fn as_str<'a, T: AsRef<str>>(c: &'a &'a T) -> Value<'a> {
+        Value::String(c.as_ref().into())
+    }
+
+    fn ser_display<S: Serializer, T: Display>(t: &T, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_str(&t.to_string())
+    }
+    // Helper function to extract the inner value from Claims
+    fn claims_inner<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
+        &c.0
+    }
+
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    pub struct Claims(pub serde_json::Value);
+
+    impl serde::Serialize for Claims {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: serde::Serializer,
+        {
+            self.0.serialize(serializer)
+        }
+    }
+
+    impl Default for Claims {
+        fn default() -> Self {
+            Claims(serde_json::Value::Object(Default::default()))
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct DynResolverRef<'a> {
+        rf: &'a DynResolver<'a>,
+    }
+    #[derive(Debug, Clone, Serialize, DynamicType)]
+    pub struct DynResolver<'a> {
+        request: Option<HttpRequestRef<'a>>,
+    }
+    impl<'a> DynResolver<'a> {
+        pub fn eval(&'a self, ctx: &'a Context, expr: &'a Expression) -> Value<'a> {
+            let resolver = DynResolverRef { rf: self };
+            Value::resolve(expr, &ctx, &resolver).unwrap()
+        }
+    }
+    impl<'a> VariableResolver<'a> for DynResolverRef<'a> {
+        fn resolve(&self, variable: &str) -> Option<Value<'a>> {
+            self.rf.field(variable)
+        }
+    }
+    impl<'a> DynResolver<'a> {
+        pub fn new_from_request(req: &'a OwnedRequest) -> Self {
+            Self {
+                request: Some(HttpRequestRef {
+                    method: &req.method,
+                    path: req.path.as_str(),
+                    headers: &req.headers,
+                    claims: &req.claims,
+                }),
+            }
+        }
+    }
+    fn as_opaque<'a>(a: &'a Value<'a>) -> Result<&'a OpaqueValue, ExecutionError> {
+        let Value::Object(a) = a else {
+            return Err(ExecutionError::UnexpectedType {
+                got: a.type_of().as_str(),
+                want: ValueType::Object.as_str(),
+            });
+        };
+
+        Ok(a)
+    }
+    fn funnel<CL>(f: CL) -> CL
     where
-        S: serde::Serializer,
+        CL: for<'b, 'a, 'rf> Fn(&'b mut FunctionContext<'a, 'rf>) -> ResolveResult<'a>,
     {
-        self.0.serialize(serializer)
+        f
     }
-}
+    #[derive(Debug, PartialEq, Eq, Clone, Serialize)]
+    pub struct IP(pub net::IpAddr);
+    impl<'a> cel::objects::Opaque for IP {
+        fn resolve_function(&self, name: &str) -> Option<&cel::extractors::Function> {
+            self.function(name)
+        }
 
-impl Default for Claims {
-    fn default() -> Self {
-        Claims(serde_json::Value::Object(Default::default()))
+        fn json(&self) -> Option<serde_json::Value> {
+            serde_json::to_value(&self).ok()
+        }
     }
-}
+    impl IP {
+        fn function(&self, name: &str) -> Option<&cel::extractors::Function> {
+            static family: LazyLock<Function> = LazyLock::new(|| {
+                Box::new(funnel(move |ftx: &mut FunctionContext<'_, '_>| {
+                    let this = ftx.this()?;
+                    let this = as_opaque(&this)?;
+                    let t = this.downcast_ref().unwrap();
+                    IP::family(t)
+                }))
+            });
 
-impl DynamicType for Claims {
-    fn materialize(&self) -> Value<'_> {
-        self.0.materialize()
-    }
-
-    fn auto_materialize(&self) -> bool {
-        true
-    }
-
-    fn field(&self, field: &str) -> Option<Value<'_>> {
-        match &self.0 {
-            serde_json::Value::Object(o) => o.get(field).map(|v| v.materialize()),
-            _ => None,
+            match name {
+                "family" => Some(&family),
+                _ => None,
+            }
+        }
+        fn family(&self) -> ResolveResult<'static> {
+            match self.0 {
+                net::IpAddr::V4(_) => Ok(4.into()),
+                net::IpAddr::V6(_) => Ok(6.into()),
+            }
         }
     }
 }
 
-// Helper function to extract the inner value from Claims
-fn claims_inner<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
-    &c.0
-}
+mod functions {
+    use cel::Value;
+    use cel::context::VariableResolver;
+    use cel::objects::{OpaqueValue, StringValue};
+    use cel::parser::Expression;
+    use cel::test::data;
+    use std::net;
+    use std::str::FromStr;
 
-// Generic helper to convert any AsRef<str> to &str
-// Works with http::Method, String, and other AsRef<str> types
-fn as_str<'a, T: AsRef<str>>(c: &'a &'a T) -> Value<'a> {
-    Value::String(c.as_ref().into())
-}
+    struct CompositeResolver<'a, 'rf> {
+        base: &'rf dyn VariableResolver<'a>,
+        name: &'a str,
+        val: Value<'a>,
+    }
 
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, DynamicType)]
-#[dynamic(auto_materialize)]
-pub struct HttpRequestRef<'a> {
-    // Use with_value to convert http::Method to Value directly
-    #[dynamic(with_value = "as_str")]
-    #[serde(serialize_with = "ser_display")]
-    method: &'a http::Method,
-    path: &'a str,
-    headers: &'a HashMap<String, String>,
-    // Use with to unwrap the Claims newtype
-    #[dynamic(with = "claims_inner")]
-    claims: &'a Claims,
-}
+    impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
+        fn resolve(&self, expr: &str) -> Option<Value<'a>> {
+            if expr == self.name {
+                Some(self.val.clone())
+            } else {
+                self.base.resolve(expr)
+            }
+        }
+    }
 
-pub fn ser_display<S: Serializer, T: Display>(t: &T, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.serialize_str(&t.to_string())
-}
+    pub fn with<'a, 'rf, 'b>(
+        ftx: &'b mut crate::FunctionContext<'a, 'rf>,
+    ) -> crate::ResolveResult<'a> {
+        let this = ftx.this.as_ref().unwrap();
+        let ident = ftx.ident(0)?;
+        let expr: &'a Expression = ftx.expr(1)?;
+        let x: &'rf dyn VariableResolver<'a> = ftx.vars();
+        let resolver = CompositeResolver::<'a, 'rf> {
+            base: x,
+            name: ident,
+            val: this.clone(),
+        };
+        let v = Value::resolve(expr, ftx.ptx, &resolver)?;
+        Ok(v)
+    }
 
-#[derive(Debug, Clone)]
-pub struct DynResolverRef<'a> {
-    rf: &'a DynResolver<'a>,
-}
-#[derive(Debug, Clone, Serialize, DynamicType)]
-pub struct DynResolver<'a> {
-    request: Option<HttpRequestRef<'a>>,
-}
-impl<'a> DynResolver<'a> {
-    pub fn eval(&'a self, ctx: &'a Context, expr: &'a Expression) -> Value<'a> {
-        let resolver2 = DynResolverRef { rf: self };
-        let res = Value::resolve(expr, &ctx, &resolver2).unwrap();
-        res
+    pub fn new_ip<'a, 'rf, 'b>(
+        ftx: &'b mut crate::FunctionContext<'a, 'rf>,
+    ) -> crate::ResolveResult<'a> {
+        let this: StringValue = ftx.this()?;
+        let ip = data::IP(net::IpAddr::from_str(this.as_ref()).map_err(|x| ftx.error(x))?);
+        Ok(Value::Object(OpaqueValue::new(ip)))
     }
 }
-impl<'a> VariableResolver<'a> for DynResolverRef<'a> {
-    fn resolve(&self, variable: &str) -> Option<Value<'a>> {
-        self.rf.field(variable)
+
+mod alloc {
+    use std::alloc::System;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::{Arc, Mutex, OnceLock};
+    use tracking_allocator::{AllocationGroupId, AllocationTracker};
+    use tracking_allocator::{AllocationRegistry, Allocator};
+
+    #[global_allocator]
+    static GLOBAL: Allocator<System> = Allocator::system();
+
+    // Global allocation tracking
+    static GLOBAL_ALLOC_COUNTER: OnceLock<Mutex<Arc<AtomicUsize>>> = OnceLock::new();
+
+    pub fn count_allocations<T>(f: impl FnOnce() -> T) -> (T, usize) {
+        let mu = GLOBAL_ALLOC_COUNTER.get_or_init(|| {
+            let counter = Arc::new(AtomicUsize::new(0));
+            let _ = AllocationRegistry::set_global_tracker(Counter(counter.clone()));
+            Mutex::new(counter)
+        });
+        let inner = mu.lock().unwrap_or_else(|e| e.into_inner());
+        inner.store(0, Ordering::SeqCst);
+        AllocationRegistry::enable_tracking();
+        let res = f();
+        AllocationRegistry::disable_tracking();
+        let amt = inner.load(Ordering::SeqCst);
+        (res, amt)
     }
-}
-impl<'a> DynResolver<'a> {
-    pub fn new_from_request(req: &'a Http2Request) -> Self {
-        Self {
-            request: Some(HttpRequestRef {
-                method: &req.method,
-                path: req.path.as_str(),
-                headers: &req.headers,
-                claims: &req.claims,
-            }),
+
+    #[derive(Default, Clone, Debug)]
+    struct Counter(Arc<AtomicUsize>);
+
+    impl AllocationTracker for Counter {
+        fn allocated(
+            &self,
+            addr: usize,
+            object_size: usize,
+            wrapped_size: usize,
+            group_id: AllocationGroupId,
+        ) {
+            self.0.fetch_add(1, Ordering::SeqCst);
+            println!(
+                "allocation -> addr=0x{:0x} object_size={} wrapped_size={} group_id={:?}",
+                addr, object_size, wrapped_size, group_id
+            );
+        }
+
+        fn deallocated(
+            &self,
+            addr: usize,
+            object_size: usize,
+            wrapped_size: usize,
+            source_group_id: AllocationGroupId,
+            current_group_id: AllocationGroupId,
+        ) {
+            println!(
+                "deallocation -> addr=0x{:0x} object_size={} wrapped_size={} source_group_id={:?} current_group_id={:?}",
+                addr, object_size, wrapped_size, source_group_id, current_group_id
+            );
         }
     }
 }
 
-fn execute_with_mut_request<'a>(
-    ctx: &'a Context,
-    expression: &'a Expression,
-    req: &'a Resolver<'a>,
-) -> StringValue<'a> {
-    let res = Value::resolve(expression, ctx, req).unwrap();
-    let Value::String(s) = res else { panic!() };
-    assert_eq!(s.as_ref(), "YES");
-    s
+fn run_with_allocation_count(expr: &str, req: OwnedRequest, f: impl FnOnce(Value)) -> usize {
+    run_with_allocation_count_and_optimizer(expr, req, f, false)
 }
 
-struct CompositeResolver<'a, 'rf> {
-    base: &'rf dyn VariableResolver<'a>,
-    name: &'a str,
-    val: Value<'a>,
-}
-
-impl<'a, 'rf> VariableResolver<'a> for CompositeResolver<'a, 'rf> {
-    fn resolve(&self, expr: &str) -> Option<Value<'a>> {
-        if expr == self.name {
-            Some(self.val.clone())
-        } else {
-            self.base.resolve(expr)
-        }
-    }
-}
-
-fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::ResolveResult<'a> {
-    let this = ftx.this.as_ref().unwrap();
-    let ident = ftx.ident(0)?;
-    let expr: &'a Expression = ftx.expr(1)?;
-    let x: &'rf dyn VariableResolver<'a> = ftx.vars();
-    let resolver = CompositeResolver::<'a, 'rf> {
-        base: x,
-        name: ident,
-        val: this.clone(),
-    };
-    let v = Value::resolve(expr, ftx.ptx, &resolver)?;
-    Ok(v)
-}
-
-// #[global_allocator]
-// static GLOBAL: Allocator<System> = Allocator::system();
-
-#[test]
-fn zero_alloc() {
-
+fn run_with_allocation_count_and_optimizer(expr: &str, req: OwnedRequest, f: impl FnOnce(Value), optimize: bool) -> usize {
     let mut pctx = Context::default();
-    pctx.add_function("with", with);
-    let req = HttpRequest {
-        method: "GET".to_string(),
-        path: "/foo".to_string(),
-        headers: Default::default(),
-        claims: Default::default(),
+    pctx.add_function("with", functions::with);
+    pctx.add_function("ip", functions::new_ip);
+    let p = if optimize {
+        Program::compile_with_optimizer(expr, optimizer::OpaqueOptimizer).unwrap()
+    } else {
+        Program::compile(expr).unwrap()
     };
-    let p = Program::compile("request.path.with(p, p == '/foo' ? 'YES' : 'NO')")
-        .unwrap()
-        .optimized()
-        .expression;
 
-    let resolver = Resolver { request: &req };
-    let count = count_allocations(|| {
-        for _ in 0..2 {
-            execute_with_mut_request(&pctx, &p, &resolver);
-        }
-    });
-    assert_eq!(count, 0);
-}
-
-#[test]
-fn header_lookup() {
-    // let (lock, count) = get_alloc_counter();
-    // let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
-
-    let mut pctx = Context::default();
-    pctx.add_function("with", with);
-    let req = HttpRequest {
-        method: "GET".to_string(),
-        path: "/foo".to_string(),
-        headers: Default::default(),
-        claims: Claims(json!({"sub": "YES"})),
-    };
-    let p = Program::compile("jwt.sub").unwrap().optimized().expression;
-    dbg!(&p);
-    let p = Program::compile("jwt['sub']")
-        .unwrap()
-        .optimized()
-        .expression;
-    dbg!(&p);
-
-    let resolver = Resolver { request: &req };
-    execute_with_mut_request(&pctx, &p, &resolver);
-
-    // AllocationRegistry::enable_tracking();
-    // for _ in 0..2 {
-    //     execute_with_mut_request(&pctx, &p, &resolver);
-    // }
-    // AllocationRegistry::disable_tracking();
-    // assert_eq!(count.load(Ordering::SeqCst), 0);
-}
-
-#[test]
-fn get_struct() {
-    // let (lock, _count) = get_alloc_counter();
-    // let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
-
-    let mut pctx = Context::default();
-    pctx.add_function("with", with);
-    let req = HttpRequest {
-        method: "GET".to_string(),
-        path: "/foo".to_string(),
-        headers: Default::default(),
-        claims: Default::default(),
-    };
-    let p = Program::compile("request").unwrap().optimized().expression;
-
-    let resolver = Resolver { request: &req };
-    let res = Value::resolve(&p, &pctx, &resolver).unwrap();
-    assert_eq!(
-        res.json().unwrap(),
-        json!({"method": "GET", "path": "/foo", "headers": {}, "claims": {}})
-    );
-    let Value::Object(ob) = res else { panic!() };
-    let req = ob.downcast_ref::<RequestOpaque>().unwrap().0;
-    assert_eq!(req.method, "GET");
-}
-
-#[test]
-fn struct_function() {
-    let mut pctx = Context::default();
-    pctx.add_function("with", with);
-    let req = HttpRequest {
-        method: "GET".to_string(),
-        path: "/foo".to_string(),
-        headers: Default::default(),
-        claims: Default::default(),
-    };
-    let p = Program::compile("request.path.with(p, p == '/foo' ? request.custom() : 'NO')")
-        .unwrap()
-        .optimized()
-        .expression;
-
-    let resolver = Resolver { request: &req };
-    execute_with_mut_request(&pctx, &p, &resolver);
-    for _ in 0..2 {
-        let _ = execute_with_mut_request(&pctx, &p, &resolver);
-    }
-}
-
-fn run(expr: &str, req: Http2Request, f: impl FnOnce(Value)) {
-    // let (lock, count) = get_alloc_counter();
-    // let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
-
-    let mut pctx = Context::default();
-    pctx.add_function("with", with);
-    let headers = HashMap::from([("k".to_string(), "v".to_string())]);
-    let claims = Claims(json!({"sub": "me@example.com"}));
-    let p = Program::compile(expr).unwrap();
-
-    // AllocationRegistry::enable_tracking();
-    let resolver = DynResolver::new_from_request(&req);
-    let res = resolver.eval(&pctx, &p.expression);
-    // AllocationRegistry::disable_tracking();
+    let resolver = data::DynResolver::new_from_request(&req);
+    let (res, cnt) = alloc::count_allocations(|| resolver.eval(&pctx, &p.expression));
     f(res);
+    cnt
 }
 
 #[test]
-fn dyn_val() {
+fn dynamic_value_complex() {
     let headers = HashMap::from([("k".to_string(), "v".to_string())]);
-    let claims = Claims(json!({"sub": "me@example.com"}));
-    run(
-        "request.claims.sub + request.method + request.path + request.headers['k']",
-        Http2Request {
+    let claims = data::Claims(json!({"sub": "me@example.com"}));
+    let allocs = run_with_allocation_count(
+        "[request.claims.sub, request.method, request.path, request.headers['k']]",
+        OwnedRequest {
             method: http::Method::GET,
             path: "/foo".to_string(),
             headers,
             claims,
         },
         |res| {
-            assert_eq!(res.json().unwrap(), json!("me@example.comGET/foov"));
+            assert!(matches!(&res, Value::List(l)), "{res:?}");
+            assert_eq!(
+                res.json().unwrap(),
+                json!(["me@example.com", "GET", "/foo", "v"])
+            );
         },
     );
+    // This should be 1 allocation, but an inefficiency
+    assert_eq!(allocs, 2);
 }
 
 #[test]
-fn test_dynamic_with_attribute() {
-    let pctx = Context::default();
-    let headers = HashMap::new();
-    let claims = Claims(json!({"sub": "user@example.com", "role": "admin"}));
+fn dynamic_value_end_to_end() {
+    let claims = data::Claims(json!({"sub": "me@example.com"}));
+    let allocs = run_with_allocation_count(
+        "request.claims",
+        OwnedRequest {
+            method: http::Method::GET,
+            path: "/foo".to_string(),
+            headers: Default::default(),
+            claims,
+        },
+        |res| {
+            // Should *not* be materialized
+            assert!(matches!(&res, Value::Dynamic(l)), "{res:?}");
+            assert_eq!(res.json().unwrap(), json!({"sub": "me@example.com"}));
+        },
+    );
+    assert_eq!(allocs, 0);
+}
 
-    let req = Http2Request {
+#[test]
+fn dynamic_value_header() {
+    let headers = HashMap::from([("k".to_string(), "v".to_string())]);
+    let req = OwnedRequest {
         method: http::Method::GET,
-        path: "/api/data".to_string(),
+        path: "/foo".to_string(),
         headers,
-        claims,
+        claims: Default::default(),
     };
-
-    let resolver = DynResolver::new_from_request(&req);
-
-    // Test accessing claims field which should use the with attribute
-    // Access through the derived DynResolver struct, not directly on the Option
-    let request_val = resolver.field("request").unwrap();
-    let request_map = match request_val {
-        Value::Map(m) => m,
-        _ => panic!("Expected map for request"),
-    };
-    let claims_val = request_map.get(&KeyRef::from("claims")).unwrap();
-
-    // The with attribute transforms &Claims to &serde_json::Value via |c| &c.0
-    // So we should be able to access the inner value directly
-    let dv = match claims_val {
-        Value::Dynamic(dv) => dv,
-        _ => panic!("Expected dynamic value for claims"),
-    };
-
-    // Access a field in the transformed value
-    let sub_val = dv.field("sub").unwrap();
-    assert_eq!(sub_val.json().unwrap(), json!("user@example.com"));
-
-    let role_val = dv.field("role").unwrap();
-    assert_eq!(role_val.json().unwrap(), json!("admin"));
-
-    // Test via CEL expression
-    let p = Program::compile("request.claims.sub").unwrap();
-    let res = resolver.eval(&pctx, &p.expression);
-    assert_eq!(res.json().unwrap(), json!("user@example.com"));
-}
-
-#[test]
-fn test_dynamic_with_value_attribute() {
-    // Test the with_value attribute which directly returns Value
-    let pctx = Context::default();
-    let headers = HashMap::new();
-    let claims = Claims(json!({"sub": "user@example.com"}));
-
-    let req = Http2Request {
-        method: http::Method::POST,
-        path: "/api/users".to_string(),
-        headers,
-        claims,
-    };
-
-    let resolver = DynResolver::new_from_request(&req);
-
-    // Test accessing method field which uses with_value attribute
-    // Access through the derived DynResolver struct
-    let request_val = resolver.field("request").unwrap();
-    let request_map = match request_val {
-        Value::Map(m) => m,
-        _ => panic!("Expected map for request"),
-    };
-    let method_val = request_map.get(&KeyRef::from("method")).unwrap();
-
-    // with_value should return Value::String directly
-    match method_val {
-        Value::String(s) => {
-            assert_eq!(s.as_ref(), "POST");
-        }
-        _ => panic!("Expected String value for method, got {:?}", method_val),
-    }
-
-    // Test via materialize
-    let materialized = resolver.materialize();
-    if let Value::Map(map) = materialized {
-        // Get the request field (which is an Option<HttpRequestRef>)
-        let request_val = map.get(&KeyRef::from("request")).unwrap();
-        // Since it's Some, it should be a Map
-        if let Value::Map(request_map) = request_val {
-            let method_from_map = request_map.get(&KeyRef::from("method")).unwrap();
-            match method_from_map {
-                Value::String(s) => {
-                    assert_eq!(s.as_ref(), "POST");
-                }
-                _ => panic!("Expected String value in map"),
-            }
-        } else {
-            panic!("Expected Map for request field");
-        }
-    } else {
-        panic!("Expected Map from materialize");
-    }
-
-    // Test via CEL expression
-    let p = Program::compile("request.method").unwrap();
-    let res = resolver.eval(&pctx, &p.expression);
-    assert_eq!(res.json().unwrap(), json!("POST"));
-}
-
-#[test]
-fn test_option_dynamic_type() {
-    // Test Option<T> fields via maybe_materialize_optional
-    // Note: Option<T> does NOT implement DynamicValueVtable directly to avoid the static vtable issue.
-    // Instead, when using #[derive(DynamicType)] on a struct with Option<T> fields,
-    // the derive macro will automatically use maybe_materialize_optional for those fields.
-    use crate::types::dynamic::{DynamicType, maybe_materialize_optional};
-
-    // Test Some(value)
-    let some_string: Option<String> = Some("hello".to_string());
-    let val = maybe_materialize_optional(&some_string);
-    assert_eq!(val, Value::String("hello".into()));
-
-    // Test None
-    let none_string: Option<String> = None;
-    let val = maybe_materialize_optional(&none_string);
-    assert_eq!(val, Value::Null);
-
-    // Test with non-auto-materializing type (HashMap)
-    let some_map: Option<std::collections::HashMap<String, String>> = Some({
-        let mut m = std::collections::HashMap::new();
-        m.insert("key".to_string(), "value".to_string());
-        m
+    let allocs = run_with_allocation_count("request.headers['k']", req.clone(), |res| {
+        // Should be materialized
+        assert!(matches!(&res, Value::String(l)), "{res:?}");
+        assert_eq!(res.json().unwrap(), json!("v"));
     });
-
-    let val = maybe_materialize_optional(&some_map);
-    // The Some(HashMap) should materialize to a Dynamic value since HashMap doesn't auto-materialize
-    match val {
-        Value::Dynamic(dv) => {
-            // Can access fields through the dynamic value
-            let field_val = dv.field("key").unwrap();
-            assert_eq!(field_val, Value::String("value".into()));
-        }
-        _ => panic!("Expected Dynamic value for HashMap"),
-    }
-
-    // Test None for HashMap
-    let none_map: Option<std::collections::HashMap<String, String>> = None;
-    let val = maybe_materialize_optional(&none_map);
-    assert_eq!(val, Value::Null);
+    assert_eq!(allocs, 0);
+    let allocs = run_with_allocation_count("request.headers", req, |res| {
+        // Should NOT be materialized
+        assert!(matches!(&res, Value::Dynamic(l)), "{res:?}");
+        assert_eq!(res.json().unwrap(), json!({"k": "v"}));
+    });
+    assert_eq!(allocs, 0);
 }
 
 #[test]
-fn test_option_in_derived_struct() {
-    // Test Option<T> fields in a derived struct
-    use crate::types::dynamic::DynamicType;
-
-    #[derive(Debug, DynamicType)]
-    struct MyStruct<'a> {
-        required: &'a str,
-        optional: Option<i64>,
-    }
-
-    let with_value = MyStruct {
-        required: "test",
-        optional: Some(42),
-    };
-
-    // Materialize the struct
-    let materialized = with_value.materialize();
-    if let Value::Map(map) = materialized {
-        // Check required field
-        let req = map.get(&KeyRef::from("required")).unwrap();
-        assert_eq!(req, &Value::String("test".into()));
-
-        // Check optional field with Some value
-        let opt = map.get(&KeyRef::from("optional")).unwrap();
-        assert_eq!(opt, &Value::Int(42));
-    } else {
-        panic!("Expected Map");
-    }
-
-    let without_value = MyStruct {
-        required: "test2",
-        optional: None,
-    };
-
-    // Materialize the struct with None
-    let materialized = without_value.materialize();
-    if let Value::Map(map) = materialized {
-        // Check required field
-        let req = map.get(&KeyRef::from("required")).unwrap();
-        assert_eq!(req, &Value::String("test2".into()));
-
-        // Check optional field with None value
-        let opt = map.get(&KeyRef::from("optional")).unwrap();
-        assert_eq!(opt, &Value::Null);
-    } else {
-        panic!("Expected Map");
-    }
-}
-
-use cel_derive::DynamicType;
-use tracking_allocator::{AllocationGroupId, AllocationRegistry, AllocationTracker, Allocator};
-
-#[derive(Default, Clone, Debug)]
-struct Counter(Arc<AtomicUsize>);
-
-impl AllocationTracker for Counter {
-    fn allocated(
-        &self,
-        addr: usize,
-        object_size: usize,
-        wrapped_size: usize,
-        group_id: AllocationGroupId,
-    ) {
-        self.0.fetch_add(1, Ordering::SeqCst);
-        println!(
-            "allocation -> addr=0x{:0x} object_size={} wrapped_size={} group_id={:?}",
-            addr, object_size, wrapped_size, group_id
-        );
-    }
-
-    fn deallocated(
-        &self,
-        addr: usize,
-        object_size: usize,
-        wrapped_size: usize,
-        source_group_id: AllocationGroupId,
-        current_group_id: AllocationGroupId,
-    ) {
-        println!(
-            "deallocation -> addr=0x{:0x} object_size={} wrapped_size={} source_group_id={:?} current_group_id={:?}",
-            addr, object_size, wrapped_size, source_group_id, current_group_id
-        );
-    }
-}
-
-// Global allocation tracking
-static GLOBAL_ALLOC_COUNTER: OnceLock<Mutex<Arc<AtomicUsize>>> = OnceLock::new();
-
-fn count_allocations(f: impl FnOnce()) -> usize {
-    let mu = GLOBAL_ALLOC_COUNTER.get_or_init(|| {
-        let counter = Arc::new(AtomicUsize::new(0));
-        let _ = AllocationRegistry::set_global_tracker(Counter(counter.clone()));
-        Mutex::new(counter)
-    });
-    let inner = mu.lock().unwrap_or_else(|e| e.into_inner());
-    inner.store(0, Ordering::SeqCst);
-    AllocationRegistry::enable_tracking();
-    f();
-    AllocationRegistry::disable_tracking();
-    let amt = inner.load(Ordering::SeqCst);
-    amt
+fn opaque() {
+    let allocs = run_with_allocation_count_and_optimizer("ip('1.2.3.4')", OwnedRequest::default(), |res| {
+        assert!(matches!(&res, Value::Object(l)), "{res:?}");
+        assert_eq!(res.json().unwrap(), json!("1.2.3.4"));
+        let Value::Object(o) = res else {
+            panic!()
+        };
+        let ip = o.downcast_ref::<data::IP>().unwrap();
+        assert_eq!(ip.0.to_string(), "1.2.3.4".to_string());
+    }, true);
+    assert_eq!(allocs, 0);
+    let allocs = run_with_allocation_count_and_optimizer("ip('1.2.3.4').family()", OwnedRequest::default(), |res| {
+        assert_eq!(res.json().unwrap(), json!(4));
+    }, true);
+    assert_eq!(allocs, 0);
 }

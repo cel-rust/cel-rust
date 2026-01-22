@@ -188,7 +188,7 @@ impl Optimize {
 #[cfg(test)]
 mod test {
     use crate::common::ast::{CallExpr, Expr};
-    use crate::objects::{ObjectType, ObjectValue};
+    use crate::objects::{Opaque, OpaqueValue};
     use crate::{
         Context, ExecutionError, FunctionContext, IdedExpr, Program, ResolveResult, Value,
     };
@@ -213,7 +213,7 @@ mod test {
                     };
 
                     // TODO: translate regex compile failures into inlined failures
-                    let opaque = Value::Object(ObjectValue::new(PrecompileRegex(
+                    let opaque = Value::Object(OpaqueValue::new(PrecompileRegex(
                         regex::Regex::new(&arg).ok()?,
                     )));
                     let id_expr = IdedExpr {
@@ -244,15 +244,15 @@ mod test {
 
     #[derive(Debug, Clone)]
     struct PrecompileRegex(regex::Regex);
-    crate::register_type!(PrecompileRegex);
 
     impl PartialEq for PrecompileRegex {
         fn eq(&self, other: &Self) -> bool {
             self.0.as_str() == other.0.as_str()
         }
     }
+    impl Eq for PrecompileRegex {}
 
-    impl ObjectType<'static> for PrecompileRegex {
+    impl Opaque for PrecompileRegex {
         fn type_name(&self) -> &'static str {
             "precompiled_regex"
         }

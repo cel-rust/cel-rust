@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use crate::macros::{impl_conversions, impl_handler};
-use crate::objects::{BytesValue, ListValue, ObjectValue, StringValue};
+use crate::objects::{BytesValue, ListValue, OpaqueValue, StringValue};
 use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
 
 impl_conversions!(
@@ -10,7 +10,7 @@ impl_conversions!(
     f64 => Value::Float,
     StringValue<'a> => Value::String,
     BytesValue<'a> => Value::Bytes,
-    ObjectValue<'a> => Value::Object,
+    OpaqueValue => Value::Object,
     bool => Value::Bool,
     ListValue<'a> => Value::List,
 );
