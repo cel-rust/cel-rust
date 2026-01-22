@@ -7,7 +7,7 @@ use syn::{
     Attribute, Data, DeriveInput, Fields, FieldsNamed, Lit, Meta, MetaNameValue, parse_macro_input,
 };
 
-/// Derive `DynamicType` and `DynamicValueVtable` for a struct.
+/// Derive `DynamicType` for a struct.
 ///
 /// # Attributes
 ///
@@ -25,7 +25,7 @@ use syn::{
 /// - `#[dynamic(with = "function")]` - Transform the field value using a helper function before
 ///   passing to `maybe_materialize`. The function receives `&self.field` (note: if the field
 ///   is already a reference like `&'a T`, the function receives `&&'a T`) and should return
-///   a reference to something that implements `DynamicType + DynamicValueVtable`.
+///   a reference to something that implements `DynamicType`.
 ///   
 ///   **Important**: Due to type inference limitations, you should use a named helper function
 ///   with explicit lifetime annotations rather than inline closures.
@@ -60,8 +60,6 @@ use syn::{
 ///       method: &'a http::Method,
 ///   }
 ///   ```
-///
-/// # Example
 ///
 /// ```rust,ignore
 /// use cel::DynamicType;
@@ -222,11 +220,11 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                     );
                 }
             } else if *is_option {
-                // For Option<T> types, use maybe_materialize_optional
+                // For Option<T> types, use always_materialize(maybe_materialize_optional)
                 quote! {
                     m.insert(
                         #crate_path::objects::KeyRef::from(#name),
-                        #crate_path::types::dynamic::maybe_materialize_optional(&self.#ident),
+                        #crate_path::types::dynamic::always_materialize(#crate_path::types::dynamic::maybe_materialize_optional(&self.#ident)),
                     );
                 }
             } else {
@@ -353,51 +351,6 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 ::core::option::Option::Some(match field {
                     #field_arms
                     _ => return ::core::option::Option::None,
-                })
-            }
-        }
-
-        impl #crate_path::types::dynamic::DynamicValueVtable for #name #vtable_ty_params {
-            fn vtable() -> &'static #crate_path::types::dynamic::Vtable {
-                use ::std::sync::OnceLock;
-                static VTABLE: OnceLock<#crate_path::types::dynamic::Vtable> = OnceLock::new();
-                VTABLE.get_or_init(|| {
-                    unsafe fn materialize_impl(ptr: *const ()) -> #crate_path::Value<'static> {
-                        unsafe {
-                            let this = &*(ptr as *const #bare_name_with_generics);
-                            ::std::mem::transmute(
-                                <#bare_name_with_generics as #crate_path::types::dynamic::DynamicType>::materialize(this)
-                            )
-                        }
-                    }
-
-                    unsafe fn field_impl(
-                        ptr: *const (),
-                        field: &str,
-                    ) -> ::core::option::Option<#crate_path::Value<'static>> {
-                        unsafe {
-                            let this = &*(ptr as *const #bare_name_with_generics);
-                            ::std::mem::transmute(
-                                <#bare_name_with_generics as #crate_path::types::dynamic::DynamicType>::field(this, field)
-                            )
-                        }
-                    }
-
-                    unsafe fn debug_impl(
-                        ptr: *const (),
-                        f: &mut ::std::fmt::Formatter<'_>,
-                    ) -> ::std::fmt::Result {
-                        unsafe {
-                            let this = &*(ptr as *const #bare_name_with_generics);
-                            ::std::fmt::Debug::fmt(this, f)
-                        }
-                    }
-
-                    #crate_path::types::dynamic::Vtable {
-                        materialize: materialize_impl,
-                        field: field_impl,
-                        debug: debug_impl,
-                    }
                 })
             }
         }

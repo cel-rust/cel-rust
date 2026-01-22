@@ -1,25 +1,13 @@
 use crate::Value;
 use cel::{to_value, types};
-use std::marker::PhantomData;
-use std::ptr::NonNull;
 
-pub struct Vtable {
-    pub materialize: unsafe fn(*const ()) -> Value<'static>,
-    pub field: unsafe fn(*const (), &str) -> Option<Value<'static>>,
-    pub debug: unsafe fn(*const (), &mut std::fmt::Formatter<'_>) -> std::fmt::Result,
-}
-
-pub trait DynamicValueVtable {
-    fn vtable() -> &'static Vtable;
-}
-
-pub fn maybe_materialize_optional<T: DynamicType + DynamicValueVtable>(t: &Option<T>) -> Value<'_> {
+pub fn maybe_materialize_optional<T: DynamicType>(t: &Option<T>) -> Value<'_> {
     match t {
         Some(v) => maybe_materialize(v),
         None => Value::Null,
     }
 }
-pub fn maybe_materialize<T: DynamicType + DynamicValueVtable>(t: &T) -> Value<'_> {
+pub fn maybe_materialize<T: DynamicType>(t: &T) -> Value<'_> {
     if t.auto_materialize() {
         t.materialize()
     } else {
@@ -51,127 +39,39 @@ pub trait DynamicType: std::fmt::Debug + Send + Sync {
 }
 
 pub struct DynamicValue<'a> {
-    data: NonNull<()>,
-    vtable: &'static Vtable,
-    _marker: PhantomData<fn() -> &'a ()>,
+    dyn_ref: &'a dyn DynamicType,
 }
 
 impl<'a> DynamicValue<'a> {
-    pub fn new<T>(t: &'a T) -> Self
-    where
-        T: DynamicType + DynamicValueVtable,
-    {
-        DynamicValue {
-            data: NonNull::from(t).cast(),
-            vtable: T::vtable(),
-            _marker: PhantomData,
+    pub fn new<T: DynamicType>(t: &'a T) -> Self {
+        Self {
+            dyn_ref: t as &dyn DynamicType,
         }
     }
 
     pub fn materialize(&self) -> Value<'a> {
-        unsafe {
-            // Safety: The vtable returns Value<'static>, but we transmute it to Value<'a>
-            // This is sound because:
-            // 1. The actual data pointer points to data that lives for 'a
-            // 2. PhantomData tracks the correct lifetime 'a
-            // 3. The implementation only returns data borrowed from self
-            std::mem::transmute((self.vtable.materialize)(self.data.as_ptr()))
-        }
+        self.dyn_ref.materialize()
     }
 
     pub fn field(&self, field: &str) -> Option<Value<'a>> {
-        unsafe {
-            // Safety: Same reasoning as materialize()
-            std::mem::transmute((self.vtable.field)(self.data.as_ptr(), field))
-        }
+        self.dyn_ref.field(field)
     }
 }
 
 impl<'a> Clone for DynamicValue<'a> {
     fn clone(&self) -> Self {
-        DynamicValue {
-            data: self.data,
-            vtable: self.vtable,
-            _marker: PhantomData,
+        Self {
+            dyn_ref: self.dyn_ref,
         }
     }
 }
 
 impl<'a> std::fmt::Debug for DynamicValue<'a> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        unsafe { (self.vtable.debug)(self.data.as_ptr(), f) }
+        self.dyn_ref.fmt(f)
     }
 }
 
-// Safety: DynamicValue is Send/Sync if the underlying type is Send + Sync (enforced by trait bound)
-unsafe impl<'a> Send for DynamicValue<'a> {}
-unsafe impl<'a> Sync for DynamicValue<'a> {}
-
-/// Implement DynamicValueVtable for a type that already implements DynamicType.
-/// Use this for foreign types where you can't use #[derive(DynamicType)].
-///
-/// # Example
-///
-/// ```ignore
-/// impl DynamicType for &str {
-///     fn materialize(&self) -> Value<'_> {
-///         Value::from(*self)
-///     }
-///     fn auto_materialize(&self) -> bool {
-///         true
-///     }
-/// }
-/// impl_dynamic_vtable!(&str);
-/// ```
-#[macro_export]
-macro_rules! impl_dynamic_vtable {
-    ($ty:ty) => {
-        impl $crate::types::dynamic::DynamicValueVtable for $ty {
-            fn vtable() -> &'static $crate::types::dynamic::Vtable {
-                use std::sync::OnceLock;
-                static VTABLE: OnceLock<$crate::types::dynamic::Vtable> = OnceLock::new();
-                VTABLE.get_or_init(|| {
-                    unsafe fn materialize_impl(ptr: *const ()) -> $crate::Value<'static> {
-                        unsafe {
-                            let this = &*(ptr as *const $ty);
-                            ::std::mem::transmute(
-                                <$ty as $crate::types::dynamic::DynamicType>::materialize(this),
-                            )
-                        }
-                    }
-
-                    unsafe fn field_impl(
-                        ptr: *const (),
-                        field: &str,
-                    ) -> ::core::option::Option<$crate::Value<'static>> {
-                        unsafe {
-                            let this = &*(ptr as *const $ty);
-                            ::std::mem::transmute(
-                                <$ty as $crate::types::dynamic::DynamicType>::field(this, field),
-                            )
-                        }
-                    }
-
-                    unsafe fn debug_impl(
-                        ptr: *const (),
-                        f: &mut ::std::fmt::Formatter<'_>,
-                    ) -> ::std::fmt::Result {
-                        unsafe {
-                            let this = &*(ptr as *const $ty);
-                            ::std::fmt::Debug::fmt(this, f)
-                        }
-                    }
-
-                    $crate::types::dynamic::Vtable {
-                        materialize: materialize_impl,
-                        field: field_impl,
-                        debug: debug_impl,
-                    }
-                })
-            }
-        }
-    };
-}
 impl DynamicType for Value<'_> {
     fn auto_materialize(&self) -> bool {
         true
@@ -181,7 +81,6 @@ impl DynamicType for Value<'_> {
         self.clone()
     }
 }
-impl_dynamic_vtable!(Value<'_>);
 
 // Primitive type implementations
 
@@ -195,7 +94,6 @@ impl DynamicType for &str {
         Value::from(*self)
     }
 }
-impl_dynamic_vtable!(&str);
 
 // String - auto-materializes to String value
 impl DynamicType for String {
@@ -207,7 +105,6 @@ impl DynamicType for String {
         Value::from(self.as_str())
     }
 }
-impl_dynamic_vtable!(String);
 
 // bool - auto-materializes to Bool value
 impl DynamicType for bool {
@@ -219,7 +116,6 @@ impl DynamicType for bool {
         Value::from(*self)
     }
 }
-impl_dynamic_vtable!(bool);
 
 // i64 - auto-materializes to Int value
 impl DynamicType for i64 {
@@ -231,7 +127,6 @@ impl DynamicType for i64 {
         Value::from(*self)
     }
 }
-impl_dynamic_vtable!(i64);
 
 // u64 - auto-materializes to Int value (as i64)
 impl DynamicType for u64 {
@@ -243,7 +138,6 @@ impl DynamicType for u64 {
         Value::from(*self as i64)
     }
 }
-impl_dynamic_vtable!(u64);
 
 // i32 - auto-materializes to Int value
 impl DynamicType for i32 {
@@ -255,7 +149,6 @@ impl DynamicType for i32 {
         Value::from(*self as i64)
     }
 }
-impl_dynamic_vtable!(i32);
 
 // u32 - auto-materializes to Int value
 impl DynamicType for u32 {
@@ -267,7 +160,6 @@ impl DynamicType for u32 {
         Value::from(*self as u64)
     }
 }
-impl_dynamic_vtable!(u32);
 
 // f64 - auto-materializes to Float value
 impl DynamicType for f64 {
@@ -279,7 +171,6 @@ impl DynamicType for f64 {
         Value::from(*self)
     }
 }
-impl_dynamic_vtable!(f64);
 
 // Collection types - these do NOT auto-materialize since they're complex structures
 
@@ -304,7 +195,6 @@ impl DynamicType for std::collections::HashMap<String, String> {
         self.get(field).map(|v| Value::from(v.as_str()))
     }
 }
-impl_dynamic_vtable!(std::collections::HashMap<String, String>);
 
 // &HashMap<String, String> - reference to HashMap
 impl DynamicType for &std::collections::HashMap<String, String> {
@@ -327,7 +217,6 @@ impl DynamicType for &std::collections::HashMap<String, String> {
         self.get(field).map(|v| Value::from(v.as_str()))
     }
 }
-impl_dynamic_vtable!(&std::collections::HashMap<String, String>);
 
 impl DynamicType for &http::HeaderMap {
     fn auto_materialize(&self) -> bool {
@@ -350,7 +239,6 @@ impl DynamicType for &http::HeaderMap {
             .and_then(|v| Some(Value::from(str::from_utf8(v.as_bytes()).ok()?)))
     }
 }
-impl_dynamic_vtable!(&http::HeaderMap);
 
 // Vec<String> - materializes to List value
 impl DynamicType for Vec<String> {
@@ -363,7 +251,6 @@ impl DynamicType for Vec<String> {
         Value::List(crate::objects::ListValue::Owned(items.into()))
     }
 }
-impl_dynamic_vtable!(Vec<String>);
 
 // &[String] - slice of Strings
 impl DynamicType for &[String] {
@@ -376,86 +263,6 @@ impl DynamicType for &[String] {
         Value::List(crate::objects::ListValue::Owned(items.into()))
     }
 }
-impl_dynamic_vtable!(&[String]);
-
-// Option<T> - materializes to inner value or Null
-// NOTE: We do NOT implement DynamicType or DynamicValueVtable for Option<T> directly
-// because that would require a blanket DynamicValueVtable impl which is impossible
-// (the static OnceLock would be shared across all T, causing UB).
-//
-// Instead, when using #[derive(DynamicType)] on structs with Option<T> fields,
-// the derive macro automatically detects Option fields and uses maybe_materialize_optional
-// instead of maybe_materialize, which handles the Option wrapping correctly.
-//
-// impl<T: DynamicType> DynamicType for Option<T>
-// where
-//     Option<T>: DynamicValueVtable,
-// {
-//     fn auto_materialize(&self) -> bool {
-//         match self {
-//             Some(v) => v.auto_materialize(),
-//             None => true, // Null should auto-materialize
-//         }
-//     }
-//
-//     fn materialize(&self) -> Value<'_> {
-//         match self {
-//             Some(v) => v.materialize(),
-//             None => Value::Null,
-//         }
-//     }
-//
-//     fn field(&self, field: &str) -> Option<Value<'_>> {
-//         match self {
-//             Some(v) => v.field(field),
-//             None => None,
-//         }
-//     }
-// }
-
-// // Generic vtable implementation for Option<T>
-// // Each concrete Option<T> gets its own static vtable instance
-// impl<T: DynamicType> DynamicValueVtable for Option<T> {
-//     fn vtable() -> &'static Vtable {
-//         use std::sync::OnceLock;
-//
-//         // Helper functions that can capture the type T in their mangled names
-//         unsafe fn materialize_impl<T: DynamicType>(ptr: *const ()) -> Value<'static> {
-//             unsafe {
-//                 let this = &*(ptr as *const Option<T>);
-//                 ::std::mem::transmute(<Option<T> as DynamicType>::materialize(this))
-//             }
-//         }
-//
-//         unsafe fn field_impl<T: DynamicType>(
-//             ptr: *const (),
-//             field: &str,
-//         ) -> ::core::option::Option<Value<'static>> {
-//             unsafe {
-//                 let this = &*(ptr as *const Option<T>);
-//                 ::std::mem::transmute(<Option<T> as DynamicType>::field(this, field))
-//             }
-//         }
-//
-//         unsafe fn debug_impl<T: DynamicType>(
-//             ptr: *const (),
-//             f: &mut ::std::fmt::Formatter<'_>,
-//         ) -> ::std::fmt::Result {
-//             unsafe {
-//                 let this = &*(ptr as *const Option<T>);
-//                 ::std::fmt::Debug::fmt(this, f)
-//             }
-//         }
-//
-//         // Each monomorphization of Option<T> gets its own static
-//         static VTABLE: OnceLock<Vtable> = OnceLock::new();
-//         VTABLE.get_or_init(|| Vtable {
-//             materialize: materialize_impl::<T>,
-//             field: field_impl::<T>,
-//             debug: debug_impl::<T>,
-//         })
-//     }
-// }
 
 impl<'a> DynamicType for serde_json::Value {
     fn materialize(&self) -> Value<'_> {
@@ -475,7 +282,6 @@ impl<'a> DynamicType for serde_json::Value {
         }
     }
 }
-crate::impl_dynamic_vtable!(serde_json::Value);
 impl<'a> DynamicType for serde_json::Map<String, serde_json::Value> {
     fn materialize(&self) -> Value<'_> {
         to_value(self).unwrap()
@@ -489,4 +295,3 @@ impl<'a> DynamicType for serde_json::Map<String, serde_json::Value> {
         Some(types::dynamic::maybe_materialize(v))
     }
 }
-crate::impl_dynamic_vtable!(serde_json::Map<String, serde_json::Value>);
