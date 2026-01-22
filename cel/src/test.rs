@@ -9,7 +9,7 @@ use std::marker::PhantomPinned;
 use std::pin::Pin;
 use std::ptr::NonNull;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 use serde::{Serialize, Serializer};
 use serde_json::json;
@@ -211,8 +211,9 @@ fn with<'a, 'rf, 'b>(ftx: &'b mut crate::FunctionContext<'a, 'rf>) -> crate::Res
 
 #[test]
 fn zero_alloc() {
-    let count = Arc::new(AtomicUsize::new(0));
-    let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
+    let (lock, count) = get_alloc_counter();
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+
     let mut pctx = Context::default();
     pctx.add_function("with", with);
     let req = HttpRequest {
@@ -228,6 +229,7 @@ fn zero_alloc() {
 
     let resolver = Resolver { request: &req };
     execute_with_mut_request(&pctx, &p, &resolver);
+
     AllocationRegistry::enable_tracking();
     for _ in 0..2 {
         execute_with_mut_request(&pctx, &p, &resolver);
@@ -238,8 +240,9 @@ fn zero_alloc() {
 
 #[test]
 fn header_lookup() {
-    let count = Arc::new(AtomicUsize::new(0));
-    let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
+    let (lock, count) = get_alloc_counter();
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+
     let mut pctx = Context::default();
     pctx.add_function("with", with);
     let req = HttpRequest {
@@ -258,6 +261,7 @@ fn header_lookup() {
 
     let resolver = Resolver { request: &req };
     execute_with_mut_request(&pctx, &p, &resolver);
+
     AllocationRegistry::enable_tracking();
     for _ in 0..2 {
         execute_with_mut_request(&pctx, &p, &resolver);
@@ -268,8 +272,9 @@ fn header_lookup() {
 
 #[test]
 fn get_struct() {
-    let count = Arc::new(AtomicUsize::new(0));
-    let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
+    let (lock, _count) = get_alloc_counter();
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+
     let mut pctx = Context::default();
     pctx.add_function("with", with);
     let req = HttpRequest {
@@ -314,16 +319,15 @@ fn struct_function() {
 }
 
 fn run(expr: &str, req: Http2Request, f: impl FnOnce(Value)) {
-    let count = Arc::new(AtomicUsize::new(0));
-    let _ = AllocationRegistry::set_global_tracker(Counter(count.clone()));
+    let (lock, count) = get_alloc_counter();
+    let _guard = lock.lock().unwrap_or_else(|e| e.into_inner());
+
     let mut pctx = Context::default();
     pctx.add_function("with", with);
     let headers = HashMap::from([("k".to_string(), "v".to_string())]);
     let claims = Claims(json!({"sub": "me@example.com"}));
-    let p = Program::compile(
-       expr,
-    )
-      .unwrap();
+    let p = Program::compile(expr).unwrap();
+
     AllocationRegistry::enable_tracking();
     let resolver = DynResolver::new_from_request(&req);
     let res = resolver.eval(&pctx, &p.expression);
@@ -345,7 +349,7 @@ fn dyn_val() {
         },
         |res| {
             assert_eq!(res.json().unwrap(), json!("me@example.comGET/foov"));
-        }
+        },
     );
 }
 
@@ -579,4 +583,17 @@ impl AllocationTracker for Counter {
             addr, object_size, wrapped_size, source_group_id, current_group_id
         );
     }
+}
+
+// Global allocation tracking
+static GLOBAL_ALLOC_COUNTER: OnceLock<(Mutex<()>, Arc<AtomicUsize>)> = OnceLock::new();
+
+fn get_alloc_counter() -> (&'static Mutex<()>, &'static Arc<AtomicUsize>) {
+    let (lock, counter) = GLOBAL_ALLOC_COUNTER.get_or_init(|| {
+        let counter = Arc::new(AtomicUsize::new(0));
+        let _ = AllocationRegistry::set_global_tracker(Counter(counter.clone()));
+        (Mutex::new(()), counter)
+    });
+    counter.store(0, Ordering::SeqCst);
+    (lock, counter)
 }
