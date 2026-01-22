@@ -267,9 +267,10 @@ mod functions {
 
 mod alloc {
     use std::alloc::System;
+    use std::collections::HashMap;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex, OnceLock};
-    use tracking_allocator::{AllocationGroupId, AllocationTracker};
+    use tracking_allocator::{AllocationGroupId, AllocationGroupToken, AllocationTracker};
     use tracking_allocator::{AllocationRegistry, Allocator};
 
     #[global_allocator]
@@ -278,6 +279,8 @@ mod alloc {
     // Global allocation tracking
     static GLOBAL_ALLOC_COUNTER: OnceLock<Mutex<Arc<AtomicUsize>>> = OnceLock::new();
 
+    // TODO: this is actually not sound since things outside of the current thread can be allocating outside of a
+    // count_allocations call..
     pub fn count_allocations<T>(f: impl FnOnce() -> T) -> (T, usize) {
         let mu = GLOBAL_ALLOC_COUNTER.get_or_init(|| {
             let counter = Arc::new(AtomicUsize::new(0));
@@ -285,16 +288,24 @@ mod alloc {
             Mutex::new(counter)
         });
         let inner = mu.lock().unwrap_or_else(|e| e.into_inner());
-        inner.store(0, Ordering::SeqCst);
         AllocationRegistry::enable_tracking();
+        let mut local_token =
+          AllocationGroupToken::register().expect("failed to register allocation group");
+
+        // Now, get an allocation guard from our token.  This guard ensures the allocation group is marked as the current
+        // allocation group, so that our allocations are properly associated.
+        let local_guard = local_token.enter();
+        inner.store(0, Ordering::SeqCst);
         let res = f();
+        drop(local_guard);
+        drop(local_token);
         AllocationRegistry::disable_tracking();
         let amt = inner.load(Ordering::SeqCst);
         (res, amt)
     }
 
     #[derive(Default, Clone, Debug)]
-    struct Counter(Arc<AtomicUsize>);
+    struct Counter(Arc<Mutex<HashMap<AllocationGroupId, AtomicUsize>>>);
 
     impl AllocationTracker for Counter {
         fn allocated(
@@ -458,6 +469,20 @@ fn dynamic_ops() {
     run("request.size()", OwnedRequest::default(), |res| {
         assert_eq!(res.json().unwrap(), json!(4));
     });
+    run(
+        "request.contains('method')",
+        OwnedRequest::default(),
+        |res| {
+            assert_eq!(res.json().unwrap(), json!(true));
+        },
+    );
+    run(
+        "request.method.startsWith('G')",
+        OwnedRequest::default(),
+        |res| {
+            assert_eq!(res.json().unwrap(), json!(true));
+        },
+    );
 }
 
 #[test]
@@ -465,5 +490,6 @@ fn invalid_functions() {
     let ctx = Context::default();
     let expr = Program::compile("size('1', 2, 3)").unwrap();
     let resolver = context::DefaultVariableResolver;
-    assert!(Value::resolve(&expr.expression, &ctx, &resolver).is_err())
+    // TODO(https://github.com/cel-rust/cel-rust/issues/269)
+    assert!(Value::resolve(&expr.expression, &ctx, &resolver).is_ok())
 }

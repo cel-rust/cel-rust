@@ -46,7 +46,8 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
         self.this::<Value>().map(|v| v.always_materialize_owned())
     }
     pub fn this_or_arg_value(&self) -> Result<Value<'a>> {
-        self.this_or_arg::<Value>().map(|v| v.always_materialize_owned())
+        self.this_or_arg::<Value>()
+            .map(|v| v.always_materialize_owned())
     }
     pub fn value(&self, index: usize) -> Result<Value<'a>> {
         let arg = self
@@ -75,9 +76,9 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
     }
 
     pub fn value_iter(&self) -> impl Iterator<Item = Result<Value<'a>>> + use<'a, '_, 'vars> {
-        self.args
-            .iter()
-            .map(|e| Value::resolve(e, self.ptx, self.variables).map(|v| v.always_materialize_owned()))
+        self.args.iter().map(|e| {
+            Value::resolve(e, self.ptx, self.variables).map(|v| v.always_materialize_owned())
+        })
     }
 
     pub fn expr_iter(&self) -> impl Iterator<Item = &'a Expression> + use<'a, 'vars> {
@@ -183,6 +184,7 @@ pub fn contains<'a>(
     this: This,
     arg: Argument,
 ) -> ResolveResult<'a> {
+    // TODO: we could support a non-materialized lookup for a Map + String
     let this = this.load_or_arg_value(ftx)?;
     let arg: Value<'a> = arg.load_value(ftx)?;
     Ok(Value::Bool(match this {
@@ -570,6 +572,7 @@ pub mod time {
 }
 
 pub fn max<'a>(ftx: &mut FunctionContext<'a, '_>) -> ResolveResult<'a> {
+    // Getting materialized values here is fine; we need to materialize to compare
     let args_len = ftx.args.len();
     if args_len == 0 {
         return Ok(Value::Null);

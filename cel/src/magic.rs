@@ -62,7 +62,7 @@ impl<'a> FromValue<'a> for Value<'a> {
     where
         Self: Sized,
     {
-        Ok(value.clone())
+        Ok(value.clone().always_materialize_owned())
     }
 }
 

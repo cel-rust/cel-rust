@@ -15,7 +15,6 @@ pub fn maybe_materialize<T: DynamicType>(t: &T) -> Value<'_> {
     }
 }
 
-
 pub trait DynamicType: std::fmt::Debug + Send + Sync {
     // If the value can be freely converted to a Value, do so.
     // This is anything but list/map
