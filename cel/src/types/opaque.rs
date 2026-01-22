@@ -100,10 +100,10 @@ impl dyn Opaque {
 /// ```rust
 /// use cel::objects::{OpaqueValue, Opaque, Value};
 ///
-/// #[derive(Clone, Debug, PartialEq)]
+/// #[derive(Clone, Debug, PartialEq, Eq)]
 /// struct MyStruct { field: String }
 ///
-/// impl Opaque<'static> for MyStruct {
+/// impl Opaque for MyStruct {
 ///     fn type_name(&self) -> &'static str { "MyStruct" }
 /// }
 ///

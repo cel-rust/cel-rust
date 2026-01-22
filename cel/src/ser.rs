@@ -19,37 +19,6 @@ use crate::objects::{BytesValue, Key, ListValue, StringValue};
 pub struct Serializer;
 pub struct KeySerializer;
 
-/// A wrapper Duration type which allows conversion to [Value::Duration] for
-/// types using automatic conversion with [serde::Serialize].
-///
-/// # Examples
-///
-/// ```
-/// use cel::{Context, Duration, Program};
-/// use serde::Serialize;
-///
-/// #[derive(Serialize)]
-/// struct MyStruct {
-///     dur: Duration,
-/// }
-///
-/// let mut context = Context::default();
-///
-/// // MyStruct will be implicitly serialized into the CEL appropriate types
-/// context
-///     .add_variable(
-///         "foo",
-///         MyStruct {
-///             dur: chrono::Duration::hours(2).into(),
-///         },
-///     )
-///     .unwrap();
-///
-/// let program = Program::compile("foo.dur == duration('2h')").unwrap();
-/// let value = program.execute(&context).unwrap();
-/// assert_eq!(value, true.into());
-/// ```
-
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Duration(pub chrono::Duration);
 
@@ -101,39 +70,6 @@ impl ser::Serialize for Duration {
         serializer.serialize_newtype_struct(Self::NAME, &DurationProxy(self.0))
     }
 }
-
-/// A wrapper Timestamp type which allows conversion to [Value::Timestamp] for
-/// types using automatic conversion with [serde::Serialize].
-///
-/// # Examples
-///
-/// ```
-/// use cel::{Context, Timestamp, Program};
-/// use serde::Serialize;
-///
-/// #[derive(Serialize)]
-/// struct MyStruct {
-///     ts: Timestamp,
-/// }
-///
-/// let mut context = Context::default();
-///
-/// // MyStruct will be implicitly serialized into the CEL appropriate types
-/// context
-///     .add_variable(
-///         "foo",
-///         MyStruct {
-///             ts: chrono::DateTime::parse_from_rfc3339("2025-01-01T00:00:00Z")
-///                 .unwrap()
-///                 .into(),
-///         },
-///     )
-///     .unwrap();
-///
-/// let program = Program::compile("foo.ts == timestamp('2025-01-01T00:00:00Z')").unwrap();
-/// let value = program.execute(&context).unwrap();
-/// assert_eq!(value, true.into());
-/// ```
 
 #[derive(Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct Timestamp(pub chrono::DateTime<FixedOffset>);

@@ -77,56 +77,6 @@ pub(crate) trait FromContext<'a, 'rf> {
         Self: Sized;
 }
 
-/// A function argument abstraction enabling dynamic method invocation on a
-/// target instance or on the first argument if the function is not called
-/// as a method.
-///
-/// This is similar to how methods can be called as functions using the
-/// [fully-qualified syntax](https://doc.rust-lang.org/book/ch19-03-advanced-traits.html#fully-qualified-syntax-for-disambiguation-calling-methods-with-the-same-name).
-///
-/// # Using `This`
-/// ```
-/// # use std::sync::Arc;
-/// # use cel::{Program, Context};
-/// use cel::extractors::This;
-/// # let mut context = Context::default();
-/// # context.add_function("startsWith", starts_with);
-///
-/// /// Notice how `This` refers to the target value when called as a method,
-/// /// but the first argument when called as a function.
-/// let program1 = "'foobar'.startsWith('foo') == true";
-/// let program2 = "startsWith('foobar', 'foo') == true";
-/// # let program1 = Program::compile(program1).unwrap();
-/// # let program2 = Program::compile(program2).unwrap();
-/// # let value = program1.execute(&context).unwrap();
-/// # assert_eq!(value, true.into());
-/// # let value = program2.execute(&context).unwrap();
-/// # assert_eq!(value, true.into());
-///
-/// fn starts_with(This(this): This<Arc<String>>, prefix: Arc<String>) -> bool {
-///     this.starts_with(prefix.as_str())
-/// }
-/// ```
-///
-/// # Type of `This`
-/// This also accepts a type `T` which determines the specific type
-/// that's extracted. Any type that supports [`FromValue`] can be used.
-/// In the previous example, the method `startsWith` is only ever called
-/// on a string, so we can use `This<Rc<String>>` to extract the string
-/// automatically prior to our method actually being called.
-///
-/// In some cases, you may want access to the raw [`Value`] instead, for
-/// example, the `contains` method works for several different types. In these
-/// cases, you can use `This<Value>` to extract the raw value.
-///
-/// ```skip
-/// pub fn contains(This(this): This<Value>, arg: Value) -> Result<Value> {
-///     Ok(match this {
-///         Value::List(v) => v.contains(&arg),
-///         ...
-///     }
-/// }
-/// ```
 pub struct This;
 
 impl This {

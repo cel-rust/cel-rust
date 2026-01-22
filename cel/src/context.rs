@@ -72,31 +72,6 @@ impl Context {
         self.qualified_functions
             .insert((base.to_string(), name.to_string()), value.into_function());
     }
-
-    /// Constructs a new empty context with no variables or functions.
-    ///
-    /// If you're looking for a context that has all the standard methods, functions
-    /// and macros already added to the context, use [`Context::default`] instead.
-    ///
-    /// # Example
-    /// ```
-    /// use cel::Context;
-    /// let mut context = Context::empty();
-    /// context.add_function("add", |a: i64, b: i64| a + b);
-    /// ```
-    pub fn empty() -> Self {
-        Context {
-            functions: Default::default(),
-            qualified_functions: Default::default(),
-        }
-    }
-    // pub fn resolve<'e>(&self, expr: &'e Expression, ) -> Result<Value<'e>, ExecutionError> {
-    //     Value::<'e>::resolve(expr, self)
-    // }
-    //
-    // pub fn resolve_all(&self, exprs: &[Expression]) -> Result<Value, ExecutionError> {
-    //     Value::resolve_all(exprs, self)
-    // }
 }
 
 impl Default for Context {

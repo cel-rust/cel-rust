@@ -27,7 +27,8 @@ impl<'a> Value<'a> {
     /// use cel::{Context, Program};
     ///
     /// let program = Program::compile("null").unwrap();
-    /// let value = program.execute(&Context::default()).unwrap();
+    /// let ctx = Context::default();
+    /// let value = program.execute(&ctx).unwrap();
     /// let result = value.json().unwrap();
     ///
     /// assert_eq!(result, serde_json::Value::Null);
