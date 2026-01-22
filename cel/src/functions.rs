@@ -6,7 +6,6 @@ use crate::context::{Context, VariableResolver};
 use crate::magic::{Argument, FromValue, This};
 use crate::objects::{BytesValue, KeyRef, OpaqueValue, OptionalValue, StringValue, Value};
 use crate::parser::Expression;
-use crate::types::dynamic;
 use crate::{ExecutionError, ResolveResult};
 
 type Result<T> = std::result::Result<T, ExecutionError>;
@@ -44,10 +43,10 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
         }
     }
     pub fn this_value(&self) -> Result<Value<'a>> {
-        self.this::<Value>().map(|v| v.always_materialize())
+        self.this::<Value>().map(|v| v.always_materialize_owned())
     }
     pub fn this_or_arg_value(&self) -> Result<Value<'a>> {
-        self.this_or_arg::<Value>().map(|v| v.always_materialize())
+        self.this_or_arg::<Value>().map(|v| v.always_materialize_owned())
     }
     pub fn value(&self, index: usize) -> Result<Value<'a>> {
         let arg = self
@@ -57,7 +56,7 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
                 index + 1,
                 self.args.len(),
             ))?;
-        Value::resolve(arg, self.ptx, self.variables).map(|v| v.always_materialize())
+        Value::resolve(arg, self.ptx, self.variables).map(|v| v.always_materialize_owned())
     }
 
     pub fn arg<T: FromValue<'a>>(&self, index: usize) -> Result<T> {
@@ -78,7 +77,7 @@ impl<'a, 'vars: 'a, 'rf> FunctionContext<'vars, 'rf> {
     pub fn value_iter(&self) -> impl Iterator<Item = Result<Value<'a>>> + use<'a, '_, 'vars> {
         self.args
             .iter()
-            .map(|e| Value::resolve(e, self.ptx, self.variables).map(|v| v.always_materialize()))
+            .map(|e| Value::resolve(e, self.ptx, self.variables).map(|v| v.always_materialize_owned()))
     }
 
     pub fn expr_iter(&self) -> impl Iterator<Item = &'a Expression> + use<'a, 'vars> {

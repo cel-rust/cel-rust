@@ -15,13 +15,6 @@ pub fn maybe_materialize<T: DynamicType>(t: &T) -> Value<'_> {
     }
 }
 
-pub fn always_materialize<'a>(t: Value<'a>) -> Value<'a> {
-    if let Value::Dynamic(d) = t {
-        d.materialize()
-    } else {
-        t
-    }
-}
 
 pub trait DynamicType: std::fmt::Debug + Send + Sync {
     // If the value can be freely converted to a Value, do so.

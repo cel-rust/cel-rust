@@ -9,9 +9,8 @@ pub use crate::types::opaque::{Opaque, OpaqueValue};
 pub use crate::types::optional::OptionalValue;
 pub use crate::types::string::StringValue;
 use crate::types::time::{TsOp, checked_op};
-use crate::{ExecutionError, Expression, types};
-use cel::types::dynamic;
-use cel::types::dynamic::DynamicValue;
+use crate::{ExecutionError, Expression};
+use cel::types::dynamic::{DynamicType, DynamicValue};
 use serde::de::Error as DeError;
 use serde::ser::Error;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -82,10 +81,25 @@ impl<'de> Deserialize<'de> for Value<'static> {
 
 impl<'a> Value<'a> {
     pub fn maybe_materialize(&self) -> Value<'_> {
-        types::dynamic::maybe_materialize(self)
+        if self.auto_materialize() {
+            self.materialize()
+        } else {
+            Value::Dynamic(DynamicValue::new(self))
+        }
     }
-    pub fn always_materialize(self) -> Value<'a> {
-        types::dynamic::always_materialize(self)
+    pub fn always_materialize(&self) -> Cow<'_, Value<'a>> {
+        if let Value::Dynamic(d) = self {
+            Cow::Owned(d.materialize())
+        } else {
+            Cow::Borrowed(self)
+        }
+    }
+    pub fn always_materialize_owned(self) -> Value<'a> {
+        if let Value::Dynamic(d) = self {
+            d.materialize()
+        } else {
+            self
+        }
     }
 }
 impl Value<'_> {
@@ -151,10 +165,10 @@ fn _assert_covariant<'short>(v: Value<'static>) -> Value<'short> {
 impl PartialEq for Value<'_> {
     fn eq(&self, other: &Self) -> bool {
         // Materialize Dynamic values before comparison
-        let self_mat = dynamic::always_materialize(self.clone());
-        let other_mat = dynamic::always_materialize(other.clone());
+        let self_mat = self.always_materialize();
+        let other_mat = other.always_materialize();
 
-        match (&self_mat, &other_mat) {
+        match (self_mat.as_ref(), other_mat.as_ref()) {
             (Value::Map(a), Value::Map(b)) => a == b,
             (Value::List(a), Value::List(b)) => {
                 a.len() == b.len() && a.iter().zip(b.iter()).all(|(a, b)| a == b)
@@ -196,10 +210,10 @@ impl Eq for Value<'_> {}
 impl PartialOrd for Value<'_> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         // Materialize Dynamic values before comparison
-        let self_mat = dynamic::always_materialize(self.clone());
-        let other_mat = dynamic::always_materialize(other.clone());
+        let self_mat = self.always_materialize();
+        let other_mat = other.always_materialize();
 
-        match (&self_mat, &other_mat) {
+        match (self_mat.as_ref(), other_mat.as_ref()) {
             (Value::Int(a), Value::Int(b)) => Some(a.cmp(b)),
             (Value::UInt(a), Value::UInt(b)) => Some(a.cmp(b)),
             (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
@@ -496,6 +510,13 @@ impl<'a> Value<'a> {
         }
     }
 
+    pub fn resolve_materialized<'vars: 'a, 'rf>(
+        expr: &'vars Expression,
+        ctx: &'vars Context,
+        resolver: &'rf dyn VariableResolver<'vars>,
+    ) -> ResolveResult<'a> {
+        Self::resolve(expr, ctx, resolver).map(|v| v.always_materialize_owned())
+    }
     #[inline(always)]
     pub fn resolve<'vars: 'a, 'rf>(
         expr: &'vars Expression,
@@ -503,6 +524,7 @@ impl<'a> Value<'a> {
         resolver: &'rf dyn VariableResolver<'vars>,
     ) -> ResolveResult<'a> {
         let resolve = |e| Value::resolve(e, ctx, resolver);
+        let resolve_materialized = |e| Value::resolve_materialized(e, ctx, resolver);
         match &expr.expr {
             Expr::Optimized {
                 optimized,
@@ -546,18 +568,18 @@ impl<'a> Value<'a> {
                             return resolve(&call.args[0])? % resolve(&call.args[1])?;
                         }
                         operators::EQUALS => {
-                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
-                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            let left = resolve_materialized(&call.args[0])?;
+                            let right = resolve_materialized(&call.args[1])?;
                             return Value::Bool(left.eq(&right)).into();
                         }
                         operators::NOT_EQUALS => {
-                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
-                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            let left = resolve_materialized(&call.args[0])?;
+                            let right = resolve_materialized(&call.args[1])?;
                             return Value::Bool(left.ne(&right)).into();
                         }
                         operators::LESS => {
-                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
-                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            let left = resolve_materialized(&call.args[0])?;
+                            let right = resolve_materialized(&call.args[1])?;
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -569,8 +591,8 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::LESS_EQUALS => {
-                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
-                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            let left = resolve_materialized(&call.args[0])?;
+                            let right = resolve_materialized(&call.args[1])?;
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -582,8 +604,8 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::GREATER => {
-                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
-                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            let left = resolve_materialized(&call.args[0])?;
+                            let right = resolve_materialized(&call.args[1])?;
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -595,8 +617,8 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::GREATER_EQUALS => {
-                            let left = dynamic::always_materialize(resolve(&call.args[0])?);
-                            let right = dynamic::always_materialize(resolve(&call.args[1])?);
+                            let left = resolve_materialized(&call.args[0])?;
+                            let right = resolve_materialized(&call.args[1])?;
                             return Value::Bool(
                                 left.partial_cmp(&right).ok_or(
                                     ExecutionError::ValuesNotComparable(
@@ -608,9 +630,15 @@ impl<'a> Value<'a> {
                             .into();
                         }
                         operators::IN => {
-                            let left = resolve(&call.args[0])?;
+                            let left = resolve_materialized(&call.args[0])?;
                             let right = resolve(&call.args[1])?;
-                            match (left, right) {
+                            if let Value::Dynamic(d) = &right
+                                && let Value::String(k) = left
+                            {
+                                // TODO: in the future, if required, we could allow lookup of int for a list
+                                return Value::Bool(d.field(k.as_ref()).is_some()).into();
+                            }
+                            match (left, right.always_materialize_owned()) {
                                 (Value::String(l), Value::String(r)) => {
                                     return Value::Bool(r.as_ref().contains(l.as_ref())).into();
                                 }
@@ -670,7 +698,7 @@ impl<'a> Value<'a> {
                             };
 
                             // Since we already established we cannot use dynamic, materialize
-                            let result = match (dynamic::always_materialize(value), idx) {
+                            let result = match (value.always_materialize_owned(), idx) {
                                 (Value::List(items), Value::Int(idx)) => {
                                     if idx >= 0 && (idx as usize) < items.len() {
                                         let x: Value<'a> = items.as_ref()[idx as usize].clone();
@@ -758,7 +786,7 @@ impl<'a> Value<'a> {
                             return Ok(Value::Bool(!expr.to_bool()?));
                         }
                         operators::NEGATE => {
-                            return match dynamic::always_materialize(resolve(&call.args[0])?) {
+                            return match resolve_materialized(&call.args[0])? {
                                 Value::Int(i) => Ok(Value::Int(-i)),
                                 Value::Float(f) => Ok(Value::Float(-f)),
                                 value => Err(ExecutionError::UnsupportedUnaryOperator(
@@ -992,8 +1020,9 @@ impl<'a> Value<'a> {
 
     #[inline(always)]
     fn to_bool(&self) -> Result<bool, ExecutionError> {
-        match dynamic::always_materialize(self.clone()) {
-            Value::Bool(v) => Ok(v),
+        let v = self.always_materialize();
+        match v.as_ref() {
+            Value::Bool(v) => Ok(*v),
             _ => Err(ExecutionError::NoSuchOverload),
         }
     }
@@ -1005,8 +1034,8 @@ impl<'a> ops::Add<Value<'a>> for Value<'a> {
     #[inline(always)]
     fn add(self, rhs: Value<'a>) -> Self::Output {
         match (
-            types::dynamic::always_materialize(self),
-            types::dynamic::always_materialize(rhs),
+            self.always_materialize_owned(),
+            rhs.always_materialize_owned(),
         ) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_add(r)
@@ -1059,8 +1088,8 @@ impl<'a> ops::Sub<Value<'a>> for Value<'a> {
     #[inline(always)]
     fn sub(self, rhs: Value) -> Self::Output {
         match (
-            types::dynamic::always_materialize(self),
-            types::dynamic::always_materialize(rhs),
+            self.always_materialize_owned(),
+            rhs.always_materialize_owned(),
         ) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_sub(r)
@@ -1099,8 +1128,8 @@ impl<'a> ops::Div<Value<'a>> for Value<'a> {
     #[inline(always)]
     fn div(self, rhs: Value) -> Self::Output {
         match (
-            types::dynamic::always_materialize(self),
-            types::dynamic::always_materialize(rhs),
+            self.always_materialize_owned(),
+            rhs.always_materialize_owned(),
         ) {
             (Value::Int(l), Value::Int(r)) => {
                 if r == 0 {
@@ -1134,8 +1163,8 @@ impl<'a> ops::Mul<Value<'a>> for Value<'a> {
     #[inline(always)]
     fn mul(self, rhs: Value) -> Self::Output {
         match (
-            types::dynamic::always_materialize(self),
-            types::dynamic::always_materialize(rhs),
+            self.always_materialize_owned(),
+            rhs.always_materialize_owned(),
         ) {
             (Value::Int(l), Value::Int(r)) => l
                 .checked_mul(r)
@@ -1164,8 +1193,8 @@ impl<'a> ops::Rem<Value<'a>> for Value<'a> {
     #[inline(always)]
     fn rem(self, rhs: Value) -> Self::Output {
         match (
-            types::dynamic::always_materialize(self),
-            types::dynamic::always_materialize(rhs),
+            self.always_materialize_owned(),
+            rhs.always_materialize_owned(),
         ) {
             (Value::Int(l), Value::Int(r)) => {
                 if r == 0 {

@@ -222,7 +222,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 quote! {
                     m.insert(
                         #crate_path::objects::KeyRef::from(#name),
-                        #crate_path::types::dynamic::always_materialize(#crate_path::types::dynamic::maybe_materialize_optional(&self.#ident)),
+                        #crate_path::types::dynamic::maybe_materialize_optional(&self.#ident).always_materialize_owned(),
                     );
                 }
             } else {
