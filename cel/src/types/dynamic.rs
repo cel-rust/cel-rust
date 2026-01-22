@@ -33,7 +33,8 @@ pub trait DynamicType: std::fmt::Debug + Send + Sync {
     // Convert this dynamic value into a proper value
     fn materialize(&self) -> Value<'_>;
 
-    fn field(&self, _field: &str) -> Option<Value<'_>> {
+    #[allow(unused_variables)]
+    fn field(&self, field: &str) -> Option<Value<'_>> {
         None
     }
 }
@@ -176,10 +177,6 @@ impl DynamicType for f64 {
 
 // HashMap<String, String> - materializes to Map value
 impl DynamicType for std::collections::HashMap<String, String> {
-    fn auto_materialize(&self) -> bool {
-        false // Maps are complex, don't auto-materialize
-    }
-
     fn materialize(&self) -> Value<'_> {
         let mut map = vector_map::VecMap::with_capacity(self.len());
         for (k, v) in self.iter() {
@@ -196,33 +193,21 @@ impl DynamicType for std::collections::HashMap<String, String> {
     }
 }
 
-// &HashMap<String, String> - reference to HashMap
-impl DynamicType for &std::collections::HashMap<String, String> {
+impl<T: DynamicType> DynamicType for &T {
     fn auto_materialize(&self) -> bool {
-        false
+        (*self).auto_materialize()
     }
 
     fn materialize(&self) -> Value<'_> {
-        let mut map = vector_map::VecMap::with_capacity(self.len());
-        for (k, v) in self.iter() {
-            map.insert(
-                crate::objects::KeyRef::from(k.as_str()),
-                Value::from(v.as_str()),
-            );
-        }
-        Value::Map(crate::objects::MapValue::Borrow(map))
+        (*self).materialize()
     }
 
     fn field(&self, field: &str) -> Option<Value<'_>> {
-        self.get(field).map(|v| Value::from(v.as_str()))
+        (*self).field(field)
     }
 }
 
-impl DynamicType for &http::HeaderMap {
-    fn auto_materialize(&self) -> bool {
-        false // Maps are complex, don't auto-materialize
-    }
-
+impl DynamicType for http::HeaderMap {
     fn materialize(&self) -> Value<'_> {
         let mut map = vector_map::VecMap::with_capacity(self.len());
         for (k, v) in self.iter() {
@@ -242,34 +227,15 @@ impl DynamicType for &http::HeaderMap {
 
 // Vec<String> - materializes to List value
 impl DynamicType for Vec<String> {
-    fn auto_materialize(&self) -> bool {
-        false // Lists are complex, don't auto-materialize
-    }
-
     fn materialize(&self) -> Value<'_> {
         let items: Vec<Value<'static>> = self.iter().map(|s| Value::from(s.clone())).collect();
         Value::List(crate::objects::ListValue::Owned(items.into()))
     }
 }
 
-// &[String] - slice of Strings
-impl DynamicType for &[String] {
-    fn auto_materialize(&self) -> bool {
-        false
-    }
-
-    fn materialize(&self) -> Value<'_> {
-        let items: Vec<Value<'static>> = self.iter().map(|s| Value::from(s.clone())).collect();
-        Value::List(crate::objects::ListValue::Owned(items.into()))
-    }
-}
-
-impl<'a> DynamicType for serde_json::Value {
+impl DynamicType for serde_json::Value {
     fn materialize(&self) -> Value<'_> {
         to_value(self).unwrap()
-    }
-    fn auto_materialize(&self) -> bool {
-        false
     }
 
     fn field(&self, field: &str) -> Option<Value<'_>> {
@@ -282,12 +248,9 @@ impl<'a> DynamicType for serde_json::Value {
         }
     }
 }
-impl<'a> DynamicType for serde_json::Map<String, serde_json::Value> {
+impl DynamicType for serde_json::Map<String, serde_json::Value> {
     fn materialize(&self) -> Value<'_> {
         to_value(self).unwrap()
-    }
-    fn auto_materialize(&self) -> bool {
-        false
     }
 
     fn field(&self, field: &str) -> Option<Value<'_>> {

@@ -13,7 +13,6 @@ use syn::{
 ///
 /// ## Struct-level attributes
 ///
-/// - `#[dynamic(auto_materialize)]` - Override `auto_materialize()` to return `true`
 /// - `#[dynamic(crate = "path")]` - Specify the path to the cel crate (default: `::cel`)
 ///   - Use `#[dynamic(crate = "crate")]` when using this derive inside the cel crate itself
 ///   - Use `#[dynamic(crate = "::cel")]` or omit for external usage
@@ -101,7 +100,6 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     let name = &input.ident;
 
     // Parse struct-level attributes
-    let auto_materialize = has_struct_attr(&input.attrs, "auto_materialize");
     let crate_path_str = get_struct_crate_path(&input.attrs);
 
     // Generate crate path - use custom path if specified, otherwise default to ::cel
@@ -299,25 +297,12 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    // Generate auto_materialize override if needed
-    let auto_materialize_impl = if auto_materialize {
-        quote! {
-            fn auto_materialize(&self) -> bool {
-                true
-            }
-        }
-    } else {
-        quote! {}
-    };
-
     // Handle generics - we need to support both lifetimes and type parameters
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     let generated = quote! {
         impl #impl_generics #crate_path::types::dynamic::DynamicType for #name #ty_generics #where_clause {
-            #auto_materialize_impl
-
             fn materialize(&self) -> #crate_path::Value<'_> {
                 let mut m = ::vector_map::VecMap::with_capacity(#field_count);
                 #materialize_inserts
@@ -334,18 +319,6 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
     };
 
     generated.into()
-}
-
-/// Check if a struct has a specific attribute at the struct level
-fn has_struct_attr(attrs: &[Attribute], name: &str) -> bool {
-    attrs.iter().any(|attr| {
-        if attr.path().is_ident("dynamic") {
-            if let Ok(Meta::Path(path)) = attr.parse_args::<Meta>() {
-                return path.is_ident(name);
-            }
-        }
-        false
-    })
 }
 
 /// Check if a field has a specific attribute

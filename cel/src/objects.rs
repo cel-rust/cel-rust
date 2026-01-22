@@ -839,8 +839,7 @@ impl<'a> Value<'a> {
                         _ => Ok(Value::Bool(false)),
                     }
                 } else {
-                    let res = left.member(&select.field);
-                    res
+                    left.member(&select.field)
                 }
             }
             Expr::List(list_expr) => {

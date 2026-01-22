@@ -422,7 +422,6 @@ pub fn ends_with<'a>(
 /// ```cel
 /// "abc".matches("^[a-z]*$") == true
 /// ```
-
 pub fn matches<'a>(
     ftx: &mut FunctionContext<'a, '_>,
     this: This,

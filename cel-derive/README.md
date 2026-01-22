@@ -29,7 +29,6 @@ pub struct MyData<'a> {
 
 ### Struct-level attributes
 
-- `#[dynamic(auto_materialize)]` - Override `auto_materialize()` to return `true`. This is typically used for primitive-like types that should always be eagerly converted to CEL values.
 - `#[dynamic(crate = "path")]` - Specify the path to the `cel` crate. Useful when using this derive macro inside the `cel` crate itself or when the crate is re-exported under a different name.
   - Use `#[dynamic(crate = "crate")]` when deriving inside the cel crate itself
   - Use `#[dynamic(crate = "::cel")]` or omit for normal external usage
@@ -145,11 +144,10 @@ pub struct InternalType {
 
 ## For Foreign Types
 
-If you need to implement `DynamicType` for a type you don't own (like types from other crates), you can manually implement `DynamicType` and use the `impl_dynamic_vtable!` macro to generate the boilerplate vtable implementation:
+If you need to implement `DynamicType` for a type you don't own (like types from other crates), you can manually implement `DynamicType`:
 
 ```rust
-use cel::types::dynamic::{DynamicType, DynamicValueVtable};
-use cel::impl_dynamic_vtable;
+use cel::types::dynamic::{DynamicType};
 
 impl DynamicType for serde_json::Value {
     fn materialize(&self) -> cel::Value<'_> {
@@ -165,6 +163,4 @@ impl DynamicType for serde_json::Value {
         None
     }
 }
-
-impl_dynamic_vtable!(serde_json::Value);
 ```

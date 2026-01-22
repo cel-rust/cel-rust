@@ -2,7 +2,6 @@ use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use crate::Value;
 use crate::extractors::Function;
 
 /// Equality helper for [`Opaque`] values.

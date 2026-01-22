@@ -14,11 +14,11 @@ use serde::{Serialize, Serializer};
 use serde_json::json;
 
 mod optimizer {
+    use crate::common::ast::{CallExpr, Expr};
+    use cel::objects::OpaqueValue;
+    use cel::{IdedExpr, Value};
     use std::net;
     use std::str::FromStr;
-    use cel::{IdedExpr, Value};
-    use cel::objects::OpaqueValue;
-    use crate::common::ast::{CallExpr, Expr};
     fn expr_as_value(e: IdedExpr) -> Option<Value<'static>> {
         match e.expr {
             Expr::Literal(l) => Some(Value::from(l)),
@@ -37,7 +37,7 @@ mod optimizer {
                     };
                     let parsed = super::data::IP(net::IpAddr::from_str(&arg).ok()?);
                     Some(Expr::Inline(Value::Object(OpaqueValue::new(parsed))))
-                },
+                }
                 _ => None,
             }
         }
@@ -50,7 +50,6 @@ mod optimizer {
             }
         }
     }
-
 }
 
 mod data {
@@ -330,7 +329,12 @@ fn run_with_allocation_count(expr: &str, req: OwnedRequest, f: impl FnOnce(Value
     run_with_allocation_count_and_optimizer(expr, req, f, false)
 }
 
-fn run_with_allocation_count_and_optimizer(expr: &str, req: OwnedRequest, f: impl FnOnce(Value), optimize: bool) -> usize {
+fn run_with_allocation_count_and_optimizer(
+    expr: &str,
+    req: OwnedRequest,
+    f: impl FnOnce(Value),
+    optimize: bool,
+) -> usize {
     let mut pctx = Context::default();
     pctx.add_function("with", functions::with);
     pctx.add_function("ip", functions::new_ip);
@@ -415,18 +419,26 @@ fn dynamic_value_header() {
 
 #[test]
 fn opaque() {
-    let allocs = run_with_allocation_count_and_optimizer("ip('1.2.3.4')", OwnedRequest::default(), |res| {
-        assert!(matches!(&res, Value::Object(l)), "{res:?}");
-        assert_eq!(res.json().unwrap(), json!("1.2.3.4"));
-        let Value::Object(o) = res else {
-            panic!()
-        };
-        let ip = o.downcast_ref::<data::IP>().unwrap();
-        assert_eq!(ip.0.to_string(), "1.2.3.4".to_string());
-    }, true);
+    let allocs = run_with_allocation_count_and_optimizer(
+        "ip('1.2.3.4')",
+        OwnedRequest::default(),
+        |res| {
+            assert!(matches!(&res, Value::Object(l)), "{res:?}");
+            assert_eq!(res.json().unwrap(), json!("1.2.3.4"));
+            let Value::Object(o) = res else { panic!() };
+            let ip = o.downcast_ref::<data::IP>().unwrap();
+            assert_eq!(ip.0.to_string(), "1.2.3.4".to_string());
+        },
+        true,
+    );
     assert_eq!(allocs, 0);
-    let allocs = run_with_allocation_count_and_optimizer("ip('1.2.3.4').family()", OwnedRequest::default(), |res| {
-        assert_eq!(res.json().unwrap(), json!(4));
-    }, true);
+    let allocs = run_with_allocation_count_and_optimizer(
+        "ip('1.2.3.4').family()",
+        OwnedRequest::default(),
+        |res| {
+            assert_eq!(res.json().unwrap(), json!(4));
+        },
+        true,
+    );
     assert_eq!(allocs, 0);
 }

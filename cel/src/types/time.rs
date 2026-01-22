@@ -4,12 +4,12 @@ use chrono::TimeZone;
 
 use crate::{ExecutionError, ResolveResult, Value};
 
-/// Timestamp values are limited to the range of values which can be serialized as a string:
-/// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
-/// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
-/// we need to perform our own spec-compliant overflow checks.
-///
-/// https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow
+// Timestamp values are limited to the range of values which can be serialized as a string:
+// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
+// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
+// we need to perform our own spec-compliant overflow checks.
+//
+// https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow
 
 static MAX_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
     let naive = chrono::NaiveDate::from_ymd_opt(9999, 12, 31)
@@ -48,7 +48,6 @@ impl TsOp {
 /// Performs a checked arithmetic operation [`TsOp`] on a timestamp and a duration and ensures that
 /// the resulting timestamp does not overflow the data type internal limits, as well as the timestamp
 /// limits defined in the cel-spec. See [`MAX_TIMESTAMP`] and [`MIN_TIMESTAMP`] for more details.
-
 pub(crate) fn checked_op<'a>(
     op: TsOp,
     lhs: &chrono::DateTime<chrono::FixedOffset>,
