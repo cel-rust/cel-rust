@@ -4,20 +4,27 @@ use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use quote::{ToTokens, quote};
 use syn::{
-    Attribute, Data, DeriveInput, Fields, FieldsNamed, Lit, Meta, MetaNameValue, parse_macro_input,
+    Attribute, Data, DeriveInput, Fields, FieldsNamed, Lit, Meta, MetaNameValue, Variant,
+    parse_macro_input,
 };
 
-/// Derive `DynamicType` for a struct.
+/// Derive `DynamicType` for a struct, tuple struct, or enum.
+///
+/// # Supported Types
+///
+/// - **Named structs**: Structs with named fields (e.g., `struct Foo { field: T }`)
+/// - **Newtype tuple structs**: Single-field tuple structs (e.g., `struct Wrapper(T)`)
+/// - **Unit enums**: Enums with only unit variants (e.g., `enum Status { Active, Inactive }`)
 ///
 /// # Attributes
 ///
-/// ## Struct-level attributes
+/// ## Struct/Enum-level attributes
 ///
 /// - `#[dynamic(crate = "path")]` - Specify the path to the cel crate (default: `::cel`)
 ///   - Use `#[dynamic(crate = "crate")]` when using this derive inside the cel crate itself
 ///   - Use `#[dynamic(crate = "::cel")]` or omit for external usage
 ///
-/// ## Field-level attributes
+/// ## Field-level attributes (Named Structs Only)
 ///
 /// - `#[dynamic(skip)]` - Skip this field in the generated implementation
 /// - `#[dynamic(rename = "name")]` - Use a different name for this field in CEL
@@ -41,6 +48,22 @@ use syn::{
 ///       pub metadata: serde_json::Value,
 ///   }
 ///   // Accessing: claims.foo will look up metadata.field("foo") if "foo" is not a direct field
+///   ```
+///
+/// ## Variant-level attributes (Unit Enums Only)
+///
+/// - `#[dynamic(rename = "name")]` - Use a different string value for this variant
+///   
+///   Example:
+///   ```rust,ignore
+///   #[derive(DynamicType)]
+///   pub enum Protocol {
+///       #[dynamic(rename = "http")]
+///       Http,
+///       #[dynamic(rename = "grpc")]
+///       Grpc,
+///   }
+///   // Protocol::Http materializes to Value::String("http")
 ///   ```
 ///
 /// - `#[dynamic(with = "function")]` - Transform the field value using a helper function before
@@ -85,12 +108,26 @@ use syn::{
 /// ```rust,ignore
 /// use cel::DynamicType;
 ///
+/// // Named struct
 /// #[derive(DynamicType)]
 /// pub struct HttpRequest<'a> {
 ///     method: &'a str,
 ///     path: &'a str,
 ///     #[dynamic(skip)]
 ///     internal_id: u64,
+/// }
+///
+/// // Newtype tuple struct (wraps another DynamicType)
+/// #[derive(DynamicType)]
+/// pub struct Metadata(serde_json::Map<String, serde_json::Value>);
+///
+/// // Unit enum (materializes to string)
+/// #[derive(DynamicType)]
+/// pub enum Protocol {
+///     Http,
+///     Grpc,
+///     #[dynamic(rename = "ws")]
+///     WebSocket,
 /// }
 ///
 /// // Using with attribute for newtype wrappers:
@@ -131,25 +168,134 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
         quote! { ::cel }
     };
 
-    // Get fields
-    let fields = match &input.data {
+    // Dispatch based on data type
+    match &input.data {
         Data::Struct(s) => match &s.fields {
-            Fields::Named(FieldsNamed { named, .. }) => named,
-            _ => {
-                return syn::Error::new_spanned(
+            Fields::Named(FieldsNamed { named, .. }) => {
+                // Named struct - existing behavior
+                derive_for_named_struct(&input, named, &crate_path)
+            }
+            Fields::Unnamed(fields) => {
+                // Tuple struct - check for single field (newtype pattern)
+                if fields.unnamed.len() == 1 {
+                    derive_for_newtype_struct(&input, &crate_path)
+                } else {
+                    syn::Error::new_spanned(
+                        name,
+                        "DynamicType can only be derived for tuple structs with a single field",
+                    )
+                    .to_compile_error()
+                    .into()
+                }
+            }
+            Fields::Unit => {
+                syn::Error::new_spanned(
                     name,
-                    "DynamicType can only be derived for structs with named fields",
+                    "DynamicType can only be derived for structs with named fields or single-field tuple structs",
                 )
                 .to_compile_error()
-                .into();
+                .into()
             }
         },
-        _ => {
-            return syn::Error::new_spanned(name, "DynamicType can only be derived for structs")
+        Data::Enum(e) => {
+            // Enum - check that all variants are unit variants
+            if e.variants.iter().all(|v| matches!(v.fields, Fields::Unit)) {
+                derive_for_unit_enum(&input, &e.variants, &crate_path)
+            } else {
+                syn::Error::new_spanned(
+                    name,
+                    "DynamicType can only be derived for unit enums (all variants must have no data)",
+                )
                 .to_compile_error()
-                .into();
+                .into()
+            }
+        }
+        Data::Union(_) => {
+            syn::Error::new_spanned(name, "DynamicType cannot be derived for unions")
+                .to_compile_error()
+                .into()
+        }
+    }
+}
+
+/// Derive DynamicType for a newtype tuple struct (single field)
+fn derive_for_newtype_struct(input: &DeriveInput, crate_path: &TokenStream2) -> TokenStream {
+    let name = &input.ident;
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    let generated = quote! {
+        impl #impl_generics #crate_path::types::dynamic::DynamicType for #name #ty_generics #where_clause {
+            fn auto_materialize(&self) -> bool {
+                self.0.auto_materialize()
+            }
+
+            fn materialize(&self) -> #crate_path::Value<'_> {
+                self.0.materialize()
+            }
+
+            fn field(&self, field: &str) -> ::core::option::Option<#crate_path::Value<'_>> {
+                self.0.field(field)
+            }
+        }
+
+        impl #impl_generics #crate_path::types::dynamic::DynamicFlatten for #name #ty_generics #where_clause {
+            fn materialize_into<'__cel_a>(&'__cel_a self, __cel_map: &mut ::vector_map::VecMap<#crate_path::objects::KeyRef<'__cel_a>, #crate_path::Value<'__cel_a>>) {
+                #crate_path::types::dynamic::DynamicFlatten::materialize_into(&self.0, __cel_map);
+            }
         }
     };
+
+    generated.into()
+}
+
+/// Derive DynamicType for a unit enum (all variants have no data)
+fn derive_for_unit_enum(
+    input: &DeriveInput,
+    variants: &syn::punctuated::Punctuated<Variant, syn::token::Comma>,
+    crate_path: &TokenStream2,
+) -> TokenStream {
+    let name = &input.ident;
+    let generics = &input.generics;
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+
+    // Generate match arms for materialize
+    let materialize_arms: TokenStream2 = variants
+        .iter()
+        .map(|variant| {
+            let variant_ident = &variant.ident;
+            let variant_name =
+                get_variant_rename(&variant.attrs).unwrap_or_else(|| variant_ident.to_string());
+            quote! {
+                Self::#variant_ident => #crate_path::Value::String(#variant_name.into()),
+            }
+        })
+        .collect();
+
+    let generated = quote! {
+        impl #impl_generics #crate_path::types::dynamic::DynamicType for #name #ty_generics #where_clause {
+            fn auto_materialize(&self) -> bool {
+                true
+            }
+
+            fn materialize(&self) -> #crate_path::Value<'_> {
+                match self {
+                    #materialize_arms
+                }
+            }
+        }
+    };
+
+    generated.into()
+}
+
+/// Derive DynamicType for a named struct (original implementation)
+fn derive_for_named_struct(
+    input: &DeriveInput,
+    fields: &syn::punctuated::Punctuated<syn::Field, syn::token::Comma>,
+    crate_path: &TokenStream2,
+) -> TokenStream {
+    let name = &input.ident;
 
     // Filter and process fields
     let processed_fields: Result<Vec<_>, syn::Error> = fields
@@ -531,4 +677,27 @@ fn is_option_type(ty: &syn::Type) -> bool {
         }
     }
     false
+}
+
+/// Get the rename value for an enum variant
+fn get_variant_rename(attrs: &[Attribute]) -> Option<String> {
+    for attr in attrs {
+        if attr.path().is_ident("dynamic") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("rename") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+    None
 }
