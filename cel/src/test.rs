@@ -2,18 +2,12 @@
 // we need to alias the crate so ::cel:: paths resolve correctly
 extern crate self as cel;
 
-use std::collections::HashMap;
-use std::fmt::Display;
-
-use crate::context::VariableResolver;
-use crate::objects::{KeyRef, Opaque};
-use crate::types::dynamic::DynamicType;
 use crate::{Context, Program, Value};
 use cel::context;
 use cel::test::data::OwnedRequest;
 use cel::types::dynamic::DynamicValue;
-use serde::{Serialize, Serializer};
 use serde_json::json;
+use std::collections::HashMap;
 
 mod optimizer {
     use crate::common::ast::{CallExpr, Expr};
@@ -192,7 +186,7 @@ mod data {
     }
     impl IP {
         fn function(&self, name: &str) -> Option<&cel::extractors::Function> {
-            static family: LazyLock<Function> = LazyLock::new(|| {
+            static FAMILY: LazyLock<Function> = LazyLock::new(|| {
                 Box::new(funnel(move |ftx: &mut FunctionContext<'_, '_>| {
                     let this = ftx.this()?;
                     let this = as_opaque(&this)?;
@@ -202,7 +196,7 @@ mod data {
             });
 
             match name {
-                "family" => Some(&family),
+                "family" => Some(&FAMILY),
                 _ => None,
             }
         }
@@ -268,7 +262,6 @@ mod functions {
 mod alloc {
     use std::alloc::System;
     use std::collections::HashMap;
-    use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::{Arc, Mutex, OnceLock};
     use tracking_allocator::{AllocationGroupId, AllocationGroupToken, AllocationTracker};
     use tracking_allocator::{AllocationRegistry, Allocator};
@@ -288,7 +281,7 @@ mod alloc {
             let _ = AllocationRegistry::set_global_tracker(c.clone());
             AllocationRegistry::enable_tracking();
             let mu = Mutex::new(());
-          (c, mu)
+            (c, mu)
         });
         let mut local_token = {
             // Work around https://github.com/tobz/tracking-allocator/issues/12
@@ -322,6 +315,7 @@ mod alloc {
     #[derive(Default, Clone, Debug)]
     struct Counter(Arc<Mutex<HashMap<AllocationGroupId, usize>>>);
 
+    #[allow(unused_variables)]
     impl AllocationTracker for Counter {
         fn allocated(
             &self,
@@ -394,7 +388,7 @@ fn dynamic_value_complex() {
             claims,
         },
         |res| {
-            assert!(matches!(&res, Value::List(l)), "{res:?}");
+            assert!(matches!(&res, Value::List(_)), "{res:?}");
             assert_eq!(
                 res.json().unwrap(),
                 json!(["me@example.com", "GET", "/foo", "v"])
@@ -418,7 +412,7 @@ fn dynamic_value_end_to_end() {
         },
         |res| {
             // Should *not* be materialized
-            assert!(matches!(&res, Value::Dynamic(l)), "{res:?}");
+            assert!(matches!(&res, Value::Dynamic(_)), "{res:?}");
             assert_eq!(res.json().unwrap(), json!({"sub": "me@example.com"}));
         },
     );
@@ -436,13 +430,13 @@ fn dynamic_value_header() {
     };
     let allocs = run("request.headers['k']", req.clone(), |res| {
         // Should be materialized
-        assert!(matches!(&res, Value::String(l)), "{res:?}");
+        assert!(matches!(&res, Value::String(_)), "{res:?}");
         assert_eq!(res.json().unwrap(), json!("v"));
     });
     assert_eq!(allocs, 0);
     let allocs = run("request.headers", req, |res| {
         // Should NOT be materialized
-        assert!(matches!(&res, Value::Dynamic(l)), "{res:?}");
+        assert!(matches!(&res, Value::Dynamic(_)), "{res:?}");
         assert_eq!(res.json().unwrap(), json!({"k": "v"}));
     });
     assert_eq!(allocs, 0);
@@ -454,7 +448,7 @@ fn opaque() {
         "ip('1.2.3.4')",
         OwnedRequest::default(),
         |res| {
-            assert!(matches!(&res, Value::Object(l)), "{res:?}");
+            assert!(matches!(&res, Value::Object(_)), "{res:?}");
             assert_eq!(res.json().unwrap(), json!("1.2.3.4"));
             let Value::Object(o) = res else { panic!() };
             let ip = o.downcast_ref::<data::IP>().unwrap();
@@ -483,7 +477,7 @@ fn dynamic_ops() {
         "a",
         Value::Dynamic(DynamicValue::new(&1)),
     );
-    let v = Value::resolve(&expr.expression, &ctx, &resolver).unwrap();
+    let _ = Value::resolve(&expr.expression, &ctx, &resolver).unwrap();
     run("request.size()", OwnedRequest::default(), |res| {
         assert_eq!(res.json().unwrap(), json!(4));
     });

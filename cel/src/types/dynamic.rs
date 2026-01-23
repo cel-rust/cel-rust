@@ -128,7 +128,7 @@ impl DynamicType for u64 {
     }
 
     fn materialize(&self) -> Value<'_> {
-        Value::from(*self as i64)
+        Value::from(*self)
     }
 }
 

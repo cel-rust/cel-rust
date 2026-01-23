@@ -482,14 +482,7 @@ impl<'a> Value<'a> {
             Value::UInt(u) => Value::UInt(*u),
             Value::Float(f) => Value::Float(*f),
             Value::Bool(b) => Value::Bool(*b),
-            // Object values are Arc-backed, so cloning is cheap and we can transmute the lifetime
-            // Safety: Object uses Arc internally, so the cloned value is independent of 'a
-            Value::Object(obj) => {
-                let cloned = obj.clone();
-                // Safety: The Object's data is Arc-wrapped and self-contained.
-                // The PhantomData marker is only for covariance; the actual data lives in the Arc.
-                unsafe { std::mem::transmute::<Value<'a>, Value<'static>>(Value::Object(cloned)) }
-            }
+            Value::Object(obj) => Value::Object(obj.clone()),
             Value::Dynamic(d) => d.materialize().as_static(),
 
             Value::Duration(d) => Value::Duration(*d),
