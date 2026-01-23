@@ -1,5 +1,6 @@
 use crate::Value;
 use cel::{to_value, types};
+use std::fmt::Debug;
 
 pub fn maybe_materialize_optional<T: DynamicType>(t: &Option<T>) -> Value<'_> {
     match t {
@@ -87,6 +88,16 @@ impl DynamicType for &str {
         Value::from(*self)
     }
 }
+impl DynamicType for arcstr::ArcStr {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        // TODO: do we want to clone or reference? For now, reference...
+        Value::from(self.as_str())
+    }
+}
 
 // String - auto-materializes to String value
 impl DynamicType for String {
@@ -145,6 +156,24 @@ impl DynamicType for i32 {
 
 // u32 - auto-materializes to Int value
 impl DynamicType for u32 {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self as u64)
+    }
+}
+impl DynamicType for u16 {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(*self as u64)
+    }
+}
+impl DynamicType for u8 {
     fn auto_materialize(&self) -> bool {
         true
     }
@@ -217,11 +246,14 @@ impl DynamicType for http::HeaderMap {
     }
 }
 
-// Vec<String> - materializes to List value
-impl DynamicType for Vec<String> {
-    fn materialize(&self) -> Value<'_> {
-        let items: Vec<Value<'static>> = self.iter().map(|s| Value::from(s.clone())).collect();
-        Value::List(crate::objects::ListValue::Owned(items.into()))
+// Vec<T> - materializes to List value
+impl<T> DynamicType for Vec<T>
+where
+    T: Debug + DynamicType,
+{
+    fn materialize<'a>(&'a self) -> Value<'a> {
+        let items: Vec<Value<'a>> = self.iter().map(|s| s.materialize()).collect();
+        Value::List(crate::objects::ListValue::PartiallyOwned(items.into()))
     }
 }
 
