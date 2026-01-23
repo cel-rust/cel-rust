@@ -32,6 +32,17 @@ pub trait DynamicType: std::fmt::Debug + Send + Sync {
     }
 }
 
+/// Trait for types that can be flattened into a parent struct's map.
+/// This is automatically implemented by the DynamicType derive macro for structs,
+/// and manually implemented for map-like types.
+pub trait DynamicFlatten: DynamicType {
+    /// Insert this type's fields directly into the given map.
+    fn materialize_into<'a>(
+        &'a self,
+        map: &mut vector_map::VecMap<crate::objects::KeyRef<'a>, Value<'a>>,
+    );
+}
+
 pub struct DynamicValue<'a> {
     dyn_ref: &'a dyn DynamicType,
 }
@@ -214,6 +225,20 @@ impl DynamicType for std::collections::HashMap<String, String> {
     }
 }
 
+impl DynamicFlatten for std::collections::HashMap<String, String> {
+    fn materialize_into<'a>(
+        &'a self,
+        map: &mut vector_map::VecMap<crate::objects::KeyRef<'a>, Value<'a>>,
+    ) {
+        for (k, v) in self.iter() {
+            map.insert(
+                crate::objects::KeyRef::from(k.as_str()),
+                Value::from(v.as_str()),
+            );
+        }
+    }
+}
+
 impl<T: DynamicType> DynamicType for &T {
     fn auto_materialize(&self) -> bool {
         (*self).auto_materialize()
@@ -246,6 +271,19 @@ impl DynamicType for http::HeaderMap {
     }
 }
 
+impl DynamicFlatten for http::HeaderMap {
+    fn materialize_into<'a>(
+        &'a self,
+        map: &mut vector_map::VecMap<crate::objects::KeyRef<'a>, Value<'a>>,
+    ) {
+        for (k, v) in self.iter() {
+            if let Ok(s) = str::from_utf8(v.as_bytes()) {
+                map.insert(crate::objects::KeyRef::from(k.as_str()), Value::from(s));
+            }
+        }
+    }
+}
+
 // Vec<T> - materializes to List value
 impl<T> DynamicType for Vec<T>
 where
@@ -272,6 +310,23 @@ impl DynamicType for serde_json::Value {
         }
     }
 }
+
+impl DynamicFlatten for serde_json::Value {
+    fn materialize_into<'a>(
+        &'a self,
+        map: &mut vector_map::VecMap<crate::objects::KeyRef<'a>, Value<'a>>,
+    ) {
+        if let serde_json::Value::Object(obj) = self {
+            for (k, v) in obj.iter() {
+                map.insert(
+                    crate::objects::KeyRef::from(k.as_str()),
+                    maybe_materialize(v),
+                );
+            }
+        }
+    }
+}
+
 impl DynamicType for serde_json::Map<String, serde_json::Value> {
     fn materialize(&self) -> Value<'_> {
         to_value(self).unwrap()
@@ -280,5 +335,19 @@ impl DynamicType for serde_json::Map<String, serde_json::Value> {
     fn field(&self, field: &str) -> Option<Value<'_>> {
         let v = self.get(field)?;
         Some(types::dynamic::maybe_materialize(v))
+    }
+}
+
+impl DynamicFlatten for serde_json::Map<String, serde_json::Value> {
+    fn materialize_into<'a>(
+        &'a self,
+        map: &mut vector_map::VecMap<crate::objects::KeyRef<'a>, Value<'a>>,
+    ) {
+        for (k, v) in self.iter() {
+            map.insert(
+                crate::objects::KeyRef::from(k.as_str()),
+                maybe_materialize(v),
+            );
+        }
     }
 }

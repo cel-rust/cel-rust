@@ -21,6 +21,28 @@ use syn::{
 ///
 /// - `#[dynamic(skip)]` - Skip this field in the generated implementation
 /// - `#[dynamic(rename = "name")]` - Use a different name for this field in CEL
+/// - `#[dynamic(flatten)]` - Flatten the contents of this field into the parent struct.
+///   The field must implement `DynamicFlatten`. When materializing, the field's contents are
+///   merged into the parent map instead of being nested. When accessing fields, lookups
+///   will fall through to the flattened field if not found in the parent.
+///   
+///   `DynamicFlatten` is implemented for:
+///   - Structs with `#[derive(DynamicType)]`
+///   - `serde_json::Value` and `serde_json::Map<String, serde_json::Value>`
+///   - `std::collections::HashMap<String, String>`
+///   - `http::HeaderMap`
+///   
+///   Example:
+///   ```rust,ignore
+///   #[derive(DynamicType)]
+///   pub struct Claims {
+///       pub key: String,
+///       #[dynamic(flatten)]
+///       pub metadata: serde_json::Value,
+///   }
+///   // Accessing: claims.foo will look up metadata.field("foo") if "foo" is not a direct field
+///   ```
+///
 /// - `#[dynamic(with = "function")]` - Transform the field value using a helper function before
 ///   passing to `maybe_materialize`. The function receives `&self.field` (note: if the field
 ///   is already a reference like `&'a T`, the function receives `&&'a T`) and should return
@@ -143,12 +165,25 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
             let is_option = is_option_type(ty);
             let with_expr = get_field_with_expr(&f.attrs);
             let with_value_expr = get_field_with_value_expr(&f.attrs);
+            let is_flatten = has_field_attr(&f.attrs, "flatten");
 
             // Check for conflicting attributes
             if with_expr.is_some() && with_value_expr.is_some() {
                 return Err(syn::Error::new_spanned(
                     f,
                     "Cannot use both `with` and `with_value` attributes on the same field",
+                ));
+            }
+
+            // flatten conflicts with all other attributes except skip (already filtered)
+            if is_flatten
+                && (with_expr.is_some()
+                    || with_value_expr.is_some()
+                    || get_field_rename(&f.attrs).is_some())
+            {
+                return Err(syn::Error::new_spanned(
+                    f,
+                    "Cannot use `flatten` with `with`, `with_value`, or `rename` attributes",
                 ));
             }
 
@@ -160,6 +195,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 is_option,
                 with_expr,
                 with_value_expr,
+                is_flatten,
             ))
         })
         .collect();
@@ -169,12 +205,19 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
         Err(e) => return e.to_compile_error().into(),
     };
 
-    let field_count = processed_fields.len();
+    // Separate normal fields from flattened fields
+    let (normal_fields, flatten_fields): (Vec<_>, Vec<_>) = processed_fields.iter().partition(
+        |(_ident, _name, _ty, _is_ref, _is_option, _with_expr, _with_value_expr, is_flatten)| {
+            !is_flatten
+        },
+    );
+
+    let field_count = normal_fields.len();
 
     // Generate materialize body
-    let materialize_inserts: TokenStream2 = processed_fields
+    let materialize_inserts: TokenStream2 = normal_fields
         .iter()
-        .map(|(ident, name, _ty, _is_ref, is_option, with_expr, with_value_expr)| {
+        .map(|(ident, name, _ty, _is_ref, is_option, with_expr, with_value_expr, _is_flatten)| {
             if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
@@ -191,7 +234,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 let expr_tokens = parsed_expr.to_token_stream();
                 // Call the helper and use returned Value directly (no maybe_materialize)
                 quote! {
-                    m.insert(
+                    __cel_map.insert(
                         #crate_path::objects::KeyRef::from(#name),
                         (#expr_tokens)(&self.#ident),
                     );
@@ -212,7 +255,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 let expr_tokens = parsed_expr.to_token_stream();
                 // Call the closure and let maybe_materialize handle the result
                 quote! {
-                    m.insert(
+                    __cel_map.insert(
                         #crate_path::objects::KeyRef::from(#name),
                         #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(&self.#ident)),
                     );
@@ -220,7 +263,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
             } else if *is_option {
                 // For Option<T> types, use always_materialize(maybe_materialize_optional)
                 quote! {
-                    m.insert(
+                    __cel_map.insert(
                         #crate_path::objects::KeyRef::from(#name),
                         #crate_path::types::dynamic::maybe_materialize_optional(&self.#ident).always_materialize_owned(),
                     );
@@ -228,7 +271,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
             } else {
                 // Always pass a reference to maybe_materialize
                 quote! {
-                    m.insert(
+                    __cel_map.insert(
                         #crate_path::objects::KeyRef::from(#name),
                         #crate_path::types::dynamic::maybe_materialize(&self.#ident),
                     );
@@ -237,10 +280,32 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
         })
         .collect();
 
-    // Generate field match arms
-    let field_arms: TokenStream2 = processed_fields
+    // Generate flatten field merging code
+    let flatten_merges: TokenStream2 = flatten_fields
         .iter()
-        .map(|(ident, name, ty, _is_ref, is_option, with_expr, with_value_expr)| {
+        .map(
+            |(
+                ident,
+                _name,
+                _ty,
+                _is_ref,
+                _is_option,
+                _with_expr,
+                _with_value_expr,
+                _is_flatten,
+            )| {
+                quote! {
+                    // Materialize the flattened field directly into the map
+                    #crate_path::types::dynamic::DynamicFlatten::materialize_into(&self.#ident, __cel_map);
+                }
+            },
+        )
+        .collect();
+
+    // Generate field match arms
+    let field_arms: TokenStream2 = normal_fields
+        .iter()
+        .map(|(ident, name, ty, _is_ref, is_option, with_expr, with_value_expr, _is_flatten)| {
             if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
@@ -260,7 +325,7 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 let expr_tokens = parsed_expr.to_token_stream();
                 // Call the helper and use returned Value directly (no maybe_materialize)
                 quote! {
-                    #name => (#expr_tokens)(&self.#ident),
+                    #name => ::core::option::Option::Some((#expr_tokens)(&self.#ident)),
                 }
             } else if let Some(expr_str) = with_expr {
                 // Parse the closure expression as a proper Expr for better diagnostics
@@ -280,22 +345,38 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
                 quote! {
                     #name => {
                         let __field_ref: &#ty = &self.#ident;
-                        #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(__field_ref))
+                        ::core::option::Option::Some(#crate_path::types::dynamic::maybe_materialize((#expr_tokens)(__field_ref)))
                     },
                 }
             } else if *is_option {
                 // For Option<T> types, use maybe_materialize_optional
                 quote! {
-                    #name => #crate_path::types::dynamic::maybe_materialize_optional(&self.#ident),
+                    #name => ::core::option::Option::Some(#crate_path::types::dynamic::maybe_materialize_optional(&self.#ident)),
                 }
             } else {
                 // Always pass a reference to maybe_materialize
                 quote! {
-                    #name => #crate_path::types::dynamic::maybe_materialize(&self.#ident),
+                    #name => ::core::option::Option::Some(#crate_path::types::dynamic::maybe_materialize(&self.#ident)),
                 }
             }
         })
         .collect();
+
+    // Generate fallback to flattened fields
+    let flatten_fallback: TokenStream2 = if !flatten_fields.is_empty() {
+        let flatten_checks = flatten_fields.iter().map(|(ident, _name, _ty, _is_ref, _is_option, _with_expr, _with_value_expr, _is_flatten)| {
+            quote! {
+                if let ::core::option::Option::Some(val) = #crate_path::types::dynamic::DynamicType::field(&self.#ident, field) {
+                    return ::core::option::Option::Some(val);
+                }
+            }
+        });
+        quote! {
+            #(#flatten_checks)*
+        }
+    } else {
+        quote! {}
+    };
 
     // Handle generics - we need to support both lifetimes and type parameters
     let generics = &input.generics;
@@ -305,15 +386,25 @@ pub fn derive_dynamic_type(input: TokenStream) -> TokenStream {
         impl #impl_generics #crate_path::types::dynamic::DynamicType for #name #ty_generics #where_clause {
             fn materialize(&self) -> #crate_path::Value<'_> {
                 let mut m = ::vector_map::VecMap::with_capacity(#field_count);
-                #materialize_inserts
+                #crate_path::types::dynamic::DynamicFlatten::materialize_into(self, &mut m);
                 #crate_path::Value::Map(#crate_path::objects::MapValue::Borrow(m))
             }
 
             fn field(&self, field: &str) -> ::core::option::Option<#crate_path::Value<'_>> {
-                ::core::option::Option::Some(match field {
+                match field {
                     #field_arms
-                    _ => return ::core::option::Option::None,
-                })
+                    _ => {
+                        #flatten_fallback
+                        ::core::option::Option::None
+                    }
+                }
+            }
+        }
+
+        impl #impl_generics #crate_path::types::dynamic::DynamicFlatten for #name #ty_generics #where_clause {
+            fn materialize_into<'__cel_a>(&'__cel_a self, __cel_map: &mut ::vector_map::VecMap<#crate_path::objects::KeyRef<'__cel_a>, #crate_path::Value<'__cel_a>>) {
+                #materialize_inserts
+                #flatten_merges
             }
         }
     };
