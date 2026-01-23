@@ -1,6 +1,7 @@
 use crate::Value;
 use cel::{to_value, types};
 use std::fmt::Debug;
+use std::sync::Arc;
 
 pub fn maybe_materialize_optional<T: DynamicType>(t: &Option<T>) -> Value<'_> {
     match t {
@@ -292,6 +293,20 @@ where
     fn materialize<'a>(&'a self) -> Value<'a> {
         let items: Vec<Value<'a>> = self.iter().map(|s| s.materialize()).collect();
         Value::List(crate::objects::ListValue::PartiallyOwned(items.into()))
+    }
+}
+impl<T> DynamicType for Arc<T>
+where
+    T: Debug + DynamicType,
+{
+    fn auto_materialize(&self) -> bool {
+        self.as_ref().auto_materialize()
+    }
+    fn materialize<'a>(&'a self) -> Value<'a> {
+        self.as_ref().materialize()
+    }
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        self.as_ref().field(field)
     }
 }
 
