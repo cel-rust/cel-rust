@@ -21,12 +21,12 @@ impl<'a> ::cel::types::dynamic::DynamicType for WithHelpers<'a> {
     fn field(&self, field: &str) -> ::core::option::Option<::cel::Value<'_>> {
         match field {
             "custom" => {
-                let __field_ref: &&'a CustomType = &self.custom;
-                ::core::option::Option::Some(
+                ::core::option::Option::Some({
+                    let __field_ref: &&'a CustomType = &self.custom;
                     ::cel::types::dynamic::maybe_materialize(
                         (extract_inner)(__field_ref),
-                    ),
-                )
+                    )
+                })
             }
             "method" => ::core::option::Option::Some((to_value)(&self.method)),
             _ => ::core::option::Option::None,

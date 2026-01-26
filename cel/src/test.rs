@@ -449,7 +449,7 @@ fn dynamic_ops() {
     );
     let _ = Value::resolve(&expr.expression, &ctx, &resolver).unwrap();
     run("request.size()", OwnedRequest::default(), |res| {
-        assert_eq!(res.json().unwrap(), json!(4));
+        assert_eq!(res.json().unwrap(), json!(3));
     });
     run(
         "request.contains('method')",
@@ -459,7 +459,7 @@ fn dynamic_ops() {
         },
     );
     run(
-        "request == {'claims': null, 'headers': {}, 'method': 'GET', 'path': '/'}",
+        "request == {'headers': {}, 'method': 'GET', 'path': '/'}",
         OwnedRequest::default(),
         |res| {
             assert_eq!(res.json().unwrap(), json!(true));

@@ -32,12 +32,29 @@ use syn::{
 /// - `#[dynamic(skip)]` - Skip this field in the generated implementation
 /// - `#[dynamic(rename = "name")]` - Use a different name for this field in CEL
 ///
+/// - `#[dynamic(skip_serializing_if = "function")]` - Skip this field if the predicate returns true.
+///   The function receives `&self.field` and should return a `bool`. When the predicate returns `true`,
+///   the field is not included in the materialized map (not even as `null`). When accessing the field
+///   via `.field("name")`, it returns `None` if the predicate is true.
+///   
+///   Example:
+///   ```rust,ignore
+///   #[derive(DynamicType)]
+///   pub struct HttpRequest<'a> {
+///       method: &'a str,
+///       #[dynamic(skip_serializing_if = "Option::is_none")]
+///       claims: Option<&'a Claims>,
+///   }
+///   // When claims is None, it's not included in the materialized map at all
+///   ```
+///
 /// ## Serde Compatibility
 ///
 /// The derive macro also reads serde attributes when present:
 /// - `#[serde(skip)]` - Same as `#[dynamic(skip)]`
 /// - `#[serde(rename = "name")]` - Same as `#[dynamic(rename = "name")]`
 /// - `#[serde(rename_all = "case")]` - Same as `#[dynamic(rename_all = "case")]`
+/// - `#[serde(skip_serializing_if = "function")]` - Same as `#[dynamic(skip_serializing_if = "function")]`
 ///
 /// When both `#[dynamic(...)]` and `#[serde(...)]` attributes are present on the same
 /// field or struct, the `#[dynamic(...)]` attribute takes precedence
@@ -328,6 +345,7 @@ fn derive_for_named_struct(
             let with_expr = get_field_with_expr(&f.attrs);
             let with_value_expr = get_field_with_value_expr(&f.attrs);
             let is_flatten = has_field_attr(&f.attrs, "flatten");
+            let skip_serializing_if = get_field_skip_serializing_if(&f.attrs);
 
             // Check for conflicting attributes
             if with_expr.is_some() && with_value_expr.is_some() {
@@ -341,11 +359,12 @@ fn derive_for_named_struct(
             if is_flatten
                 && (with_expr.is_some()
                     || with_value_expr.is_some()
-                    || get_field_rename_combined(&f.attrs).is_some())
+                    || get_field_rename_combined(&f.attrs).is_some()
+                    || skip_serializing_if.is_some())
             {
                 return Err(syn::Error::new_spanned(
                     f,
-                    "Cannot use `flatten` with `with`, `with_value`, or `rename` attributes",
+                    "Cannot use `flatten` with `with`, `with_value`, `rename`, or `skip_serializing_if` attributes",
                 ));
             }
 
@@ -357,6 +376,7 @@ fn derive_for_named_struct(
                 with_expr,
                 with_value_expr,
                 is_flatten,
+                skip_serializing_if,
             ))
         })
         .collect();
@@ -368,7 +388,16 @@ fn derive_for_named_struct(
 
     // Separate normal fields from flattened fields
     let (normal_fields, flatten_fields): (Vec<_>, Vec<_>) = processed_fields.iter().partition(
-        |(_ident, _name, _ty, _is_ref, _with_expr, _with_value_expr, is_flatten)| !is_flatten,
+        |(
+            _ident,
+            _name,
+            _ty,
+            _is_ref,
+            _with_expr,
+            _with_value_expr,
+            is_flatten,
+            _skip_serializing_if,
+        )| !is_flatten,
     );
 
     let field_count = normal_fields.len();
@@ -376,8 +405,8 @@ fn derive_for_named_struct(
     // Generate materialize body
     let materialize_inserts: TokenStream2 = normal_fields
         .iter()
-        .map(|(ident, name, _ty, _is_ref, with_expr, with_value_expr, _is_flatten)| {
-            if let Some(expr_str) = with_value_expr {
+        .map(|(ident, name, _ty, _is_ref, with_expr, with_value_expr, _is_flatten, skip_serializing_if)| {
+            let insert_code = if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
                     Ok(expr) => expr,
@@ -427,6 +456,28 @@ fn derive_for_named_struct(
                         #crate_path::types::dynamic::maybe_materialize(&self.#ident),
                     );
                 }
+            };
+
+            // Wrap with skip_serializing_if check if present
+            if let Some(skip_fn_str) = skip_serializing_if {
+                let skip_fn: syn::Expr = match syn::parse_str(skip_fn_str) {
+                    Ok(expr) => expr,
+                    Err(e) => {
+                        return syn::Error::new(
+                            proc_macro2::Span::call_site(),
+                            format!("Failed to parse `skip_serializing_if` expression `{}`: {}", skip_fn_str, e)
+                        )
+                        .to_compile_error();
+                    }
+                };
+                let skip_fn_tokens = skip_fn.to_token_stream();
+                quote! {
+                    if !(#skip_fn_tokens)(&self.#ident) {
+                        #insert_code
+                    }
+                }
+            } else {
+                insert_code
             }
         })
         .collect();
@@ -443,6 +494,7 @@ fn derive_for_named_struct(
                 _with_expr,
                 _with_value_expr,
                 _is_flatten,
+                _skip_serializing_if,
             )| {
                 quote! {
                     // Materialize the flattened field directly into the map
@@ -455,8 +507,8 @@ fn derive_for_named_struct(
     // Generate field match arms
     let field_arms: TokenStream2 = normal_fields
         .iter()
-        .map(|(ident, name, ty, _is_ref, with_expr, with_value_expr, _is_flatten)| {
-            if let Some(expr_str) = with_value_expr {
+        .map(|(ident, name, ty, _is_ref, with_expr, with_value_expr, _is_flatten, skip_serializing_if)| {
+            let field_value = if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
                     Ok(expr) => expr,
@@ -475,7 +527,7 @@ fn derive_for_named_struct(
                 let expr_tokens = parsed_expr.to_token_stream();
                 // Call the helper and use returned Value directly (no maybe_materialize)
                 quote! {
-                    #name => ::core::option::Option::Some((#expr_tokens)(&self.#ident)),
+                    (#expr_tokens)(&self.#ident)
                 }
             } else if let Some(expr_str) = with_expr {
                 // Parse the closure expression as a proper Expr for better diagnostics
@@ -493,15 +545,43 @@ fn derive_for_named_struct(
                 let expr_tokens = parsed_expr.to_token_stream();
                 // Generate code with explicit type annotation for better type inference
                 quote! {
-                    #name => {
+                    {
                         let __field_ref: &#ty = &self.#ident;
-                        ::core::option::Option::Some(#crate_path::types::dynamic::maybe_materialize((#expr_tokens)(__field_ref)))
-                    },
+                        #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(__field_ref))
+                    }
                 }
             } else {
                 // Always pass a reference to maybe_materialize
                 quote! {
-                    #name => ::core::option::Option::Some(#crate_path::types::dynamic::maybe_materialize(&self.#ident)),
+                    #crate_path::types::dynamic::maybe_materialize(&self.#ident)
+                }
+            };
+
+            // Wrap with skip_serializing_if check if present
+            if let Some(skip_fn_str) = skip_serializing_if {
+                let skip_fn: syn::Expr = match syn::parse_str(skip_fn_str) {
+                    Ok(expr) => expr,
+                    Err(e) => {
+                        return syn::Error::new(
+                            proc_macro2::Span::call_site(),
+                            format!("Failed to parse `skip_serializing_if` expression `{}`: {}", skip_fn_str, e)
+                        )
+                        .to_compile_error();
+                    }
+                };
+                let skip_fn_tokens = skip_fn.to_token_stream();
+                quote! {
+                    #name => {
+                        if (#skip_fn_tokens)(&self.#ident) {
+                            ::core::option::Option::None
+                        } else {
+                            ::core::option::Option::Some(#field_value)
+                        }
+                    },
+                }
+            } else {
+                quote! {
+                    #name => ::core::option::Option::Some(#field_value),
                 }
             }
         })
@@ -509,7 +589,7 @@ fn derive_for_named_struct(
 
     // Generate fallback to flattened fields
     let flatten_fallback: TokenStream2 = if !flatten_fields.is_empty() {
-        let flatten_checks = flatten_fields.iter().map(|(ident, _name, _ty, _is_ref, _with_expr, _with_value_expr, _is_flatten)| {
+        let flatten_checks = flatten_fields.iter().map(|(ident, _name, _ty, _is_ref, _with_expr, _with_value_expr, _is_flatten, _skip_serializing_if)| {
             quote! {
                 if let ::core::option::Option::Some(val) = #crate_path::types::dynamic::DynamicType::field(&self.#ident, field) {
                     return ::core::option::Option::Some(val);
@@ -658,6 +738,52 @@ fn get_field_with_value_expr(attrs: &[Attribute]) -> Option<String> {
             }
         }
     }
+    None
+}
+
+/// Get the `skip_serializing_if` expression for a field (checks both dynamic and serde)
+/// Prefers dynamic over serde if both are present
+fn get_field_skip_serializing_if(attrs: &[Attribute]) -> Option<String> {
+    // First check dynamic
+    for attr in attrs {
+        if attr.path().is_ident("dynamic") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("skip_serializing_if") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+
+    // Fall back to serde
+    for attr in attrs {
+        if attr.path().is_ident("serde") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("skip_serializing_if") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+
     None
 }
 
