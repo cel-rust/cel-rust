@@ -826,15 +826,27 @@ impl<'a> Value<'a> {
                             return (func)(&mut fctx);
                         }
                         let tgt = Some(resolve(target)?);
-                        let of = &match tgt {
-                            Some(Value::Object(ref ob)) => {
-                                ob.resolve_function(call.func_name.as_str())
+
+                        // Try call_function first for opaque objects
+                        if let Some(Value::Object(ob)) = &tgt {
+                            let ob = ob.clone();
+                            let mut fctx = FunctionContext::new(
+                                &call.func_name,
+                                None,
+                                ctx,
+                                &call.args,
+                                resolver,
+                            );
+                            if let Some(result) =
+                                ob.call_function(call.func_name.as_str(), &mut fctx)
+                            {
+                                return result;
                             }
-                            _ => None,
-                        };
-                        let Some(func) = of
-                            .or(qualified_func)
-                            .or_else(|| ctx.get_function(call.func_name.as_str()))
+                        }
+
+                        // Fall back to qualified_func or ctx.get_function
+                        let Some(func) =
+                            qualified_func.or_else(|| ctx.get_function(call.func_name.as_str()))
                         else {
                             return Err(ExecutionError::UndeclaredReference(
                                 call.func_name.clone().into(),

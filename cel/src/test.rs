@@ -51,17 +51,14 @@ mod optimizer {
 mod data {
     use crate::Value;
     use cel::context::VariableResolver;
-    use cel::extractors::Function;
-    use cel::objects::{OpaqueValue, ValueType};
     use cel::parser::Expression;
     use cel::types::dynamic::DynamicType;
-    use cel::{Context, ExecutionError, FunctionContext, ResolveResult};
+    use cel::{Context, FunctionContext, ResolveResult};
     use cel_derive::DynamicType;
     use serde::{Serialize, Serializer};
     use std::collections::HashMap;
     use std::fmt::Display;
     use std::net;
-    use std::sync::LazyLock;
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub struct OwnedRequest {
@@ -157,27 +154,18 @@ mod data {
             }
         }
     }
-    fn as_opaque<'a>(a: &'a Value<'a>) -> Result<&'a OpaqueValue, ExecutionError> {
-        let Value::Object(a) = a else {
-            return Err(ExecutionError::UnexpectedType {
-                got: a.type_of().as_str(),
-                want: ValueType::Object.as_str(),
-            });
-        };
-
-        Ok(a)
-    }
-    fn funnel<CL>(f: CL) -> CL
-    where
-        CL: for<'b, 'a, 'rf> Fn(&'b mut FunctionContext<'a, 'rf>) -> ResolveResult<'a>,
-    {
-        f
-    }
     #[derive(Debug, PartialEq, Eq, Clone, Serialize)]
     pub struct IP(pub net::IpAddr);
-    impl<'a> cel::objects::Opaque for IP {
-        fn resolve_function(&self, name: &str) -> Option<&cel::extractors::Function> {
-            self.function(name)
+    impl cel::objects::Opaque for IP {
+        fn call_function<'a, 'rf>(
+            &self,
+            name: &str,
+            _ftx: &mut FunctionContext<'a, 'rf>,
+        ) -> Option<ResolveResult<'a>> {
+            match name {
+                "family" => Some(self.family()),
+                _ => None,
+            }
         }
 
         fn json(&self) -> Option<serde_json::Value> {
@@ -185,21 +173,6 @@ mod data {
         }
     }
     impl IP {
-        fn function(&self, name: &str) -> Option<&cel::extractors::Function> {
-            static FAMILY: LazyLock<Function> = LazyLock::new(|| {
-                Box::new(funnel(move |ftx: &mut FunctionContext<'_, '_>| {
-                    let this = ftx.this()?;
-                    let this = as_opaque(&this)?;
-                    let t = this.downcast_ref().unwrap();
-                    IP::family(t)
-                }))
-            });
-
-            match name {
-                "family" => Some(&FAMILY),
-                _ => None,
-            }
-        }
         fn family(&self) -> ResolveResult<'static> {
             match self.0 {
                 net::IpAddr::V4(_) => Ok(4.into()),

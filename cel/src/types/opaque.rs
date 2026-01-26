@@ -2,7 +2,8 @@ use std::any::Any;
 use std::fmt::{Debug, Formatter};
 use std::sync::Arc;
 
-use crate::extractors::Function;
+use crate::functions::FunctionContext;
+use crate::objects::ResolveResult;
 
 /// Equality helper for [`Opaque`] values.
 ///
@@ -69,7 +70,11 @@ pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
     }
 
     /// Resolves a method function by name.
-    fn resolve_function(&self, _name: &str) -> Option<&Function> {
+    fn call_function<'a, 'rf>(
+        &self,
+        _name: &str,
+        _ftx: &mut FunctionContext<'a, 'rf>,
+    ) -> Option<ResolveResult<'a>> {
         None
     }
 
@@ -140,8 +145,12 @@ impl OpaqueValue {
     }
 
     /// Resolves a method function by name.
-    pub fn resolve_function(&self, name: &str) -> Option<&Function> {
-        self.0.resolve_function(name)
+    pub fn call_function<'a, 'rf>(
+        &self,
+        name: &str,
+        ftx: &mut FunctionContext<'a, 'rf>,
+    ) -> Option<ResolveResult<'a>> {
+        self.0.call_function(name, ftx)
     }
 
     /// Attempts to downcast to a concrete type.
