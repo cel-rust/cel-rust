@@ -53,3 +53,10 @@ impl<'a> AsRef<[Value<'a>]> for ListValue<'a> {
         }
     }
 }
+
+impl Eq for ListValue<'_> {}
+impl PartialEq for ListValue<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}

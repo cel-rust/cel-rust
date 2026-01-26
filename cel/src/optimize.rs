@@ -187,6 +187,8 @@ impl Optimize {
 
 #[cfg(test)]
 mod test {
+    use serde::{Serialize, Serializer};
+
     use crate::common::ast::{CallExpr, Expr};
     use crate::objects::{Opaque, OpaqueValue};
     use crate::{
@@ -256,9 +258,14 @@ mod test {
         fn type_name(&self) -> &'static str {
             "precompiled_regex"
         }
+    }
 
-        fn json(&self) -> Option<serde_json::Value> {
-            None
+    impl Serialize for PrecompileRegex {
+        fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+        where
+            S: Serializer,
+        {
+            serializer.serialize_str(self.0.as_str())
         }
     }
 

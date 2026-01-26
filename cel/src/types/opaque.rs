@@ -57,7 +57,7 @@ where
     }
 }
 
-pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
+pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync + erased_serde::Serialize {
     /// Returns a stable, fully-qualified type name for this value's runtime type.
     ///
     /// This name is used to check type compatibility before attempting downcasts
@@ -75,14 +75,6 @@ pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
         _name: &str,
         _ftx: &mut FunctionContext<'a, 'rf>,
     ) -> Option<ResolveResult<'a>> {
-        None
-    }
-
-    /// Optional JSON representation (requires the `json` feature).
-    ///
-    /// The default implementation returns `None`, indicating that the value
-    /// cannot be represented as JSON.
-    fn json(&self) -> Option<serde_json::Value> {
         None
     }
 }
@@ -104,8 +96,9 @@ impl dyn Opaque {
 /// # Example
 /// ```rust
 /// use cel::objects::{OpaqueValue, Opaque, Value};
+/// use serde::Serialize;
 ///
-/// #[derive(Clone, Debug, PartialEq, Eq)]
+/// #[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 /// struct MyStruct { field: String }
 ///
 /// impl Opaque for MyStruct {
@@ -160,6 +153,6 @@ impl OpaqueValue {
 
     /// Returns the JSON representation if available.
     pub fn json(&self) -> Option<serde_json::Value> {
-        self.0.json()
+        erased_serde::serialize(&*self.0, serde_json::value::Serializer).ok()
     }
 }

@@ -65,7 +65,7 @@ mod data {
         pub method: http::Method,
         pub path: String,
         pub headers: HashMap<String, String>,
-        pub claims: Claims,
+        pub claims: Option<Claims>,
     }
     impl Default for OwnedRequest {
         fn default() -> Self {
@@ -88,7 +88,8 @@ mod data {
         headers: &'a HashMap<String, String>,
         // Use with to unwrap the Claims newtype
         #[dynamic(with = "claims_inner")]
-        claims: &'a Claims,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        claims: Option<&'a Claims>,
     }
 
     // Generic helper to convert any AsRef<str> to &str
@@ -101,8 +102,8 @@ mod data {
         serializer.serialize_str(&t.to_string())
     }
     // Helper function to extract the inner value from Claims
-    fn claims_inner<'a>(c: &'a &'a Claims) -> &'a serde_json::Value {
-        &c.0
+    fn claims_inner<'a>(c: &'a Option<&'a Claims>) -> &'a serde_json::Value {
+        c.as_ref().map(|c| &c.0).unwrap_or(&serde_json::Value::Null)
     }
 
     #[derive(Clone, Debug, PartialEq, Eq)]
@@ -149,7 +150,7 @@ mod data {
                     method: &req.method,
                     path: req.path.as_str(),
                     headers: &req.headers,
-                    claims: &req.claims,
+                    claims: req.claims.as_ref(),
                 }),
             }
         }
@@ -166,10 +167,6 @@ mod data {
                 "family" => Some(self.family()),
                 _ => None,
             }
-        }
-
-        fn json(&self) -> Option<serde_json::Value> {
-            serde_json::to_value(&self).ok()
         }
     }
     impl IP {
@@ -358,7 +355,7 @@ fn dynamic_value_complex() {
             method: http::Method::GET,
             path: "/foo".to_string(),
             headers,
-            claims,
+            claims: Some(claims),
         },
         |res| {
             assert!(matches!(&res, Value::List(_)), "{res:?}");
@@ -381,7 +378,7 @@ fn dynamic_value_end_to_end() {
             method: http::Method::GET,
             path: "/foo".to_string(),
             headers: Default::default(),
-            claims,
+            claims: Some(claims),
         },
         |res| {
             // Should *not* be materialized
@@ -456,6 +453,13 @@ fn dynamic_ops() {
     });
     run(
         "request.contains('method')",
+        OwnedRequest::default(),
+        |res| {
+            assert_eq!(res.json().unwrap(), json!(true));
+        },
+    );
+    run(
+        "request == {'claims': null, 'headers': {}, 'method': 'GET', 'path': '/'}",
         OwnedRequest::default(),
         |res| {
             assert_eq!(res.json().unwrap(), json!(true));

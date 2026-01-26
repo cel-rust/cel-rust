@@ -8,7 +8,7 @@ use hashbrown::Equivalent;
 use crate::Value;
 use crate::objects::StringValue;
 
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, Clone)]
 pub enum MapValue<'a> {
     Owned(Arc<hashbrown::HashMap<Key, Value<'static>>>),
     Borrow(vector_map::VecMap<KeyRef<'a>, Value<'a>>),
@@ -79,6 +79,18 @@ impl<'a> MapValue<'a> {
 impl PartialOrd for MapValue<'_> {
     fn partial_cmp(&self, _: &Self) -> Option<Ordering> {
         None
+    }
+}
+
+impl PartialEq for MapValue<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        // Compare lengths first for efficiency
+        if self.len() != other.len() {
+            return false;
+        }
+        // Compare all key-value pairs regardless of Owned/Borrow variant
+        self.iter()
+            .all(|(k, v)| other.get(&k).map_or(false, |other_v| v == other_v))
     }
 }
 

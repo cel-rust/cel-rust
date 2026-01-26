@@ -1,5 +1,6 @@
 use crate::objects::Opaque;
 use crate::{ExecutionError, Value};
+use serde::{Serialize, Serializer};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct OptionalValue {
@@ -22,11 +23,16 @@ impl Opaque for OptionalValue {
     fn type_name(&self) -> &'static str {
         "optional_type"
     }
-    fn json(&self) -> Option<serde_json::Value> {
+}
+
+impl Serialize for OptionalValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
         match self.value.as_ref() {
-            // TODO: or exclude it?
-            None => Some(serde_json::Value::Null),
-            Some(v) => v.json().ok(),
+            None => serializer.serialize_none(),
+            Some(v) => v.serialize(serializer),
         }
     }
 }

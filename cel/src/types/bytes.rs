@@ -23,3 +23,10 @@ impl<'a> AsRef<[u8]> for BytesValue<'a> {
         }
     }
 }
+
+impl Eq for BytesValue<'_> {}
+impl PartialEq for BytesValue<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.as_ref() == other.as_ref()
+    }
+}

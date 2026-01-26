@@ -1562,10 +1562,6 @@ mod tests {
             fn type_name(&self) -> &'static str {
                 "my_struct"
             }
-
-            fn json(&self) -> Option<serde_json::Value> {
-                Some(serde_json::to_value(self).unwrap())
-            }
         }
 
         // #[derive(Debug, Eq, PartialEq, Serialize)]
