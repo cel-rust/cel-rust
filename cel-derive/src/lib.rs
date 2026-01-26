@@ -764,21 +764,27 @@ fn get_field_skip_serializing_if(attrs: &[Attribute]) -> Option<String> {
         }
     }
 
-    // Fall back to serde
+    // Fall back to serde - need to parse as a list to handle multiple arguments
     for attr in attrs {
         if attr.path().is_ident("serde") {
-            if let Ok(Meta::NameValue(MetaNameValue {
-                path,
-                value:
-                    syn::Expr::Lit(syn::ExprLit {
-                        lit: Lit::Str(lit_str),
+            if let Ok(list) = attr.parse_args_with(
+                syn::punctuated::Punctuated::<Meta, syn::token::Comma>::parse_terminated,
+            ) {
+                for meta in list {
+                    if let Meta::NameValue(MetaNameValue {
+                        path,
+                        value:
+                            syn::Expr::Lit(syn::ExprLit {
+                                lit: Lit::Str(lit_str),
+                                ..
+                            }),
                         ..
-                    }),
-                ..
-            })) = attr.parse_args::<Meta>()
-            {
-                if path.is_ident("skip_serializing_if") {
-                    return Some(lit_str.value());
+                    }) = meta
+                    {
+                        if path.is_ident("skip_serializing_if") {
+                            return Some(lit_str.value());
+                        }
+                    }
                 }
             }
         }
@@ -834,21 +840,27 @@ fn get_rename_all(attrs: &[Attribute]) -> Option<String> {
         }
     }
 
-    // Fall back to serde attribute
+    // Fall back to serde attribute - need to parse as a list to handle multiple arguments
     for attr in attrs {
         if attr.path().is_ident("serde") {
-            if let Ok(Meta::NameValue(MetaNameValue {
-                path,
-                value:
-                    syn::Expr::Lit(syn::ExprLit {
-                        lit: Lit::Str(lit_str),
+            if let Ok(list) = attr.parse_args_with(
+                syn::punctuated::Punctuated::<Meta, syn::token::Comma>::parse_terminated,
+            ) {
+                for meta in list {
+                    if let Meta::NameValue(MetaNameValue {
+                        path,
+                        value:
+                            syn::Expr::Lit(syn::ExprLit {
+                                lit: Lit::Str(lit_str),
+                                ..
+                            }),
                         ..
-                    }),
-                ..
-            })) = attr.parse_args::<Meta>()
-            {
-                if path.is_ident("rename_all") {
-                    return Some(lit_str.value());
+                    }) = meta
+                    {
+                        if path.is_ident("rename_all") {
+                            return Some(lit_str.value());
+                        }
+                    }
                 }
             }
         }
@@ -896,11 +908,19 @@ fn has_field_attr_combined(attrs: &[Attribute], name: &str) -> bool {
         return true;
     }
 
-    // Fall back to serde
+    // Fall back to serde - need to parse as a list to handle multiple arguments
     attrs.iter().any(|attr| {
         if attr.path().is_ident("serde") {
-            if let Ok(Meta::Path(path)) = attr.parse_args::<Meta>() {
-                return path.is_ident(name);
+            if let Ok(list) = attr.parse_args_with(
+                syn::punctuated::Punctuated::<Meta, syn::token::Comma>::parse_terminated,
+            ) {
+                for meta in list {
+                    if let Meta::Path(path) = meta {
+                        if path.is_ident(name) {
+                            return true;
+                        }
+                    }
+                }
             }
         }
         false
@@ -915,21 +935,27 @@ fn get_field_rename_combined(attrs: &[Attribute]) -> Option<String> {
         return Some(name);
     }
 
-    // Fall back to serde
+    // Fall back to serde - need to parse as a list to handle multiple arguments
     for attr in attrs {
         if attr.path().is_ident("serde") {
-            if let Ok(Meta::NameValue(MetaNameValue {
-                path,
-                value:
-                    syn::Expr::Lit(syn::ExprLit {
-                        lit: Lit::Str(lit_str),
+            if let Ok(list) = attr.parse_args_with(
+                syn::punctuated::Punctuated::<Meta, syn::token::Comma>::parse_terminated,
+            ) {
+                for meta in list {
+                    if let Meta::NameValue(MetaNameValue {
+                        path,
+                        value:
+                            syn::Expr::Lit(syn::ExprLit {
+                                lit: Lit::Str(lit_str),
+                                ..
+                            }),
                         ..
-                    }),
-                ..
-            })) = attr.parse_args::<Meta>()
-            {
-                if path.is_ident("rename") {
-                    return Some(lit_str.value());
+                    }) = meta
+                    {
+                        if path.is_ident("rename") {
+                            return Some(lit_str.value());
+                        }
+                    }
                 }
             }
         }
