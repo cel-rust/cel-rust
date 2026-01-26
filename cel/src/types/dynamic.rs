@@ -1,7 +1,10 @@
 use crate::Value;
+use cel::objects::KeyRef;
 use cel::{to_value, types};
 use std::fmt::Debug;
+use std::net::IpAddr;
 use std::sync::Arc;
+use vector_map::VecMap;
 
 pub fn maybe_materialize_optional<T: DynamicType>(t: &Option<T>) -> Value<'_> {
     match t {
@@ -205,6 +208,15 @@ impl DynamicType for f64 {
         Value::from(*self)
     }
 }
+impl DynamicType for IpAddr {
+    fn auto_materialize(&self) -> bool {
+        true
+    }
+
+    fn materialize(&self) -> Value<'_> {
+        Value::from(self.to_string())
+    }
+}
 
 // Collection types - these do NOT auto-materialize since they're complex structures
 
@@ -307,6 +319,39 @@ where
     }
     fn field(&self, field: &str) -> Option<Value<'_>> {
         self.as_ref().field(field)
+    }
+}
+impl<T> DynamicType for Option<T>
+where
+    T: Debug + DynamicType,
+{
+    fn auto_materialize(&self) -> bool {
+        match self {
+            Some(v) => v.auto_materialize(),
+            None => true,
+        }
+    }
+    fn materialize<'a>(&'a self) -> Value<'a> {
+        match self {
+            Some(v) => v.materialize(),
+            None => Value::Null,
+        }
+    }
+    fn field(&self, field: &str) -> Option<Value<'_>> {
+        match self {
+            Some(v) => v.field(field),
+            None => None,
+        }
+    }
+}
+impl<T> DynamicFlatten for Option<T>
+where
+    T: Debug + DynamicFlatten,
+{
+    fn materialize_into<'a>(&'a self, map: &mut VecMap<KeyRef<'a>, Value<'a>>) {
+        if let Some(v) = self {
+            v.materialize_into(map);
+        }
     }
 }
 

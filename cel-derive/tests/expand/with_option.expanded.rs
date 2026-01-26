@@ -19,14 +19,12 @@ impl ::cel::types::dynamic::DynamicType for WithOption {
             }
             "optional" => {
                 ::core::option::Option::Some(
-                    ::cel::types::dynamic::maybe_materialize_optional(&self.optional),
+                    ::cel::types::dynamic::maybe_materialize(&self.optional),
                 )
             }
             "nested_optional" => {
                 ::core::option::Option::Some(
-                    ::cel::types::dynamic::maybe_materialize_optional(
-                        &self.nested_optional,
-                    ),
+                    ::cel::types::dynamic::maybe_materialize(&self.nested_optional),
                 )
             }
             _ => ::core::option::Option::None,
@@ -49,14 +47,12 @@ impl ::cel::types::dynamic::DynamicFlatten for WithOption {
         __cel_map
             .insert(
                 ::cel::objects::KeyRef::from("optional"),
-                ::cel::types::dynamic::maybe_materialize_optional(&self.optional)
-                    .always_materialize_owned(),
+                ::cel::types::dynamic::maybe_materialize(&self.optional),
             );
         __cel_map
             .insert(
                 ::cel::objects::KeyRef::from("nested_optional"),
-                ::cel::types::dynamic::maybe_materialize_optional(&self.nested_optional)
-                    .always_materialize_owned(),
+                ::cel::types::dynamic::maybe_materialize(&self.nested_optional),
             );
     }
 }

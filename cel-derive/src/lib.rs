@@ -307,8 +307,6 @@ fn derive_for_named_struct(
             let ty = &f.ty;
             // Check if the type is a reference type
             let is_ref = matches!(ty, syn::Type::Reference(_));
-            // Check if the type is Option<T>
-            let is_option = is_option_type(ty);
             let with_expr = get_field_with_expr(&f.attrs);
             let with_value_expr = get_field_with_value_expr(&f.attrs);
             let is_flatten = has_field_attr(&f.attrs, "flatten");
@@ -338,7 +336,6 @@ fn derive_for_named_struct(
                 name,
                 ty,
                 is_ref,
-                is_option,
                 with_expr,
                 with_value_expr,
                 is_flatten,
@@ -353,9 +350,7 @@ fn derive_for_named_struct(
 
     // Separate normal fields from flattened fields
     let (normal_fields, flatten_fields): (Vec<_>, Vec<_>) = processed_fields.iter().partition(
-        |(_ident, _name, _ty, _is_ref, _is_option, _with_expr, _with_value_expr, is_flatten)| {
-            !is_flatten
-        },
+        |(_ident, _name, _ty, _is_ref, _with_expr, _with_value_expr, is_flatten)| !is_flatten,
     );
 
     let field_count = normal_fields.len();
@@ -363,7 +358,7 @@ fn derive_for_named_struct(
     // Generate materialize body
     let materialize_inserts: TokenStream2 = normal_fields
         .iter()
-        .map(|(ident, name, _ty, _is_ref, is_option, with_expr, with_value_expr, _is_flatten)| {
+        .map(|(ident, name, _ty, _is_ref, with_expr, with_value_expr, _is_flatten)| {
             if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
@@ -406,14 +401,6 @@ fn derive_for_named_struct(
                         #crate_path::types::dynamic::maybe_materialize((#expr_tokens)(&self.#ident)),
                     );
                 }
-            } else if *is_option {
-                // For Option<T> types, use always_materialize(maybe_materialize_optional)
-                quote! {
-                    __cel_map.insert(
-                        #crate_path::objects::KeyRef::from(#name),
-                        #crate_path::types::dynamic::maybe_materialize_optional(&self.#ident).always_materialize_owned(),
-                    );
-                }
             } else {
                 // Always pass a reference to maybe_materialize
                 quote! {
@@ -435,7 +422,6 @@ fn derive_for_named_struct(
                 _name,
                 _ty,
                 _is_ref,
-                _is_option,
                 _with_expr,
                 _with_value_expr,
                 _is_flatten,
@@ -451,7 +437,7 @@ fn derive_for_named_struct(
     // Generate field match arms
     let field_arms: TokenStream2 = normal_fields
         .iter()
-        .map(|(ident, name, ty, _is_ref, is_option, with_expr, with_value_expr, _is_flatten)| {
+        .map(|(ident, name, ty, _is_ref, with_expr, with_value_expr, _is_flatten)| {
             if let Some(expr_str) = with_value_expr {
                 // Parse the helper function path for with_value
                 let parsed_expr: syn::Expr = match syn::parse_str(expr_str) {
@@ -494,11 +480,6 @@ fn derive_for_named_struct(
                         ::core::option::Option::Some(#crate_path::types::dynamic::maybe_materialize((#expr_tokens)(__field_ref)))
                     },
                 }
-            } else if *is_option {
-                // For Option<T> types, use maybe_materialize_optional
-                quote! {
-                    #name => ::core::option::Option::Some(#crate_path::types::dynamic::maybe_materialize_optional(&self.#ident)),
-                }
             } else {
                 // Always pass a reference to maybe_materialize
                 quote! {
@@ -510,7 +491,7 @@ fn derive_for_named_struct(
 
     // Generate fallback to flattened fields
     let flatten_fallback: TokenStream2 = if !flatten_fields.is_empty() {
-        let flatten_checks = flatten_fields.iter().map(|(ident, _name, _ty, _is_ref, _is_option, _with_expr, _with_value_expr, _is_flatten)| {
+        let flatten_checks = flatten_fields.iter().map(|(ident, _name, _ty, _is_ref, _with_expr, _with_value_expr, _is_flatten)| {
             quote! {
                 if let ::core::option::Option::Some(val) = #crate_path::types::dynamic::DynamicType::field(&self.#ident, field) {
                     return ::core::option::Option::Some(val);
@@ -660,23 +641,6 @@ fn get_field_with_value_expr(attrs: &[Attribute]) -> Option<String> {
         }
     }
     None
-}
-
-/// Check if a type is Option<T> and return true if so
-/// Handles: Option<T>, std::option::Option<T>, ::std::option::Option<T>, core::option::Option<T>
-fn is_option_type(ty: &syn::Type) -> bool {
-    if let syn::Type::Path(type_path) = ty {
-        let segments = &type_path.path.segments;
-        // Check for Option or ::std::option::Option or core::option::Option
-        if let Some(last_segment) = segments.last() {
-            if last_segment.ident == "Option" {
-                if let syn::PathArguments::AngleBracketed(_) = &last_segment.arguments {
-                    return true;
-                }
-            }
-        }
-    }
-    false
 }
 
 /// Get the rename value for an enum variant
