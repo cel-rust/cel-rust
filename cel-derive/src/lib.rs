@@ -23,11 +23,24 @@ use syn::{
 /// - `#[dynamic(crate = "path")]` - Specify the path to the cel crate (default: `::cel`)
 ///   - Use `#[dynamic(crate = "crate")]` when using this derive inside the cel crate itself
 ///   - Use `#[dynamic(crate = "::cel")]` or omit for external usage
+/// - `#[dynamic(rename_all = "case")]` - Apply a naming convention to all fields
+///   - Supported cases: `"camelCase"`, `"lowercase"`
+///   - Example: `#[dynamic(rename_all = "camelCase")]` transforms `user_name` to `userName`
 ///
 /// ## Field-level attributes (Named Structs Only)
 ///
 /// - `#[dynamic(skip)]` - Skip this field in the generated implementation
 /// - `#[dynamic(rename = "name")]` - Use a different name for this field in CEL
+///
+/// ## Serde Compatibility
+///
+/// The derive macro also reads serde attributes when present:
+/// - `#[serde(skip)]` - Same as `#[dynamic(skip)]`
+/// - `#[serde(rename = "name")]` - Same as `#[dynamic(rename = "name")]`
+/// - `#[serde(rename_all = "case")]` - Same as `#[dynamic(rename_all = "case")]`
+///
+/// When both `#[dynamic(...)]` and `#[serde(...)]` attributes are present on the same
+/// field or struct, the `#[dynamic(...)]` attribute takes precedence
 /// - `#[dynamic(flatten)]` - Flatten the contents of this field into the parent struct.
 ///   The field must implement `DynamicFlatten`. When materializing, the field's contents are
 ///   merged into the parent map instead of being nested. When accessing fields, lookups
@@ -297,13 +310,18 @@ fn derive_for_named_struct(
 ) -> TokenStream {
     let name = &input.ident;
 
+    // Get struct-level rename_all setting
+    let rename_all = get_rename_all(&input.attrs);
+
     // Filter and process fields
     let processed_fields: Result<Vec<_>, syn::Error> = fields
         .iter()
-        .filter(|f| !has_field_attr(&f.attrs, "skip"))
+        .filter(|f| !has_field_attr_combined(&f.attrs, "skip"))
         .map(|f| {
             let ident = f.ident.as_ref().unwrap();
-            let name = get_field_rename(&f.attrs).unwrap_or_else(|| ident.to_string());
+            // Apply rename logic: explicit rename > rename_all > original name
+            let name = get_field_rename_combined(&f.attrs)
+                .unwrap_or_else(|| apply_rename_all(&ident.to_string(), rename_all.as_deref()));
             let ty = &f.ty;
             // Check if the type is a reference type
             let is_ref = matches!(ty, syn::Type::Reference(_));
@@ -323,7 +341,7 @@ fn derive_for_named_struct(
             if is_flatten
                 && (with_expr.is_some()
                     || with_value_expr.is_some()
-                    || get_field_rename(&f.attrs).is_some())
+                    || get_field_rename_combined(&f.attrs).is_some())
             {
                 return Err(syn::Error::new_spanned(
                     f,
@@ -663,5 +681,133 @@ fn get_variant_rename(attrs: &[Attribute]) -> Option<String> {
             }
         }
     }
+    None
+}
+
+/// Get the rename_all value from struct-level attributes
+/// Checks both #[dynamic(rename_all = "...")] and #[serde(rename_all = "...")]
+/// Prefers dynamic over serde if both are present
+fn get_rename_all(attrs: &[Attribute]) -> Option<String> {
+    // First check for dynamic attribute
+    for attr in attrs {
+        if attr.path().is_ident("dynamic") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("rename_all") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+
+    // Fall back to serde attribute
+    for attr in attrs {
+        if attr.path().is_ident("serde") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("rename_all") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+
+    None
+}
+
+/// Apply rename_all transformation to a field name
+fn apply_rename_all(name: &str, rename_all: Option<&str>) -> String {
+    match rename_all {
+        Some("camelCase") => to_camel_case(name),
+        Some("lowercase") => name.to_lowercase(),
+        _ => name.to_string(),
+    }
+}
+
+/// Convert snake_case to camelCase
+fn to_camel_case(s: &str) -> String {
+    let mut result = String::new();
+    let mut capitalize_next = false;
+
+    for (i, ch) in s.chars().enumerate() {
+        if ch == '_' {
+            capitalize_next = true;
+        } else if capitalize_next {
+            result.push(ch.to_ascii_uppercase());
+            capitalize_next = false;
+        } else if i == 0 {
+            // First character should be lowercase
+            result.push(ch.to_ascii_lowercase());
+        } else {
+            result.push(ch);
+        }
+    }
+
+    result
+}
+
+/// Check if a field has a specific attribute (checks both dynamic and serde)
+/// Prefers dynamic over serde if both are present
+fn has_field_attr_combined(attrs: &[Attribute], name: &str) -> bool {
+    // First check dynamic
+    if has_field_attr(attrs, name) {
+        return true;
+    }
+
+    // Fall back to serde
+    attrs.iter().any(|attr| {
+        if attr.path().is_ident("serde") {
+            if let Ok(Meta::Path(path)) = attr.parse_args::<Meta>() {
+                return path.is_ident(name);
+            }
+        }
+        false
+    })
+}
+
+/// Get the rename value for a field (checks both dynamic and serde)
+/// Prefers dynamic over serde if both are present
+fn get_field_rename_combined(attrs: &[Attribute]) -> Option<String> {
+    // First check dynamic
+    if let Some(name) = get_field_rename(attrs) {
+        return Some(name);
+    }
+
+    // Fall back to serde
+    for attr in attrs {
+        if attr.path().is_ident("serde") {
+            if let Ok(Meta::NameValue(MetaNameValue {
+                path,
+                value:
+                    syn::Expr::Lit(syn::ExprLit {
+                        lit: Lit::Str(lit_str),
+                        ..
+                    }),
+                ..
+            })) = attr.parse_args::<Meta>()
+            {
+                if path.is_ident("rename") {
+                    return Some(lit_str.value());
+                }
+            }
+        }
+    }
+
     None
 }
