@@ -7,6 +7,129 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0](https://github.com/cel-rust/cel-rust/compare/v0.12.0...v0.13.0) - 2026-02-06
+
+### Added
+
+- *(dyn Val)* Fix `OpaqueVal` and `TryFrom` for actual opaques
+- *(dyn Val)* Making `Val: Send + Sync`... for now?
+- *(dyn Val)* `CelDuration` & `CelTimestamp` use chrono again
+- *(dyn Val)* Avoid cloning key on Map access
+- *(dyn Val)* Inject `Box<dyn Val>` straight into context, bypassing `From::<Value>`
+- *(dyn Val)* All literals as dyn Val
+- *(dyn Val)* [**breaking**] Context is NOT `Send` anymore, but stores `dyn Val`s
+- *(dyn Val)* Bench now uses only that `resolve_val`
+- *(dyn Val)* Optional support in `Expr::Map`
+- *(dyn Val)* `Expr::List` flattens `CelOptional::None`
+- *(dyn Val)* Deal with OPT_INDEX
+- *(dyn Val)* Full `Optional` type
+- *(dyn Val)* Support for generic Opaque
+- *(dyn Val)* need neg durations
+- *(dyn Val)* Comparer for Numbers
+- *(dyn Val)* need max/min and no neg duration
+- *(dyn Val)* Map impl into Indexer
+- *(dyn Val)* Binary ops return UnsupportedBinaryOperator on Err
+- *(dyn Val)* UInt impl (Adder|Comparer|Divider|Modder|Multiplier|Subtractor)
+- *(dyn Val)* Timestamp impl (Adder|Comparer|Subtractor)
+- *(dyn Val)* String impl (Adder|Comparer)
+- *(dyn Val)* Int impl Negator
+- *(dyn Val)* Duration impl (Adder|Comparer|Substrator)
+- *(dyn Val)* Double impl (Adder|Comparer|Divider|Multiplier|Negator|Subtractor)
+- *(dyn Val)* Adder for Bytes
+- *(dyn Val)* Bytes impl (Adder|Comparer)
+- *(dyn Val)* Bool impl (Comparer|Negator)
+- *(dyn Val)* DefaultMap index lookup errors
+- *(dyn Val)* impl Adder for DefaultList
+- *(dyn Val)* Overflow safe math ops on int
+- *(dyn Val)* fixed all maths ops operands
+- *(dyn Val)* impl Indexer for DefaultMap
+- *(dyn Val)* Trailing ::resolve's replaced
+- *(dyn Val)* Implement Val.equals for all types
+- *(dyn Val)* new iterator et al trait sigs and impl for List & Map
+- *(dyn Val)* DefaultMap as_container
+- *(dyn Val)* Interpreter _should_ be ready, other than optional
+- *(dyn Val)* Expr::Map, missing optional still
+- *(dyn Val)* DefaultList Indexer no more panics
+- *(dyn Val)* Indexer impl for DefaultList to support UInt
+- *(dyn Val)* wrapping in Cow... where needed for now
+- *(dyn Val)* reflective impl for Value to dyn Val
+- *(dyn Val)* `TryFrom<&dyn Val>` container types added
+- *(dyn Val)* Basic Map support
+- *(dyn Val)* CelList construction rework, no `::new`
+- *(dyn Val)* Expr::Select
+- *(dyn Val)* Expr::Ident in interpreter using try_into
+- *(dyn Val)* fn calls using try_into
+- *(dyn Val)* `!_`, `-_` & `@not_strictly_false` in interpreter
+- *(dyn Val)* `@in` operator support
+- *(dyn Val)* align all type impl of traits
+- *(dyn Val)* Bytes, Duration & Timestamp from/to dyn Val/Value
+- *(dyn Val)* aligned TryFrom from/to dyn Val/Value
+- *(dyn Val)* `TryFrom<Value> for Box<dyn Val>`
+- *(dyn Val)* Basic `Modder` support in interpreter & types::INT
+- *(dyn Val)* Basic div support in interpreter & types::INT
+- *(dyn Val)* No default impl for CEL traits
+- *(dyn Val)* `Divider` trait basic support
+- *(dyn Val)* `Subtractor` trait basic support
+- *(dyn Val)* Basic cmp support in interpreter & types::INT
+- *(dyn Val)* Adder.add failable
+- *(dyn Val)* DefaultList tests and removed support for UINT indexes
+- *(dyn Val)* Indexer has proper Result/Err return sigs
+- *(dyn Val)* list expr
+- *(dyn Val)* fix to amend testing the Cow approach
+- *(dyn Val)* default Indexer::steal impl
+- *(dyn Val)* faster steal from Vec in Indexer
+- *(dyn Val)* Very lazy List indexing with Cow
+- *(dyn Val)* testing the Cow approach... unsure
+- *(dyn Val)* todo impl optional again
+- *(dyn Val)* Index interpreter
+- *(dyn Val)* fixing bool logic
+- *(dyn Val)* Listerals to Cow<dyn Val>
+- *(dyn Val)* all types and base are there, now fix objects.rs 🫣
+- *(dyn Val)* fix to `Adder` API
+- *(dyn Val)* `impl Val for Int` and fix to `Indexer` API
+- *(dyn Val)* `impl Val for Int`
+- *(dyn Val)* `impl Val for Err`
+- *(dyn Val)* list
+- *(dyn Val)* cond, or, and, eq & neq do use CelVal
+- *(dyn Val)* Box<Self>
+- *(dyn Val)* LiteralValue
+- *(dyn Val)* Basic dyn Val and matching types
+
+### Fixed
+
+- [**breaking**] no type coersion for map index access
+- [**breaking**] NoSuchOverload when indexing into String
+- *(bench)* Make sure expression compiles
+
+### Other
+
+- *(deps)* replaced `paste` with newer `pastey`
+- *(tests)* smaller stack on max depth test
+- explain `fn cast_boxed<T: Val>`, and safety related checks
+- rustfmt
+- Only lazily create `ok_or`'s `Err`
+- slightly faster `Adder for String`
+- let's use a single lifetime on ::resolve_val
+- Use iterator trait on comprehensions
+- deleted `CelVal`
+- clippy
+- Adder trait sig
+- Int as Comparer
+- no need for `as` cast in as_* impl
+- *(dyn Val)* clippy clean ups
+- *(dyn Val)* extracted `cast_boxed` fn
+- *(dyn Val)* added `TryFrom<&dyn Val> for Value`
+- clean ups
+- `PartialEq` for `Val` delegating to `Val::equals`
+- export all types::{type} as Cel{type}
+- *(dyn Val)* no into_any, CelVal is not a Val
+- fixing up type sigs and original resolve
+- *(fmt)* rustfmt
+- Isolated interpreter special cases of ops
+- :Int copy & default
+- use key references
+- update minimal rust version to 1.86
+
 ## [0.12.0](https://github.com/cel-rust/cel-rust/compare/v0.11.6...v0.12.0) - 2025-12-29
 
 ### Added
