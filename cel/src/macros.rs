@@ -62,7 +62,7 @@ macro_rules! impl_conversions {
 #[macro_export]
 macro_rules! impl_handler {
     ($($t:ty),*) => {
-        paste::paste! {
+        pastey::paste! {
             impl<F, $($t,)* R> IntoFunction<($($t,)*)> for F
             where
                 F: Fn($($t,)*) -> R + Send + Sync + 'static,
