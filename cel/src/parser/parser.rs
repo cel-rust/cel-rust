@@ -1229,20 +1229,20 @@ mod tests {
             );
         }
         let expressions = [
-            "[[[[[[[[[[[[1]]]]]]]]]]]]",
-            "((((((((((((1))))))))))))",
-            "{1: {2: {3: {4: {5: {6: {1: {2: {3: {4: {5: {6: 'none'}}}}}}}}}}}}",
-            "type(type(type(type(type(type(type(type(type(type(type(type(1))))))))))))",
-            "[{'a': size([{'1':size([{'1':size([[[[]]]])}])}])}]",
+            "[[[[[[[[[[1]]]]]]]]]]",
+            "((((((((((1))))))))))",
+            "{1: {2: {3: {4: {5: {6: {1: {2: {3: {4: 'none'}}}}}}}}}}",
+            "type(type(type(type(type(type(type(type(type(type(1))))))))))",
+            "[{'a': size([{'1':size([{'1':size([[]])}])}])}]",
         ];
         for expr in expressions {
             assert!(
-                Parser::new().max_recursion_depth(12).parse(expr).is_ok(),
+                Parser::new().max_recursion_depth(10).parse(expr).is_ok(),
                 "Expression `{}` should parse",
                 expr
             );
             assert!(
-                Parser::new().max_recursion_depth(11).parse(expr).is_err(),
+                Parser::new().max_recursion_depth(9).parse(expr).is_err(),
                 "Expression `{}` should not parse",
                 expr
             );
