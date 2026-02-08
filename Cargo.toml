@@ -2,6 +2,9 @@
 members = ["cel", "example", "fuzz"]
 resolver = "2"
 
+[profile.dev]
+opt-level = 1
+
 [profile.bench]
 lto = true
 codegen-units = 1
