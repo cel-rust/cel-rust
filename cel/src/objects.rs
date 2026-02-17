@@ -973,8 +973,8 @@ impl Value {
             Expr::Call(call) => {
                 // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
-                    let cond = Value::resolve_val(&call.args[0], ctx)?;
-                    return if try_bool(cond.as_ref())? {
+                    let cond = Value::resolve_val(&call.args[0], ctx);
+                    return if try_bool(cond)? {
                         Value::resolve_val(&call.args[1], ctx)
                     } else {
                         Value::resolve_val(&call.args[2], ctx)
@@ -983,9 +983,8 @@ impl Value {
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            let left = Value::resolve_val(&call.args[0], ctx)?;
-                            return if try_bool(left.as_ref())? {
-                                Ok(left)
+                            return if try_bool(Value::resolve_val(&call.args[0], ctx))? {
+                                Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
                             } else {
                                 let right = Value::resolve_val(&call.args[1], ctx)?;
                                 if right.get_type() == BOOL_TYPE {
@@ -996,9 +995,8 @@ impl Value {
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = Value::resolve_val(&call.args[0], ctx)?;
-                            return if !try_bool(left.as_ref())? {
-                                Ok(left)
+                            return if !try_bool(Value::resolve_val(&call.args[0], ctx))? {
+                                Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
                             } else {
                                 let right = Value::resolve_val(&call.args[1], ctx)?;
                                 if right.get_type() == BOOL_TYPE {
@@ -1262,8 +1260,7 @@ impl Value {
                         }
                         operators::NOT_STRICTLY_FALSE => {
                             return Ok(bool(
-                                try_bool(Value::resolve_val(&call.args[0], ctx)?.as_ref())
-                                    .unwrap_or(true),
+                                try_bool(Value::resolve_val(&call.args[0], ctx)).unwrap_or(true),
                             ));
                         }
                         _ => (),
@@ -1408,7 +1405,7 @@ impl Value {
                     .ok_or(ExecutionError::NoSuchOverload)?
                     .iter();
                 while let Some(item) = items.next() {
-                    if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx)?.as_ref())? {
+                    if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
                         break;
                     }
                     ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
@@ -1429,10 +1426,14 @@ fn bool<'a>(boolean: bool) -> Cow<'a, dyn Val> {
     Cow::<dyn Val>::Owned(Box::new(CelBool::from(boolean)))
 }
 
-fn try_bool(val: &dyn Val) -> Result<bool, ExecutionError> {
-    val.downcast_ref::<CelBool>()
-        .map(|b| *b.inner())
-        .ok_or(ExecutionError::NoSuchOverload)
+fn try_bool(val: Result<Cow<dyn Val>, ExecutionError>) -> Result<bool, ExecutionError> {
+    match val {
+        Ok(val) => val
+            .downcast_ref::<CelBool>()
+            .map(|b| *b.inner())
+            .ok_or(ExecutionError::NoSuchOverload),
+        Err(err) => Result::Err(err),
+    }
 }
 
 impl ops::Add<Value> for Value {
