@@ -983,14 +983,21 @@ impl Value {
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            return if try_bool(Value::resolve_val(&call.args[0], ctx))? {
+                            let left = try_bool(Value::resolve_val(&call.args[0], ctx));
+                            return if Ok(true) == left {
                                 Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
                             } else {
-                                let right = Value::resolve_val(&call.args[1], ctx)?;
-                                if right.get_type() == BOOL_TYPE {
-                                    Ok(right)
-                                } else {
-                                    Err(ExecutionError::NoSuchOverload)
+                                let right = Value::resolve_val(&call.args[1], ctx)?
+                                    .downcast_ref::<CelBool>()
+                                    .map(|b| *b.inner());
+                                match (&left, right) {
+                                    (Ok(false), Some(right)) => {
+                                        Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(right))))
+                                    }
+                                    (Err(_), Some(true)) => {
+                                        Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
+                                    }
+                                    (_, _) => Err(left.err().unwrap_or(NoSuchOverload)),
                                 }
                             };
                         }
@@ -1858,6 +1865,20 @@ mod tests {
             value.is_ok(),
             "The AND expression should support short-circuit evaluation."
         );
+    }
+
+    #[test]
+    fn test_or_ignores_err_when_short_circuiting() {
+        let mut context = Context::default();
+        context.add_variable_from_value("foo", 42);
+        context.add_variable_from_value("bar", 42);
+        let program = Program::compile("foo || bar > 0").unwrap();
+        let value = program.execute(&context);
+        assert_eq!(value, Ok(true.into()));
+
+        let program = Program::compile("foo || bar < 0").unwrap();
+        let value = program.execute(&context);
+        assert!(value.is_err());
     }
 
     #[test]
