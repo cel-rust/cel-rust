@@ -990,14 +990,14 @@ impl Value {
                                 let right = Value::resolve_val(&call.args[1], ctx)?
                                     .downcast_ref::<CelBool>()
                                     .map(|b| *b.inner());
-                                match (&left, right) {
+                                match (left, right) {
                                     (Ok(false), Some(right)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(right))))
                                     }
                                     (Err(_), Some(true)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
                                     }
-                                    (_, _) => Err(left.err().unwrap_or(NoSuchOverload)),
+                                    (left, _) => Err(left.err().unwrap_or(NoSuchOverload)),
                                 }
                             };
                         }
@@ -1009,14 +1009,14 @@ impl Value {
                                 let right = Value::resolve_val(&call.args[1], ctx)?
                                     .downcast_ref::<CelBool>()
                                     .map(|b| *b.inner());
-                                match (&left, right) {
+                                match (left, right) {
                                     (Ok(true), Some(right)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(right))))
                                     }
                                     (Err(_), Some(false)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
                                     }
-                                    (_, _) => Err(left.err().unwrap_or(NoSuchOverload)),
+                                    (left, _) => Err(left.err().unwrap_or(NoSuchOverload)),
                                 }
                             };
                         }
