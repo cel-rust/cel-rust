@@ -150,7 +150,7 @@ where
         Self: Sized,
     {
         if let Some(ref this) = ctx.this {
-            Ok(This(T::from_value(this)?))
+            Ok(This(T::from_value(&this.as_ref().try_into()?)?))
         } else {
             let arg = arg_value_from_context(ctx)
                 .map_err(|_| ExecutionError::missing_argument_or_target())?;

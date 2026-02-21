@@ -1308,7 +1308,7 @@ impl Value {
                                     })?;
                                 let mut ctx = FunctionContext::new(
                                     &call.func_name,
-                                    Some(Value::resolve_val(target, ctx)?.as_ref().try_into()?),
+                                    Some(Value::resolve_val(target, ctx)?),
                                     ctx,
                                     &call.args,
                                 );
@@ -2001,7 +2001,7 @@ mod tests {
     }
 
     mod opaque {
-        use crate::objects::{Map, Opaque, OptionalValue};
+        use crate::objects::{Map, Opaque, OpaqueVal, OptionalValue};
         use crate::parser::Parser;
         use crate::{Context, ExecutionError, FunctionContext, Program, Value};
         use serde::Serialize;
@@ -2029,9 +2029,11 @@ mod tests {
         #[test]
         fn test_opaque_fn() {
             pub fn my_fn(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
-                if let Some(Value::Opaque(opaque)) = &ftx.this {
-                    if opaque.runtime_type_name() == "my_struct" {
+                if let Some(Some(opaque)) = ftx.this.as_ref().map(|v| v.downcast_ref::<OpaqueVal>())
+                {
+                    if opaque.0.runtime_type_name() == "my_struct" {
                         Ok(opaque
+                            .0
                             .deref()
                             .downcast_ref::<MyStruct>()
                             .unwrap()
@@ -2040,7 +2042,7 @@ mod tests {
                             .into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
-                            got: opaque.runtime_type_name().to_string(),
+                            got: opaque.0.runtime_type_name().to_string(),
                             want: "my_struct".to_string(),
                         })
                     }

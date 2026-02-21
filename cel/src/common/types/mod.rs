@@ -66,6 +66,12 @@ pub struct Type<'a> {
     trait_mask: TraitSet,
 }
 
+impl Type<'_> {
+    pub fn kind(&self) -> Kind {
+        self.kind
+    }
+}
+
 pub const ANY_TYPE: Type = Type {
     kind: Kind::Any,
     parameters: &[],

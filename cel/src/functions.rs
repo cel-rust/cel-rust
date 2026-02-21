@@ -4,6 +4,7 @@ use crate::objects::{KeyRef, OptionalValue, Value};
 use crate::parser::Expression;
 use crate::resolvers::Resolver;
 use crate::ExecutionError;
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -18,7 +19,7 @@ type Result<T> = std::result::Result<T, ExecutionError>;
 #[derive(Clone)]
 pub struct FunctionContext<'context, 'call: 'context> {
     pub name: &'call str,
-    pub this: Option<Value>,
+    pub this: Option<Cow<'context, dyn Val>>,
     pub ptx: &'context Context<'context>,
     pub args: &'call [Expression],
     pub arg_idx: usize,
@@ -27,7 +28,7 @@ pub struct FunctionContext<'context, 'call: 'context> {
 impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     pub fn new(
         name: &'call str,
-        this: Option<Value>,
+        this: Option<Cow<'context, dyn Val>>,
         ptx: &'context Context<'context>,
         args: &'call [Expression],
     ) -> Self {
@@ -315,6 +316,7 @@ pub fn matches(
     }
 }
 
+use crate::common::value::Val;
 #[cfg(feature = "chrono")]
 pub use time::duration;
 #[cfg(feature = "chrono")]
