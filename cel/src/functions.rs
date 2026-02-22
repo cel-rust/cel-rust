@@ -1,7 +1,6 @@
 use crate::context::Context;
 use crate::magic::{Arguments, This};
 use crate::objects::{KeyRef, OptionalValue, Value};
-use crate::parser::Expression;
 use crate::resolvers::Resolver;
 use crate::ExecutionError;
 use std::borrow::Cow;
@@ -21,7 +20,7 @@ pub struct FunctionContext<'context, 'call: 'context> {
     pub name: &'call str,
     pub this: Option<Cow<'context, dyn Val>>,
     pub ptx: &'context Context<'context>,
-    pub args: &'call [Expression],
+    pub args: Vec<Cow<'context, dyn Val>>,
     pub arg_idx: usize,
 }
 
@@ -30,7 +29,7 @@ impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
         name: &'call str,
         this: Option<Cow<'context, dyn Val>>,
         ptx: &'context Context<'context>,
-        args: &'call [Expression],
+        args: Vec<Cow<'context, dyn Val>>,
     ) -> Self {
         Self {
             name,

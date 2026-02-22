@@ -37,7 +37,7 @@ impl Resolver for Argument {
             .args
             .get(index)
             .ok_or_else(|| ExecutionError::invalid_argument_count(index + 1, ctx.args.len()))?;
-        Value::resolve(arg, ctx.ptx)
+        arg.as_ref().try_into()
     }
 }
 
@@ -54,7 +54,7 @@ impl Resolver for AllArguments {
     fn resolve(&self, ctx: &FunctionContext) -> ResolveResult {
         let mut args = Vec::with_capacity(ctx.args.len());
         for arg in ctx.args.iter() {
-            args.push(Value::resolve(arg, ctx.ptx)?);
+            args.push(arg.as_ref().try_into()?);
         }
         Ok(Value::List(args.into()))
     }

@@ -1,8 +1,7 @@
-use crate::common::ast::Expr;
 use crate::macros::{impl_conversions, impl_handler};
 use crate::objects::Opaque;
 use crate::resolvers::{AllArguments, Argument};
-use crate::{ExecutionError, Expression, FunctionContext, ResolveResult, Value};
+use crate::{ExecutionError, FunctionContext, ResolveResult, Value};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -190,21 +189,6 @@ where
 #[derive(Clone)]
 pub struct Identifier(pub Arc<String>);
 
-impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Identifier {
-    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
-    where
-        Self: Sized,
-    {
-        match &arg_expr_from_context(ctx).expr {
-            Expr::Ident(ident) => Ok(Identifier(ident.clone().into())),
-            expr => Err(ExecutionError::UnexpectedType {
-                got: format!("{expr:?}"),
-                want: "identifier".to_string(),
-            }),
-        }
-    }
-}
-
 impl From<&Identifier> for String {
     fn from(value: &Identifier) -> Self {
         value.0.to_string()
@@ -262,28 +246,6 @@ impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Value {
     {
         arg_value_from_context(ctx)
     }
-}
-
-impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Expression {
-    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
-    where
-        Self: Sized,
-    {
-        Ok(arg_expr_from_context(ctx).clone())
-    }
-}
-
-/// Returns the next argument specified by the context's `arg_idx` field as an expression
-/// (i.e. not resolved). Calling this multiple times will increment the `arg_idx` which will
-/// return subsequent arguments every time.
-///
-/// Calling this function when there are no more arguments will result in a panic. Since this
-/// function is only ever called within the context of a controlled macro that calls it once
-/// for each argument, this should never happen.
-fn arg_expr_from_context<'a>(ctx: &'a mut FunctionContext) -> &'a Expression {
-    let idx = ctx.arg_idx;
-    ctx.arg_idx += 1;
-    &ctx.args[idx]
 }
 
 /// Returns the next argument specified by the context's `arg_idx` field as after resolving

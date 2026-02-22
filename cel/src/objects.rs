@@ -1285,8 +1285,12 @@ impl Value {
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
                         })?;
-                        // todo fix this to _not_ use `Value`
-                        let mut ctx = FunctionContext::new(&call.func_name, None, ctx, &call.args);
+                        let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
+                            .args
+                            .iter()
+                            .map(|a| Value::resolve_val(a, ctx))
+                            .collect();
+                        let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args?);
                         let v = (func)(&mut ctx)?;
                         Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                     }
@@ -1306,19 +1310,29 @@ impl Value {
                                             call.func_name.clone().into(),
                                         )
                                     })?;
+                                let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
+                                    .args
+                                    .iter()
+                                    .map(|a| Value::resolve_val(a, ctx))
+                                    .collect();
                                 let mut ctx = FunctionContext::new(
                                     &call.func_name,
                                     Some(Value::resolve_val(target, ctx)?),
                                     ctx,
-                                    &call.args,
+                                    args?,
                                 );
                                 // todo fix this to _not_ use `Value`
                                 let v = (func)(&mut ctx)?;
                                 Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                             }
                             Some(func) => {
+                                let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
+                                    .args
+                                    .iter()
+                                    .map(|a| Value::resolve_val(a, ctx))
+                                    .collect();
                                 let mut ctx =
-                                    FunctionContext::new(&call.func_name, None, ctx, &call.args);
+                                    FunctionContext::new(&call.func_name, None, ctx, args?);
                                 // todo fix this to _not_ use `Value`
                                 let v = (func)(&mut ctx)?;
                                 Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
@@ -1957,34 +1971,6 @@ mod tests {
         for (expr, err) in cases {
             test_execution_error(expr, err);
         }
-    }
-
-    #[test]
-    fn test_function_identifier() {
-        fn with(
-            ftx: &crate::FunctionContext,
-            crate::extractors::This(this): crate::extractors::This<Value>,
-            ident: crate::extractors::Identifier,
-            expr: crate::parser::Expression,
-        ) -> crate::ResolveResult {
-            let mut ptx = ftx.ptx.new_inner_scope();
-            ptx.add_variable_from_value(&ident, this);
-            ptx.resolve(&expr)
-        }
-        let mut context = Context::default();
-        context.add_function("with", with);
-
-        let program = Program::compile("[1,2].with(a, a + a)").unwrap();
-        let value = program.execute(&context);
-        assert_eq!(
-            value,
-            Ok(Value::List(Arc::new(vec![
-                Value::Int(1),
-                Value::Int(2),
-                Value::Int(1),
-                Value::Int(2)
-            ])))
-        );
     }
 
     #[test]
