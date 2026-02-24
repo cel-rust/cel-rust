@@ -2,7 +2,7 @@ use crate::common::value::Val;
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
-use crate::{functions, ExecutionError};
+use crate::{functions, Env, ExecutionError};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -37,6 +37,7 @@ pub enum Context<'a> {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
+        env: Arc<Env<'a>>,
     },
     Child {
         parent: &'a Context<'a>,
@@ -152,6 +153,13 @@ impl<'a> Context<'a> {
         }
     }
 
+    pub(crate) fn env(&self) -> &Env<'_> {
+        match self {
+            Context::Root { env, .. } => env.as_ref(),
+            Context::Child { parent, .. } => parent.env(),
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn get_function(&self, name: &str) -> Option<&Function> {
         match self {
@@ -198,6 +206,16 @@ impl<'a> Context<'a> {
     /// ```
     pub fn empty() -> Self {
         Context::Root {
+            env: Arc::new(Env::default()),
+            variables: Default::default(),
+            functions: Default::default(),
+            resolver: None,
+        }
+    }
+
+    pub fn with_env(env: Arc<Env<'a>>) -> Self {
+        Context::Root {
+            env,
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
@@ -208,6 +226,7 @@ impl<'a> Context<'a> {
 impl Default for Context<'_> {
     fn default() -> Self {
         let mut ctx = Context::Root {
+            env: Arc::new(Env::stdlib()),
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,

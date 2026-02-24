@@ -8,6 +8,7 @@ mod macros;
 
 pub mod common;
 pub mod context;
+mod env;
 pub mod parser;
 
 pub use common::ast::IdedExpr;
@@ -26,6 +27,8 @@ mod resolvers;
 mod duration;
 #[cfg(feature = "chrono")]
 pub use ser::{Duration, Timestamp};
+
+pub use env::Env;
 
 mod ser;
 pub use ser::to_value;
