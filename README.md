@@ -28,7 +28,7 @@ Add `cel` to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-cel = "0.12.0"
+cel = "0.13.0"
 ```
 
 Create and execute a simple CEL expression:
