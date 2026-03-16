@@ -65,3 +65,7 @@ required-features = ["json"]
 name = "example-anyhow"
 path = "src/anyhow.rs"
 required-features = ["anyhow"]
+
+[[bin]]
+name = "example-var-resolver"
+path = "src/resolver.rs"

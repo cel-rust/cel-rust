@@ -4,6 +4,7 @@ use crate::common::traits::{
 use crate::common::types::Type;
 use std::any::Any;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
 pub trait Val: Any + Debug + Send + Sync {
     fn get_type(&self) -> Type<'_>;
@@ -76,6 +77,24 @@ impl ToOwned for dyn Val {
 impl PartialEq for dyn Val {
     fn eq(&self, other: &Self) -> bool {
         self.equals(other)
+    }
+}
+
+pub struct BorrowedVal<'a, T: Val> {
+    val: Box<T>,
+    phantom: PhantomData<&'a ()>,
+}
+
+impl<'a, T: Val> BorrowedVal<'a, T> {
+    pub fn new(val: T) -> Self {
+        Self {
+            val: Box::new(val),
+            phantom: PhantomData,
+        }
+    }
+
+    pub fn inner(&self) -> &T {
+        self.val.as_ref()
     }
 }
 

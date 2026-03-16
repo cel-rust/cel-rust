@@ -124,31 +124,21 @@ impl<'a> Context<'a> {
                 variables,
                 parent,
                 resolver,
-            } => resolver
-                .and_then(|r| {
-                    r.resolve(name)
-                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
-                })
-                .or_else(|| {
-                    variables
-                        .get(name)
-                        .map(|b| Cow::<dyn Val>::Borrowed(b.as_ref()))
-                        .or_else(|| parent.get_variable(name))
-                }),
+            } => resolver.and_then(|r| r.resolve_val(name)).or_else(|| {
+                variables
+                    .get(name)
+                    .map(|b| Cow::<dyn Val>::Borrowed(b.as_ref()))
+                    .or_else(|| parent.get_variable(name))
+            }),
             Context::Root {
                 variables,
                 resolver,
                 ..
-            } => resolver
-                .and_then(|r| {
-                    r.resolve(name)
-                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
-                })
-                .or_else(|| {
-                    variables
-                        .get(name)
-                        .map(|v| Cow::<dyn Val>::Borrowed(v.as_ref()))
-                }),
+            } => resolver.and_then(|r| r.resolve_val(name)).or_else(|| {
+                variables
+                    .get(name)
+                    .map(|v| Cow::<dyn Val>::Borrowed(v.as_ref()))
+            }),
         }
     }
 
@@ -281,6 +271,11 @@ impl Default for Context<'_> {
 /// ```
 pub trait VariableResolver: Send + Sync {
     fn resolve(&self, variable: &str) -> Option<Value>;
+
+    fn resolve_val<'a>(&'a self, variable: &str) -> Option<Cow<'a, dyn Val>> {
+        self.resolve(variable)
+            .map(|v| Cow::<dyn Val>::Owned(v.try_into().expect("implicit conversion failed")))
+    }
 }
 
 impl<T: VariableResolver> VariableResolver for Box<T> {
