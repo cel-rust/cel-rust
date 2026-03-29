@@ -16,6 +16,6 @@ pub(crate) enum Op {
     Function(Function<'static>),
 }
 
-type UnaryOp<'a> = fn(&dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
-type BinaryOp<'a> = fn(&dyn Val, &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
-type Function<'a> = fn(&[&dyn Val]) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+type UnaryOp<'a> = fn(Cow<dyn Val>) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+type BinaryOp<'a> = fn(Cow<dyn Val>, Cow<dyn Val>) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+type Function<'a> = fn(&[Cow<dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError>;
