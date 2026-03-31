@@ -1,7 +1,7 @@
-use crate::common::traits;
-use crate::common::types::Type;
+use crate::common::types::{CelInt, Type};
 use crate::common::value::Val;
 use crate::Value;
+use crate::{common::traits, ExecutionError};
 use std::borrow::Cow;
 use std::ops::Deref;
 use traits::{Adder, Comparer};
@@ -105,5 +105,17 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
             return Ok(bytes.inner());
         }
         Err(value)
+    }
+}
+
+pub(crate) fn size_fn<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    match args[0].as_ref().downcast_ref::<Bytes>() {
+        Some(arg) => Ok(Cow::<dyn Val>::Owned(Box::new(CelInt::from(
+            arg.len() as i64
+        )))),
+        None => Err(ExecutionError::UnexpectedType {
+            got: args[0].get_type().name().to_owned(),
+            want: "Bytes".to_owned(),
+        }),
     }
 }

@@ -1282,15 +1282,22 @@ impl Value {
                 }
                 match &call.target {
                     None => {
-                        let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
-                            ExecutionError::UndeclaredReference(call.func_name.clone().into())
-                        })?;
+                        // TODO: Optimize for the 1 and 2 arg cases and avoid the Vec altogether
                         let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
                             .args
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
-                        let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args?);
+                        let args = args?;
+                        let arg_types: Vec<Type<'_>> = args.iter().map(|a| a.get_type()).collect();
+                        if let Some(op) = ctx.env().find_overload(&call.func_name, &arg_types) {
+                            let ret = op(&args)?;
+                            return Ok(ret);
+                        }
+                        let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
+                            ExecutionError::UndeclaredReference(call.func_name.clone().into())
+                        })?;
+                        let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
                         let v = (func)(&mut ctx)?;
                         Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                     }
@@ -1304,17 +1311,17 @@ impl Value {
                         };
                         match qualified_func {
                             None => {
+                                let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
+                                    .args
+                                    .iter()
+                                    .map(|a| Value::resolve_val(a, ctx))
+                                    .collect();
                                 let func =
                                     ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                                         ExecutionError::UndeclaredReference(
                                             call.func_name.clone().into(),
                                         )
                                     })?;
-                                let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
-                                    .args
-                                    .iter()
-                                    .map(|a| Value::resolve_val(a, ctx))
-                                    .collect();
                                 let mut ctx = FunctionContext::new(
                                     &call.func_name,
                                     Some(Value::resolve_val(target, ctx)?),

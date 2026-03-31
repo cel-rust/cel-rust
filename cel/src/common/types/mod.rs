@@ -2,7 +2,7 @@ use crate::common::traits;
 use std::any::Any;
 
 pub(crate) mod bool;
-mod bytes;
+pub(crate) mod bytes;
 mod double;
 #[cfg(feature = "chrono")]
 mod duration;

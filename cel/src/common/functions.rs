@@ -3,19 +3,11 @@ use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
 
+#[allow(dead_code)]
 pub struct Overload {
     operator: String,
     operand_trait: TraitSet,
-    op: Op,
+    op: Function,
 }
 
-// todo, probably don't want 'static here, but... for now
-pub(crate) enum Op {
-    Unary(UnaryOp<'static>),
-    Binary(BinaryOp<'static>),
-    Function(Function<'static>),
-}
-
-type UnaryOp<'a> = fn(Cow<dyn Val>) -> Result<Cow<'a, dyn Val>, ExecutionError>;
-type BinaryOp<'a> = fn(Cow<dyn Val>, Cow<dyn Val>) -> Result<Cow<'a, dyn Val>, ExecutionError>;
-type Function<'a> = fn(&[Cow<dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+pub type Function = for<'a> fn(&[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError>;
