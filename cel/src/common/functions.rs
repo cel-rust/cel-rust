@@ -10,4 +10,4 @@ pub struct Overload {
     op: Function,
 }
 
-pub type Function = for<'a> fn(&[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+pub type Function = for<'a> fn(Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError>;

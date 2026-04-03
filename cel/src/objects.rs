@@ -1291,7 +1291,7 @@ impl Value {
                         let args = args?;
                         let arg_types: Vec<Type<'_>> = args.iter().map(|a| a.get_type()).collect();
                         if let Some(op) = ctx.env().find_overload(&call.func_name, &arg_types) {
-                            return op(&args);
+                            return op(args);
                         }
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
@@ -1315,7 +1315,7 @@ impl Value {
                                 if let Some(op) =
                                     ctx.env().find_overload(&qualified_name, &arg_types)
                                 {
-                                    return op(&args);
+                                    return op(args);
                                 }
                                 ctx.get_function(&qualified_name)
                             }
@@ -1331,7 +1331,7 @@ impl Value {
                                 if let Some(op) =
                                     ctx.env().find_member_overload(&call.func_name, &arg_types)
                                 {
-                                    return op(&args);
+                                    return op(args);
                                 }
                                 let target = args.remove(0);
                                 let func =

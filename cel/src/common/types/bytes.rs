@@ -108,7 +108,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
     }
 }
 
-fn size<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn size<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     match args[0].as_ref().downcast_ref::<Bytes>() {
         Some(arg) => Ok(Cow::<dyn Val>::Owned(Box::new(CelInt::from(
             arg.len() as i64
@@ -120,11 +120,12 @@ fn size<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionErro
     }
 }
 
-fn bytes_to_bytes<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    Ok(args[0].clone())
+fn bytes_to_bytes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let mut args = args;
+    Ok(args.remove(0))
 }
 
-fn string_to_bytes<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn string_to_bytes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     match args[0].as_ref().downcast_ref::<CelString>() {
         Some(arg) => {
             let value = arg.as_bytes().to_vec();
