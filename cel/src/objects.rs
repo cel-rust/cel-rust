@@ -1301,19 +1301,26 @@ impl Value {
                         Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                     }
                     Some(target) => {
-                        let qualified_func = match &target.expr {
-                            Expr::Ident(prefix) => {
-                                let qualified_name = format!("{prefix}.{}", &call.func_name);
-                                ctx.get_function(&qualified_name)
-                            }
-                            _ => None,
-                        };
                         let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
                             .args
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let args = args?;
+                        let qualified_func = match &target.expr {
+                            Expr::Ident(prefix) => {
+                                let qualified_name = format!("{prefix}.{}", &call.func_name);
+                                let arg_types: Vec<Type<'_>> =
+                                    args.iter().map(|a| a.get_type()).collect();
+                                if let Some(op) =
+                                    ctx.env().find_overload(&qualified_name, &arg_types)
+                                {
+                                    return op(&args);
+                                }
+                                ctx.get_function(&qualified_name)
+                            }
+                            _ => None,
+                        };
                         let (target, func, args) = match qualified_func {
                             None => {
                                 let target = Value::resolve_val(target, ctx)?;
