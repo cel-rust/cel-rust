@@ -1291,8 +1291,7 @@ impl Value {
                         let args = args?;
                         let arg_types: Vec<Type<'_>> = args.iter().map(|a| a.get_type()).collect();
                         if let Some(op) = ctx.env().find_overload(&call.func_name, &arg_types) {
-                            let ret = op(&args)?;
-                            return Ok(ret);
+                            return op(&args);
                         }
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
@@ -1314,9 +1313,22 @@ impl Value {
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
+                        let args = args?;
                         let (target, func) = match qualified_func {
                             None => {
                                 let target = Value::resolve_val(target, ctx)?;
+                                let arg_types: Vec<Type<'_>> =
+                                    args.iter().map(|a| a.get_type()).collect();
+                                if let Some(op) = ctx.env().find_member_overload(
+                                    &call.func_name,
+                                    target.get_type(),
+                                    &arg_types,
+                                ) {
+                                    let mut args = args;
+                                    args.insert(0, target);
+                                    return op(&args);
+                                }
+                                println!("Miss");
                                 let func =
                                     ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                                         ExecutionError::UndeclaredReference(
@@ -1327,7 +1339,7 @@ impl Value {
                             }
                             Some(func) => (None, func),
                         };
-                        let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args?);
+                        let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
                         // todo fix this to _not_ use `Value`
                         let v = (func)(&mut ctx)?;
                         Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))

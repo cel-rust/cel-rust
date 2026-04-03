@@ -538,6 +538,7 @@ mod tests {
             ("size of bytes", "size(b'foo') == 3"),
             ("size as a list method", "[1, 2, 3].size() == 3"),
             ("size as a string method", "'foobar'.size() == 6"),
+            ("size as a bytes method", "b'foobar'.size() == 6"),
         ]
         .iter()
         .for_each(assert_script);

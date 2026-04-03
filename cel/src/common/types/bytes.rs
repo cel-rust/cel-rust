@@ -108,7 +108,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
     }
 }
 
-pub(crate) fn size_fn<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+pub(crate) fn size<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     match args[0].as_ref().downcast_ref::<Bytes>() {
         Some(arg) => Ok(Cow::<dyn Val>::Owned(Box::new(CelInt::from(
             arg.len() as i64

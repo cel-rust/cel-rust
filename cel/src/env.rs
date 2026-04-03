@@ -20,7 +20,15 @@ impl<'a> Env<'a> {
             "size",
             "size_bytes",
             vec![types::BYTES_TYPE],
-            types::bytes::size_fn,
+            types::bytes::size,
+        )
+        .expect("Must be unique id");
+        env.add_member_overload(
+            "size",
+            "bytes_size",
+            types::BYTES_TYPE,
+            vec![],
+            types::bytes::size,
         )
         .expect("Must be unique id");
         env
@@ -56,13 +64,45 @@ impl<'a> Env<'a> {
         }
     }
 
+    #[allow(clippy::result_unit_err)]
+    pub fn add_member_overload(
+        &mut self,
+        name: &str,
+        id: &str,
+        target: Type<'a>,
+        args: Vec<types::Type<'a>>,
+        op: Function,
+    ) -> Result<(), ()> {
+        let mut args = args;
+        args.insert(0, target);
+        match self.functions.entry(name.to_owned()) {
+            Vacant(vacant_entry) => {
+                let mut value = FunctionDecl::new(name);
+                value.add_overload(id.to_string(), true, args, op)?;
+                vacant_entry.insert(value);
+                Ok(())
+            }
+            Occupied(occupied_entry) => {
+                occupied_entry
+                    .into_mut()
+                    .add_overload(id.to_string(), true, args, op)
+            }
+        }
+    }
+
     pub fn find_member_overload(
         &self,
-        _name: &str,
-        _target: Type<'_>,
-        _args: &[Type<'_>],
+        name: &str,
+        target: Type<'_>,
+        args: &[Type<'_>],
     ) -> Option<Function> {
-        None
+        let mut arg_types = Vec::with_capacity(args.len());
+        arg_types.push(target);
+        arg_types.extend_from_slice(args);
+        match self.functions.get(name) {
+            None => None,
+            Some(fn_decl) => fn_decl.find_overload(true, &arg_types),
+        }
     }
 }
 
