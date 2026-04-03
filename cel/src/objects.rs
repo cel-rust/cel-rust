@@ -1309,42 +1309,28 @@ impl Value {
                             }
                             _ => None,
                         };
-                        match qualified_func {
+                        let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
+                            .args
+                            .iter()
+                            .map(|a| Value::resolve_val(a, ctx))
+                            .collect();
+                        let (target, func) = match qualified_func {
                             None => {
-                                let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
-                                    .args
-                                    .iter()
-                                    .map(|a| Value::resolve_val(a, ctx))
-                                    .collect();
+                                let target = Value::resolve_val(target, ctx)?;
                                 let func =
                                     ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                                         ExecutionError::UndeclaredReference(
                                             call.func_name.clone().into(),
                                         )
                                     })?;
-                                let mut ctx = FunctionContext::new(
-                                    &call.func_name,
-                                    Some(Value::resolve_val(target, ctx)?),
-                                    ctx,
-                                    args?,
-                                );
-                                // todo fix this to _not_ use `Value`
-                                let v = (func)(&mut ctx)?;
-                                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+                                (Some(target), func)
                             }
-                            Some(func) => {
-                                let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
-                                    .args
-                                    .iter()
-                                    .map(|a| Value::resolve_val(a, ctx))
-                                    .collect();
-                                let mut ctx =
-                                    FunctionContext::new(&call.func_name, None, ctx, args?);
-                                // todo fix this to _not_ use `Value`
-                                let v = (func)(&mut ctx)?;
-                                Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
-                            }
-                        }
+                            Some(func) => (None, func),
+                        };
+                        let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args?);
+                        // todo fix this to _not_ use `Value`
+                        let v = (func)(&mut ctx)?;
+                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
                     }
                 }
             }

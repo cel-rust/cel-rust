@@ -21,7 +21,8 @@ impl<'a> Env<'a> {
             "size_bytes",
             vec![types::BYTES_TYPE],
             types::bytes::size_fn,
-        ).expect("Must be unique id");
+        )
+        .expect("Must be unique id");
         env
     }
 
