@@ -16,21 +16,7 @@ pub struct Env<'a> {
 impl<'a> Env<'a> {
     pub fn stdlib() -> Env<'a> {
         let mut env = Env::default();
-        env.add_overload(
-            "size",
-            "size_bytes",
-            vec![types::BYTES_TYPE],
-            types::bytes::size,
-        )
-        .expect("Must be unique id");
-        env.add_member_overload(
-            "size",
-            "bytes_size",
-            types::BYTES_TYPE,
-            vec![],
-            types::bytes::size,
-        )
-        .expect("Must be unique id");
+        types::bytes::stdlib(&mut env);
         env
     }
 

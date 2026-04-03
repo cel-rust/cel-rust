@@ -108,7 +108,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
     }
 }
 
-pub(crate) fn size<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn size<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     match args[0].as_ref().downcast_ref::<Bytes>() {
         Some(arg) => Ok(Cow::<dyn Val>::Owned(Box::new(CelInt::from(
             arg.len() as i64
@@ -118,4 +118,11 @@ pub(crate) fn size<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, Ex
             want: "Bytes".to_owned(),
         }),
     }
+}
+
+pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_overload("size", "size_bytes", vec![super::BYTES_TYPE], size)
+        .expect("Must be unique id");
+    env.add_member_overload("size", "bytes_size", super::BYTES_TYPE, vec![], size)
+        .expect("Must be unique id");
 }
