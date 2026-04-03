@@ -919,6 +919,7 @@ mod tests {
         [
             ("string", "bytes('abc') == b'abc'"),
             ("bytes", "bytes('abc') == b'\\x61b\\x63'"),
+            ("bytes_to_bytes", "bytes(b'abc') == b'\\x61b\\x63'"),
         ]
         .iter()
         .for_each(assert_script);

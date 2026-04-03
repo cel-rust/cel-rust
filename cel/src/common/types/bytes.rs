@@ -1,4 +1,4 @@
-use crate::common::types::{CelInt, Type};
+use crate::common::types::{CelInt, CelString, Type};
 use crate::common::value::Val;
 use crate::Value;
 use crate::{common::traits, ExecutionError};
@@ -120,7 +120,38 @@ fn size<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionErro
     }
 }
 
+fn bytes_to_bytes<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    Ok(args[0].clone())
+}
+
+fn string_to_bytes<'a>(args: &[Cow<'a, dyn Val>]) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    match args[0].as_ref().downcast_ref::<CelString>() {
+        Some(arg) => {
+            let value = arg.as_bytes().to_vec();
+            Ok(Cow::<dyn Val>::Owned(Box::new(Bytes::from(value))))
+        }
+        None => Err(ExecutionError::UnexpectedType {
+            got: args[0].get_type().name().to_owned(),
+            want: "Bytes".to_owned(),
+        }),
+    }
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_overload(
+        "bytes",
+        "string_to_bytes",
+        vec![super::STRING_TYPE],
+        string_to_bytes,
+    )
+    .expect("Must be unique id");
+    env.add_overload(
+        "bytes",
+        "bytes_to_bytes",
+        vec![super::BYTES_TYPE],
+        bytes_to_bytes,
+    )
+    .expect("Must be unique id");
     env.add_overload("size", "size_bytes", vec![super::BYTES_TYPE], size)
         .expect("Must be unique id");
     env.add_member_overload("size", "bytes_size", super::BYTES_TYPE, vec![], size)
