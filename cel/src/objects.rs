@@ -1314,30 +1314,28 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let args = args?;
-                        let (target, func) = match qualified_func {
+                        let (target, func, args) = match qualified_func {
                             None => {
                                 let target = Value::resolve_val(target, ctx)?;
+                                let mut args = args;
+                                args.insert(0, target);
                                 let arg_types: Vec<Type<'_>> =
                                     args.iter().map(|a| a.get_type()).collect();
-                                if let Some(op) = ctx.env().find_member_overload(
-                                    &call.func_name,
-                                    target.get_type(),
-                                    &arg_types,
-                                ) {
-                                    let mut args = args;
-                                    args.insert(0, target);
+                                if let Some(op) =
+                                    ctx.env().find_member_overload(&call.func_name, &arg_types)
+                                {
                                     return op(&args);
                                 }
-                                println!("Miss");
+                                let target = args.remove(0);
                                 let func =
                                     ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                                         ExecutionError::UndeclaredReference(
                                             call.func_name.clone().into(),
                                         )
                                     })?;
-                                (Some(target), func)
+                                (Some(target), func, args)
                             }
-                            Some(func) => (None, func),
+                            Some(func) => (None, func, args),
                         };
                         let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
                         // todo fix this to _not_ use `Value`

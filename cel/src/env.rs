@@ -90,18 +90,10 @@ impl<'a> Env<'a> {
         }
     }
 
-    pub fn find_member_overload(
-        &self,
-        name: &str,
-        target: Type<'_>,
-        args: &[Type<'_>],
-    ) -> Option<Function> {
-        let mut arg_types = Vec::with_capacity(args.len());
-        arg_types.push(target);
-        arg_types.extend_from_slice(args);
+    pub fn find_member_overload(&self, name: &str, args: &[Type<'_>]) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
-            Some(fn_decl) => fn_decl.find_overload(true, &arg_types),
+            Some(fn_decl) => fn_decl.find_overload(true, args),
         }
     }
 }
