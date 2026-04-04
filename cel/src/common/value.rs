@@ -65,6 +65,23 @@ impl dyn Val {
     }
 }
 
+pub trait Downcast {
+    type Error;
+
+    fn downcast<T: Val>(self) -> Result<Box<T>, Self::Error>;
+}
+
+impl Downcast for Box<dyn Val> {
+    type Error = Self;
+
+    fn downcast<T: Val>(self) -> Result<Box<T>, Self> {
+        if <dyn Any + 'static>::is::<T>(self.as_ref()) {
+            return Ok(<Box<dyn Any>>::downcast::<T>(self).expect("we just tested it is!"));
+        }
+        Err(self)
+    }
+}
+
 impl ToOwned for dyn Val {
     type Owned = Box<dyn Val>;
 

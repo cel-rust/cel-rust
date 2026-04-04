@@ -1,5 +1,5 @@
 use crate::common::types::{CelInt, CelString, Type};
-use crate::common::value::Val;
+use crate::common::value::{Downcast, Val};
 use crate::Value;
 use crate::{common::traits, ExecutionError};
 use std::borrow::Cow;
@@ -126,13 +126,15 @@ fn bytes_to_bytes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, E
 }
 
 fn string_to_bytes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    match args[0].as_ref().downcast_ref::<CelString>() {
-        Some(arg) => {
-            let value = arg.as_bytes().to_vec();
+    let mut args = args;
+    let arg = args.remove(0).into_owned();
+    match arg.downcast::<CelString>() {
+        Ok(arg) => {
+            let value = arg.into_inner().into_bytes();
             Ok(Cow::<dyn Val>::Owned(Box::new(Bytes::from(value))))
         }
-        None => Err(ExecutionError::UnexpectedType {
-            got: args[0].get_type().name().to_owned(),
+        Err(e) => Err(ExecutionError::UnexpectedType {
+            got: e.get_type().name().to_owned(),
             want: "Bytes".to_owned(),
         }),
     }
