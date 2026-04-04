@@ -99,6 +99,8 @@ impl PartialEq for dyn Val {
 #[cfg(test)]
 mod test {
     use crate::common::types;
+    use crate::common::types::CelString;
+    use crate::common::value::Downcast;
     use crate::common::value::Val;
     use std::borrow::Cow;
 
@@ -116,5 +118,10 @@ mod test {
         assert!(test(borrowed.as_ref()));
         assert!(test(cow.as_ref()));
         assert!(test(borrowed.clone().as_ref()));
+        assert_eq!(cow.downcast_ref::<CelString>().unwrap().inner(), "cel");
+        let boxed = cow.into_owned();
+        let s: CelString = *boxed.downcast::<CelString>().unwrap();
+        let s: String = s.into();
+        assert_eq!(s.as_str(), "cel");
     }
 }
