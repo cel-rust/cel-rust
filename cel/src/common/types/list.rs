@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Container, Indexer, Iterable};
+use crate::common::traits::{Adder, Container, Indexer, Iterable, Sizer};
 use crate::common::types::{CelInt, CelUInt, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
@@ -58,6 +58,10 @@ impl Val for DefaultList {
     }
 
     fn as_iterable(&self) -> Option<&dyn Iterable> {
+        Some(self)
+    }
+
+    fn as_sizer(&self) -> Option<&dyn Sizer> {
         Some(self)
     }
 
@@ -173,6 +177,12 @@ impl Indexer for DefaultList {
 impl Iterable for DefaultList {
     fn iter<'a>(&'a self) -> Box<dyn super::traits::Iterator<'a> + 'a> {
         Box::new(SliceIterator::new(self.0.as_slice()))
+    }
+}
+
+impl Sizer for DefaultList {
+    fn size(&self) -> CelInt {
+        (self.inner().len() as i64).into()
     }
 }
 
