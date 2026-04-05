@@ -234,6 +234,24 @@ impl<'a> traits::Iterator<'a> for SliceIterator<'a> {
     }
 }
 
+pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_overload(
+        "size",
+        "size_list",
+        vec![super::LIST_TYPE],
+        traits::adapter::sizer_size,
+    )
+    .expect("Must be unique id");
+    env.add_member_overload(
+        "size",
+        "list_size",
+        super::LIST_TYPE,
+        vec![],
+        traits::adapter::sizer_size,
+    )
+    .expect("Must be unique id");
+}
+
 #[cfg(test)]
 pub mod tests {
     use crate::common::traits::Indexer;

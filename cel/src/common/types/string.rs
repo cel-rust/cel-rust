@@ -125,6 +125,24 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
     }
 }
 
+pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_overload(
+        "size",
+        "size_string",
+        vec![super::STRING_TYPE],
+        traits::adapter::sizer_size,
+    )
+    .expect("Must be unique id");
+    env.add_member_overload(
+        "size",
+        "string_size",
+        super::STRING_TYPE,
+        vec![],
+        traits::adapter::sizer_size,
+    )
+    .expect("Must be unique id");
+}
+
 #[cfg(test)]
 mod tests {
     use super::StdString;

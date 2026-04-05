@@ -7,11 +7,11 @@ mod double;
 #[cfg(feature = "chrono")]
 mod duration;
 mod int;
-mod list;
-mod map;
+pub(crate) mod list;
+pub(crate) mod map;
 mod null;
 mod optional;
-mod string;
+pub(crate) mod string;
 #[cfg(feature = "chrono")]
 mod timestamp;
 mod uint;

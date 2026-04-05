@@ -233,7 +233,6 @@ impl Default for Context<'_> {
         };
 
         ctx.add_function("contains", functions::contains);
-        ctx.add_function("size", functions::size);
         ctx.add_function("max", functions::max);
         ctx.add_function("min", functions::min);
         ctx.add_function("startsWith", functions::starts_with);
