@@ -1,5 +1,5 @@
-use crate::common::traits::{Adder, Comparer};
-use crate::common::types::Type;
+use crate::common::traits::{self, Adder, Comparer, Sizer};
+use crate::common::types::{CelInt, Type};
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
@@ -41,6 +41,10 @@ impl Val for String {
         Some(self)
     }
 
+    fn as_sizer(&self) -> Option<&dyn Sizer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
@@ -76,6 +80,12 @@ impl Comparer for String {
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
+    }
+}
+
+impl Sizer for String {
+    fn size(&self) -> CelInt {
+        (self.inner().len() as i64).into()
     }
 }
 
