@@ -1,3 +1,4 @@
+use crate::common::types::CelInt;
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::any::Any;
@@ -91,6 +92,10 @@ pub trait Negator {
     fn negate(&self) -> Result<Box<dyn Val>, ExecutionError>;
 }
 
+pub trait Sizer {
+    fn size(&self) -> CelInt;
+}
+
 pub trait Subtractor {
     fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
@@ -103,4 +108,21 @@ pub trait Indexer {
 
 pub trait Lister: Debug + Any {
     fn as_indexer(&self) -> &dyn Indexer;
+}
+
+pub(crate) mod adapter {
+    use std::borrow::Cow;
+
+    use crate::{common::value::Val, ExecutionError};
+
+    pub fn sizer_size<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        let target = &args[0];
+        match target.as_sizer() {
+            None => Err(ExecutionError::UnexpectedType {
+                got: target.get_type().name().to_owned(),
+                want: "missing trait Sizer".to_owned(),
+            }),
+            Some(sizer) => Ok(Cow::<dyn Val>::Owned(Box::new(sizer.size()))),
+        }
+    }
 }

@@ -1,3 +1,4 @@
+use crate::common::traits::Sizer;
 use crate::common::types::{CelInt, CelString, Type};
 use crate::common::value::{Downcast, Val};
 use crate::Value;
@@ -40,6 +41,10 @@ impl Val for Bytes {
         Some(self)
     }
 
+    fn as_sizer(&self) -> Option<&dyn Sizer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
@@ -77,6 +82,12 @@ impl Comparer for Bytes {
     }
 }
 
+impl Sizer for Bytes {
+    fn size(&self) -> CelInt {
+        (self.inner().len() as i64).into()
+    }
+}
+
 impl From<Vec<u8>> for Bytes {
     fn from(value: Vec<u8>) -> Self {
         Bytes(value)
@@ -105,18 +116,6 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
             return Ok(bytes.inner());
         }
         Err(value)
-    }
-}
-
-fn size<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    match args[0].as_ref().downcast_ref::<Bytes>() {
-        Some(arg) => Ok(Cow::<dyn Val>::Owned(Box::new(CelInt::from(
-            arg.len() as i64
-        )))),
-        None => Err(ExecutionError::UnexpectedType {
-            got: args[0].get_type().name().to_owned(),
-            want: "Bytes".to_owned(),
-        }),
     }
 }
 
@@ -155,8 +154,19 @@ pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
         bytes_to_bytes,
     )
     .expect("Must be unique id");
-    env.add_overload("size", "size_bytes", vec![super::BYTES_TYPE], size)
-        .expect("Must be unique id");
-    env.add_member_overload("size", "bytes_size", super::BYTES_TYPE, vec![], size)
-        .expect("Must be unique id");
+    env.add_overload(
+        "size",
+        "size_bytes",
+        vec![super::BYTES_TYPE],
+        traits::adapter::sizer_size,
+    )
+    .expect("Must be unique id");
+    env.add_member_overload(
+        "size",
+        "bytes_size",
+        super::BYTES_TYPE,
+        vec![],
+        traits::adapter::sizer_size,
+    )
+    .expect("Must be unique id");
 }

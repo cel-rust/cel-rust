@@ -1,5 +1,6 @@
 use crate::common::traits::{
-    Adder, Comparer, Container, Divider, Indexer, Iterable, Modder, Multiplier, Negator, Subtractor,
+    Adder, Comparer, Container, Divider, Indexer, Iterable, Modder, Multiplier, Negator, Sizer,
+    Subtractor,
 };
 use crate::common::types::Type;
 use std::any::Any;
@@ -45,6 +46,10 @@ pub trait Val: Any + Debug + Send + Sync {
     }
 
     fn as_negator(&self) -> Option<&dyn Negator> {
+        None
+    }
+
+    fn as_sizer(&self) -> Option<&dyn Sizer> {
         None
     }
 
