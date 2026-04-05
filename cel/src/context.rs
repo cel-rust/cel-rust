@@ -239,7 +239,6 @@ impl Default for Context<'_> {
         ctx.add_function("startsWith", functions::starts_with);
         ctx.add_function("endsWith", functions::ends_with);
         ctx.add_function("string", functions::string);
-        ctx.add_function("bytes", functions::bytes);
         ctx.add_function("double", functions::double);
         ctx.add_function("int", functions::int);
         ctx.add_function("uint", functions::uint);
