@@ -268,26 +268,6 @@ pub fn optional_or_value(This(this): This<Value>, other: Value) -> Result<Value>
     }
 }
 
-/// Returns true if a string starts with another string.
-///
-/// # Example
-/// ```cel
-/// "abc".startsWith("a") == true
-/// ```
-pub fn starts_with(This(this): This<Arc<String>>, prefix: Arc<String>) -> bool {
-    this.starts_with(prefix.as_str())
-}
-
-/// Returns true if a string ends with another string.
-///
-/// # Example
-/// ```cel
-/// "abc".endsWith("c") == true
-/// ```
-pub fn ends_with(This(this): This<Arc<String>>, suffix: Arc<String>) -> bool {
-    this.ends_with(suffix.as_str())
-}
-
 /// Returns true if a string matches the regular expression.
 ///
 /// # Example

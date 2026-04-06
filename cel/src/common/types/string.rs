@@ -146,43 +146,25 @@ fn string_contains<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, 
 }
 
 fn ends_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let target = &args[0];
-    let arg = &args[1];
-    match target.downcast_ref::<String>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: target.get_type().name().to_string(),
-            want: super::STRING_TYPE.name().to_string(),
-        }),
-        Some(s) => match arg.downcast_ref::<String>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg.get_type().name().to_string(),
-                want: super::STRING_TYPE.name().to_string(),
-            }),
-            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
-                s.ends_with(needle.inner()),
-            )))),
+    super::binary_fn(
+        args,
+        super::STRING_TYPE,
+        super::STRING_TYPE,
+        |target: &String, needle: &String| {
+            Ok(Box::new(CelBool::from(target.ends_with(needle.inner()))))
         },
-    }
+    )
 }
 
 fn starts_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let target = &args[0];
-    let arg = &args[1];
-    match target.downcast_ref::<String>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: target.get_type().name().to_string(),
-            want: super::STRING_TYPE.name().to_string(),
-        }),
-        Some(s) => match arg.downcast_ref::<String>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg.get_type().name().to_string(),
-                want: super::STRING_TYPE.name().to_string(),
-            }),
-            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
-                s.starts_with(needle.inner()),
-            )))),
+    super::binary_fn(
+        args,
+        super::STRING_TYPE,
+        super::STRING_TYPE,
+        |target: &String, needle: &String| {
+            Ok(Box::new(CelBool::from(target.starts_with(needle.inner()))))
         },
-    }
+    )
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
