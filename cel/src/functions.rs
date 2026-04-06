@@ -126,14 +126,6 @@ pub fn contains(This(this): This<Value>, arg: Value) -> Result<Value> {
                 false
             }
         }
-        Value::Bytes(b) => {
-            if let Value::Bytes(arg) = arg {
-                let s = arg.as_slice();
-                b.windows(arg.len()).any(|w| w == s)
-            } else {
-                false
-            }
-        }
         _ => false,
     }
     .into())
@@ -859,7 +851,6 @@ mod tests {
             ("list", "[1, 2, 3].contains(3) == true"),
             ("map", "{1: true, 2: true, 3: true}.contains(3) == true"),
             ("string", "'foobar'.contains('bar') == true"),
-            ("bytes", "b'foobar'.contains(b'o') == true"),
         ];
 
         for (name, script) in tests {
