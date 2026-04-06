@@ -145,6 +145,46 @@ fn string_contains<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, 
     }
 }
 
+fn ends_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let target = &args[0];
+    let arg = &args[1];
+    match target.downcast_ref::<String>() {
+        None => Err(ExecutionError::UnexpectedType {
+            got: target.get_type().name().to_string(),
+            want: super::STRING_TYPE.name().to_string(),
+        }),
+        Some(s) => match arg.downcast_ref::<String>() {
+            None => Err(ExecutionError::UnexpectedType {
+                got: arg.get_type().name().to_string(),
+                want: super::STRING_TYPE.name().to_string(),
+            }),
+            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                s.ends_with(needle.inner()),
+            )))),
+        },
+    }
+}
+
+fn starts_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let target = &args[0];
+    let arg = &args[1];
+    match target.downcast_ref::<String>() {
+        None => Err(ExecutionError::UnexpectedType {
+            got: target.get_type().name().to_string(),
+            want: super::STRING_TYPE.name().to_string(),
+        }),
+        Some(s) => match arg.downcast_ref::<String>() {
+            None => Err(ExecutionError::UnexpectedType {
+                got: arg.get_type().name().to_string(),
+                want: super::STRING_TYPE.name().to_string(),
+            }),
+            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                s.starts_with(needle.inner()),
+            )))),
+        },
+    }
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
     env.add_member_overload(
         "contains",
@@ -152,6 +192,14 @@ pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
         super::STRING_TYPE,
         vec![super::STRING_TYPE],
         string_contains,
+    )
+    .expect("Must be unique id");
+    env.add_member_overload(
+        "endsWith",
+        "ends_with_string",
+        super::STRING_TYPE,
+        vec![super::STRING_TYPE],
+        ends_with_string,
     )
     .expect("Must be unique id");
     env.add_overload(
@@ -167,6 +215,14 @@ pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
         super::STRING_TYPE,
         vec![],
         traits::adapter::sizer_size,
+    )
+    .expect("Must be unique id");
+    env.add_member_overload(
+        "startsWith",
+        "starts_with_string",
+        super::STRING_TYPE,
+        vec![super::STRING_TYPE],
+        starts_with_string,
     )
     .expect("Must be unique id");
 }

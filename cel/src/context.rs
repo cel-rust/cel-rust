@@ -234,8 +234,6 @@ impl Default for Context<'_> {
 
         ctx.add_function("max", functions::max);
         ctx.add_function("min", functions::min);
-        ctx.add_function("startsWith", functions::starts_with);
-        ctx.add_function("endsWith", functions::ends_with);
         ctx.add_function("string", functions::string);
         ctx.add_function("double", functions::double);
         ctx.add_function("int", functions::int);
