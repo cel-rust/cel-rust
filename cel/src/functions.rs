@@ -756,6 +756,10 @@ mod tests {
                 "duration getSeconds overflow",
                 "duration('90s').getSeconds() == 90",
             ),
+            (
+                "duration getSeconds overflow",
+                "duration(duration('13s')).getSeconds() == 13",
+            ),
         ]
         .iter()
         .for_each(assert_script);

@@ -249,12 +249,6 @@ fn timestamp<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Execut
     })
 }
 
-fn noop<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let ts = args.remove(0);
-    Ok(ts)
-}
-
 pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
     env.add_overload(
         "timestamp",
@@ -267,7 +261,7 @@ pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
         "timestamp",
         "timestamp_to_timestamp",
         vec![super::TIMESTAMP_TYPE],
-        noop,
+        super::noop,
     )
     .expect("Must be unique");
     env.add_member_overload(

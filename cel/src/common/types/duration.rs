@@ -171,6 +171,13 @@ pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
         duration,
     )
     .expect("Must be unique");
+    env.add_overload(
+        "duration",
+        "duration_to_duration",
+        vec![super::DURATION_TYPE],
+        super::noop,
+    )
+    .expect("Must be unique");
     env.add_member_overload(
         "getHours",
         "duration_to_hours",

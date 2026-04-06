@@ -305,6 +305,12 @@ fn binary_fn<'a, A: Val, B: Val>(
     }
 }
 
+fn noop<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let mut args = args;
+    let ts = args.remove(0);
+    Ok(ts)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
