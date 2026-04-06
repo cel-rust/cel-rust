@@ -1,5 +1,5 @@
-use crate::ExecutionError;
 use crate::common::traits;
+use crate::ExecutionError;
 use std::any::Any;
 use std::borrow::Cow;
 
@@ -7,7 +7,7 @@ pub(crate) mod bool;
 pub(crate) mod bytes;
 mod double;
 #[cfg(feature = "chrono")]
-mod duration;
+pub(crate) mod duration;
 mod int;
 pub(crate) mod list;
 pub(crate) mod map;
@@ -15,7 +15,7 @@ mod null;
 mod optional;
 pub(crate) mod string;
 #[cfg(feature = "chrono")]
-mod timestamp;
+pub(crate) mod timestamp;
 mod uint;
 
 use crate::common::traits::TraitSet;
@@ -264,7 +264,23 @@ fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
     Err(value)
 }
 
+type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
 type BinaryFn<A, B> = fn(&A, &B) -> Result<Box<dyn Val>, ExecutionError>;
+
+fn unary_fn<'a, A: Val>(
+    args: Vec<Cow<'a, dyn Val>>,
+    type_a: Type<'_>,
+    func: UnaryFn<A>,
+) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let arg = &args[0];
+    match arg.downcast_ref::<A>() {
+        None => Err(ExecutionError::UnexpectedType {
+            got: arg.get_type().name().to_string(),
+            want: type_a.name().to_string(),
+        }),
+        Some(arg) => Ok(Cow::<dyn Val>::Owned(func(arg)?)),
+    }
+}
 
 fn binary_fn<'a, A: Val, B: Val>(
     args: Vec<Cow<'a, dyn Val>>,
@@ -288,7 +304,6 @@ fn binary_fn<'a, A: Val, B: Val>(
         },
     }
 }
-
 
 #[cfg(test)]
 mod tests {

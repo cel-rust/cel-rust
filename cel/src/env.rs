@@ -24,6 +24,12 @@ impl<'a> Env<'a> {
         types::list::stdlib(&mut env);
         types::map::stdlib(&mut env);
         types::string::stdlib(&mut env);
+
+        #[cfg(feature = "chrono")]
+        {
+            types::duration::stdlib(&mut env);
+            types::timestamp::stdlib(&mut env);
+        }
         env
     }
 

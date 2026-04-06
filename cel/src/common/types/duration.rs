@@ -130,3 +130,5 @@ impl<'a> TryFrom<&'a dyn Val> for &'a chrono::Duration {
         Err(value)
     }
 }
+
+pub(crate) fn stdlib(_env: &mut crate::Env<'_>) {}
