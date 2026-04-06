@@ -625,6 +625,10 @@ mod tests {
                 "timestamp('2023-05-28T00:00:00Z').string() == '2023-05-28T00:00:00+00:00'",
             ),
             (
+                "timestamp timestamp",
+                "timestamp(timestamp('2023-05-28T00:00:00Z')).string() == '2023-05-28T00:00:00+00:00'",
+            ),
+            (
                 "timestamp getFullYear",
                 "timestamp('2023-05-28T00:00:00Z').getFullYear() == 2023",
             ),
