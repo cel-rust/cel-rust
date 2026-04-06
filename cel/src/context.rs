@@ -232,12 +232,15 @@ impl Default for Context<'_> {
             resolver: None,
         };
 
-        ctx.add_function("max", functions::max);
-        ctx.add_function("min", functions::min);
         ctx.add_function("string", functions::string);
         ctx.add_function("double", functions::double);
         ctx.add_function("int", functions::int);
         ctx.add_function("uint", functions::uint);
+
+        #[cfg(feature = "regex")]
+        ctx.add_function("matches", functions::matches);
+
+        // Optional
         ctx.add_function("optional.none", functions::optional_none);
         ctx.add_function("optional.of", functions::optional_of);
         ctx.add_function(
@@ -248,10 +251,6 @@ impl Default for Context<'_> {
         ctx.add_function("hasValue", functions::optional_has_value);
         ctx.add_function("or", functions::optional_or_optional);
         ctx.add_function("orValue", functions::optional_or_value);
-
-        #[cfg(feature = "regex")]
-        ctx.add_function("matches", functions::matches);
-
         ctx
     }
 }

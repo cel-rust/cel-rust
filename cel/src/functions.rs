@@ -552,7 +552,14 @@ mod tests {
             ("max no args", "max() == null"),
         ]
         .iter()
-        .for_each(assert_script);
+        .for_each(|a| {
+            let input: &(&str, &str) = a;
+            let mut context = Context::default();
+            context.add_function("max", super::max);
+            let ctx = Some(context);
+            let r = test_script(input.1, ctx);
+            assert_eq!(r, Ok(true.into()), "{}", input.0);
+        });
     }
 
     #[test]
@@ -571,7 +578,14 @@ mod tests {
             ("min no args", "min() == null"),
         ]
         .iter()
-        .for_each(assert_script);
+        .for_each(|a| {
+            let input: &(&str, &str) = a;
+            let mut context = Context::default();
+            context.add_function("min", super::min);
+            let ctx = Some(context);
+            let r = test_script(input.1, ctx);
+            assert_eq!(r, Ok(true.into()), "{}", input.0);
+        });
     }
 
     #[test]
