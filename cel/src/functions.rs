@@ -314,15 +314,12 @@ pub mod time {
     /// - `1ns` parses as 1 nanosecond
     /// - `1.5ns` parses as 1 nanosecond (sub-nanosecond durations not supported)
     pub fn duration(value: Arc<String>) -> crate::functions::Result<Value> {
-        Ok(Value::Duration(_duration(value.as_str())?))
-    }
-
-    /// A wrapper around [`parse_duration`] that converts errors into [`ExecutionError`].
-    /// and only returns the duration, rather than returning the remaining input.
-    fn _duration(i: &str) -> Result<chrono::Duration> {
-        let (_, duration) = crate::duration::parse_duration(i)
-            .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
-        Ok(duration)
+        Ok(Value::Duration({
+            let i = value.as_str();
+            let (_, duration) = crate::duration::parse_duration(i)
+                .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
+            Ok(duration)
+        }?))
     }
 
     fn _timestamp(i: &str) -> Result<chrono::DateTime<chrono::FixedOffset>> {

@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Subtractor};
-use crate::common::types::Type;
+use crate::common::types::{CelInt, CelString, Type};
 use crate::common::value::Val;
 use crate::{ExecutionError, Value};
 use std::borrow::Cow;
@@ -131,4 +131,76 @@ impl<'a> TryFrom<&'a dyn Val> for &'a chrono::Duration {
     }
 }
 
-pub(crate) fn stdlib(_env: &mut crate::Env<'_>) {}
+fn millis<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
+        Ok(Box::new(CelInt::from(ts.inner().num_milliseconds())))
+    })
+}
+
+fn seconds<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
+        Ok(Box::new(CelInt::from(ts.inner().num_seconds())))
+    })
+}
+
+fn minutes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
+        Ok(Box::new(CelInt::from(ts.inner().num_minutes())))
+    })
+}
+
+fn hours<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
+        Ok(Box::new(CelInt::from(ts.inner().num_hours())))
+    })
+}
+
+fn duration<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    super::unary_fn(args, super::STRING_TYPE, |value: &CelString| {
+        let (_, duration) = crate::duration::parse_duration(value.inner())
+            .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
+        Ok(Box::new(Duration::from(duration)))
+    })
+}
+
+pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_overload(
+        "duration",
+        "string_to_duration",
+        vec![super::STRING_TYPE],
+        duration,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "getHours",
+        "duration_to_hours",
+        super::DURATION_TYPE,
+        Vec::default(),
+        hours,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "getMinutes",
+        "duration_to_minutes",
+        super::DURATION_TYPE,
+        Vec::default(),
+        minutes,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "getSeconds",
+        "duration_to_seconds",
+        super::DURATION_TYPE,
+        Vec::default(),
+        seconds,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "getMilliseconds",
+        "duration_to_millis",
+        super::DURATION_TYPE,
+        Vec::default(),
+        millis,
+    )
+    .expect("Must be unique");
+}

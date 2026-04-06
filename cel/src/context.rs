@@ -252,16 +252,6 @@ impl Default for Context<'_> {
         #[cfg(feature = "regex")]
         ctx.add_function("matches", functions::matches);
 
-        #[cfg(feature = "chrono")]
-        {
-            ctx.add_function("duration", functions::duration);
-
-            ctx.add_function("getHours", functions::time::get_hours);
-            ctx.add_function("getMinutes", functions::time::get_minutes);
-            ctx.add_function("getSeconds", functions::time::get_seconds);
-            ctx.add_function("getMilliseconds", functions::time::get_milliseconds);
-        }
-
         ctx
     }
 }
