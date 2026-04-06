@@ -1,5 +1,5 @@
 use crate::common::traits::{self, Adder, Comparer, Sizer};
-use crate::common::types::{CelInt, Type};
+use crate::common::types::{CelBool, CelInt, Type};
 use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
@@ -125,7 +125,35 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
     }
 }
 
+fn string_contains<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let target = &args[0];
+    let arg = &args[1];
+    match target.downcast_ref::<String>() {
+        None => Err(ExecutionError::UnexpectedType {
+            got: target.get_type().name().to_string(),
+            want: super::STRING_TYPE.name().to_string(),
+        }),
+        Some(s) => match arg.downcast_ref::<String>() {
+            None => Err(ExecutionError::UnexpectedType {
+                got: arg.get_type().name().to_string(),
+                want: super::STRING_TYPE.name().to_string(),
+            }),
+            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
+                s.contains(needle.inner()),
+            )))),
+        },
+    }
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_member_overload(
+        "contains",
+        "contains_string",
+        super::STRING_TYPE,
+        vec![super::STRING_TYPE],
+        string_contains,
+    )
+    .expect("Must be unique id");
     env.add_overload(
         "size",
         "size_string",
