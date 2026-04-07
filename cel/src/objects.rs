@@ -1289,8 +1289,7 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let args = args?;
-                        let arg_types: Vec<Type<'_>> = args.iter().map(|a| a.get_type()).collect();
-                        if let Some(op) = ctx.env().find_overload(&call.func_name, &arg_types) {
+                        if let Some(op) = ctx.env().find_overload(&call.func_name, &args) {
                             return op(args);
                         }
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
@@ -1310,11 +1309,7 @@ impl Value {
                         let qualified_func = match &target.expr {
                             Expr::Ident(prefix) => {
                                 let qualified_name = format!("{prefix}.{}", &call.func_name);
-                                let arg_types: Vec<Type<'_>> =
-                                    args.iter().map(|a| a.get_type()).collect();
-                                if let Some(op) =
-                                    ctx.env().find_overload(&qualified_name, &arg_types)
-                                {
+                                if let Some(op) = ctx.env().find_overload(&qualified_name, &args) {
                                     return op(args);
                                 }
                                 ctx.get_function(&qualified_name)
@@ -1326,10 +1321,8 @@ impl Value {
                                 let target = Value::resolve_val(target, ctx)?;
                                 let mut args = args;
                                 args.insert(0, target);
-                                let arg_types: Vec<Type<'_>> =
-                                    args.iter().map(|a| a.get_type()).collect();
                                 if let Some(op) =
-                                    ctx.env().find_member_overload(&call.func_name, &arg_types)
+                                    ctx.env().find_member_overload(&call.func_name, &args)
                                 {
                                     return op(args);
                                 }

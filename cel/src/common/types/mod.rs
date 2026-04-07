@@ -67,6 +67,12 @@ pub struct Type<'a> {
 }
 
 impl Type<'_> {
+    pub fn is_assignable(&self, val: &dyn Val) -> bool {
+        *self == val.get_type()
+    }
+}
+
+impl Type<'_> {
     pub fn kind(&self) -> Kind {
         self.kind
     }

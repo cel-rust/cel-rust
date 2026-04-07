@@ -2,10 +2,14 @@ use crate::common::{
     decls::FunctionDecl,
     functions::Function,
     types::{self, Type},
+    value::Val,
 };
-use std::collections::{
-    btree_map::Entry::{Occupied, Vacant},
-    BTreeMap,
+use std::{
+    borrow::Cow,
+    collections::{
+        btree_map::Entry::{Occupied, Vacant},
+        BTreeMap,
+    },
 };
 
 #[derive(Default)]
@@ -46,7 +50,7 @@ impl<'a> Env<'a> {
         }
     }
 
-    pub fn find_overload(&self, name: &str, args: &[Type<'_>]) -> Option<Function> {
+    pub fn find_overload(&self, name: &str, args: &[Cow<dyn Val>]) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(false, args),
@@ -79,7 +83,7 @@ impl<'a> Env<'a> {
         }
     }
 
-    pub fn find_member_overload(&self, name: &str, args: &[Type<'_>]) -> Option<Function> {
+    pub fn find_member_overload(&self, name: &str, args: &[Cow<dyn Val>]) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(true, args),

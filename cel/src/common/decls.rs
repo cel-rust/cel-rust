@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::common::functions::Function;
 use crate::common::types::Type;
 use crate::common::value::Val;
@@ -15,9 +17,16 @@ impl<'a> FunctionDecl<'a> {
         }
     }
 
-    pub fn find_overload(&self, member_function: bool, arg_types: &[Type<'a>]) -> Option<Function> {
+    pub fn find_overload(&self, member_function: bool, args: &[Cow<dyn Val>]) -> Option<Function> {
         for overload in &self.overloads {
-            if overload.member_function == member_function && overload.arg_types == arg_types {
+            if overload.member_function == member_function
+                && args.len() == overload.arg_types.len()
+                && overload
+                    .arg_types
+                    .iter()
+                    .enumerate()
+                    .all(|(i, t)| t.is_assignable(args[i].as_ref()))
+            {
                 return Some(overload.op);
             }
         }
