@@ -26,6 +26,7 @@ impl<'a> Env<'a> {
         types::list::stdlib(&mut env);
         types::map::stdlib(&mut env);
         types::string::stdlib(&mut env);
+        types::uint::stdlib(&mut env);
 
         #[cfg(feature = "chrono")]
         {

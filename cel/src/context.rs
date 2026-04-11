@@ -232,8 +232,6 @@ impl Default for Context<'_> {
             resolver: None,
         };
 
-        ctx.add_function("uint", functions::uint);
-
         // Optional
         ctx.add_function("optional.none", functions::optional_none);
         ctx.add_function("optional.of", functions::optional_of);

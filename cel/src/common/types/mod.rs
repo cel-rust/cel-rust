@@ -16,7 +16,7 @@ mod optional;
 pub(crate) mod string;
 #[cfg(feature = "chrono")]
 pub(crate) mod timestamp;
-mod uint;
+pub(crate) mod uint;
 
 use crate::common::traits::TraitSet;
 use crate::common::value::Val;

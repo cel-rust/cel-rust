@@ -875,8 +875,10 @@ mod tests {
     #[test]
     fn test_uint() {
         [
-            ("string", "'10'.uint() == 10.uint()"),
-            ("double", "10.5.uint() == 10.uint()"),
+            ("uint", "uint(10u) == 10u"),
+            ("int", "uint(10) == 10u"),
+            ("string", "uint('10') == 10u"),
+            ("double", "uint(10.5) == 10u"),
         ]
         .iter()
         .for_each(assert_script);
