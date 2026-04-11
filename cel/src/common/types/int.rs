@@ -1,7 +1,7 @@
 use crate::common::traits::Negator;
 use crate::common::traits::{self, Comparer};
-use crate::common::types::{CelDouble, CelUInt, Type};
-use crate::common::value::Val;
+use crate::common::types::{CelDouble, CelString, CelUInt, Type};
+use crate::common::value::{Downcast, Val};
 use crate::ExecutionError;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -214,6 +214,52 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
         }
         Err(value)
     }
+}
+
+fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let mut args = args;
+    let arg = args.remove(0).into_owned();
+    let ret: Result<Box<Int>, Box<dyn Val>> = match arg.get_type() {
+        super::INT_TYPE => arg.downcast::<Int>(),
+        super::UINT_TYPE => arg
+            .downcast::<CelUInt>()
+            .map(|arg| Box::new(Int::from(*arg.inner() as i64))),
+        super::DOUBLE_TYPE => arg
+            .downcast::<CelDouble>()
+            .map(|arg| Box::new(Int::from(*arg.inner() as i64))),
+        super::STRING_TYPE => match arg.downcast::<CelString>() {
+            Err(arg) => Err(arg),
+            Ok(arg) => match arg.inner().parse::<i64>() {
+                Ok(arg) => Ok(Box::new(Int::from(arg))),
+                Err(e) => {
+                    return Err(ExecutionError::FunctionError {
+                        function: "int".to_owned(),
+                        message: format!("string parse error: {e}"),
+                    })
+                }
+            },
+        },
+        _ => Err(arg),
+    };
+
+    match ret {
+        Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
+        Err(arg) => Err(ExecutionError::FunctionError {
+            function: "double".to_owned(),
+            message: format!("cannot convert {arg:?} to double"),
+        }),
+    }
+}
+
+pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_overload("int", "int64_to_int64", vec![super::INT_TYPE], int)
+        .expect("Must be unique id");
+    env.add_overload("int", "uint64_to_int64", vec![super::UINT_TYPE], int)
+        .expect("Must be unique id");
+    env.add_overload("int", "double_to_int64", vec![super::DOUBLE_TYPE], int)
+        .expect("Must be unique id");
+    env.add_overload("int", "string_to_int64", vec![super::STRING_TYPE], int)
+        .expect("Must be unique id");
 }
 
 #[cfg(test)]

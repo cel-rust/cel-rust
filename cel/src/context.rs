@@ -232,7 +232,6 @@ impl Default for Context<'_> {
             resolver: None,
         };
 
-        ctx.add_function("int", functions::int);
         ctx.add_function("uint", functions::uint);
 
         // Optional

@@ -8,7 +8,7 @@ pub(crate) mod bytes;
 pub(crate) mod double;
 #[cfg(feature = "chrono")]
 pub(crate) mod duration;
-mod int;
+pub(crate) mod int;
 pub(crate) mod list;
 pub(crate) mod map;
 mod null;

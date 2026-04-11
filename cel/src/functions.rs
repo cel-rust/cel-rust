@@ -885,10 +885,10 @@ mod tests {
     #[test]
     fn test_int() {
         [
-            ("string", "'10'.int() == 10"),
-            ("int", "10.int() == 10"),
-            ("uint", "10.uint().int() == 10"),
-            ("double", "10.5.int() == 10"),
+            ("string", "int('10') == 10"),
+            ("int", "int(10) == 10"),
+            ("uint", "int(10u) == 10"),
+            ("double", "int(10.5) == 10"),
         ]
         .iter()
         .for_each(assert_script);
