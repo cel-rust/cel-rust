@@ -5,7 +5,7 @@ use std::borrow::Cow;
 
 pub(crate) mod bool;
 pub(crate) mod bytes;
-mod double;
+pub(crate) mod double;
 #[cfg(feature = "chrono")]
 pub(crate) mod duration;
 mod int;

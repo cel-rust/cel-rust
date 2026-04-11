@@ -864,9 +864,9 @@ mod tests {
     #[test]
     fn test_double() {
         [
-            ("string", "'10'.double() == 10.0"),
-            ("int", "10.double() == 10.0"),
-            ("double", "10.0.double() == 10.0"),
+            ("string", "double('10') == 10.0"),
+            ("int", "double(10) == 10.0"),
+            ("double", "double(10.0) == 10.0"),
         ]
         .iter()
         .for_each(assert_script);

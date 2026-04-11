@@ -21,6 +21,7 @@ impl<'a> Env<'a> {
     pub fn stdlib() -> Env<'a> {
         let mut env = Env::default();
         types::bytes::stdlib(&mut env);
+        types::double::stdlib(&mut env);
         types::list::stdlib(&mut env);
         types::map::stdlib(&mut env);
         types::string::stdlib(&mut env);
