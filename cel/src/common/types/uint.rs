@@ -57,9 +57,9 @@ impl Val for UInt {
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
-        other
-            .downcast_ref::<Self>()
-            .is_some_and(|other| self.0 == other.0)
+        self.compare(other)
+            .map(|r| r == Ordering::Equal)
+            .unwrap_or(false)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
@@ -234,5 +234,25 @@ impl<'a> TryFrom<&'a dyn Val> for &'a u64 {
             return Ok(&u.0);
         }
         Err(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::common::{
+        types::{CelDouble, CelInt, CelString, CelUInt},
+        value::Val,
+    };
+
+    #[test]
+    fn test_equals() {
+        let uint = CelUInt::from(42);
+        assert!(uint.equals(&uint));
+        assert!(uint.equals(&CelInt::from(42)));
+        assert!(!uint.equals(&CelInt::from(-42)));
+        assert!(uint.equals(&CelDouble::from(42.0)));
+        assert!(!uint.equals(&CelDouble::from(42.2)));
+        assert!(!uint.equals(&CelDouble::from(f64::NAN)));
+        assert!(!uint.equals(&CelString::from("42")));
     }
 }

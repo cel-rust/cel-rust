@@ -1,5 +1,5 @@
-use crate::common::traits;
 use crate::common::traits::Negator;
+use crate::common::traits::{self, Comparer};
 use crate::common::types::{CelDouble, CelUInt, Type};
 use crate::common::value::Val;
 use crate::ExecutionError;
@@ -62,9 +62,9 @@ impl Val for Int {
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
-        other
-            .downcast_ref::<Self>()
-            .is_some_and(|other| self.0 == other.0)
+        self.compare(other)
+            .map(|r| r == Ordering::Equal)
+            .unwrap_or(false)
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
@@ -219,7 +219,8 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
 #[cfg(test)]
 mod tests {
     use crate::common::traits::Comparer;
-    use crate::common::types::CelInt;
+    use crate::common::types::{CelDouble, CelInt, CelString, CelUInt};
+    use crate::common::value::Val;
     use std::cmp::Ordering::{Equal, Greater, Less};
 
     #[test]
@@ -229,5 +230,19 @@ mod tests {
         assert_eq!(one.compare(&two), Ok(Less));
         assert_eq!(two.compare(&one), Ok(Greater));
         assert_eq!(two.compare(&two), Ok(Equal));
+    }
+
+    #[test]
+    fn test_equals() {
+        let int = CelInt::from(42);
+        let neg = CelInt::from(-42);
+        assert!(int.equals(&int));
+        assert!(int.equals(&CelUInt::from(42u64)));
+        assert!(!neg.equals(&CelUInt::from(42u64)));
+        assert!(int.equals(&CelDouble::from(42.0)));
+        assert!(neg.equals(&CelDouble::from(-42.0)));
+        assert!(!int.equals(&CelDouble::from(f64::NAN)));
+        assert!(!neg.equals(&CelDouble::from(f64::NAN)));
+        assert!(!int.equals(&CelString::from("42")));
     }
 }
