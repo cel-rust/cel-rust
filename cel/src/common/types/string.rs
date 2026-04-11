@@ -167,6 +167,22 @@ fn starts_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val
     )
 }
 
+#[cfg(feature = "regex")]
+fn matches<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    super::binary_fn(
+        args,
+        super::STRING_TYPE,
+        super::STRING_TYPE,
+        |this: &String, regex: &String| match regex::Regex::new(regex.inner()) {
+            Ok(re) => Ok(Box::new(CelBool::from(re.is_match(this.inner())))),
+            Err(err) => Err(ExecutionError::FunctionError {
+                function: "matches".to_string(),
+                message: format!("'{}' not a valid regex:\n{err}", regex.inner()),
+            }),
+        },
+    )
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
     env.add_member_overload(
         "contains",
@@ -205,6 +221,15 @@ pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
         super::STRING_TYPE,
         vec![super::STRING_TYPE],
         starts_with_string,
+    )
+    .expect("Must be unique id");
+    #[cfg(feature = "regex")]
+    env.add_member_overload(
+        "matches",
+        "matches",
+        super::STRING_TYPE,
+        vec![super::STRING_TYPE],
+        matches,
     )
     .expect("Must be unique id");
 }
