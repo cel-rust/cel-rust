@@ -633,11 +633,11 @@ mod tests {
             ),
             (
                 "timestamp string",
-                "timestamp('2023-05-28T00:00:00Z').string() == '2023-05-28T00:00:00+00:00'",
+                "string(timestamp('2023-05-28T00:00:00Z')) == '2023-05-28T00:00:00+00:00'",
             ),
             (
                 "timestamp timestamp",
-                "timestamp(timestamp('2023-05-28T00:00:00Z')).string() == '2023-05-28T00:00:00+00:00'",
+                "string(timestamp(timestamp('2023-05-28T00:00:00Z'))) == '2023-05-28T00:00:00+00:00'",
             ),
             (
                 "timestamp getFullYear",
@@ -784,10 +784,10 @@ mod tests {
     #[test]
     fn test_chrono_string() {
         [
-            ("duration", "duration('1h30m').string() == '1h30m0s'"),
+            ("duration", "string(duration('1h30m')) == '1h30m0s'"),
             (
                 "timestamp",
-                "timestamp('2023-05-29T00:00:00Z').string() == '2023-05-29T00:00:00+00:00'",
+                "string(timestamp('2023-05-29T00:00:00Z')) == '2023-05-29T00:00:00+00:00'",
             ),
         ]
         .iter()
@@ -841,10 +841,10 @@ mod tests {
     #[test]
     fn test_string() {
         [
-            ("string", "'foo'.string() == 'foo'"),
-            ("int", "10.string() == '10'"),
-            ("float", "10.5.string() == '10.5'"),
-            ("bytes", "b'foo'.string() == 'foo'"),
+            ("string", "string('foo') == 'foo'"),
+            ("int", "string(10) == '10'"),
+            ("float", "string(10.5) == '10.5'"),
+            ("bytes", "string(b'foo') == 'foo'"),
         ]
         .iter()
         .for_each(assert_script);

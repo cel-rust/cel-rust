@@ -1,6 +1,8 @@
 use crate::common::traits::{self, Adder, Comparer, Sizer};
-use crate::common::types::{CelBool, CelInt, Type};
-use crate::common::value::Val;
+use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelUInt, Type};
+#[cfg(feature = "chrono")]
+use crate::common::types::{CelDuration, CelTimestamp};
+use crate::common::value::{Downcast, Val};
 use crate::ExecutionError;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -183,7 +185,84 @@ fn matches<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Executio
     )
 }
 
+fn string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let mut args = args;
+    let arg = args.remove(0).into_owned();
+    let ret: Result<Box<String>, Box<dyn Val>> = match arg.get_type() {
+        super::STRING_TYPE => arg.downcast::<String>(),
+        super::INT_TYPE => arg
+            .downcast::<CelInt>()
+            .map(|arg| Box::new(String::from(arg.to_string()))),
+        super::UINT_TYPE => arg
+            .downcast::<CelUInt>()
+            .map(|arg| Box::new(String::from(arg.to_string()))),
+        super::DOUBLE_TYPE => arg
+            .downcast::<CelDouble>()
+            .map(|arg| Box::new(String::from(arg.to_string()))),
+        super::BYTES_TYPE => arg.downcast::<CelBytes>().map(|arg| {
+            Box::new(String::from(
+                StdString::from_utf8_lossy(arg.inner()).as_ref(),
+            ))
+        }),
+        #[cfg(feature = "chrono")]
+        super::TIMESTAMP_TYPE => arg
+            .downcast::<CelTimestamp>()
+            .map(|ts| Box::new(String::from(ts.inner().to_rfc3339()))),
+        #[cfg(feature = "chrono")]
+        super::DURATION_TYPE => arg
+            .downcast::<CelDuration>()
+            .map(|arg| Box::new(String::from(crate::duration::format_duration(arg.inner())))),
+        _ => Err(arg),
+    };
+    match ret {
+        Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
+        Err(arg) => Err(ExecutionError::FunctionError {
+            function: "string".to_owned(),
+            message: format!("cannot convert {arg:?} to string"),
+        }),
+    }
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+    env.add_overload(
+        "string",
+        "string_to_string",
+        vec![super::STRING_TYPE],
+        string,
+    )
+    .expect("Must be unique id");
+    env.add_overload("string", "int64_to_string", vec![super::INT_TYPE], string)
+        .expect("Must be unique id");
+    env.add_overload("string", "uint64_to_string", vec![super::UINT_TYPE], string)
+        .expect("Must be unique id");
+    env.add_overload(
+        "string",
+        "double_to_string",
+        vec![super::DOUBLE_TYPE],
+        string,
+    )
+    .expect("Must be unique id");
+    env.add_overload("string", "bytes_to_string", vec![super::BYTES_TYPE], string)
+        .expect("Must be unique id");
+
+    #[cfg(feature = "chrono")]
+    {
+        env.add_overload(
+            "string",
+            "timestamp_to_string",
+            vec![super::TIMESTAMP_TYPE],
+            string,
+        )
+        .expect("Must be unique id");
+        env.add_overload(
+            "string",
+            "duration_to_string",
+            vec![super::DURATION_TYPE],
+            string,
+        )
+        .expect("Must be unique id");
+    }
+
     env.add_member_overload(
         "contains",
         "contains_string",
