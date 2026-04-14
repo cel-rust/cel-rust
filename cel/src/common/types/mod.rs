@@ -188,7 +188,7 @@ pub const UINT_TYPE: Type = Type {
 pub const UNKNOWN_TYPE: Type = Type::simple_type(Kind::Unknown, "unknown");
 
 impl<'a> Type<'a> {
-    pub const fn simple_type(kind: Kind, name: &str) -> Type<'_> {
+    pub const fn simple_type(kind: Kind, name: &'a str) -> Type<'a> {
         Type {
             kind,
             parameters: &[],
@@ -197,7 +197,7 @@ impl<'a> Type<'a> {
         }
     }
 
-    pub const fn new_list_type<'b>(param: &'b [&'b Type<'b>; 1]) -> Type<'b> {
+    pub const fn new_list_type(param: &'a [&'a Type<'a>; 1]) -> Type<'a> {
         Type {
             kind: Kind::List,
             parameters: param,
@@ -210,7 +210,7 @@ impl<'a> Type<'a> {
         }
     }
 
-    pub const fn new_map_type<'b>(param: &'b [&'b Type<'b>; 2]) -> Type<'b> {
+    pub const fn new_map_type(param: &'a [&'a Type<'a>; 2]) -> Type<'a> {
         Type {
             kind: Kind::Map,
             parameters: param,
@@ -222,7 +222,7 @@ impl<'a> Type<'a> {
         }
     }
 
-    pub const fn new_unspecified_type(name: &str) -> Type<'_> {
+    pub const fn new_unspecified_type(name: &'a str) -> Type<'a> {
         Type {
             kind: Kind::Unspecified,
             parameters: &[],
@@ -231,7 +231,7 @@ impl<'a> Type<'a> {
         }
     }
 
-    pub const fn new_opaque_type(name: &str) -> Type<'_> {
+    pub const fn new_opaque_type(name: &'a str) -> Type<'a> {
         Type {
             kind: Kind::Opaque,
             parameters: &[],
