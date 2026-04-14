@@ -14,6 +14,8 @@ pub(crate) mod map;
 mod null;
 mod optional;
 pub(crate) mod string;
+#[cfg(feature = "structs")]
+pub(crate) mod r#struct;
 #[cfg(feature = "chrono")]
 pub(crate) mod timestamp;
 pub(crate) mod uint;
@@ -31,6 +33,8 @@ pub use map::DefaultMap as CelMap;
 pub use map::Key as CelMapKey;
 pub use null::Null as CelNull;
 pub use optional::Optional as CelOptional;
+#[cfg(feature = "structs")]
+pub use r#struct::Struct as CelStruct;
 pub use string::String as CelString;
 #[cfg(feature = "chrono")]
 pub use timestamp::Timestamp as CelTimestamp;
@@ -237,6 +241,16 @@ impl<'a> Type<'a> {
             parameters: &[],
             runtime_type_name: name,
             trait_mask: 0,
+        }
+    }
+
+    #[cfg(feature = "structs")]
+    pub const fn new_struct_type(name: &'a str) -> Type<'a> {
+        Type {
+            kind: Kind::Struct,
+            parameters: &[],
+            runtime_type_name: name,
+            trait_mask: traits::FIELD_TESTER_TYPE | traits::INDEXER_TYPE,
         }
     }
 

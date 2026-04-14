@@ -561,6 +561,8 @@ pub enum Value {
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
     Opaque(Arc<dyn Opaque>),
+    #[cfg(feature = "structs")]
+    Struct(Arc<CelStruct>),
     Null,
 }
 
@@ -582,6 +584,8 @@ impl Debug for Value {
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Opaque(o) => write!(f, "Opaque<{}>({:?})", o.runtime_type_name(), o.as_debug()),
             Value::Null => write!(f, "Null"),
+            #[cfg(feature = "structs")]
+            Value::Struct(s) => write!(f, "{} {{}}", s.name()),
         }
     }
 }
@@ -601,6 +605,8 @@ pub enum ValueType {
     Timestamp,
     Opaque,
     Null,
+    #[cfg(feature = "structs")]
+    Struct,
 }
 
 impl Display for ValueType {
@@ -619,6 +625,8 @@ impl Display for ValueType {
             ValueType::Duration => write!(f, "duration"),
             ValueType::Timestamp => write!(f, "timestamp"),
             ValueType::Null => write!(f, "null"),
+            #[cfg(feature = "structs")]
+            ValueType::Struct => write!(f, "struct"),
         }
     }
 }
@@ -641,6 +649,8 @@ impl Value {
             #[cfg(feature = "chrono")]
             Value::Timestamp(_) => ValueType::Timestamp,
             Value::Null => ValueType::Null,
+            #[cfg(feature = "structs")]
+            Value::Struct(_) => ValueType::Struct,
         }
     }
 
@@ -917,6 +927,19 @@ impl TryFrom<&dyn Val> for Value {
                 }
             })),
             _ => {
+                #[cfg(feature = "structs")]
+                {
+                    if let Some(v) = v.downcast_ref::<CelStruct>() {
+                        use crate::common::value::Downcast;
+
+                        return match v.clone_as_boxed().downcast::<CelStruct>() {
+                            Ok(v) => Ok(Value::Struct(Arc::new(*v))),
+                            Err(v) => Err(ExecutionError::InternalError(format!(
+                                "Not a Struct: `{v:?}`"
+                            ))),
+                        };
+                    }
+                }
                 if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
                     Ok(Value::Opaque(opaque.val.clone()))
                 } else {
@@ -1473,7 +1496,20 @@ impl Value {
                     Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
                 ))
             }
-            Expr::Struct(_) => todo!("Support structs!"),
+            Expr::Struct(strct) => {
+                let name = strct.type_name.clone();
+                #[cfg(not(feature = "structs"))]
+                {
+                    Err(ExecutionError::InternalError(format!(
+                        "Found struct {name}, feature not enabled!"
+                    )))
+                }
+                #[cfg(feature = "structs")]
+                {
+                    let s = CelStruct::new(name);
+                    Ok(Cow::<dyn Val>::Owned(Box::new(s)))
+                }
+            }
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
         }
     }
@@ -2539,6 +2575,26 @@ mod tests {
                     map: Arc::from(HashMap::new())
                 }))
             );
+        }
+    }
+
+    #[cfg(feature = "structs")]
+    mod structs {
+        use std::sync::Arc;
+
+        use crate::{common::types::CelStruct, Context, Program, Value};
+
+        #[test]
+        fn test_empty_struct() {
+            let program = Program::compile("cel.MyStruct {}").unwrap();
+            let value = program.execute(&Context::default()).unwrap();
+            match value {
+                Value::Struct(s) => assert_eq!(s.name(), "cel.MyStruct"),
+                _ => assert_eq!(
+                    value,
+                    Value::Struct(Arc::new(CelStruct::new("cel.MyStruct".to_string())))
+                ),
+            }
         }
     }
 }

@@ -116,6 +116,8 @@ pub enum ExecutionError {
     Overflow(&'static str, Value, Value),
     #[error("Index out of bounds: {0:?}")]
     IndexOutOfBounds(Value),
+    #[error("InternalError: {0:?}")]
+    InternalError(String),
 }
 
 impl ExecutionError {
