@@ -409,18 +409,20 @@ impl dyn Opaque {
     }
 }
 
-#[derive(Clone)]
-struct OpaqueVal(Arc<dyn Opaque>);
+struct OpaqueVal {
+    r#type: Type<'static>,
+    val: Arc<dyn Opaque>,
+}
 
 impl Debug for OpaqueVal {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "OpaqueVal<{}>", self.0.runtime_type_name())
+        write!(f, "OpaqueVal<{}>", self.val.runtime_type_name())
     }
 }
 
 impl Val for OpaqueVal {
-    fn get_type(&self) -> Type<'_> {
-        Type::new_opaque_type(self.0.runtime_type_name())
+    fn get_type(&self) -> &Type<'_> {
+        &self.r#type
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
@@ -429,19 +431,43 @@ impl Val for OpaqueVal {
         } else {
             match other.downcast_ref::<OpaqueVal>() {
                 None => false,
-                Some(other) => self.0.opaque_eq(other.0.deref()),
+                Some(other) => self.val.opaque_eq(other.val.deref()),
             }
         }
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(self.clone())
+        Box::new(Self {
+            r#type: Type::new_opaque_type(self.val.runtime_type_name().to_owned().leak()),
+            val: self.val.clone(),
+        })
     }
 }
 
 impl OpaqueVal {
+    fn new(val: Arc<dyn Opaque>) -> Self {
+        Self {
+            r#type: Type::new_opaque_type(val.runtime_type_name().to_owned().leak()),
+            val,
+        }
+    }
+
     fn clone_inner(&self) -> Arc<dyn Opaque> {
-        self.0.clone()
+        self.val.clone()
+    }
+}
+
+impl Drop for OpaqueVal {
+    fn drop(&mut self) {
+        let name = self.r#type.name();
+
+        let ptr = name.as_ptr();
+        let len = name.len();
+
+        // SAFETY `Type` is not `Clone` and is solely owned by this
+        // We leak the name on `OpaqueVal::new` to get a &'static str, that we now no longer need
+        let name = unsafe { String::from_raw_parts(ptr as *mut u8, len, len) };
+        std::mem::drop(name);
     }
 }
 
@@ -831,7 +857,7 @@ impl From<Value> for ResolveResult {
 impl TryFrom<&dyn Val> for Value {
     type Error = ExecutionError;
     fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
-        match v.get_type() {
+        match *v.get_type() {
             BOOL_TYPE => Ok(Value::Bool(*v.downcast_ref::<CelBool>().unwrap().inner())),
             INT_TYPE => Ok(Value::Int(*v.downcast_ref::<CelInt>().unwrap().inner())),
             UINT_TYPE => Ok(Value::UInt(*v.downcast_ref::<CelUInt>().unwrap().inner())),
@@ -892,7 +918,7 @@ impl TryFrom<&dyn Val> for Value {
             })),
             _ => {
                 if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
-                    Ok(Value::Opaque(opaque.0.clone()))
+                    Ok(Value::Opaque(opaque.val.clone()))
                 } else {
                     Err(ExecutionError::UnexpectedType {
                         got: v.get_type().name().to_string(),
@@ -941,7 +967,7 @@ impl TryFrom<Value> for Box<dyn Val> {
                         Some(v) => Box::new(CelOptional::of(v.clone().try_into()?)),
                     }
                 } else {
-                    Box::new(OpaqueVal(o))
+                    Box::new(OpaqueVal::new(o))
                 };
                 Ok(v)
             }
@@ -1076,7 +1102,7 @@ impl Value {
                         operators::OPT_SELECT => {
                             let operand = Value::resolve_val(&call.args[0], ctx)?;
                             let field_literal = Value::resolve_val(&call.args[1], ctx)?;
-                            let field = match field_literal.get_type() {
+                            let field = match *field_literal.get_type() {
                                 STRING_TYPE => field_literal
                                     .downcast_ref::<CelString>()
                                     .expect("field must be string"),
@@ -1349,7 +1375,7 @@ impl Value {
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
-                match left.get_type() {
+                match *left.get_type() {
                     MAP_TYPE => {
                         let key: CelString = select.field.as_str().into();
                         if select.test {
@@ -2020,9 +2046,9 @@ mod tests {
             pub fn my_fn(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
                 if let Some(Some(opaque)) = ftx.this.as_ref().map(|v| v.downcast_ref::<OpaqueVal>())
                 {
-                    if opaque.0.runtime_type_name() == "my_struct" {
+                    if opaque.val.runtime_type_name() == "my_struct" {
                         Ok(opaque
-                            .0
+                            .val
                             .deref()
                             .downcast_ref::<MyStruct>()
                             .unwrap()
@@ -2031,7 +2057,7 @@ mod tests {
                             .into())
                     } else {
                         Err(ExecutionError::UnexpectedType {
-                            got: opaque.0.runtime_type_name().to_string(),
+                            got: opaque.val.runtime_type_name().to_string(),
                             want: "my_struct".to_string(),
                         })
                     }

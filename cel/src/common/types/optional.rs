@@ -21,8 +21,8 @@ impl OptionalInternal {
 }
 
 impl Val for Optional {
-    fn get_type(&self) -> Type<'_> {
-        super::OPTIONAL_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::OPTIONAL_TYPE
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {

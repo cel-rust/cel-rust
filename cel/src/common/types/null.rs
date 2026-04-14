@@ -5,8 +5,8 @@ use crate::common::value::Val;
 pub struct Null;
 
 impl Val for Null {
-    fn get_type(&self) -> Type<'_> {
-        super::NULL_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::NULL_TYPE
     }
 
     fn equals(&self, other: &dyn Val) -> bool {

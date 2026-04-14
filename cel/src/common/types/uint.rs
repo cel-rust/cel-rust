@@ -28,8 +28,8 @@ impl Deref for UInt {
 }
 
 impl Val for UInt {
-    fn get_type(&self) -> Type<'_> {
-        super::UINT_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::UINT_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {
@@ -240,7 +240,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a u64 {
 fn uint<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let mut args = args;
     let arg = args.remove(0).into_owned();
-    let ret: Result<Box<UInt>, Box<dyn Val>> = match arg.get_type() {
+    let ret: Result<Box<UInt>, Box<dyn Val>> = match *arg.get_type() {
         super::UINT_TYPE => arg.downcast::<UInt>(),
         super::INT_TYPE => arg
             .downcast::<CelInt>()

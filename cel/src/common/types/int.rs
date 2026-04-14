@@ -29,8 +29,8 @@ impl Deref for Int {
 }
 
 impl Val for Int {
-    fn get_type(&self) -> Type<'_> {
-        super::INT_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::INT_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn traits::Adder> {
@@ -219,7 +219,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
 fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let mut args = args;
     let arg = args.remove(0).into_owned();
-    let ret: Result<Box<Int>, Box<dyn Val>> = match arg.get_type() {
+    let ret: Result<Box<Int>, Box<dyn Val>> = match *arg.get_type() {
         super::INT_TYPE => arg.downcast::<Int>(),
         super::UINT_TYPE => arg
             .downcast::<CelUInt>()

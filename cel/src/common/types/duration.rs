@@ -27,8 +27,8 @@ impl Deref for Duration {
 }
 
 impl Val for Duration {
-    fn get_type(&self) -> Type<'_> {
-        super::DURATION_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::DURATION_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {

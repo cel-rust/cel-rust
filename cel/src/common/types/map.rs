@@ -34,8 +34,8 @@ impl Deref for DefaultMap {
 }
 
 impl Val for DefaultMap {
-    fn get_type(&self) -> Type<'_> {
-        types::MAP_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &types::MAP_TYPE
     }
 
     fn as_container(&self) -> Option<&dyn Container> {
@@ -316,7 +316,7 @@ impl TryFrom<Box<dyn Val>> for Key {
     type Error = ExecutionError;
 
     fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
-        let key = match value.get_type() {
+        let key = match *value.get_type() {
             types::BOOL_TYPE => value
                 .downcast_ref::<CelBool>()
                 .copied()

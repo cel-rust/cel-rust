@@ -23,8 +23,8 @@ impl Timestamp {
 }
 
 impl Val for Timestamp {
-    fn get_type(&self) -> Type<'_> {
-        super::TIMESTAMP_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::TIMESTAMP_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {

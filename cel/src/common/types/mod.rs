@@ -60,7 +60,8 @@ pub enum Kind {
     Unknown,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+// This cannot be made `Clone`, see `OpaqueVal`'s `Drop`
+#[derive(Debug, Eq, PartialEq)]
 pub struct Type<'a> {
     kind: Kind,
     parameters: &'a [&'a Type<'a>],
@@ -70,7 +71,7 @@ pub struct Type<'a> {
 
 impl Type<'_> {
     pub fn is_assignable(&self, val: &dyn Val) -> bool {
-        *self == val.get_type()
+        self == val.get_type()
     }
 }
 

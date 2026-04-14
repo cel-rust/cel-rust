@@ -7,7 +7,7 @@ use std::any::Any;
 use std::fmt::Debug;
 
 pub trait Val: Any + Debug + Send + Sync {
-    fn get_type(&self) -> Type<'_>;
+    fn get_type(&self) -> &Type<'_>;
 
     fn as_adder(&self) -> Option<&dyn Adder> {
         None
@@ -110,7 +110,7 @@ mod test {
     use std::borrow::Cow;
 
     fn test(val: &dyn Val) -> bool {
-        val.get_type() == types::STRING_TYPE
+        *val.get_type() == types::STRING_TYPE
     }
 
     #[test]

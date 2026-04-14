@@ -31,8 +31,8 @@ impl Deref for String {
 }
 
 impl Val for String {
-    fn get_type(&self) -> Type<'_> {
-        super::STRING_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::STRING_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {
@@ -188,7 +188,7 @@ fn matches<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Executio
 fn string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let mut args = args;
     let arg = args.remove(0).into_owned();
-    let ret: Result<Box<String>, Box<dyn Val>> = match arg.get_type() {
+    let ret: Result<Box<String>, Box<dyn Val>> = match *arg.get_type() {
         super::STRING_TYPE => arg.downcast::<String>(),
         super::INT_TYPE => arg
             .downcast::<CelInt>()

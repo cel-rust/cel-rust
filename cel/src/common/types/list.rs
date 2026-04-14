@@ -37,8 +37,8 @@ impl Deref for DefaultList {
 }
 
 impl Val for DefaultList {
-    fn get_type(&self) -> Type<'_> {
-        types::LIST_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &types::LIST_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {
@@ -103,7 +103,7 @@ impl Container for DefaultList {
 
 impl Indexer for DefaultList {
     fn get<'a>(&'a self, idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        match idx.get_type() {
+        match *idx.get_type() {
             types::INT_TYPE => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
@@ -141,7 +141,7 @@ impl Indexer for DefaultList {
 
     fn steal(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
         let mut list = self;
-        match idx.get_type() {
+        match *idx.get_type() {
             types::INT_TYPE => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()

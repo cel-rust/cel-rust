@@ -28,8 +28,8 @@ impl Deref for Double {
 }
 
 impl Val for Double {
-    fn get_type(&self) -> Type<'_> {
-        super::DOUBLE_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::DOUBLE_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {
@@ -189,7 +189,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a f64 {
 fn double<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let mut args = args;
     let arg = args.remove(0).into_owned();
-    let ret: Result<Box<Double>, Box<dyn Val>> = match arg.get_type() {
+    let ret: Result<Box<Double>, Box<dyn Val>> = match *arg.get_type() {
         super::DOUBLE_TYPE => arg.downcast::<Double>(),
         super::INT_TYPE => arg
             .downcast::<CelInt>()

@@ -29,8 +29,8 @@ impl Deref for Bytes {
 }
 
 impl Val for Bytes {
-    fn get_type(&self) -> Type<'_> {
-        super::BYTES_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::BYTES_TYPE
     }
 
     fn as_adder(&self) -> Option<&dyn Adder> {

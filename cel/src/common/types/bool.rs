@@ -30,8 +30,8 @@ impl Deref for Bool {
 }
 
 impl Val for Bool {
-    fn get_type(&self) -> Type<'_> {
-        super::BOOL_TYPE
+    fn get_type(&self) -> &Type<'_> {
+        &super::BOOL_TYPE
     }
 
     fn as_comparer(&self) -> Option<&dyn Comparer> {
@@ -117,7 +117,7 @@ mod tests {
     #[test]
     fn test_type() {
         let value = Bool(true);
-        assert_eq!(value.get_type(), types::BOOL_TYPE);
+        assert_eq!(*value.get_type(), types::BOOL_TYPE);
         assert_eq!(value.get_type().kind, Kind::Boolean);
     }
 }
