@@ -1506,7 +1506,20 @@ impl Value {
                 }
                 #[cfg(feature = "structs")]
                 {
-                    let s = CelStruct::new(name);
+                    let mut s = CelStruct::new(name);
+                    for entry in &strct.entries {
+                        match &entry.expr {
+                            EntryExpr::StructField(expr) => {
+                                let f = expr.field.clone();
+                                s.add_field_value(f, Value::resolve_val(&expr.value, ctx)?);
+                            }
+                            EntryExpr::MapEntry(entry) => {
+                                return Err(ExecutionError::InternalError(format!(
+                                    "Expected struct_field_expr, got {entry:?}"
+                                )))
+                            }
+                        }
+                    }
                     Ok(Cow::<dyn Val>::Owned(Box::new(s)))
                 }
             }
@@ -2582,7 +2595,13 @@ mod tests {
     mod structs {
         use std::sync::Arc;
 
-        use crate::{common::types::CelStruct, Context, Program, Value};
+        use crate::{
+            common::{
+                types::{CelBool, CelInt},
+                value::Val,
+            },
+            Context, Program, Value,
+        };
 
         #[test]
         fn test_empty_struct() {
@@ -2590,10 +2609,34 @@ mod tests {
             let value = program.execute(&Context::default()).unwrap();
             match value {
                 Value::Struct(s) => assert_eq!(s.name(), "cel.MyStruct"),
-                _ => assert_eq!(
-                    value,
-                    Value::Struct(Arc::new(CelStruct::new("cel.MyStruct".to_string())))
-                ),
+                _ => panic!("This can't be!"),
+            }
+        }
+
+        #[test]
+        fn test_struct() {
+            let program =
+                Program::compile("cel.Problem { solved: 0 != null, answer: 21 * 2 }").unwrap();
+            let value = program.execute(&Context::default()).unwrap();
+            match value {
+                Value::Struct(s) => {
+                    assert_eq!(s.name(), "cel.Problem");
+                    assert_eq!(
+                        s.field_value("solved"),
+                        Some(&CelBool::from(true) as &dyn Val)
+                    );
+                    assert_eq!(s.field_value("answer"), Some(&CelInt::from(42) as &dyn Val));
+                    assert_eq!(s.field_values().len(), 2);
+                    assert_eq!(
+                        s.field_values().get("solved").cloned(),
+                        Some(Arc::new(CelBool::from(true)) as Arc<dyn Val>)
+                    );
+                    assert_eq!(
+                        s.field_values().get("answer").cloned(),
+                        Some(Arc::new(CelInt::from(42)) as Arc<dyn Val>)
+                    );
+                }
+                _ => panic!("This can't be!"),
             }
         }
     }

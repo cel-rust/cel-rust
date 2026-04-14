@@ -1,19 +1,35 @@
+use std::{borrow::Cow, collections::BTreeMap, ops::Deref, sync::Arc};
+
 use crate::common::{types::Type, value::Val};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug)]
 pub struct Struct {
     r#type: Type<'static>,
+    entries: BTreeMap<String, Arc<dyn Val>>,
 }
 
 impl Struct {
     pub fn new(name: String) -> Self {
         Self {
             r#type: Type::new_struct_type(name.leak()),
+            entries: BTreeMap::default(),
         }
     }
 
     pub fn name(&self) -> &str {
         self.r#type.name()
+    }
+
+    pub fn field_value(&self, name: &str) -> Option<&dyn Val> {
+        self.entries.get(name).map(Deref::deref)
+    }
+
+    pub fn add_field_value(&mut self, name: String, value: Cow<dyn Val>) {
+        self.entries.insert(name, Arc::from(value.into_owned()));
+    }
+
+    pub fn field_values(&self) -> BTreeMap<String, Arc<dyn Val>> {
+        self.entries.clone()
     }
 }
 
@@ -25,6 +41,11 @@ impl Val for Struct {
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Self {
             r#type: Type::new_struct_type(self.name().to_owned().leak()),
+            entries: self
+                .entries
+                .iter()
+                .map(|(k, v)| (k.clone(), Arc::from(v.clone_as_boxed())))
+                .collect(),
         })
     }
 }
