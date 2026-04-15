@@ -1511,12 +1511,19 @@ impl Value {
                 }
                 #[cfg(feature = "structs")]
                 {
-                    let mut s = CelStruct::new(name);
+                    let struct_def =
+                        ctx.env()
+                            .find_struct(&name)
+                            .ok_or(ExecutionError::UnexpectedType {
+                                got: name.to_owned(),
+                                want: "known struct".to_owned(),
+                            })?;
+                    let mut fields = std::collections::BTreeMap::new();
                     for entry in &strct.entries {
                         match &entry.expr {
                             EntryExpr::StructField(expr) => {
                                 let f = expr.field.clone();
-                                s.add_field_value(f, Value::resolve_val(&expr.value, ctx)?);
+                                fields.insert(f, Value::resolve_val(&expr.value, ctx)?);
                             }
                             EntryExpr::MapEntry(entry) => {
                                 return Err(ExecutionError::InternalError(format!(
@@ -1525,6 +1532,7 @@ impl Value {
                             }
                         }
                     }
+                    let s = struct_def.new_struct(fields)?;
                     Ok(Cow::<dyn Val>::Owned(Box::new(s)))
                 }
             }
@@ -2602,16 +2610,19 @@ mod tests {
 
         use crate::{
             common::{
-                types::{CelBool, CelInt},
+                types::{self, CelBool, CelInt},
                 value::Val,
             },
-            Context, ExecutionError, Program, Value,
+            env::StructDef,
+            Context, Env, ExecutionError, Program, Value,
         };
 
         #[test]
         fn test_empty_struct() {
+            let mut env = Env::stdlib();
+            env.add_struct(StructDef::new(String::from("cel.MyStruct")));
             let program = Program::compile("cel.MyStruct {}").unwrap();
-            let value = program.execute(&Context::default()).unwrap();
+            let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
             match value {
                 Value::Struct(s) => assert_eq!(s.name(), "cel.MyStruct"),
                 _ => panic!("This can't be!"),
@@ -2620,9 +2631,15 @@ mod tests {
 
         #[test]
         fn test_struct() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.Problem"))
+                    .add_field(String::from("solved"), types::BOOL_TYPE)
+                    .add_field(String::from("answer"), types::INT_TYPE),
+            );
             let program =
                 Program::compile("cel.Problem { solved: 0 != null, answer: 21 * 2 }").unwrap();
-            let value = program.execute(&Context::default()).unwrap();
+            let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
             match value {
                 Value::Struct(s) => {
                     assert_eq!(s.name(), "cel.Problem");
@@ -2647,18 +2664,58 @@ mod tests {
 
         #[test]
         fn test_struct_field_access() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.MyStruct"))
+                    .add_field("some".into(), types::STRING_TYPE),
+            );
             let program = Program::compile("cel.MyStruct { some: 'value' }.some").unwrap();
-            let value = program.execute(&Context::default()).unwrap();
+            let value = program.execute(&Context::with_env(env.into())).unwrap();
             assert_eq!(value, Value::String(Arc::new("value".to_owned())));
         }
 
         #[test]
+        fn test_struct_no_such_field() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.MyStruct"))
+                    .add_field("some".into(), types::STRING_TYPE),
+            );
+            let program = Program::compile("cel.MyStruct { not_here: 'value' }").unwrap();
+            let result = program.execute(&Context::with_env(env.into()));
+            assert_eq!(
+                result,
+                Err(ExecutionError::NoSuchKey(
+                    String::from("field `not_here` on struct `cel.MyStruct`").into()
+                ))
+            );
+        }
+
+        #[test]
         fn test_struct_no_such_field_access() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.MyStruct"))
+                    .add_field("some".into(), types::STRING_TYPE),
+            );
+            let program = Program::compile("cel.MyStruct { some: 'value' }.not_here").unwrap();
+            let result = program.execute(&Context::with_env(env.into()));
+            assert_eq!(
+                result,
+                Err(ExecutionError::NoSuchKey(String::from("not_here").into()))
+            );
+        }
+
+        #[test]
+        fn unknown_struct() {
             let program = Program::compile("cel.MyStruct { some: 'value' }.not_here").unwrap();
             let result = program.execute(&Context::default());
             assert_eq!(
                 result,
-                Err(ExecutionError::NoSuchKey(String::from("not_here").into()))
+                Err(ExecutionError::UnexpectedType {
+                    got: String::from("cel.MyStruct"),
+                    want: String::from("known struct")
+                })
             );
         }
     }

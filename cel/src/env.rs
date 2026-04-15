@@ -4,6 +4,8 @@ use crate::common::{
     types::{self, Type},
     value::Val,
 };
+#[cfg(feature = "structs")]
+use crate::{common::types::CelStruct, ExecutionError};
 use std::{
     borrow::Cow,
     collections::{
@@ -15,6 +17,7 @@ use std::{
 #[derive(Default)]
 pub struct Env<'a> {
     functions: BTreeMap<String, FunctionDecl<'a>>,
+    structs: BTreeMap<String, StructDef<'a>>,
 }
 
 impl<'a> Env<'a> {
@@ -97,6 +100,78 @@ impl<'a> Env<'a> {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(true, args),
         }
+    }
+
+    pub fn add_struct(&mut self, def: StructDef<'a>) {
+        self.structs.insert(def.name.clone(), def);
+    }
+
+    #[cfg(feature = "structs")]
+    pub(crate) fn find_struct(&self, name: &str) -> Option<&StructDef<'a>> {
+        self.structs.get(name)
+    }
+}
+
+pub struct StructDef<'a> {
+    name: String,
+    fields: BTreeMap<String, Type<'a>>,
+    defaults: BTreeMap<String, Box<dyn Val>>,
+}
+
+impl<'a> StructDef<'a> {
+    pub fn new(name: String) -> Self {
+        Self {
+            name,
+            fields: Default::default(),
+            defaults: Default::default(),
+        }
+    }
+
+    pub fn add_field(self, field: String, t: Type<'a>) -> Self {
+        self.add_field_with_default(field, t, None)
+    }
+
+    pub fn add_field_with_default(
+        self,
+        field: String,
+        t: Type<'a>,
+        default: Option<Box<dyn Val>>,
+    ) -> Self {
+        let mut def = self;
+        def.fields.insert(field.clone(), t);
+        if let Some(default) = default {
+            def.defaults.insert(field, default);
+        }
+        def
+    }
+
+    #[cfg(feature = "structs")]
+    pub(crate) fn new_struct(
+        &self,
+        fields: BTreeMap<String, std::borrow::Cow<dyn Val>>,
+    ) -> Result<CelStruct, ExecutionError> {
+        let mut s = CelStruct::new(self.name.clone());
+        // TODO: insert default values
+        for (field, value) in fields {
+            match self.fields.get(&field) {
+                Some(t) => {
+                    if t != value.get_type() {
+                        return Err(ExecutionError::UnexpectedType {
+                            got: value.get_type().name().to_owned(),
+                            want: format!("{} for field {field} in {}", t.name(), self.name),
+                        });
+                    }
+                    s.add_field_value(field, value);
+                }
+                None => {
+                    return Err(ExecutionError::NoSuchKey(std::sync::Arc::new(format!(
+                        "field `{field}` on struct `{}`",
+                        self.name
+                    ))))
+                }
+            }
+        }
+        Ok(s)
     }
 }
 
