@@ -1,6 +1,13 @@
 use std::{borrow::Cow, collections::BTreeMap, ops::Deref, sync::Arc};
 
-use crate::common::{types::Type, value::Val};
+use crate::{
+    common::{
+        traits::Indexer,
+        types::{CelString, Type},
+        value::Val,
+    },
+    ExecutionError,
+};
 
 #[derive(Debug)]
 pub struct Struct {
@@ -47,6 +54,42 @@ impl Val for Struct {
                 .map(|(k, v)| (k.clone(), Arc::from(v.clone_as_boxed())))
                 .collect(),
         })
+    }
+
+    fn as_indexer(&self) -> Option<&dyn crate::common::traits::Indexer> {
+        Some(self)
+    }
+
+    fn into_indexer(self: Box<Self>) -> Option<Box<dyn crate::common::traits::Indexer>> {
+        Some(self)
+    }
+
+    fn equals(&self, _other: &dyn Val) -> bool {
+        false
+    }
+}
+
+impl Indexer for Struct {
+    fn get<'a>(&'a self, idx: &dyn Val) -> Result<Cow<'a, dyn Val>, crate::ExecutionError> {
+        if let Some(field) = idx.downcast_ref::<CelString>() {
+            self.field_value(field.inner())
+                .map(Cow::Borrowed)
+                .ok_or(ExecutionError::NoSuchKey(Arc::new(String::from(
+                    field.inner(),
+                ))))
+        } else {
+            Err(ExecutionError::UnsupportedIndex(
+                idx.try_into()?,
+                (self as &dyn Val).try_into()?,
+            ))
+        }
+    }
+
+    fn steal(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val>, crate::ExecutionError> {
+        // TODO: Can't implement this right now really, as we impl `Drop`, can't take ownership of
+        // the fields easily... let's see if this pattern sticks first, then we'll optimize the call
+        // to be no copy
+        self.get(idx).map(Cow::into_owned)
     }
 }
 

@@ -1398,9 +1398,9 @@ impl Value {
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                let key: CelString = select.field.as_str().into();
                 match *left.get_type() {
                     MAP_TYPE => {
-                        let key: CelString = select.field.as_str().into();
                         if select.test {
                             Ok(bool(
                                 left.as_container()
@@ -1421,7 +1421,12 @@ impl Value {
                             ))
                         }
                     }
-                    _ => Ok(bool(false)),
+                    _ => Ok(Cow::<dyn Val>::Owned(
+                        left.as_indexer()
+                            .ok_or_else(|| ExecutionError::NoSuchOverload)?
+                            .get(&key)?
+                            .into_owned(),
+                    )),
                 }
             }
             Expr::List(list_expr) => {
@@ -2600,7 +2605,7 @@ mod tests {
                 types::{CelBool, CelInt},
                 value::Val,
             },
-            Context, Program, Value,
+            Context, ExecutionError, Program, Value,
         };
 
         #[test]
@@ -2638,6 +2643,23 @@ mod tests {
                 }
                 _ => panic!("This can't be!"),
             }
+        }
+
+        #[test]
+        fn test_struct_field_access() {
+            let program = Program::compile("cel.MyStruct { some: 'value' }.some").unwrap();
+            let value = program.execute(&Context::default()).unwrap();
+            assert_eq!(value, Value::String(Arc::new("value".to_owned())));
+        }
+
+        #[test]
+        fn test_struct_no_such_field_access() {
+            let program = Program::compile("cel.MyStruct { some: 'value' }.not_here").unwrap();
+            let result = program.execute(&Context::default());
+            assert_eq!(
+                result,
+                Err(ExecutionError::NoSuchKey(String::from("not_here").into()))
+            );
         }
     }
 }
