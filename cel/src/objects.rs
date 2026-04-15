@@ -2610,7 +2610,7 @@ mod tests {
 
         use crate::{
             common::{
-                types::{self, CelBool, CelInt},
+                types::{self, CelBool, CelInt, CelString},
                 value::Val,
             },
             env::StructDef,
@@ -2689,6 +2689,41 @@ mod tests {
                     String::from("field `not_here` on struct `cel.MyStruct`").into()
                 ))
             );
+        }
+
+        #[test]
+        fn test_struct_with_default() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.MyStruct"))
+                    .add_field("some".into(), types::STRING_TYPE)
+                    .add_field_with_default(
+                        "here".into(),
+                        types::STRING_TYPE,
+                        Some(Box::new(CelString::from("yes"))),
+                    ),
+            );
+            let program = Program::compile("cel.MyStruct { some: 'value' }.here").unwrap();
+            let result = program.execute(&Context::with_env(env.into()));
+            assert_eq!(result, Ok(Value::String(Arc::new(String::from("yes")))));
+        }
+
+        #[test]
+        fn test_struct_with_default_overwritten() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.MyStruct"))
+                    .add_field("some".into(), types::STRING_TYPE)
+                    .add_field_with_default(
+                        "here".into(),
+                        types::STRING_TYPE,
+                        Some(Box::new(CelString::from("yes"))),
+                    ),
+            );
+            let program =
+                Program::compile("cel.MyStruct { some: 'value', here: 'totally' }.here").unwrap();
+            let result = program.execute(&Context::with_env(env.into()));
+            assert_eq!(result, Ok(Value::String(Arc::new(String::from("totally")))));
         }
 
         #[test]

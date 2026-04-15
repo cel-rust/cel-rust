@@ -151,7 +151,14 @@ impl<'a> StructDef<'a> {
         fields: BTreeMap<String, std::borrow::Cow<dyn Val>>,
     ) -> Result<CelStruct, ExecutionError> {
         let mut s = CelStruct::new(self.name.clone());
-        // TODO: insert default values
+        let mut fields = fields;
+        for (field, default) in &self.defaults {
+            if let Some(value) = fields.remove(field) {
+                s.add_field_value(field.clone(), value);
+            } else {
+                s.add_field_value(field.clone(), Cow::Owned(default.clone_as_boxed()));
+            }
+        }
         for (field, value) in fields {
             match self.fields.get(&field) {
                 Some(t) => {
