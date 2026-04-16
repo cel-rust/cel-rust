@@ -2683,11 +2683,7 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
-                    .add_field_with_default(
-                        "here".into(),
-                        types::STRING_TYPE,
-                        Some(Box::new(CelString::from("yes"))),
-                    ),
+                    .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
             );
             let program = Program::compile("cel.MyStruct { some: 'value' }.here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
@@ -2700,11 +2696,7 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
-                    .add_field_with_default(
-                        "here".into(),
-                        types::STRING_TYPE,
-                        Some(Box::new(CelString::from("yes"))),
-                    ),
+                    .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
             );
             let program =
                 Program::compile("cel.MyStruct { some: 'value', here: 'totally' }.here").unwrap();

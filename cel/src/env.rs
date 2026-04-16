@@ -128,15 +128,14 @@ impl StructDef {
     }
 
     pub fn add_field(self, field: String, t: Type) -> Self {
-        self.add_field_with_default(field, t, None)
+        self.insert_field(field, t, None)
     }
 
-    pub fn add_field_with_default(
-        self,
-        field: String,
-        t: Type,
-        default: Option<Box<dyn Val>>,
-    ) -> Self {
+    pub fn add_field_with_default(self, field: String, default: Box<dyn Val>) -> Self {
+        self.insert_field(field, default.get_type().to_owned(), Some(default))
+    }
+
+    fn insert_field(self, field: String, t: Type, default: Option<Box<dyn Val>>) -> Self {
         let mut def = self;
         def.fields.insert(field.clone(), t);
         if let Some(default) = default {
