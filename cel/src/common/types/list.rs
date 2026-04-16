@@ -37,7 +37,7 @@ impl Deref for DefaultList {
 }
 
 impl Val for DefaultList {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &types::LIST_TYPE
     }
 

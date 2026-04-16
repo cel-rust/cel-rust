@@ -28,7 +28,7 @@ impl Deref for UInt {
 }
 
 impl Val for UInt {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &super::UINT_TYPE
     }
 

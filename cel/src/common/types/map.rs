@@ -34,7 +34,7 @@ impl Deref for DefaultMap {
 }
 
 impl Val for DefaultMap {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &types::MAP_TYPE
     }
 

@@ -7,7 +7,7 @@ use std::any::Any;
 use std::fmt::Debug;
 
 pub trait Val: Any + Debug + Send + Sync {
-    fn get_type(&self) -> &Type<'_>;
+    fn get_type<'a>(&self) -> &Type<'a>;
 
     fn as_adder(&self) -> Option<&dyn Adder> {
         None

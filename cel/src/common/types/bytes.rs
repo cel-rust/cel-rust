@@ -29,7 +29,7 @@ impl Deref for Bytes {
 }
 
 impl Val for Bytes {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &super::BYTES_TYPE
     }
 

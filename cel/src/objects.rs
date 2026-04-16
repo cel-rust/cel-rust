@@ -421,7 +421,7 @@ impl Debug for OpaqueVal {
 }
 
 impl Val for OpaqueVal {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &self.r#type
     }
 

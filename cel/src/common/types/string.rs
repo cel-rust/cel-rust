@@ -31,7 +31,7 @@ impl Deref for String {
 }
 
 impl Val for String {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &super::STRING_TYPE
     }
 

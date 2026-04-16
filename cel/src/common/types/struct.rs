@@ -41,7 +41,7 @@ impl Struct {
 }
 
 impl Val for Struct {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &self.r#type
     }
 

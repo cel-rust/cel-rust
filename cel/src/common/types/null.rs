@@ -5,7 +5,7 @@ use crate::common::value::Val;
 pub struct Null;
 
 impl Val for Null {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &super::NULL_TYPE
     }
 

@@ -28,7 +28,7 @@ impl Deref for Double {
 }
 
 impl Val for Double {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &super::DOUBLE_TYPE
     }
 

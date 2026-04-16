@@ -23,7 +23,7 @@ impl Timestamp {
 }
 
 impl Val for Timestamp {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &super::TIMESTAMP_TYPE
     }
 

@@ -27,7 +27,7 @@ impl Deref for Duration {
 }
 
 impl Val for Duration {
-    fn get_type(&self) -> &Type<'_> {
+    fn get_type<'a>(&self) -> &Type<'a> {
         &super::DURATION_TYPE
     }
 
