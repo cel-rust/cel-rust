@@ -87,7 +87,15 @@ impl ToOwned for Type {
 
 impl Type {
     pub fn is_assignable(&self, val: &dyn Val) -> bool {
-        self == val.get_type()
+        if self == val.get_type() {
+            true
+        } else {
+            match self.kind() {
+                Kind::Dyn => true,
+                Kind::Opaque => self.parameters.first().is_some_and(|t| t.is_assignable(val)),
+                _ => false
+            }
+        }
     }
 }
 
@@ -203,7 +211,7 @@ pub const NULL_TYPE: Type = {
 
 pub const OPTIONAL_TYPE: Type = Type {
     kind: Kind::Opaque,
-    parameters: Cow::Borrowed(&[]),
+    parameters: Cow::Borrowed(&[Cow::Borrowed(&DYN_TYPE)]),
     runtime_type_name: Cow::Borrowed("optional_type"),
     trait_mask: 0,
 };

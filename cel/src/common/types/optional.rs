@@ -102,3 +102,16 @@ impl From<Optional> for Option<Arc<dyn Val>> {
         })
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::common::types::{self, CelInt, CelString};
+
+    #[test]
+    fn is_assignable() {
+        let s = CelString::from("foo");
+        assert!(types::OPTIONAL_TYPE.is_assignable(&s));
+        let i = CelInt::from(42);
+        assert!(types::OPTIONAL_TYPE.is_assignable(&i));
+    }
+}
