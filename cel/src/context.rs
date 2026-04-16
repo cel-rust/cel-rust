@@ -37,7 +37,7 @@ pub enum Context<'a> {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
-        env: Arc<Env<'a>>,
+        env: Arc<Env>,
     },
     Child {
         parent: &'a Context<'a>,
@@ -153,7 +153,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn env(&self) -> &Env<'_> {
+    pub(crate) fn env(&self) -> &Env {
         match self {
             Context::Root { env, .. } => env.as_ref(),
             Context::Child { parent, .. } => parent.env(),
@@ -213,7 +213,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn with_env(env: Arc<Env<'a>>) -> Self {
+    pub fn with_env(env: Arc<Env>) -> Self {
         Context::Root {
             env,
             variables: Default::default(),

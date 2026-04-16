@@ -21,7 +21,7 @@ impl OptionalInternal {
 }
 
 impl Val for Optional {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::OPTIONAL_TYPE
     }
 

@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Container, Indexer, Iterable, Sizer};
-use crate::common::types::{CelInt, CelUInt, Type};
+use crate::common::types::{CelInt, CelUInt, Kind, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
 use crate::ExecutionError;
@@ -37,7 +37,7 @@ impl Deref for DefaultList {
 }
 
 impl Val for DefaultList {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &types::LIST_TYPE
     }
 
@@ -103,8 +103,8 @@ impl Container for DefaultList {
 
 impl Indexer for DefaultList {
     fn get<'a>(&'a self, idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        match *idx.get_type() {
-            types::INT_TYPE => {
+        match idx.get_type().kind() {
+            Kind::Int => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
                     .ok_or(ExecutionError::NoSuchOverload)?
@@ -116,7 +116,7 @@ impl Indexer for DefaultList {
                         .as_ref(),
                 ))
             }
-            types::UINT_TYPE => {
+            Kind::UInt => {
                 let idx: u64 = *idx
                     .downcast_ref::<CelUInt>()
                     .ok_or(ExecutionError::NoSuchOverload)?
@@ -141,8 +141,8 @@ impl Indexer for DefaultList {
 
     fn steal(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
         let mut list = self;
-        match *idx.get_type() {
-            types::INT_TYPE => {
+        match idx.get_type().kind() {
+            Kind::Int => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
                     .ok_or(ExecutionError::NoSuchOverload)?
@@ -152,7 +152,7 @@ impl Indexer for DefaultList {
                 }
                 Ok(list.0.remove(idx as usize))
             }
-            types::UINT_TYPE => {
+            Kind::UInt => {
                 let idx: u64 = *idx
                     .downcast_ref::<CelUInt>()
                     .ok_or(ExecutionError::NoSuchOverload)?
@@ -234,7 +234,7 @@ impl<'a> traits::Iterator<'a> for SliceIterator<'a> {
     }
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "size",
         "size_list",

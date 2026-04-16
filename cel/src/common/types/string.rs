@@ -1,5 +1,5 @@
 use crate::common::traits::{self, Adder, Comparer, Sizer};
-use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelUInt, Type};
+use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelUInt, Kind, Type};
 #[cfg(feature = "chrono")]
 use crate::common::types::{CelDuration, CelTimestamp};
 use crate::common::value::{Downcast, Val};
@@ -31,7 +31,7 @@ impl Deref for String {
 }
 
 impl Val for String {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::STRING_TYPE
     }
 
@@ -188,28 +188,28 @@ fn matches<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Executio
 fn string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let mut args = args;
     let arg = args.remove(0).into_owned();
-    let ret: Result<Box<String>, Box<dyn Val>> = match *arg.get_type() {
-        super::STRING_TYPE => arg.downcast::<String>(),
-        super::INT_TYPE => arg
+    let ret: Result<Box<String>, Box<dyn Val>> = match arg.get_type().kind() {
+        Kind::String => arg.downcast::<String>(),
+        Kind::Int => arg
             .downcast::<CelInt>()
             .map(|arg| Box::new(String::from(arg.to_string()))),
-        super::UINT_TYPE => arg
+        Kind::UInt => arg
             .downcast::<CelUInt>()
             .map(|arg| Box::new(String::from(arg.to_string()))),
-        super::DOUBLE_TYPE => arg
+        Kind::Double => arg
             .downcast::<CelDouble>()
             .map(|arg| Box::new(String::from(arg.to_string()))),
-        super::BYTES_TYPE => arg.downcast::<CelBytes>().map(|arg| {
+        Kind::Bytes => arg.downcast::<CelBytes>().map(|arg| {
             Box::new(String::from(
                 StdString::from_utf8_lossy(arg.inner()).as_ref(),
             ))
         }),
         #[cfg(feature = "chrono")]
-        super::TIMESTAMP_TYPE => arg
+        Kind::Timestamp => arg
             .downcast::<CelTimestamp>()
             .map(|ts| Box::new(String::from(ts.inner().to_rfc3339()))),
         #[cfg(feature = "chrono")]
-        super::DURATION_TYPE => arg
+        Kind::Duration => arg
             .downcast::<CelDuration>()
             .map(|arg| Box::new(String::from(crate::duration::format_duration(arg.inner())))),
         _ => Err(arg),
@@ -223,7 +223,7 @@ fn string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Execution
     }
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "string",
         "string_to_string",

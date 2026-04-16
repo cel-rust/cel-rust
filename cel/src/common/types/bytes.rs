@@ -29,7 +29,7 @@ impl Deref for Bytes {
 }
 
 impl Val for Bytes {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::BYTES_TYPE
     }
 
@@ -139,7 +139,7 @@ fn string_to_bytes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, 
     }
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "bytes",
         "string_to_bytes",

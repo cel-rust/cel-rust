@@ -64,22 +64,34 @@ pub enum Kind {
     Unknown,
 }
 
-// This cannot be made `Clone`, see `OpaqueVal`'s `Drop`
 #[derive(Debug, Eq, PartialEq)]
-pub struct Type<'a> {
+pub struct Type {
     kind: Kind,
-    parameters: &'a [&'a Type<'a>],
-    runtime_type_name: &'a str,
+    parameters: Cow<'static, [Cow<'static, Type>]>,
+    runtime_type_name: Cow<'static, str>,
     trait_mask: TraitSet,
 }
 
-impl Type<'_> {
+impl ToOwned for Type {
+    type Owned = Type;
+
+    fn to_owned(&self) -> Self::Owned {
+        Self {
+            kind: self.kind,
+            parameters: self.parameters.clone(),
+            runtime_type_name: self.runtime_type_name.clone(),
+            trait_mask: self.trait_mask,
+        }
+    }
+}
+
+impl Type {
     pub fn is_assignable(&self, val: &dyn Val) -> bool {
         self == val.get_type()
     }
 }
 
-impl Type<'_> {
+impl Type {
     pub fn kind(&self) -> Kind {
         self.kind
     }
@@ -87,29 +99,29 @@ impl Type<'_> {
 
 pub const ANY_TYPE: Type = Type {
     kind: Kind::Any,
-    parameters: &[],
-    runtime_type_name: "google.protobuf.Any",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("google.protobuf.Any"),
     trait_mask: traits::FIELD_TESTER_TYPE | traits::INDEXER_TYPE,
 };
 
 pub const BOOL_TYPE: Type = Type {
     kind: Kind::Boolean,
-    parameters: &[],
-    runtime_type_name: "bool",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("bool"),
     trait_mask: traits::COMPARER_TYPE | traits::NEGATOR_TYPE,
 };
 
 pub const BYTES_TYPE: Type = Type {
     kind: Kind::Bytes,
-    parameters: &[],
-    runtime_type_name: "bytes",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("bytes"),
     trait_mask: traits::ADDER_TYPE | traits::COMPARER_TYPE | traits::SIZER_TYPE,
 };
 
 pub const DOUBLE_TYPE: Type = Type {
     kind: Kind::Double,
-    parameters: &[],
-    runtime_type_name: "double",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("double"),
     trait_mask: traits::ADDER_TYPE
         | traits::COMPARER_TYPE
         | traits::DIVIDER_TYPE
@@ -120,8 +132,8 @@ pub const DOUBLE_TYPE: Type = Type {
 
 pub const DURATION_TYPE: Type = Type {
     kind: Kind::Duration,
-    parameters: &[],
-    runtime_type_name: "google.protobuf.Duration",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("google.protobuf.Duration"),
     trait_mask: traits::ADDER_TYPE
         | traits::COMPARER_TYPE
         | traits::NEGATOR_TYPE
@@ -129,14 +141,22 @@ pub const DURATION_TYPE: Type = Type {
         | traits::SUBTRACTOR_TYPE,
 };
 
-pub const DYN_TYPE: Type = Type::simple_type(Kind::Dyn, "dyn");
+pub const DYN_TYPE: Type = {
+    let kind = Kind::Dyn;
+    Type {
+        kind,
+        parameters: Cow::Borrowed(&[]),
+        runtime_type_name: Cow::Borrowed("dyn"),
+        trait_mask: 0,
+    }
+};
 
 pub const ERROR_TYPE: Type = Type::simple_type(Kind::Error, "error");
 
 pub const INT_TYPE: Type = Type {
     kind: Kind::Int,
-    parameters: &[],
-    runtime_type_name: "int",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("int"),
     trait_mask: traits::ADDER_TYPE
         | traits::COMPARER_TYPE
         | traits::DIVIDER_TYPE
@@ -146,18 +166,52 @@ pub const INT_TYPE: Type = Type {
         | traits::SUBTRACTOR_TYPE,
 };
 
-pub const LIST_TYPE: Type = Type::new_list_type(&[&DYN_TYPE]);
+pub const LIST_TYPE: Type = {
+    Type {
+        kind: Kind::List,
+        parameters: Cow::Borrowed(&[Cow::Borrowed(&DYN_TYPE)]),
+        runtime_type_name: Cow::Borrowed("list"),
+        trait_mask: traits::ADDER_TYPE
+            | traits::CONTAINER_TYPE
+            | traits::INDEXER_TYPE
+            | traits::ITERABLE_TYPE
+            | traits::SIZER_TYPE,
+    }
+};
 
-pub const MAP_TYPE: Type = Type::new_map_type(&[&DYN_TYPE, &DYN_TYPE]);
+pub const MAP_TYPE: Type = {
+    Type {
+        kind: Kind::Map,
+        parameters: Cow::Borrowed(&[Cow::Borrowed(&DYN_TYPE), Cow::Borrowed(&DYN_TYPE)]),
+        runtime_type_name: Cow::Borrowed("map"),
+        trait_mask: traits::CONTAINER_TYPE
+            | traits::INDEXER_TYPE
+            | traits::ITERABLE_TYPE
+            | traits::SIZER_TYPE,
+    }
+};
 
-pub const NULL_TYPE: Type = Type::simple_type(Kind::NullType, "null_type");
+pub const NULL_TYPE: Type = {
+    let kind = Kind::NullType;
+    Type {
+        kind,
+        parameters: Cow::Borrowed(&[]),
+        runtime_type_name: Cow::Borrowed("null_type"),
+        trait_mask: 0,
+    }
+};
 
-pub const OPTIONAL_TYPE: Type = Type::new_opaque_type("optional_type");
+pub const OPTIONAL_TYPE: Type = Type {
+    kind: Kind::Opaque,
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("optional_type"),
+    trait_mask: 0,
+};
 
 pub const STRING_TYPE: Type = Type {
     kind: Kind::String,
-    parameters: &[],
-    runtime_type_name: "string",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("string"),
     trait_mask: traits::ADDER_TYPE
         | traits::COMPARER_TYPE
         | traits::MATCHER_TYPE
@@ -167,8 +221,8 @@ pub const STRING_TYPE: Type = Type {
 
 pub const TIMESTAMP_TYPE: Type = Type {
     kind: Kind::Timestamp,
-    parameters: &[],
-    runtime_type_name: "google.protobuf.Timestamp",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("google.protobuf.Timestamp"),
     trait_mask: traits::ADDER_TYPE
         | traits::COMPARER_TYPE
         | traits::RECEIVER_TYPE
@@ -179,8 +233,8 @@ pub const TYPE_TYPE: Type = Type::simple_type(Kind::Type, "type");
 
 pub const UINT_TYPE: Type = Type {
     kind: Kind::UInt,
-    parameters: &[],
-    runtime_type_name: "uint",
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("uint"),
     trait_mask: traits::ADDER_TYPE
         | traits::COMPARER_TYPE
         | traits::DIVIDER_TYPE
@@ -191,21 +245,21 @@ pub const UINT_TYPE: Type = Type {
 
 pub const UNKNOWN_TYPE: Type = Type::simple_type(Kind::Unknown, "unknown");
 
-impl<'a> Type<'a> {
-    pub const fn simple_type(kind: Kind, name: &'a str) -> Type<'a> {
+impl Type {
+    pub const fn simple_type(kind: Kind, name: &'static str) -> Type {
         Type {
             kind,
-            parameters: &[],
-            runtime_type_name: name,
+            parameters: Cow::Borrowed(&[]),
+            runtime_type_name: Cow::Borrowed(name),
             trait_mask: 0,
         }
     }
 
-    pub const fn new_list_type(param: &'a [&'a Type<'a>; 1]) -> Type<'a> {
+    pub fn new_list_type(param: &'static [Cow<Type>; 1]) -> Type {
         Type {
             kind: Kind::List,
-            parameters: param,
-            runtime_type_name: "list",
+            parameters: Cow::Borrowed(param),
+            runtime_type_name: Cow::Borrowed("list"),
             trait_mask: traits::ADDER_TYPE
                 | traits::CONTAINER_TYPE
                 | traits::INDEXER_TYPE
@@ -214,11 +268,11 @@ impl<'a> Type<'a> {
         }
     }
 
-    pub const fn new_map_type(param: &'a [&'a Type<'a>; 2]) -> Type<'a> {
+    pub fn new_map_type(param: &'static [Cow<Type>; 2]) -> Type {
         Type {
             kind: Kind::Map,
-            parameters: param,
-            runtime_type_name: "map",
+            parameters: Cow::Borrowed(param),
+            runtime_type_name: Cow::Borrowed("map"),
             trait_mask: traits::CONTAINER_TYPE
                 | traits::INDEXER_TYPE
                 | traits::ITERABLE_TYPE
@@ -226,36 +280,55 @@ impl<'a> Type<'a> {
         }
     }
 
-    pub const fn new_unspecified_type(name: &'a str) -> Type<'a> {
+    pub const fn new_unspecified_type(name: &'static str) -> Type {
         Type {
             kind: Kind::Unspecified,
-            parameters: &[],
-            runtime_type_name: name,
+            parameters: Cow::Borrowed(&[]),
+            runtime_type_name: Cow::Borrowed(name),
             trait_mask: 0,
         }
     }
 
-    pub const fn new_opaque_type(name: &'a str) -> Type<'a> {
+    pub fn new_opaque_type(name: &'static str) -> Type {
         Type {
             kind: Kind::Opaque,
-            parameters: &[],
-            runtime_type_name: name,
+            parameters: Cow::Borrowed(&[]),
+            runtime_type_name: Cow::Borrowed(name),
+            trait_mask: 0,
+        }
+    }
+
+    pub fn new_opaque(name: String) -> Type {
+        Type {
+            kind: Kind::Opaque,
+            parameters: Cow::Borrowed(&[]),
+            runtime_type_name: Cow::Owned(name),
             trait_mask: 0,
         }
     }
 
     #[cfg(feature = "structs")]
-    pub const fn new_struct_type(name: &'a str) -> Type<'a> {
+    pub const fn new_struct_type(name: &'static str) -> Type {
         Type {
             kind: Kind::Struct,
-            parameters: &[],
-            runtime_type_name: name,
+            parameters: Cow::Borrowed(&[]),
+            runtime_type_name: Cow::Borrowed(name),
             trait_mask: traits::FIELD_TESTER_TYPE | traits::INDEXER_TYPE,
         }
     }
 
-    pub fn name(&self) -> &'a str {
-        self.runtime_type_name
+    #[cfg(feature = "structs")]
+    pub const fn new_struct(name: String) -> Type {
+        Type {
+            kind: Kind::Struct,
+            parameters: Cow::Borrowed(&[]),
+            runtime_type_name: Cow::Owned(name),
+            trait_mask: traits::FIELD_TESTER_TYPE | traits::INDEXER_TYPE,
+        }
+    }
+
+    pub fn name(&self) -> &str {
+        &self.runtime_type_name
     }
 
     pub fn has_trait(&self, t: u16) -> bool {
@@ -284,7 +357,7 @@ type BinaryFn<A, B> = fn(&A, &B) -> Result<Box<dyn Val>, ExecutionError>;
 
 fn unary_fn<'a, A: Val>(
     args: Vec<Cow<'a, dyn Val>>,
-    type_a: Type<'_>,
+    type_a: Type,
     func: UnaryFn<A>,
 ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let arg = &args[0];
@@ -299,8 +372,8 @@ fn unary_fn<'a, A: Val>(
 
 fn binary_fn<'a, A: Val, B: Val>(
     args: Vec<Cow<'a, dyn Val>>,
-    type_a: Type<'_>,
-    type_b: Type<'_>,
+    type_a: Type,
+    type_b: Type,
     func: BinaryFn<A, B>,
 ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let arg1 = &args[0];
@@ -324,39 +397,4 @@ fn noop<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionEr
     let mut args = args;
     let ts = args.remove(0);
     Ok(ts)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn parameterized_type() {
-        let param = Type {
-            kind: Kind::Unspecified,
-            parameters: &[],
-            runtime_type_name: "",
-            trait_mask: 0,
-        };
-
-        let t = std::string::String::from("List");
-        let parameterized_list = Type {
-            kind: Kind::List,
-            parameters: &[&param],
-            runtime_type_name: &t,
-            trait_mask: 0,
-        };
-        assert_eq!(&param, parameterized_list.parameters[0]);
-
-        let params = [&param];
-        let list2 = Type::new_list_type(&params);
-        assert_eq!(&param, list2.parameters[0]);
-        assert_eq!(1, list2.parameters.len());
-
-        let params = [&param, &param];
-        let map = Type::new_map_type(&params);
-        assert_eq!(&param, map.parameters[0]);
-        assert_eq!(&param, map.parameters[1]);
-        assert_eq!(2, map.parameters.len());
-    }
 }

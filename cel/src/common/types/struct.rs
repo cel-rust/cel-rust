@@ -11,14 +11,14 @@ use crate::{
 
 #[derive(Debug, Eq, PartialEq)]
 pub struct Struct {
-    r#type: Type<'static>,
+    r#type: Type,
     entries: BTreeMap<String, Arc<dyn Val>>,
 }
 
 impl Struct {
     pub fn new(name: String) -> Self {
         Self {
-            r#type: Type::new_struct_type(name.leak()),
+            r#type: Type::new_struct(name),
             entries: BTreeMap::default(),
         }
     }
@@ -41,13 +41,13 @@ impl Struct {
 }
 
 impl Val for Struct {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &self.r#type
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Self {
-            r#type: Type::new_struct_type(self.name().to_owned().leak()),
+            r#type: Type::new_struct(self.name().to_owned()),
             entries: self
                 .entries
                 .iter()
@@ -88,24 +88,7 @@ impl Indexer for Struct {
     }
 
     fn steal(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val>, crate::ExecutionError> {
-        // TODO: Can't implement this right now really, as we impl `Drop`, can't take ownership of
-        // the fields easily... let's see if this pattern sticks first, then we'll optimize the call
-        // to be no copy
         self.get(idx).map(Cow::into_owned)
-    }
-}
-
-impl Drop for Struct {
-    fn drop(&mut self) {
-        let name = self.r#type.name();
-
-        let ptr = name.as_ptr();
-        let len = name.len();
-
-        // SAFETY `Type` is not `Clone` and as such solely owned by this `Struct` being dropped
-        // We leak the name on `Struct::new` to get a &'static str, that we now no longer need
-        let name = unsafe { String::from_raw_parts(ptr as *mut u8, len, len) };
-        std::mem::drop(name);
     }
 }
 

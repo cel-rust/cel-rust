@@ -410,7 +410,7 @@ impl dyn Opaque {
 }
 
 struct OpaqueVal {
-    r#type: Type<'static>,
+    r#type: Type,
     val: Arc<dyn Opaque>,
 }
 
@@ -421,7 +421,7 @@ impl Debug for OpaqueVal {
 }
 
 impl Val for OpaqueVal {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &self.r#type
     }
 
@@ -438,7 +438,7 @@ impl Val for OpaqueVal {
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Self {
-            r#type: Type::new_opaque_type(self.val.runtime_type_name().to_owned().leak()),
+            r#type: Type::new_opaque(self.val.runtime_type_name().to_owned()),
             val: self.val.clone(),
         })
     }
@@ -447,27 +447,13 @@ impl Val for OpaqueVal {
 impl OpaqueVal {
     fn new(val: Arc<dyn Opaque>) -> Self {
         Self {
-            r#type: Type::new_opaque_type(val.runtime_type_name().to_owned().leak()),
+            r#type: Type::new_opaque(val.runtime_type_name().to_owned()),
             val,
         }
     }
 
     fn clone_inner(&self) -> Arc<dyn Opaque> {
         self.val.clone()
-    }
-}
-
-impl Drop for OpaqueVal {
-    fn drop(&mut self) {
-        let name = self.r#type.name();
-
-        let ptr = name.as_ptr();
-        let len = name.len();
-
-        // SAFETY `Type` is not `Clone` and is solely owned by this
-        // We leak the name on `OpaqueVal::new` to get a &'static str, that we now no longer need
-        let name = unsafe { String::from_raw_parts(ptr as *mut u8, len, len) };
-        std::mem::drop(name);
     }
 }
 
@@ -867,30 +853,30 @@ impl From<Value> for ResolveResult {
 impl TryFrom<&dyn Val> for Value {
     type Error = ExecutionError;
     fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
-        match *v.get_type() {
-            BOOL_TYPE => Ok(Value::Bool(*v.downcast_ref::<CelBool>().unwrap().inner())),
-            INT_TYPE => Ok(Value::Int(*v.downcast_ref::<CelInt>().unwrap().inner())),
-            UINT_TYPE => Ok(Value::UInt(*v.downcast_ref::<CelUInt>().unwrap().inner())),
-            DOUBLE_TYPE => Ok(Value::Float(
+        match v.get_type().kind() {
+            Kind::Boolean => Ok(Value::Bool(*v.downcast_ref::<CelBool>().unwrap().inner())),
+            Kind::Int => Ok(Value::Int(*v.downcast_ref::<CelInt>().unwrap().inner())),
+            Kind::UInt => Ok(Value::UInt(*v.downcast_ref::<CelUInt>().unwrap().inner())),
+            Kind::Double => Ok(Value::Float(
                 *v.downcast_ref::<CelDouble>().unwrap().inner(),
             )),
-            STRING_TYPE => Ok(Value::String(Arc::new(
+            Kind::String => Ok(Value::String(Arc::new(
                 v.downcast_ref::<CelString>().unwrap().inner().to_string(),
             ))),
-            NULL_TYPE => Ok(Value::Null),
-            BYTES_TYPE => Ok(Value::Bytes(Arc::new(
+            Kind::NullType => Ok(Value::Null),
+            Kind::Bytes => Ok(Value::Bytes(Arc::new(
                 v.downcast_ref::<CelBytes>().unwrap().inner().to_vec(),
             ))),
             #[cfg(feature = "chrono")]
-            DURATION_TYPE => Ok(Value::Duration(
+            Kind::Duration => Ok(Value::Duration(
                 *v.downcast_ref::<CelDuration>().unwrap().inner(),
             )),
             #[cfg(feature = "chrono")]
-            TIMESTAMP_TYPE => {
+            Kind::Timestamp => {
                 let ts = v.downcast_ref::<CelTimestamp>().unwrap().inner();
                 Ok(Value::Timestamp(*ts))
             }
-            LIST_TYPE => {
+            Kind::List => {
                 let list = v.downcast_ref::<CelList>().unwrap().inner();
                 Ok(Value::List(Arc::new(
                     list.iter()
@@ -898,7 +884,7 @@ impl TryFrom<&dyn Val> for Value {
                         .collect(),
                 )))
             }
-            MAP_TYPE => {
+            Kind::Map => {
                 let map = v.downcast_ref::<CelMap>().unwrap().inner();
                 Ok(Value::Map(Map {
                     map: Arc::new(
@@ -913,7 +899,7 @@ impl TryFrom<&dyn Val> for Value {
                     ),
                 }))
             }
-            OPTIONAL_TYPE => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
+            Kind::Opaque => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
                 None => v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
                 Some(opt) => {
                     let opt: Option<Result<Value, _>> = opt.option().map(|v| v.try_into());
@@ -1125,8 +1111,8 @@ impl Value {
                         operators::OPT_SELECT => {
                             let operand = Value::resolve_val(&call.args[0], ctx)?;
                             let field_literal = Value::resolve_val(&call.args[1], ctx)?;
-                            let field = match *field_literal.get_type() {
-                                STRING_TYPE => field_literal
+                            let field = match field_literal.get_type().kind() {
+                                Kind::String => field_literal
                                     .downcast_ref::<CelString>()
                                     .expect("field must be string"),
                                 _ => {
@@ -1399,8 +1385,8 @@ impl Value {
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
                 let key: CelString = select.field.as_str().into();
-                match *left.get_type() {
-                    MAP_TYPE => {
+                match left.get_type().kind() {
+                    Kind::Map => {
                         if select.test {
                             Ok(bool(
                                 left.as_container()

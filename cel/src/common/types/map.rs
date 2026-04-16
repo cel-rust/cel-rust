@@ -1,5 +1,5 @@
 use crate::common::traits::{Container, Indexer, Iterable, Sizer};
-use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Type};
+use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Kind, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
 use crate::ExecutionError;
@@ -34,7 +34,7 @@ impl Deref for DefaultMap {
 }
 
 impl Val for DefaultMap {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &types::MAP_TYPE
     }
 
@@ -316,8 +316,8 @@ impl TryFrom<Box<dyn Val>> for Key {
     type Error = ExecutionError;
 
     fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
-        let key = match *value.get_type() {
-            types::BOOL_TYPE => value
+        let key = match value.get_type().kind() {
+            Kind::Boolean => value
                 .downcast_ref::<CelBool>()
                 .copied()
                 .map(Key::Bool)
@@ -326,7 +326,7 @@ impl TryFrom<Box<dyn Val>> for Key {
                         value.as_ref().try_into().expect("Can't convert key!"),
                     )
                 })?,
-            types::INT_TYPE => value
+            Kind::Int => value
                 .downcast_ref::<CelInt>()
                 .copied()
                 .map(Key::Int)
@@ -335,7 +335,7 @@ impl TryFrom<Box<dyn Val>> for Key {
                         value.as_ref().try_into().expect("Can't convert key!"),
                     )
                 })?,
-            types::STRING_TYPE => {
+            Kind::String => {
                 let s = super::cast_boxed::<CelString>(value).map_err(|v| {
                     ExecutionError::UnsupportedKeyType(
                         v.as_ref().try_into().expect("Can't convert key!"),
@@ -343,7 +343,7 @@ impl TryFrom<Box<dyn Val>> for Key {
                 })?;
                 Key::String(s.into_inner().into())
             }
-            types::UINT_TYPE => value
+            Kind::UInt => value
                 .downcast_ref::<CelUInt>()
                 .copied()
                 .map(Key::UInt)
@@ -378,7 +378,7 @@ impl<'a> traits::Iterator<'a> for MapKeyIterator<'a> {
     }
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "size",
         "size_map",

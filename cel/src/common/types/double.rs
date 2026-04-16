@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Divider, Multiplier, Negator, Subtractor};
-use crate::common::types::{CelInt, CelString, CelUInt, Type};
+use crate::common::types::{CelInt, CelString, CelUInt, Kind, Type};
 use crate::common::value::{Downcast, Val};
 use crate::{ExecutionError, Value};
 use std::borrow::Cow;
@@ -28,7 +28,7 @@ impl Deref for Double {
 }
 
 impl Val for Double {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::DOUBLE_TYPE
     }
 
@@ -189,15 +189,15 @@ impl<'a> TryFrom<&'a dyn Val> for &'a f64 {
 fn double<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let mut args = args;
     let arg = args.remove(0).into_owned();
-    let ret: Result<Box<Double>, Box<dyn Val>> = match *arg.get_type() {
-        super::DOUBLE_TYPE => arg.downcast::<Double>(),
-        super::INT_TYPE => arg
+    let ret: Result<Box<Double>, Box<dyn Val>> = match arg.get_type().kind() {
+        Kind::Double => arg.downcast::<Double>(),
+        Kind::Int => arg
             .downcast::<CelInt>()
             .map(|arg| Box::new(Double::from(*arg.inner() as f64))),
-        super::UINT_TYPE => arg
+        Kind::UInt => arg
             .downcast::<CelUInt>()
             .map(|arg| Box::new(Double::from(*arg.inner() as f64))),
-        super::STRING_TYPE => match arg.downcast::<CelString>() {
+        Kind::String => match arg.downcast::<CelString>() {
             Err(arg) => Err(arg),
             Ok(arg) => match arg.inner().parse::<f64>() {
                 Ok(arg) => Ok(Box::new(Double::from(arg))),
@@ -221,7 +221,7 @@ fn double<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Execution
     }
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "double",
         "double_to_double",

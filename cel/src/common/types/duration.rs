@@ -27,7 +27,7 @@ impl Deref for Duration {
 }
 
 impl Val for Duration {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::DURATION_TYPE
     }
 
@@ -163,7 +163,7 @@ fn duration<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Executi
     })
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "duration",
         "string_to_duration",

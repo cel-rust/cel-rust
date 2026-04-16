@@ -30,7 +30,7 @@ impl Deref for Bool {
 }
 
 impl Val for Bool {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::BOOL_TYPE
     }
 

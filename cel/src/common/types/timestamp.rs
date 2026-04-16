@@ -23,7 +23,7 @@ impl Timestamp {
 }
 
 impl Val for Timestamp {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::TIMESTAMP_TYPE
     }
 
@@ -249,7 +249,7 @@ fn timestamp<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Execut
     })
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "timestamp",
         "string_to_timestamp",

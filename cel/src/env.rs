@@ -15,13 +15,13 @@ use std::{
 };
 
 #[derive(Default)]
-pub struct Env<'a> {
-    functions: BTreeMap<String, FunctionDecl<'a>>,
-    structs: BTreeMap<String, StructDef<'a>>,
+pub struct Env {
+    functions: BTreeMap<String, FunctionDecl>,
+    structs: BTreeMap<String, StructDef>,
 }
 
-impl<'a> Env<'a> {
-    pub fn stdlib() -> Env<'a> {
+impl Env {
+    pub fn stdlib() -> Env {
         let mut env = Env::default();
         types::bytes::stdlib(&mut env);
         types::double::stdlib(&mut env);
@@ -44,7 +44,7 @@ impl<'a> Env<'a> {
         &mut self,
         name: &str,
         id: &str,
-        args: Vec<types::Type<'a>>,
+        args: Vec<types::Type>,
         op: Function,
     ) -> Result<(), ()> {
         match self.functions.entry(name.to_owned()) {
@@ -74,8 +74,8 @@ impl<'a> Env<'a> {
         &mut self,
         name: &str,
         id: &str,
-        target: Type<'a>,
-        args: Vec<types::Type<'a>>,
+        target: Type,
+        args: Vec<types::Type>,
         op: Function,
     ) -> Result<(), ()> {
         let mut args = args;
@@ -102,23 +102,23 @@ impl<'a> Env<'a> {
         }
     }
 
-    pub fn add_struct(&mut self, def: StructDef<'a>) {
+    pub fn add_struct(&mut self, def: StructDef) {
         self.structs.insert(def.name.clone(), def);
     }
 
     #[cfg(feature = "structs")]
-    pub(crate) fn find_struct(&self, name: &str) -> Option<&StructDef<'a>> {
+    pub(crate) fn find_struct(&self, name: &str) -> Option<&StructDef> {
         self.structs.get(name)
     }
 }
 
-pub struct StructDef<'a> {
+pub struct StructDef {
     name: String,
-    fields: BTreeMap<String, Type<'a>>,
+    fields: BTreeMap<String, Type>,
     defaults: BTreeMap<String, Box<dyn Val>>,
 }
 
-impl<'a> StructDef<'a> {
+impl StructDef {
     pub fn new(name: String) -> Self {
         Self {
             name,
@@ -127,14 +127,14 @@ impl<'a> StructDef<'a> {
         }
     }
 
-    pub fn add_field(self, field: String, t: Type<'a>) -> Self {
+    pub fn add_field(self, field: String, t: Type) -> Self {
         self.add_field_with_default(field, t, None)
     }
 
     pub fn add_field_with_default(
         self,
         field: String,
-        t: Type<'a>,
+        t: Type,
         default: Option<Box<dyn Val>>,
     ) -> Self {
         let mut def = self;

@@ -4,13 +4,13 @@ use crate::common::functions::Function;
 use crate::common::types::Type;
 use crate::common::value::Val;
 
-pub struct FunctionDecl<'a> {
+pub struct FunctionDecl {
     pub name: String,
-    overloads: Vec<OverloadDecl<'a>>,
+    overloads: Vec<OverloadDecl>,
 }
 
-impl<'a> FunctionDecl<'a> {
-    pub fn new(name: &str) -> FunctionDecl<'a> {
+impl FunctionDecl {
+    pub fn new(name: &str) -> FunctionDecl {
         FunctionDecl {
             name: name.to_string(),
             overloads: Vec::default(),
@@ -37,7 +37,7 @@ impl<'a> FunctionDecl<'a> {
         &mut self,
         id: String,
         member_function: bool,
-        arg_types: Vec<Type<'a>>,
+        arg_types: Vec<Type>,
         op: Function,
     ) -> Result<(), ()> {
         if self.is_present(&id, member_function, &arg_types) {
@@ -52,7 +52,7 @@ impl<'a> FunctionDecl<'a> {
         Ok(())
     }
 
-    fn is_present(&self, name: &str, member_function: bool, arg_types: &[Type<'a>]) -> bool {
+    fn is_present(&self, name: &str, member_function: bool, arg_types: &[Type]) -> bool {
         for overload in &self.overloads {
             if overload.id == name
                 || (overload.member_function == member_function && overload.arg_types == arg_types)
@@ -64,9 +64,9 @@ impl<'a> FunctionDecl<'a> {
     }
 }
 
-pub struct OverloadDecl<'a> {
+pub struct OverloadDecl {
     pub id: String,
-    arg_types: Vec<Type<'a>>,
+    arg_types: Vec<Type>,
     //result_type: &'a Type<'a>,
     member_function: bool,
     //operand_traits: TraitSet,
@@ -76,6 +76,6 @@ pub struct OverloadDecl<'a> {
 #[allow(dead_code)]
 struct VariableDecl<'a, 'b> {
     name: String,
-    var_type: &'a Type<'a>,
+    var_type: &'a Type,
     value: &'b dyn Val,
 }

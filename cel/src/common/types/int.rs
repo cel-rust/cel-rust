@@ -1,6 +1,6 @@
 use crate::common::traits::Negator;
 use crate::common::traits::{self, Comparer};
-use crate::common::types::{CelDouble, CelString, CelUInt, Type};
+use crate::common::types::{CelDouble, CelString, CelUInt, Kind, Type};
 use crate::common::value::{Downcast, Val};
 use crate::ExecutionError;
 use std::borrow::Cow;
@@ -29,7 +29,7 @@ impl Deref for Int {
 }
 
 impl Val for Int {
-    fn get_type<'a>(&self) -> &Type<'a> {
+    fn get_type(&self) -> &Type {
         &super::INT_TYPE
     }
 
@@ -219,15 +219,15 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
 fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     let mut args = args;
     let arg = args.remove(0).into_owned();
-    let ret: Result<Box<Int>, Box<dyn Val>> = match *arg.get_type() {
-        super::INT_TYPE => arg.downcast::<Int>(),
-        super::UINT_TYPE => arg
+    let ret: Result<Box<Int>, Box<dyn Val>> = match arg.get_type().kind() {
+        Kind::Int => arg.downcast::<Int>(),
+        Kind::UInt => arg
             .downcast::<CelUInt>()
             .map(|arg| Box::new(Int::from(*arg.inner() as i64))),
-        super::DOUBLE_TYPE => arg
+        Kind::Double => arg
             .downcast::<CelDouble>()
             .map(|arg| Box::new(Int::from(*arg.inner() as i64))),
-        super::STRING_TYPE => match arg.downcast::<CelString>() {
+        Kind::String => match arg.downcast::<CelString>() {
             Err(arg) => Err(arg),
             Ok(arg) => match arg.inner().parse::<i64>() {
                 Ok(arg) => Ok(Box::new(Int::from(arg))),
@@ -251,7 +251,7 @@ fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionErr
     }
 }
 
-pub(crate) fn stdlib(env: &mut crate::Env<'_>) {
+pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload("int", "int64_to_int64", vec![super::INT_TYPE], int)
         .expect("Must be unique id");
     env.add_overload("int", "uint64_to_int64", vec![super::UINT_TYPE], int)
