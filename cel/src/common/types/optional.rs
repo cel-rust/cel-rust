@@ -1,5 +1,8 @@
-use crate::common::types::Type;
+use crate::common::traits::Zeroer;
+use crate::common::types::{self, CelBool, Type, OPTIONAL_TYPE};
 use crate::common::value::Val;
+use crate::ExecutionError;
+use std::borrow::Cow;
 use std::sync::Arc;
 
 #[derive(Debug)]
@@ -101,6 +104,128 @@ impl From<Optional> for Option<Arc<dyn Val>> {
             OptionalInternal::Box(b) => Arc::from(b),
         })
     }
+}
+
+fn optional_none<'a>(_args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    Ok(Cow::<dyn Val>::Owned(Box::new(Optional::none())))
+}
+
+fn optional_of<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let mut args = args;
+    let value = args.remove(0);
+    Ok(Cow::<dyn Val>::Owned(Box::new(Optional::of(
+        value.into_owned(),
+    ))))
+}
+
+fn optional_of_non_zero_value<'a>(
+    args: Vec<Cow<'a, dyn Val>>,
+) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    match args[0].as_zeroer().is_some_and(Zeroer::is_zero_value) {
+        true => optional_none(args),
+        false => optional_of(args),
+    }
+}
+
+fn optional_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    // TODO: This can be optimized to avoid cloning and "just" pass the `Cow`
+    // but we either need to deal with the `Arc` case or wait until that's all ripped out!
+    let mut args = args;
+    args.remove(0)
+        .downcast_ref::<Optional>()
+        .expect("must be `CelOptional`")
+        .option()
+        .map(|v| Cow::Owned(v.to_owned()))
+        .ok_or_else(|| ExecutionError::function_error("value", "optional.none() dereference"))
+}
+
+fn optional_has_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    super::unary_fn(args, OPTIONAL_TYPE, |opt: &Optional| {
+        Ok(Box::new(CelBool::from(opt.option().is_some())))
+    })
+}
+
+fn optional_or_optional<'a>(
+    args: Vec<Cow<'a, dyn Val>>,
+) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let mut args = args;
+    let other = args.remove(1);
+    let this = args.remove(0);
+    if this
+        .downcast_ref::<Optional>()
+        .expect("Must be an `Optional`")
+        .option()
+        .is_some()
+    {
+        Ok(this)
+    } else {
+        Ok(other)
+    }
+}
+
+fn optional_or_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    // TODO: This can be optimized to avoid cloning and "just" pass the `Cow`
+    // but we either need to deal with the `Arc` case or wait until that's all ripped out!
+    let mut args = args;
+    let other = args.remove(1);
+    Ok(args
+        .remove(0)
+        .downcast_ref::<Optional>()
+        .expect("must be `CelOptional`")
+        .option()
+        .map(|v| Cow::Owned(v.to_owned()))
+        .unwrap_or(other))
+}
+
+pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_overload("optional.none", "optional_none", vec![], optional_none)
+        .expect("Must be unique");
+    env.add_overload(
+        "optional.of",
+        "optional_of",
+        vec![types::DYN_TYPE],
+        optional_of,
+    )
+    .expect("Must be unique");
+    env.add_overload(
+        "optional.ofNonZeroValue",
+        "optional_ofNonZeroValue",
+        vec![types::DYN_TYPE],
+        optional_of_non_zero_value,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "value",
+        "optional_value",
+        OPTIONAL_TYPE,
+        vec![],
+        optional_value,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "hasValue",
+        "optional_has_value",
+        OPTIONAL_TYPE,
+        vec![],
+        optional_has_value,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "or",
+        "optional_or_optional",
+        OPTIONAL_TYPE,
+        vec![OPTIONAL_TYPE],
+        optional_or_optional,
+    )
+    .expect("Must be unique");
+    env.add_member_overload(
+        "orValue",
+        "optional_or_value",
+        OPTIONAL_TYPE,
+        vec![types::DYN_TYPE],
+        optional_or_value,
+    )
+    .expect("Must be unique");
 }
 
 #[cfg(test)]

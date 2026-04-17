@@ -12,7 +12,7 @@ pub(crate) mod int;
 pub(crate) mod list;
 pub(crate) mod map;
 mod null;
-mod optional;
+pub(crate) mod optional;
 pub(crate) mod string;
 #[cfg(feature = "structs")]
 pub(crate) mod r#struct;
@@ -92,8 +92,11 @@ impl Type {
         } else {
             match self.kind() {
                 Kind::Dyn => true,
-                Kind::Opaque => self.parameters.first().is_some_and(|t| t.is_assignable(val)),
-                _ => false
+                Kind::Opaque => self
+                    .parameters
+                    .first()
+                    .is_some_and(|t| t.is_assignable(val)),
+                _ => false,
             }
         }
     }

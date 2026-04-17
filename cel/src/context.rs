@@ -2,7 +2,7 @@ use crate::common::value::Val;
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
-use crate::{functions, Env, ExecutionError};
+use crate::{Env, ExecutionError};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -225,25 +225,12 @@ impl<'a> Context<'a> {
 
 impl Default for Context<'_> {
     fn default() -> Self {
-        let mut ctx = Context::Root {
+        Context::Root {
             env: Arc::new(Env::stdlib()),
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
-        };
-
-        // Optional
-        ctx.add_function("optional.none", functions::optional_none);
-        ctx.add_function("optional.of", functions::optional_of);
-        ctx.add_function(
-            "optional.ofNonZeroValue",
-            functions::optional_of_non_zero_value,
-        );
-        ctx.add_function("value", functions::optional_value);
-        ctx.add_function("hasValue", functions::optional_has_value);
-        ctx.add_function("or", functions::optional_or_optional);
-        ctx.add_function("orValue", functions::optional_or_value);
-        ctx
+        }
     }
 }
 

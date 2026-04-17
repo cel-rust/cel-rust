@@ -28,6 +28,7 @@ impl Env {
         types::int::stdlib(&mut env);
         types::list::stdlib(&mut env);
         types::map::stdlib(&mut env);
+        types::optional::stdlib(&mut env);
         types::string::stdlib(&mut env);
         types::uint::stdlib(&mut env);
 
