@@ -101,6 +101,8 @@ impl PartialEq for dyn Val {
     }
 }
 
+impl Eq for dyn Val {}
+
 #[cfg(test)]
 mod test {
     use crate::common::types;

@@ -9,7 +9,7 @@ use crate::{
     ExecutionError,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Eq, PartialEq)]
 pub struct Struct {
     r#type: Type<'static>,
     entries: BTreeMap<String, Arc<dyn Val>>,
@@ -64,8 +64,10 @@ impl Val for Struct {
         Some(self)
     }
 
-    fn equals(&self, _other: &dyn Val) -> bool {
-        false
+    fn equals(&self, other: &dyn Val) -> bool {
+        other
+            .downcast_ref::<Struct>()
+            .is_some_and(|other| self == other)
     }
 }
 
@@ -104,5 +106,36 @@ impl Drop for Struct {
         // We leak the name on `Struct::new` to get a &'static str, that we now no longer need
         let name = unsafe { String::from_raw_parts(ptr as *mut u8, len, len) };
         std::mem::drop(name);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use crate::common::{
+        types::{CelBool, CelStruct},
+        value::Val,
+    };
+
+    #[test]
+    fn equality() {
+        let mut s1 = CelStruct::new("foo".to_owned());
+        s1.add_field_value(
+            "bar".to_owned(),
+            Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))),
+        );
+        let mut s2 = CelStruct::new("foo".to_owned());
+        assert_ne!(s1, s2);
+        s2.add_field_value(
+            "bar".to_owned(),
+            Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))),
+        );
+        assert_eq!(s1, s2);
+        s2.add_field_value(
+            "bar".to_owned(),
+            Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))),
+        );
+        assert_ne!(s1, s2);
     }
 }
