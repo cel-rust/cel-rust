@@ -61,6 +61,10 @@ impl Val for Int {
         Some(self)
     }
 
+    fn as_zeroer(&self) -> Option<&dyn traits::Zeroer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         self.compare(other)
             .map(|r| r == Ordering::Equal)
@@ -179,6 +183,12 @@ impl traits::Subtractor for Int {
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
+    }
+}
+
+impl traits::Zeroer for Int {
+    fn is_zero_value(&self) -> bool {
+        self.0 == 0
     }
 }
 

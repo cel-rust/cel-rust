@@ -100,6 +100,10 @@ pub trait Subtractor {
     fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 }
 
+pub trait Zeroer {
+    fn is_zero_value(&self) -> bool;
+}
+
 pub trait Indexer {
     fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
 

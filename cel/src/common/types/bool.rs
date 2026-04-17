@@ -1,4 +1,4 @@
-use crate::common::traits::{Comparer, Negator};
+use crate::common::traits::{Comparer, Negator, Zeroer};
 use crate::common::types::Type;
 use crate::common::value::Val;
 use crate::ExecutionError;
@@ -42,6 +42,10 @@ impl Val for Bool {
         Some(self)
     }
 
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other.downcast_ref::<Self>().is_some_and(|a| self.0 == a.0)
     }
@@ -64,6 +68,12 @@ impl Comparer for Bool {
 impl Negator for Bool {
     fn negate(&self) -> Result<Box<dyn Val>, ExecutionError> {
         Ok(Box::new(self.negate()))
+    }
+}
+
+impl Zeroer for Bool {
+    fn is_zero_value(&self) -> bool {
+        !self.0
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::common::traits::{Container, Indexer, Iterable, Sizer};
+use crate::common::traits::{Container, Indexer, Iterable, Sizer, Zeroer};
 use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Kind, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
@@ -55,6 +55,10 @@ impl Val for DefaultMap {
     }
 
     fn as_sizer(&self) -> Option<&dyn Sizer> {
+        Some(self)
+    }
+
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         Some(self)
     }
 
@@ -142,6 +146,12 @@ impl Iterable for DefaultMap {
 impl Sizer for DefaultMap {
     fn size(&self) -> CelInt {
         (self.inner().len() as i64).into()
+    }
+}
+
+impl Zeroer for DefaultMap {
+    fn is_zero_value(&self) -> bool {
+        self.inner().is_empty()
     }
 }
 

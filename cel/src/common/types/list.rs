@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Container, Indexer, Iterable, Sizer};
+use crate::common::traits::{Adder, Container, Indexer, Iterable, Sizer, Zeroer};
 use crate::common::types::{CelInt, CelUInt, Kind, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
@@ -62,6 +62,10 @@ impl Val for DefaultList {
     }
 
     fn as_sizer(&self) -> Option<&dyn Sizer> {
+        Some(self)
+    }
+
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         Some(self)
     }
 
@@ -183,6 +187,12 @@ impl Iterable for DefaultList {
 impl Sizer for DefaultList {
     fn size(&self) -> CelInt {
         (self.inner().len() as i64).into()
+    }
+}
+
+impl Zeroer for DefaultList {
+    fn is_zero_value(&self) -> bool {
+        self.inner().is_empty()
     }
 }
 

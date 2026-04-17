@@ -1,3 +1,4 @@
+use crate::common::traits::Zeroer;
 use crate::common::types::Type;
 use crate::common::value::Val;
 
@@ -13,7 +14,17 @@ impl Val for Null {
         other.downcast_ref::<Null>().is_some()
     }
 
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
+        Some(self)
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Null)
+    }
+}
+
+impl Zeroer for Null {
+    fn is_zero_value(&self) -> bool {
+        true
     }
 }

@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Comparer, Divider, Multiplier, Negator, Subtractor};
+use crate::common::traits::{Adder, Comparer, Divider, Multiplier, Negator, Subtractor, Zeroer};
 use crate::common::types::{CelInt, CelString, CelUInt, Kind, Type};
 use crate::common::value::{Downcast, Val};
 use crate::{ExecutionError, Value};
@@ -53,6 +53,10 @@ impl Val for Double {
     }
 
     fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        Some(self)
+    }
+
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         Some(self)
     }
 
@@ -149,6 +153,12 @@ impl Subtractor for Double {
                 rhs.try_into().unwrap_or(Value::Null),
             ))
         }
+    }
+}
+
+impl Zeroer for Double {
+    fn is_zero_value(&self) -> bool {
+        self.0 == 0.0
     }
 }
 

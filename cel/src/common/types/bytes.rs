@@ -1,4 +1,4 @@
-use crate::common::traits::Sizer;
+use crate::common::traits::{Sizer, Zeroer};
 use crate::common::types::{CelInt, CelString, Type};
 use crate::common::value::{Downcast, Val};
 use crate::Value;
@@ -45,6 +45,10 @@ impl Val for Bytes {
         Some(self)
     }
 
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
@@ -85,6 +89,12 @@ impl Comparer for Bytes {
 impl Sizer for Bytes {
     fn size(&self) -> CelInt {
         (self.inner().len() as i64).into()
+    }
+}
+
+impl Zeroer for Bytes {
+    fn is_zero_value(&self) -> bool {
+        self.inner().is_empty()
     }
 }
 

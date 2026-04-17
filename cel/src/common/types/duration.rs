@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Comparer, Subtractor};
+use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
 use crate::common::types::{CelInt, CelString, Type};
 use crate::common::value::Val;
 use crate::{ExecutionError, Value};
@@ -40,6 +40,10 @@ impl Val for Duration {
     }
 
     fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        Some(self)
+    }
+
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         Some(self)
     }
 
@@ -95,6 +99,12 @@ impl Subtractor for Duration {
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
+    }
+}
+
+impl Zeroer for Duration {
+    fn is_zero_value(&self) -> bool {
+        self.0.is_zero()
     }
 }
 

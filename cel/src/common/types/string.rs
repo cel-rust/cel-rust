@@ -1,4 +1,4 @@
-use crate::common::traits::{self, Adder, Comparer, Sizer};
+use crate::common::traits::{self, Adder, Comparer, Sizer, Zeroer};
 use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelUInt, Kind, Type};
 #[cfg(feature = "chrono")]
 use crate::common::types::{CelDuration, CelTimestamp};
@@ -47,6 +47,10 @@ impl Val for String {
         Some(self)
     }
 
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Self>()
@@ -88,6 +92,12 @@ impl Comparer for String {
 impl Sizer for String {
     fn size(&self) -> CelInt {
         (self.inner().len() as i64).into()
+    }
+}
+
+impl Zeroer for String {
+    fn is_zero_value(&self) -> bool {
+        self.inner().is_empty()
     }
 }
 

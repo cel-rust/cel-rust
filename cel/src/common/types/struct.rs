@@ -2,7 +2,7 @@ use std::{borrow::Cow, collections::BTreeMap, ops::Deref, sync::Arc};
 
 use crate::{
     common::{
-        traits::Indexer,
+        traits::{Indexer, Zeroer},
         types::{CelString, Type},
         value::Val,
     },
@@ -64,6 +64,10 @@ impl Val for Struct {
         Some(self)
     }
 
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
+        Some(self)
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         other
             .downcast_ref::<Struct>()
@@ -89,6 +93,12 @@ impl Indexer for Struct {
 
     fn steal(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val>, crate::ExecutionError> {
         self.get(idx).map(Cow::into_owned)
+    }
+}
+
+impl Zeroer for Struct {
+    fn is_zero_value(&self) -> bool {
+        self.entries.is_empty()
     }
 }
 

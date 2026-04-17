@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Comparer, Subtractor};
+use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
 use crate::common::types::{CelDuration, CelInt, CelString, Type};
 use crate::common::value::Val;
 use crate::{ExecutionError, Value};
@@ -36,6 +36,10 @@ impl Val for Timestamp {
     }
 
     fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        Some(self)
+    }
+
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         Some(self)
     }
 
@@ -131,6 +135,12 @@ impl Subtractor for Timestamp {
                 rhs.try_into().unwrap_or(Value::Null),
             ))
         }
+    }
+}
+
+impl Zeroer for Timestamp {
+    fn is_zero_value(&self) -> bool {
+        self.0.timestamp_nanos_opt().is_some_and(|ns| ns == 0)
     }
 }
 

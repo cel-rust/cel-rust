@@ -1,4 +1,4 @@
-use crate::common::traits::{Adder, Comparer, Divider, Modder, Multiplier, Subtractor};
+use crate::common::traits::{Adder, Comparer, Divider, Modder, Multiplier, Subtractor, Zeroer};
 use crate::common::types::{CelDouble, CelInt, CelString, Kind, Type};
 use crate::common::value::{Downcast, Val};
 use crate::{ExecutionError, Value};
@@ -53,6 +53,10 @@ impl Val for UInt {
     }
 
     fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        Some(self)
+    }
+
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         Some(self)
     }
 
@@ -201,6 +205,12 @@ impl Subtractor for UInt {
                 rhs.try_into().unwrap_or(Value::Null),
             ))
         }
+    }
+}
+
+impl Zeroer for UInt {
+    fn is_zero_value(&self) -> bool {
+        self.0 == 0
     }
 }
 

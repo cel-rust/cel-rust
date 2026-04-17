@@ -1,6 +1,6 @@
 use crate::common::traits::{
     Adder, Comparer, Container, Divider, Indexer, Iterable, Modder, Multiplier, Negator, Sizer,
-    Subtractor,
+    Subtractor, Zeroer,
 };
 use crate::common::types::Type;
 use std::any::Any;
@@ -54,6 +54,10 @@ pub trait Val: Any + Debug + Send + Sync {
     }
 
     fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+        None
+    }
+
+    fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         None
     }
 
