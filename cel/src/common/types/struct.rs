@@ -9,6 +9,9 @@ use crate::{
     ExecutionError,
 };
 
+/// A CEL struct value.
+///
+/// A struct has a type and a set of field values.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Struct {
     r#type: Type,
@@ -16,6 +19,7 @@ pub struct Struct {
 }
 
 impl Struct {
+    /// Creates a new struct with the given name and no fields.
     pub fn new(name: String) -> Self {
         Self {
             r#type: Type::new_struct(name),
@@ -23,18 +27,22 @@ impl Struct {
         }
     }
 
+    /// Returns the name of the struct type.
     pub fn name(&self) -> &str {
         self.r#type.name()
     }
 
+    /// Returns the value of the field with the given name, if it exists.
     pub fn field_value(&self, name: &str) -> Option<&dyn Val> {
         self.entries.get(name).map(Deref::deref)
     }
 
+    /// Adds a field value to the struct.
     pub fn add_field_value(&mut self, name: String, value: Cow<dyn Val>) {
         self.entries.insert(name, Arc::from(value.into_owned()));
     }
 
+    /// Returns a map of all field values in the struct.
     pub fn field_values(&self) -> BTreeMap<String, Arc<dyn Val>> {
         self.entries.clone()
     }

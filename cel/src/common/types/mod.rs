@@ -64,6 +64,7 @@ pub enum Kind {
     Unknown,
 }
 
+/// Represents a CEL type.
 #[derive(Debug, Eq, PartialEq)]
 pub struct Type {
     kind: Kind,
@@ -86,6 +87,7 @@ impl ToOwned for Type {
 }
 
 impl Type {
+    /// Returns true if the given value can be assigned to this type.
     pub fn is_assignable(&self, val: &dyn Val) -> bool {
         if self == val.get_type() {
             true
@@ -103,6 +105,7 @@ impl Type {
 }
 
 impl Type {
+    /// Returns the kind of the type.
     pub fn kind(&self) -> Kind {
         self.kind
     }
@@ -257,6 +260,7 @@ pub const UINT_TYPE: Type = Type {
 pub const UNKNOWN_TYPE: Type = Type::simple_type(Kind::Unknown, "unknown");
 
 impl Type {
+    /// Creates a new simple type with the given kind and name.
     pub const fn simple_type(kind: Kind, name: &'static str) -> Type {
         Type {
             kind,
@@ -266,6 +270,7 @@ impl Type {
         }
     }
 
+    /// Creates a new list type with the given element type.
     pub fn new_list_type(param: &'static [Cow<Type>; 1]) -> Type {
         Type {
             kind: Kind::List,
@@ -279,6 +284,7 @@ impl Type {
         }
     }
 
+    /// Creates a new map type with the given key and value types.
     pub fn new_map_type(param: &'static [Cow<Type>; 2]) -> Type {
         Type {
             kind: Kind::Map,
@@ -291,6 +297,7 @@ impl Type {
         }
     }
 
+    /// Creates a new unspecified type with the given name.
     pub const fn new_unspecified_type(name: &'static str) -> Type {
         Type {
             kind: Kind::Unspecified,
@@ -300,6 +307,7 @@ impl Type {
         }
     }
 
+    /// Creates a new opaque type with the given name.
     pub fn new_opaque_type(name: &'static str) -> Type {
         Type {
             kind: Kind::Opaque,
@@ -309,6 +317,7 @@ impl Type {
         }
     }
 
+    /// Creates a new opaque type with the given owned name.
     pub fn new_opaque(name: String) -> Type {
         Type {
             kind: Kind::Opaque,
@@ -318,6 +327,7 @@ impl Type {
         }
     }
 
+    /// Creates a new struct type with the given name.
     #[cfg(feature = "structs")]
     pub const fn new_struct_type(name: &'static str) -> Type {
         Type {
@@ -328,6 +338,7 @@ impl Type {
         }
     }
 
+    /// Creates a new struct type with the given owned name.
     #[cfg(feature = "structs")]
     pub const fn new_struct(name: String) -> Type {
         Type {
@@ -338,10 +349,12 @@ impl Type {
         }
     }
 
+    /// Returns the name of the type.
     pub fn name(&self) -> &str {
         &self.runtime_type_name
     }
 
+    /// Returns true if the type has the given trait.
     pub fn has_trait(&self, t: u16) -> bool {
         self.trait_mask & t == t
     }

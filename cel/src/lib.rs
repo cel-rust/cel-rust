@@ -1,3 +1,16 @@
+//! # CEL-Rust
+//!
+//! A parser and interpreter for the Common Expression Language (CEL) in Rust.
+//!
+//! ## Optional Features
+//!
+//! - `structs`: Enables support for custom struct types. This allows you to define
+//!   struct definitions using [`StructDef`] and add them to your [`Env`].
+//!   Custom structs can then be instantiated and accessed within CEL expressions.
+//! - `chrono`: Enables support for `duration` and `timestamp` types using the `chrono` crate.
+//! - `regex`: Enables support for regular expressions.
+//! - `json`: Enables conversion between CEL values and JSON.
+//!
 extern crate core;
 
 use std::convert::TryFrom;
@@ -83,28 +96,26 @@ pub enum ExecutionError {
     /// Indicates that a comparison could not be performed.
     #[error("{0:?} can not be compared to {1:?}")]
     ValuesNotComparable(Value, Value),
-    /// Indicates that an operator was used on a type that does not support it.
+    #[deprecated]
     #[error("Unsupported unary operator '{0}': {1:?}")]
     UnsupportedUnaryOperator(&'static str, Value),
     /// Indicates that an unsupported binary operator was applied on two values
     /// where it's unsupported, for example list + map.
     #[error("Unsupported binary operator '{0}': {1:?}, {2:?}")]
     UnsupportedBinaryOperator(&'static str, Value, Value),
-    /// Indicates that an unsupported type was used to index a map
+    #[deprecated]
     #[error("Cannot use value as map index: {0:?}")]
     UnsupportedMapIndex(Value),
-    /// Indicates that an unsupported type was used to index a list
+    #[deprecated]
     #[error("Cannot use value as list index: {0:?}")]
     UnsupportedListIndex(Value),
     /// Indicates that an unsupported type was used to index a list
     #[error("Cannot use value {0:?} to index {1:?}")]
     UnsupportedIndex(Value, Value),
-    /// Indicates that a function call occurred without an [`Expression::Ident`]
-    /// as the function identifier.
+    #[deprecated]
     #[error("Unsupported function call identifier type: {0:?}")]
     UnsupportedFunctionCallIdentifierType(Expression),
-    /// Indicates that a [`Member::Fields`] construction was attempted
-    /// which is not yet supported.
+    #[deprecated]
     #[error("Unsupported fields construction: {0:?}")]
     UnsupportedFieldsConstruction(SelectExpr),
     /// Indicates that a function had an error during execution.
