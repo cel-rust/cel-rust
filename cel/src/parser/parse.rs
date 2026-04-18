@@ -2,7 +2,7 @@ use std::iter::Enumerate;
 use std::num::ParseIntError;
 use std::str::Chars;
 
-/// Error type of [unescape](unescape).
+/// Error type of [parse_string].
 #[derive(Debug, PartialEq)]
 pub enum ParseSequenceError {
     // #[error("invalid escape {escape} at {index} in {string}")]
@@ -22,7 +22,7 @@ pub enum ParseSequenceError {
     MissingClosingQuote,
 }
 
-/// Source error type of [ParseError::InvalidUnicode](ParseError::InvalidUnicode).
+/// Source error type of [`ParseSequenceError::InvalidUnicode`].
 #[derive(Debug, PartialEq, Clone)]
 pub enum ParseUnicodeError {
     // #[error("could not parse {string} as u32 hex: {source}")]

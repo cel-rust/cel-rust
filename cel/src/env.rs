@@ -14,6 +14,47 @@ use std::{
     },
 };
 
+/// An environment for the CEL execution.
+///
+/// This is where functions, overloads, and custom structs are defined.
+///
+/// # Example
+///
+/// ## Custom Structs
+///
+/// You can define custom struct types that can be instantiated from CEL expressions.
+///
+/// ```
+/// #[cfg(feature = "structs")]
+/// {
+/// use cel::{Env, StructDef, common::types, common::types::CelString};
+///
+/// let mut env = Env::stdlib();
+/// env.add_struct(
+///     StructDef::new("cel.MyStruct".to_owned())
+///         .add_field("some_field".to_owned(), types::STRING_TYPE)
+///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
+/// );
+/// }
+/// ```
+///
+/// ## Function Overloads
+///
+/// You can add custom function overloads to the environment.
+///
+/// ```
+/// use cel::{Env, common::types, common::value::Val};
+/// use std::borrow::Cow;
+///
+/// let mut env = Env::stdlib();
+///
+/// // Define a function that takes an integer and returns its square.
+/// env.add_overload("square", "int_square", vec![types::INT_TYPE], |args| {
+///     let val = args[0].downcast_ref::<cel::common::types::CelInt>().unwrap();
+///     let result: Box<dyn Val> = Box::new(cel::common::types::CelInt::from(val.inner() * val.inner()));
+///     Ok(Cow::Owned(result))
+/// }).unwrap();
+/// ```
 #[derive(Default)]
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
@@ -22,6 +63,10 @@ pub struct Env {
 }
 
 impl Env {
+    /// Returns the standard library environment.
+    ///
+    /// This environment contains all the standard functions and types as defined by the
+    /// CEL specification.
     pub fn stdlib() -> Env {
         let mut env = Env::default();
         types::bytes::stdlib(&mut env);
@@ -41,6 +86,12 @@ impl Env {
         env
     }
 
+    /// Adds a global function overload to the environment.
+    ///
+    /// The name is the function name (e.g., `_==_`, `size`).
+    /// The id is the unique identifier for this overload (e.g., `equals_int64`).
+    /// The args are the expected argument types.
+    /// The op is the function implementation.
     #[allow(clippy::result_unit_err)]
     pub fn add_overload(
         &mut self,
@@ -64,6 +115,7 @@ impl Env {
         }
     }
 
+    /// Finds a global function overload that matches the given name and arguments.
     pub fn find_overload(&self, name: &str, args: &[Cow<dyn Val>]) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
@@ -71,6 +123,14 @@ impl Env {
         }
     }
 
+    /// Adds a member function overload to the environment.
+    ///
+    /// A member function is one that is called using the receiver syntax (e.g., `x.matches(y)`).
+    /// The name is the function name.
+    /// The id is the unique identifier for this overload.
+    /// The target is the type of the receiver.
+    /// The args are the expected argument types (excluding the receiver).
+    /// The op is the function implementation.
     #[allow(clippy::result_unit_err)]
     pub fn add_member_overload(
         &mut self,
@@ -97,24 +157,49 @@ impl Env {
         }
     }
 
-    pub fn find_member_overload(&self, name: &str, args: &[Cow<dyn Val>]) -> Option<Function> {
+    /// Finds a member function overload that matches the given name and arguments.
+    pub(crate) fn find_member_overload(
+        &self,
+        name: &str,
+        args: &[Cow<dyn Val>],
+    ) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(true, args),
         }
     }
 
+    /// Adds a custom struct definition to the environment.
     #[cfg(feature = "structs")]
     pub fn add_struct(&mut self, def: StructDef) {
         self.structs.insert(def.name.clone(), def);
     }
 
+    /// Finds a struct definition by name.
     #[cfg(feature = "structs")]
     pub(crate) fn find_struct(&self, name: &str) -> Option<&StructDef> {
         self.structs.get(name)
     }
 }
 
+/// A definition for a custom struct type.
+///
+/// A struct definition defines the name of the struct, its fields, and any default values
+/// for those fields. Struct definitions are added to an [`Env`] to allow them to be
+/// instantiated from CEL expressions.
+///
+/// # Example
+///
+/// ```
+/// use cel::{Env, StructDef, common::types, common::types::CelString};
+///
+/// let mut env = Env::stdlib();
+/// env.add_struct(
+///     StructDef::new("MyStruct".to_owned())
+///         .add_field("some_field".to_owned(), types::STRING_TYPE)
+///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
+/// );
+/// ```
 #[cfg(feature = "structs")]
 pub struct StructDef {
     name: String,
@@ -124,6 +209,10 @@ pub struct StructDef {
 
 #[cfg(feature = "structs")]
 impl StructDef {
+    /// Creates a new struct definition with the given name.
+    ///
+    /// The name should be the fully qualified name of the struct as it will be
+    /// referenced in CEL expressions (e.g., `cel.MyStruct`).
     pub fn new(name: String) -> Self {
         Self {
             name,
@@ -132,14 +221,26 @@ impl StructDef {
         }
     }
 
+    /// Adds a field to the struct definition.
+    ///
+    /// This method adds a field with the given name and type. When the struct is
+    /// instantiated in a CEL expression, this field must be provided unless it
+    /// has a default value (see [`add_field_with_default`](Self::add_field_with_default)).
     pub fn add_field(self, field: String, t: Type) -> Self {
         self.insert_field(field, t, None)
     }
 
+    /// Adds a field to the struct definition with a default value.
+    ///
+    /// This method adds a field with the given name and a default value. The type
+    /// of the field is automatically inferred from the default value. When the
+    /// struct is instantiated in a CEL expression, this field may be omitted, in
+    /// which case the default value will be used.
     pub fn add_field_with_default(self, field: String, default: Box<dyn Val>) -> Self {
         self.insert_field(field, default.get_type().to_owned(), Some(default))
     }
 
+    /// Internal method to insert a field into the struct definition.
     fn insert_field(self, field: String, t: Type, default: Option<Box<dyn Val>>) -> Self {
         let mut def = self;
         def.fields.insert(field.clone(), t);
@@ -149,6 +250,19 @@ impl StructDef {
         def
     }
 
+    /// Creates a new instance of the struct with the given field values.
+    ///
+    /// This method is used internally by the CEL execution engine to instantiate
+    /// a struct from a CEL expression.
+    ///
+    /// # Errors
+    ///
+    /// Missing fields will be populated with their default values if defined.
+    /// Returns an error if:
+    /// - A field is missing and has no default value.
+    /// - A field's type does not match the type in the definition.
+    /// - An unknown field name is provided.
+    #[cfg(feature = "structs")]
     pub(crate) fn new_struct(
         &self,
         fields: BTreeMap<String, std::borrow::Cow<dyn Val>>,

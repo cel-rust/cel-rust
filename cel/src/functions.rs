@@ -301,7 +301,7 @@ pub mod time {
     /// Duration parses the provided argument into a [`Value::Duration`] value.
     ///
     /// The argument must be string, and must be in the format of a duration. See
-    /// the [`parse_duration`] documentation for more information on the supported
+    /// the [`crate::duration::parse_duration`] documentation for more information on the supported
     /// formats.
     ///
     /// # Examples

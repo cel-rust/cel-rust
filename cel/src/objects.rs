@@ -21,10 +21,10 @@ use std::sync::LazyLock;
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
-/// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
-/// we need to perform our own spec-compliant overflow checks.
+/// and the min is a larger timestamp than what is possible to represent with
+/// [`chrono::DateTime`], we need to perform our own spec-compliant overflow checks.
 ///
-/// https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow
+/// <https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow>
 #[cfg(feature = "chrono")]
 static MAX_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
     let naive = chrono::NaiveDate::from_ymd_opt(9999, 12, 31)
@@ -352,7 +352,7 @@ where
 ///
 /// Implement this trait for types that should participate in CEL evaluation as
 /// opaque/user-defined values. An opaque value:
-/// - must report a stable runtime type name via [`runtime_type_name`];
+/// - must report a stable runtime type name via [`Opaque::runtime_type_name`];
 /// - participates in equality via the blanket [`OpaqueEq`] implementation;
 /// - can be formatted via [`AsDebug`];
 /// - must be thread-safe (`Send + Sync`).

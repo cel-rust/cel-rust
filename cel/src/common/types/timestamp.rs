@@ -56,10 +56,11 @@ impl Val for Timestamp {
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
-/// and the min is a larger timestamp than what is possible to represent with [`DateTime`],
+/// and the min is a larger timestamp than what is possible to represent with
+/// [`chrono::DateTime`],
 /// we need to perform our own spec-compliant overflow checks.
 ///
-/// https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow
+/// <https://github.com/google/cel-spec/blob/master/doc/langdef.md#overflow>
 static MAX_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock::new(|| {
     let naive = chrono::NaiveDate::from_ymd_opt(9999, 12, 31)
         .unwrap()
