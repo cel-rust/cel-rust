@@ -29,6 +29,8 @@ mod duration;
 pub use ser::{Duration, Timestamp};
 
 pub use env::Env;
+#[cfg(feature = "structs")]
+pub use env::StructDef;
 
 mod ser;
 pub use ser::to_value;

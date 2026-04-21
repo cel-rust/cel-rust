@@ -17,6 +17,7 @@ use std::{
 #[derive(Default)]
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
+    #[cfg(feature = "structs")]
     structs: BTreeMap<String, StructDef>,
 }
 
@@ -103,6 +104,7 @@ impl Env {
         }
     }
 
+    #[cfg(feature = "structs")]
     pub fn add_struct(&mut self, def: StructDef) {
         self.structs.insert(def.name.clone(), def);
     }
@@ -113,12 +115,14 @@ impl Env {
     }
 }
 
+#[cfg(feature = "structs")]
 pub struct StructDef {
     name: String,
     fields: BTreeMap<String, Type>,
     defaults: BTreeMap<String, Box<dyn Val>>,
 }
 
+#[cfg(feature = "structs")]
 impl StructDef {
     pub fn new(name: String) -> Self {
         Self {
@@ -145,7 +149,6 @@ impl StructDef {
         def
     }
 
-    #[cfg(feature = "structs")]
     pub(crate) fn new_struct(
         &self,
         fields: BTreeMap<String, std::borrow::Cow<dyn Val>>,
