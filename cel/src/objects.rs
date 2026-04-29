@@ -980,6 +980,10 @@ impl TryFrom<Value> for Box<dyn Val> {
                 };
                 Ok(v)
             }
+            #[cfg(feature = "structs")]
+            Value::Struct(s) => Ok(Arc::try_unwrap(s)
+                .map(|s| Box::new(s) as Box<dyn Val>)
+                .unwrap_or_else(|arc| arc.clone_as_boxed())),
             _ => Err(ExecutionError::UnsupportedTargetType { target: value }),
         }
     }
@@ -2592,11 +2596,12 @@ mod tests {
 
     #[cfg(feature = "structs")]
     mod structs {
+        use std::borrow::Cow;
         use std::sync::Arc;
 
         use crate::{
             common::{
-                types::{self, CelBool, CelInt, CelString},
+                types::{self, CelBool, CelInt, CelString, CelStruct},
                 value::Val,
             },
             env::StructDef,
@@ -2730,6 +2735,35 @@ mod tests {
                     want: String::from("known struct")
                 })
             );
+        }
+
+        #[test]
+        fn add_struct_variable_to_context() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.MyStruct"))
+                    .add_field("name".into(), types::STRING_TYPE)
+                    .add_field("value".into(), types::INT_TYPE),
+            );
+
+            let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
+            my_struct.add_field_value(
+                "name".to_owned(),
+                Cow::<dyn Val>::Owned(Box::new(CelString::from("test"))),
+            );
+            my_struct.add_field_value(
+                "value".to_owned(),
+                Cow::<dyn Val>::Owned(Box::new(CelInt::from(42))),
+            );
+
+            let mut context = Context::with_env(Arc::new(env));
+            context
+                .add_variable("my_var", Value::Struct(Arc::new(my_struct)))
+                .unwrap();
+
+            let program = Program::compile("my_var.name + ' ' + string(my_var.value)").unwrap();
+            let result = program.execute(&context).unwrap();
+            assert_eq!(result, Value::String(Arc::new("test 42".to_owned())));
         }
     }
 }
