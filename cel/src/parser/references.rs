@@ -30,36 +30,50 @@ impl ExpressionReferences<'_> {
     /// let expression = Parser::new().parse("size(foo) > 0").unwrap();
     /// let references = expression.references();
     /// assert!(references.has_function("size"));
+    /// assert!(references.has_function("_>_"))
     /// ```
     pub fn has_function(&self, name: impl AsRef<str>) -> bool {
         self.functions.contains(name.as_ref())
     }
 
-    /// Returns a list of all variables referenced in the expression.
+    /// Returns an iterator over all variables referenced in the expression.
     ///
+    /// Note: [`Self::has_variable`] is a more efficient way to test for the presense of variables.
+    /// Use this function only if you need to iterate over all variables referenced in this expression.
     /// # Example
+    ///
     /// ```rust
     /// # use cel::parser::Parser;
-    /// let expression = Parser::new().parse("foo.bar == true").unwrap();
+    /// let expression = Parser::new().parse("foo.bar == true && bar.baz == false && zzz.bar == false").unwrap();
     /// let references = expression.references();
-    /// assert_eq!(vec!["foo"], references.variables());
+    /// let mut variables = references.variables().collect::<Vec<_>>();
+    /// variables.sort();
+    /// assert_eq!(vec!["bar", "foo", "zzz"], variables);
     /// ```
-    pub fn variables(&self) -> Vec<&str> {
-        self.variables.iter().copied().collect()
+    pub fn variables(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.variables.iter().copied()
     }
 
-    /// Returns a list of all functions referenced in the expression.
+    /// Returns an iterator over all functions referenced in the expression.
+    ///
+    /// Note: [`Self::has_function`] is a more efficient way to test for the presense of functions.
+    /// Use this function only if you need to iterate over all functions referenced in this expression.
     ///
     /// # Example
     /// ```rust
     /// # use cel::parser::Parser;
+    /// # use std::collections::BTreeSet;
     /// let expression = Parser::new().parse("size(foo) > 0").unwrap();
     /// let references = expression.references();
-    /// assert!(references.functions().contains(&"_>_"));
-    /// assert!(references.functions().contains(&"size"));
+    /// for function in references.functions()
+    /// {
+    ///     println!("{function}");
+    /// }
+    /// let all_functions: BTreeSet<&str> = references.functions().collect();
+    /// assert_eq!(all_functions, BTreeSet::from(["_>_", "size"]));
     /// ```
-    pub fn functions(&self) -> Vec<&str> {
-        self.functions.iter().copied().collect()
+    pub fn functions(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.functions.iter().copied()
     }
 }
 
