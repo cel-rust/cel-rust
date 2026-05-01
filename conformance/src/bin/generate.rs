@@ -245,7 +245,7 @@ fn render_file_module(
         for test in &section.tests {
             out.push_str(&format!("    // Test: {}\n", test.name));
             if test.ignored {
-                out.push_str("    #[ignore]\n");
+                out.push_str("    #[should_panic]\n");
             }
             out.push_str("    #[test]\n");
             out.push_str(&format!("    fn {}() {{\n", test.identifier));

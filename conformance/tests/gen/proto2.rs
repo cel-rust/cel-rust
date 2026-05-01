@@ -11,7 +11,7 @@ mod literal_singular {
     use dedent::dedent;
 
     // Test: int64_nocontainer
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int64_nocontainer() {
         run_test(&dedent!(
@@ -27,7 +27,7 @@ mod literal_singular {
     }
 
     // Test: int32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int32() {
         run_test(&dedent!(
@@ -44,7 +44,7 @@ mod literal_singular {
     }
 
     // Test: int32_eq_uint
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int32_eq_uint() {
         run_test(&dedent!(
@@ -57,7 +57,7 @@ mod literal_singular {
     }
 
     // Test: not_int32_eq_uint
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not_int32_eq_uint() {
         run_test(&dedent!(
@@ -70,7 +70,7 @@ mod literal_singular {
     }
 
     // Test: int32_eq_double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int32_eq_double() {
         run_test(&dedent!(
@@ -83,7 +83,7 @@ mod literal_singular {
     }
 
     // Test: not_int32_eq_double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not_int32_eq_double() {
         run_test(&dedent!(
@@ -96,7 +96,7 @@ mod literal_singular {
     }
 
     // Test: int64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int64() {
         run_test(&dedent!(
@@ -113,7 +113,7 @@ mod literal_singular {
     }
 
     // Test: uint32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint32() {
         run_test(&dedent!(
@@ -130,7 +130,7 @@ mod literal_singular {
     }
 
     // Test: uint32_eq_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint32_eq_int() {
         run_test(&dedent!(
@@ -143,7 +143,7 @@ mod literal_singular {
     }
 
     // Test: not_uint32_eq_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not_uint32_eq_int() {
         run_test(&dedent!(
@@ -156,7 +156,7 @@ mod literal_singular {
     }
 
     // Test: uint32_eq_double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint32_eq_double() {
         run_test(&dedent!(
@@ -169,7 +169,7 @@ mod literal_singular {
     }
 
     // Test: not_uint32_eq_double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not_uint32_eq_double() {
         run_test(&dedent!(
@@ -182,7 +182,7 @@ mod literal_singular {
     }
 
     // Test: uint64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint64() {
         run_test(&dedent!(
@@ -199,7 +199,7 @@ mod literal_singular {
     }
 
     // Test: sint32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sint32() {
         run_test(&dedent!(
@@ -216,7 +216,7 @@ mod literal_singular {
     }
 
     // Test: sint64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sint64() {
         run_test(&dedent!(
@@ -233,7 +233,7 @@ mod literal_singular {
     }
 
     // Test: fixed32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn fixed32() {
         run_test(&dedent!(
@@ -250,7 +250,7 @@ mod literal_singular {
     }
 
     // Test: fixed64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn fixed64() {
         run_test(&dedent!(
@@ -267,7 +267,7 @@ mod literal_singular {
     }
 
     // Test: sfixed32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sfixed32() {
         run_test(&dedent!(
@@ -284,7 +284,7 @@ mod literal_singular {
     }
 
     // Test: sfixed64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sfixed64() {
         run_test(&dedent!(
@@ -301,7 +301,7 @@ mod literal_singular {
     }
 
     // Test: float
-    #[ignore]
+    #[should_panic]
     #[test]
     fn float() {
         run_test(&dedent!(
@@ -318,7 +318,7 @@ mod literal_singular {
     }
 
     // Test: float_eq_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn float_eq_int() {
         run_test(&dedent!(
@@ -331,7 +331,7 @@ mod literal_singular {
     }
 
     // Test: not_float_eq_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not_float_eq_int() {
         run_test(&dedent!(
@@ -344,7 +344,7 @@ mod literal_singular {
     }
 
     // Test: float_eq_uint
-    #[ignore]
+    #[should_panic]
     #[test]
     fn float_eq_uint() {
         run_test(&dedent!(
@@ -357,7 +357,7 @@ mod literal_singular {
     }
 
     // Test: not_float_eq_uint
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not_float_eq_uint() {
         run_test(&dedent!(
@@ -370,7 +370,7 @@ mod literal_singular {
     }
 
     // Test: double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double() {
         run_test(&dedent!(
@@ -387,7 +387,7 @@ mod literal_singular {
     }
 
     // Test: bool
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bool() {
         run_test(&dedent!(
@@ -404,7 +404,7 @@ mod literal_singular {
     }
 
     // Test: string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string() {
         run_test(&dedent!(
@@ -421,7 +421,7 @@ mod literal_singular {
     }
 
     // Test: bytes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bytes() {
         run_test(&dedent!(
@@ -445,7 +445,7 @@ mod literal_wellknown {
     use dedent::dedent;
 
     // Test: any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn any() {
         run_test(&dedent!(
@@ -468,7 +468,7 @@ mod literal_wellknown {
     }
 
     // Test: duration
-    #[ignore]
+    #[should_panic]
     #[test]
     fn duration() {
         run_test(&dedent!(
@@ -489,7 +489,7 @@ mod literal_wellknown {
     }
 
     // Test: timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn timestamp() {
         run_test(&dedent!(
@@ -510,7 +510,7 @@ mod literal_wellknown {
     }
 
     // Test: struct
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#struct() {
         run_test(&dedent!(
@@ -538,7 +538,7 @@ mod literal_wellknown {
     }
 
     // Test: value
-    #[ignore]
+    #[should_panic]
     #[test]
     fn value() {
         run_test(&dedent!(
@@ -559,7 +559,7 @@ mod literal_wellknown {
     }
 
     // Test: int64_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int64_wrapper() {
         run_test(&dedent!(
@@ -580,7 +580,7 @@ mod literal_wellknown {
     }
 
     // Test: int32_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int32_wrapper() {
         run_test(&dedent!(
@@ -601,7 +601,7 @@ mod literal_wellknown {
     }
 
     // Test: double_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_wrapper() {
         run_test(&dedent!(
@@ -622,7 +622,7 @@ mod literal_wellknown {
     }
 
     // Test: float_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn float_wrapper() {
         run_test(&dedent!(
@@ -643,7 +643,7 @@ mod literal_wellknown {
     }
 
     // Test: uint64_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint64_wrapper() {
         run_test(&dedent!(
@@ -664,7 +664,7 @@ mod literal_wellknown {
     }
 
     // Test: uint32_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint32_wrapper() {
         run_test(&dedent!(
@@ -685,7 +685,7 @@ mod literal_wellknown {
     }
 
     // Test: string_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_wrapper() {
         run_test(&dedent!(
@@ -706,7 +706,7 @@ mod literal_wellknown {
     }
 
     // Test: bool_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bool_wrapper() {
         run_test(&dedent!(
@@ -727,7 +727,7 @@ mod literal_wellknown {
     }
 
     // Test: bytes_wrapper
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bytes_wrapper() {
         run_test(&dedent!(
@@ -755,7 +755,7 @@ mod singular_bind {
     use dedent::dedent;
 
     // Test: int32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int32() {
         run_test(&dedent!(
@@ -781,7 +781,7 @@ mod singular_bind {
     }
 
     // Test: int64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int64() {
         run_test(&dedent!(
@@ -814,7 +814,7 @@ mod empty_field {
     use dedent::dedent;
 
     // Test: scalar_with_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn scalar_with_default() {
         run_test(&dedent!(
@@ -827,7 +827,7 @@ mod empty_field {
     }
 
     // Test: scalar_no_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn scalar_no_default() {
         run_test(&dedent!(
@@ -840,7 +840,7 @@ mod empty_field {
     }
 
     // Test: nested_message
-    #[ignore]
+    #[should_panic]
     #[test]
     fn nested_message() {
         run_test(&dedent!(
@@ -857,7 +857,7 @@ mod empty_field {
     }
 
     // Test: nested_message_subfield
-    #[ignore]
+    #[should_panic]
     #[test]
     fn nested_message_subfield() {
         run_test(&dedent!(
@@ -870,7 +870,7 @@ mod empty_field {
     }
 
     // Test: wkt
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wkt() {
         run_test(&dedent!(
@@ -883,7 +883,7 @@ mod empty_field {
     }
 
     // Test: repeated_scalar
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_scalar() {
         run_test(&dedent!(
@@ -896,7 +896,7 @@ mod empty_field {
     }
 
     // Test: repeated_enum
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_enum() {
         run_test(&dedent!(
@@ -909,7 +909,7 @@ mod empty_field {
     }
 
     // Test: repeated_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_nested() {
         run_test(&dedent!(
@@ -922,7 +922,7 @@ mod empty_field {
     }
 
     // Test: map
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map() {
         run_test(&dedent!(
@@ -957,7 +957,7 @@ mod has {
     }
 
     // Test: repeated_none_implicit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_none_implicit() {
         run_test(&dedent!(
@@ -970,7 +970,7 @@ mod has {
     }
 
     // Test: repeated_none_explicit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_none_explicit() {
         run_test(&dedent!(
@@ -983,7 +983,7 @@ mod has {
     }
 
     // Test: repeated_one
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_one() {
         run_test(&dedent!(
@@ -996,7 +996,7 @@ mod has {
     }
 
     // Test: repeated_many
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_many() {
         run_test(&dedent!(
@@ -1009,7 +1009,7 @@ mod has {
     }
 
     // Test: map_none_implicit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_none_implicit() {
         run_test(&dedent!(
@@ -1022,7 +1022,7 @@ mod has {
     }
 
     // Test: map_none_explicit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_none_explicit() {
         run_test(&dedent!(
@@ -1035,7 +1035,7 @@ mod has {
     }
 
     // Test: map_one_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_one_default() {
         run_test(&dedent!(
@@ -1048,7 +1048,7 @@ mod has {
     }
 
     // Test: map_one
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_one() {
         run_test(&dedent!(
@@ -1061,7 +1061,7 @@ mod has {
     }
 
     // Test: map_many
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_many() {
         run_test(&dedent!(
@@ -1074,7 +1074,7 @@ mod has {
     }
 
     // Test: required
-    #[ignore]
+    #[should_panic]
     #[test]
     fn required() {
         run_test(&dedent!(
@@ -1087,7 +1087,7 @@ mod has {
     }
 
     // Test: optional_unset_no_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_unset_no_default() {
         run_test(&dedent!(
@@ -1100,7 +1100,7 @@ mod has {
     }
 
     // Test: optional_set_no_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_set_no_default() {
         run_test(&dedent!(
@@ -1113,7 +1113,7 @@ mod has {
     }
 
     // Test: optional_unset_with_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_unset_with_default() {
         run_test(&dedent!(
@@ -1126,7 +1126,7 @@ mod has {
     }
 
     // Test: optional_set_with_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_set_with_default() {
         run_test(&dedent!(
@@ -1139,7 +1139,7 @@ mod has {
     }
 
     // Test: optional_set_to_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_set_to_default() {
         run_test(&dedent!(
@@ -1152,7 +1152,7 @@ mod has {
     }
 
     // Test: optional_message_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_message_unset() {
         run_test(&dedent!(
@@ -1165,7 +1165,7 @@ mod has {
     }
 
     // Test: optional_message_set
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_message_set() {
         run_test(&dedent!(
@@ -1178,7 +1178,7 @@ mod has {
     }
 
     // Test: optional_enum_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_enum_unset() {
         run_test(&dedent!(
@@ -1191,7 +1191,7 @@ mod has {
     }
 
     // Test: optional_enum_set
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_enum_set() {
         run_test(&dedent!(
@@ -1204,7 +1204,7 @@ mod has {
     }
 
     // Test: optional_enum_set_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_enum_set_zero() {
         run_test(&dedent!(
@@ -1217,7 +1217,7 @@ mod has {
     }
 
     // Test: oneof_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn oneof_unset() {
         run_test(&dedent!(
@@ -1230,7 +1230,7 @@ mod has {
     }
 
     // Test: oneof_other_set
-    #[ignore]
+    #[should_panic]
     #[test]
     fn oneof_other_set() {
         run_test(&dedent!(
@@ -1243,7 +1243,7 @@ mod has {
     }
 
     // Test: oneof_set
-    #[ignore]
+    #[should_panic]
     #[test]
     fn oneof_set() {
         run_test(&dedent!(
@@ -1256,7 +1256,7 @@ mod has {
     }
 
     // Test: oneof_set_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn oneof_set_default() {
         run_test(&dedent!(
@@ -1275,7 +1275,7 @@ mod set_null {
     use dedent::dedent;
 
     // Test: single_message
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_message() {
         run_test(&dedent!(
@@ -1288,7 +1288,7 @@ mod set_null {
     }
 
     // Test: single_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_any() {
         run_test(&dedent!(
@@ -1301,7 +1301,7 @@ mod set_null {
     }
 
     // Test: single_value
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_value() {
         run_test(&dedent!(
@@ -1314,7 +1314,7 @@ mod set_null {
     }
 
     // Test: single_duration
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_duration() {
         run_test(&dedent!(
@@ -1327,7 +1327,7 @@ mod set_null {
     }
 
     // Test: single_timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_timestamp() {
         run_test(&dedent!(
@@ -1421,7 +1421,7 @@ mod quoted_fields {
     use dedent::dedent;
 
     // Test: set_field_with_quoted_name
-    #[ignore]
+    #[should_panic]
     #[test]
     fn set_field_with_quoted_name() {
         run_test(&dedent!(
@@ -1434,7 +1434,7 @@ mod quoted_fields {
     }
 
     // Test: get_field_with_quoted_name
-    #[ignore]
+    #[should_panic]
     #[test]
     fn get_field_with_quoted_name() {
         run_test(&dedent!(
@@ -1454,7 +1454,7 @@ mod extensions_has {
     use dedent::dedent;
 
     // Test: package_scoped_int32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_int32() {
         run_test(&dedent!(
@@ -1481,7 +1481,7 @@ mod extensions_has {
     }
 
     // Test: package_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_nested_ext() {
         run_test(&dedent!(
@@ -1508,7 +1508,7 @@ mod extensions_has {
     }
 
     // Test: package_scoped_test_all_types_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_ext() {
         run_test(&dedent!(
@@ -1535,7 +1535,7 @@ mod extensions_has {
     }
 
     // Test: package_scoped_test_all_types_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_nested_enum_ext() {
         run_test(&dedent!(
@@ -1562,7 +1562,7 @@ mod extensions_has {
     }
 
     // Test: package_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_repeated_test_all_types() {
         run_test(&dedent!(
@@ -1589,7 +1589,7 @@ mod extensions_has {
     }
 
     // Test: message_scoped_int64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_int64() {
         run_test(&dedent!(
@@ -1616,7 +1616,7 @@ mod extensions_has {
     }
 
     // Test: message_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_ext() {
         run_test(&dedent!(
@@ -1643,7 +1643,7 @@ mod extensions_has {
     }
 
     // Test: message_scoped_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_enum_ext() {
         run_test(&dedent!(
@@ -1670,7 +1670,7 @@ mod extensions_has {
     }
 
     // Test: message_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_repeated_test_all_types() {
         run_test(&dedent!(
@@ -1704,7 +1704,7 @@ mod extensions_get {
     use dedent::dedent;
 
     // Test: package_scoped_int32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_int32() {
         run_test(&dedent!(
@@ -1731,7 +1731,7 @@ mod extensions_get {
     }
 
     // Test: package_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_nested_ext() {
         run_test(&dedent!(
@@ -1758,7 +1758,7 @@ mod extensions_get {
     }
 
     // Test: package_scoped_test_all_types_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_ext() {
         run_test(&dedent!(
@@ -1785,7 +1785,7 @@ mod extensions_get {
     }
 
     // Test: package_scoped_test_all_types_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_nested_enum_ext() {
         run_test(&dedent!(
@@ -1812,7 +1812,7 @@ mod extensions_get {
     }
 
     // Test: package_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_repeated_test_all_types() {
         run_test(&dedent!(
@@ -1839,7 +1839,7 @@ mod extensions_get {
     }
 
     // Test: message_scoped_int64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_int64() {
         run_test(&dedent!(
@@ -1866,7 +1866,7 @@ mod extensions_get {
     }
 
     // Test: message_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_ext() {
         run_test(&dedent!(
@@ -1893,7 +1893,7 @@ mod extensions_get {
     }
 
     // Test: message_scoped_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_enum_ext() {
         run_test(&dedent!(
@@ -1920,7 +1920,7 @@ mod extensions_get {
     }
 
     // Test: message_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_repeated_test_all_types() {
         run_test(&dedent!(

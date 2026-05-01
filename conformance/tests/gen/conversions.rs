@@ -294,7 +294,7 @@ mod r#dyn {
     use dedent::dedent;
 
     // Test: dyn_heterogeneous_list
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyn_heterogeneous_list() {
         run_test(&dedent!(
@@ -347,7 +347,7 @@ mod int {
     }
 
     // Test: uint_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint_range() {
         run_test(&dedent!(
@@ -440,7 +440,7 @@ mod int {
     }
 
     // Test: double_int_max_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_int_max_range() {
         run_test(&dedent!(
@@ -455,7 +455,7 @@ mod int {
     }
 
     // Test: double_int_min_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_int_min_range() {
         run_test(&dedent!(
@@ -470,7 +470,7 @@ mod int {
     }
 
     // Test: double_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_range() {
         run_test(&dedent!(
@@ -495,7 +495,7 @@ mod int {
     }
 
     // Test: timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn timestamp() {
         run_test(&dedent!(
@@ -591,7 +591,7 @@ mod string {
     }
 
     // Test: bytes_invalid
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bytes_invalid() {
         run_test(&dedent!(
@@ -612,7 +612,7 @@ mod r#type {
     use dedent::dedent;
 
     // Test: bool
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bool() {
         run_test(&dedent!(
@@ -624,7 +624,7 @@ mod r#type {
     }
 
     // Test: bool_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bool_denotation() {
         run_test(&dedent!(
@@ -650,7 +650,7 @@ mod r#type {
     }
 
     // Test: int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int() {
         run_test(&dedent!(
@@ -662,7 +662,7 @@ mod r#type {
     }
 
     // Test: int_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int_denotation() {
         run_test(&dedent!(
@@ -674,7 +674,7 @@ mod r#type {
     }
 
     // Test: eq_same
-    #[ignore]
+    #[should_panic]
     #[test]
     fn eq_same() {
         run_test(&dedent!(
@@ -686,7 +686,7 @@ mod r#type {
     }
 
     // Test: uint
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint() {
         run_test(&dedent!(
@@ -698,7 +698,7 @@ mod r#type {
     }
 
     // Test: uint_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint_denotation() {
         run_test(&dedent!(
@@ -710,7 +710,7 @@ mod r#type {
     }
 
     // Test: double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double() {
         run_test(&dedent!(
@@ -722,7 +722,7 @@ mod r#type {
     }
 
     // Test: double_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_denotation() {
         run_test(&dedent!(
@@ -734,7 +734,7 @@ mod r#type {
     }
 
     // Test: null_type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null_type() {
         run_test(&dedent!(
@@ -746,7 +746,7 @@ mod r#type {
     }
 
     // Test: null_type_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null_type_denotation() {
         run_test(&dedent!(
@@ -758,7 +758,7 @@ mod r#type {
     }
 
     // Test: string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string() {
         run_test(&dedent!(
@@ -770,7 +770,7 @@ mod r#type {
     }
 
     // Test: string_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_denotation() {
         run_test(&dedent!(
@@ -782,7 +782,7 @@ mod r#type {
     }
 
     // Test: bytes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bytes() {
         run_test(&dedent!(
@@ -794,7 +794,7 @@ mod r#type {
     }
 
     // Test: bytes_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bytes_denotation() {
         run_test(&dedent!(
@@ -806,7 +806,7 @@ mod r#type {
     }
 
     // Test: list
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list() {
         run_test(&dedent!(
@@ -818,7 +818,7 @@ mod r#type {
     }
 
     // Test: list_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_denotation() {
         run_test(&dedent!(
@@ -830,7 +830,7 @@ mod r#type {
     }
 
     // Test: lists_monomorphic
-    #[ignore]
+    #[should_panic]
     #[test]
     fn lists_monomorphic() {
         run_test(&dedent!(
@@ -842,7 +842,7 @@ mod r#type {
     }
 
     // Test: map
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map() {
         run_test(&dedent!(
@@ -854,7 +854,7 @@ mod r#type {
     }
 
     // Test: map_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_denotation() {
         run_test(&dedent!(
@@ -866,7 +866,7 @@ mod r#type {
     }
 
     // Test: map_monomorphic
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_monomorphic() {
         run_test(&dedent!(
@@ -878,7 +878,7 @@ mod r#type {
     }
 
     // Test: eq_diff
-    #[ignore]
+    #[should_panic]
     #[test]
     fn eq_diff() {
         run_test(&dedent!(
@@ -890,7 +890,7 @@ mod r#type {
     }
 
     // Test: neq_same
-    #[ignore]
+    #[should_panic]
     #[test]
     fn neq_same() {
         run_test(&dedent!(
@@ -902,7 +902,7 @@ mod r#type {
     }
 
     // Test: neq_diff
-    #[ignore]
+    #[should_panic]
     #[test]
     fn neq_diff() {
         run_test(&dedent!(
@@ -914,7 +914,7 @@ mod r#type {
     }
 
     // Test: meta
-    #[ignore]
+    #[should_panic]
     #[test]
     fn meta() {
         run_test(&dedent!(
@@ -926,7 +926,7 @@ mod r#type {
     }
 
     // Test: type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#type() {
         run_test(&dedent!(
@@ -938,7 +938,7 @@ mod r#type {
     }
 
     // Test: type_denotation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_denotation() {
         run_test(&dedent!(
@@ -950,7 +950,7 @@ mod r#type {
     }
 
     // Test: type_type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_type() {
         run_test(&dedent!(
@@ -991,7 +991,7 @@ mod uint {
     }
 
     // Test: int_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int_neg() {
         run_test(&dedent!(
@@ -1062,7 +1062,7 @@ mod uint {
     }
 
     // Test: double_uint_max_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_uint_max_range() {
         run_test(&dedent!(
@@ -1077,7 +1077,7 @@ mod uint {
     }
 
     // Test: double_range_beyond_uint
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_range_beyond_uint() {
         run_test(&dedent!(
@@ -1109,7 +1109,7 @@ mod bool {
     use dedent::dedent;
 
     // Test: string_1
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_1() {
         run_test(&dedent!(
@@ -1121,7 +1121,7 @@ mod bool {
     }
 
     // Test: string_t
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_t() {
         run_test(&dedent!(
@@ -1133,7 +1133,7 @@ mod bool {
     }
 
     // Test: string_true_lowercase
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_true_lowercase() {
         run_test(&dedent!(
@@ -1145,7 +1145,7 @@ mod bool {
     }
 
     // Test: string_true_uppercase
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_true_uppercase() {
         run_test(&dedent!(
@@ -1157,7 +1157,7 @@ mod bool {
     }
 
     // Test: string_true_pascalcase
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_true_pascalcase() {
         run_test(&dedent!(
@@ -1169,7 +1169,7 @@ mod bool {
     }
 
     // Test: string_0
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_0() {
         run_test(&dedent!(
@@ -1181,7 +1181,7 @@ mod bool {
     }
 
     // Test: string_f
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_f() {
         run_test(&dedent!(
@@ -1193,7 +1193,7 @@ mod bool {
     }
 
     // Test: string_false_lowercase
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_false_lowercase() {
         run_test(&dedent!(
@@ -1205,7 +1205,7 @@ mod bool {
     }
 
     // Test: string_false_uppercase
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_false_uppercase() {
         run_test(&dedent!(
@@ -1217,7 +1217,7 @@ mod bool {
     }
 
     // Test: string_false_pascalcase
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_false_pascalcase() {
         run_test(&dedent!(
@@ -1262,7 +1262,7 @@ mod identity {
     use dedent::dedent;
 
     // Test: bool
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bool() {
         run_test(&dedent!(
@@ -1340,7 +1340,7 @@ mod identity {
     }
 
     // Test: timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn timestamp() {
         run_test(&dedent!(

@@ -10,7 +10,7 @@ mod has_ext {
     use dedent::dedent;
 
     // Test: package_scoped_int32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_int32() {
         run_test(&dedent!(
@@ -37,7 +37,7 @@ mod has_ext {
     }
 
     // Test: package_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_nested_ext() {
         run_test(&dedent!(
@@ -64,7 +64,7 @@ mod has_ext {
     }
 
     // Test: package_scoped_test_all_types_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_ext() {
         run_test(&dedent!(
@@ -91,7 +91,7 @@ mod has_ext {
     }
 
     // Test: package_scoped_test_all_types_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_nested_enum_ext() {
         run_test(&dedent!(
@@ -118,7 +118,7 @@ mod has_ext {
     }
 
     // Test: package_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_repeated_test_all_types() {
         run_test(&dedent!(
@@ -145,7 +145,7 @@ mod has_ext {
     }
 
     // Test: message_scoped_int64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_int64() {
         run_test(&dedent!(
@@ -172,7 +172,7 @@ mod has_ext {
     }
 
     // Test: message_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_ext() {
         run_test(&dedent!(
@@ -199,7 +199,7 @@ mod has_ext {
     }
 
     // Test: message_scoped_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_enum_ext() {
         run_test(&dedent!(
@@ -226,7 +226,7 @@ mod has_ext {
     }
 
     // Test: message_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_repeated_test_all_types() {
         run_test(&dedent!(
@@ -259,7 +259,7 @@ mod get_ext {
     use dedent::dedent;
 
     // Test: package_scoped_int32
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_int32() {
         run_test(&dedent!(
@@ -286,7 +286,7 @@ mod get_ext {
     }
 
     // Test: package_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_nested_ext() {
         run_test(&dedent!(
@@ -313,7 +313,7 @@ mod get_ext {
     }
 
     // Test: package_scoped_test_all_types_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_ext() {
         run_test(&dedent!(
@@ -340,7 +340,7 @@ mod get_ext {
     }
 
     // Test: package_scoped_test_all_types_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_test_all_types_nested_enum_ext() {
         run_test(&dedent!(
@@ -367,7 +367,7 @@ mod get_ext {
     }
 
     // Test: package_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package_scoped_repeated_test_all_types() {
         run_test(&dedent!(
@@ -394,7 +394,7 @@ mod get_ext {
     }
 
     // Test: message_scoped_int64
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_int64() {
         run_test(&dedent!(
@@ -421,7 +421,7 @@ mod get_ext {
     }
 
     // Test: message_scoped_nested_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_ext() {
         run_test(&dedent!(
@@ -448,7 +448,7 @@ mod get_ext {
     }
 
     // Test: message_scoped_nested_enum_ext
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_nested_enum_ext() {
         run_test(&dedent!(
@@ -475,7 +475,7 @@ mod get_ext {
     }
 
     // Test: message_scoped_repeated_test_all_types
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_scoped_repeated_test_all_types() {
         run_test(&dedent!(

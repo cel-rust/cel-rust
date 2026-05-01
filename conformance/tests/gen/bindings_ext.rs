@@ -10,7 +10,7 @@ mod bind {
     use dedent::dedent;
 
     // Test: boolean_literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn boolean_literal() {
         run_test(&dedent!(
@@ -24,7 +24,7 @@ mod bind {
     }
 
     // Test: string_concat
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_concat() {
         run_test(&dedent!(
@@ -38,7 +38,7 @@ mod bind {
     }
 
     // Test: bind_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bind_nested() {
         run_test(&dedent!(
@@ -52,7 +52,7 @@ mod bind {
     }
 
     // Test: macro_exists
-    #[ignore]
+    #[should_panic]
     #[test]
     fn macro_exists() {
         run_test(&dedent!(
@@ -66,7 +66,7 @@ mod bind {
     }
 
     // Test: macro_not_exists
-    #[ignore]
+    #[should_panic]
     #[test]
     fn macro_not_exists() {
         run_test(&dedent!(
