@@ -69,7 +69,7 @@ pub fn run_test(simple_test_textproto: &str) {
                 proto_value_to_cel_value(expected_value).expect("Failed to convert expected value");
             let actual_value = result.expect("Execution failed for value result matcher");
             assert!(
-                values_equal(&actual_value, &expected_cel_value, &test.container),
+                values_equal(&actual_value, &expected_cel_value),
                 "Expected {:?}, got {:?}",
                 expected_cel_value,
                 actual_value
@@ -80,20 +80,17 @@ pub fn run_test(simple_test_textproto: &str) {
             assert!(result.is_err(), "Expected error but got success");
         }
         Some(ResultMatcher::Unknown(_)) => {
-            assert!(false, "Unknown result matching not implemented");
+            todo!("Unknown result matching not implemented");
         }
         Some(ResultMatcher::AnyEvalErrors(_)) => {
-            assert!(false, "Any eval errors matching not implemented");
+            todo!("Any eval errors matching not implemented");
         }
         Some(ResultMatcher::AnyUnknowns(_)) => {
-            assert!(false, "Any unknowns matching not implemented");
+            todo!("Any unknowns matching not implemented");
         }
         Some(ResultMatcher::TypedResult(_typed_result)) => {
             // TypedResult requires type checking which is not available.
-            assert!(
-                false,
-                "TypedResult matching requires type checker (not available)"
-            );
+            todo!("TypedResult matching requires type checker (not available)");
         }
         None => {
             // Default to expecting true.
@@ -107,7 +104,7 @@ pub fn run_test(simple_test_textproto: &str) {
     }
 }
 
-fn values_equal(a: &CelValue, b: &CelValue, container: &str) -> bool {
+fn values_equal(a: &CelValue, b: &CelValue) -> bool {
     use CelValue::*;
     match (a, b) {
         (Null, Null) => true,
@@ -128,9 +125,7 @@ fn values_equal(a: &CelValue, b: &CelValue, container: &str) -> bool {
             if a.len() != b.len() {
                 return false;
             }
-            a.iter()
-                .zip(b.iter())
-                .all(|(a, b)| values_equal(a, b, container))
+            a.iter().zip(b.iter()).all(|(a, b)| values_equal(a, b))
         }
         (Map(a), Map(b)) => {
             if a.map.len() != b.map.len() {
@@ -139,7 +134,7 @@ fn values_equal(a: &CelValue, b: &CelValue, container: &str) -> bool {
             for (key, a_val) in a.map.iter() {
                 match b.map.get(key) {
                     Some(b_val) => {
-                        if !values_equal(a_val, b_val, container) {
+                        if !values_equal(a_val, b_val) {
                             return false;
                         }
                     }

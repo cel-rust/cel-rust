@@ -278,6 +278,7 @@ fn render_test_index(modules: &[String]) -> String {
 
     for module in modules {
         out.push_str(&format!("#[path = \"gen/{}.rs\"]\n", module));
+        out.push_str("#[allow(clippy::all)]\n");
         out.push_str(&format!("mod {};\n", module));
     }
 

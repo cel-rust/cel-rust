@@ -15,6 +15,7 @@ pub(crate) fn descriptor_pool() -> &'static DescriptorPool {
 
 // Generated protobuf code
 #[allow(dead_code)]
+#[allow(clippy::all)]
 pub mod cel {
     pub mod expr {
         include!(concat!(env!("CARGO_MANIFEST_DIR"), "/src/gen/cel.expr.rs"));
