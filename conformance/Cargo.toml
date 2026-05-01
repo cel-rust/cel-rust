@@ -1,0 +1,34 @@
+[package]
+name = "conformance"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.86.0"
+
+[package.metadata.generate]
+cel_spec_version = "v0.25.1"
+
+[features]
+skip-version-check = []
+
+[dependencies]
+cargo_toml = "0.22.3"
+cel = { path = "../cel", features = ["json"] }
+check_keyword = "0.4.1"
+prost = "0.14.3"
+prost-build = { version = "0.14.3", features = ["cleanup-markdown"] }
+prost-types = "0.14.3"
+prost-reflect = { version = "0.16.3", features = ["text-format"] }
+protox = "0.9.1"
+reqwest = { version = "0.13.3", default-features = false, features = ["blocking", "rustls"] }
+thiserror = "1.0"
+chrono = "0.4.44"
+walkdir = "2.5"
+zip = { version = "8.6", default-features = false, features = ["deflate"] }
+
+[build-dependencies]
+cargo_toml = "0.22.3"
+
+[dev-dependencies]
+dedent = "0.1.1"
+
