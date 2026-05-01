@@ -337,7 +337,7 @@ mod self_eval_nonzeroish {
     }
 
     // Test: self_eval_int_hex_negative
-    #[ignore]
+    #[should_panic]
     #[test]
     fn self_eval_int_hex_negative() {
         run_test(&dedent!(
@@ -393,7 +393,7 @@ mod self_eval_nonzeroish {
     }
 
     // Test: self_eval_ascii_escape_seq
-    #[ignore]
+    #[should_panic]
     #[test]
     fn self_eval_ascii_escape_seq() {
         run_test(&dedent!(

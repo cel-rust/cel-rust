@@ -10,7 +10,7 @@ mod char_at {
     use dedent::dedent;
 
     // Test: middle_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn middle_index() {
         run_test(&dedent!(
@@ -24,7 +24,7 @@ mod char_at {
     }
 
     // Test: end_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn end_index() {
         run_test(&dedent!(
@@ -38,7 +38,7 @@ mod char_at {
     }
 
     // Test: multiple
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiple() {
         run_test(&dedent!(
@@ -55,7 +55,7 @@ mod index_of {
     use dedent::dedent;
 
     // Test: empty_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_index() {
         run_test(&dedent!(
@@ -69,7 +69,7 @@ mod index_of {
     }
 
     // Test: string_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_index() {
         run_test(&dedent!(
@@ -83,7 +83,7 @@ mod index_of {
     }
 
     // Test: nomatch
-    #[ignore]
+    #[should_panic]
     #[test]
     fn nomatch() {
         run_test(&dedent!(
@@ -94,7 +94,7 @@ mod index_of {
     }
 
     // Test: empty_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_index_1() {
         run_test(&dedent!(
@@ -105,7 +105,7 @@ mod index_of {
     }
 
     // Test: char_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn char_index() {
         run_test(&dedent!(
@@ -116,7 +116,7 @@ mod index_of {
     }
 
     // Test: string_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_index_1() {
         run_test(&dedent!(
@@ -127,7 +127,7 @@ mod index_of {
     }
 
     // Test: unicode_char
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_char() {
         run_test(&dedent!(
@@ -138,7 +138,7 @@ mod index_of {
     }
 
     // Test: unicode_char_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_char_index() {
         run_test(&dedent!(
@@ -149,7 +149,7 @@ mod index_of {
     }
 
     // Test: unicode_string_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_string_index() {
         run_test(&dedent!(
@@ -160,7 +160,7 @@ mod index_of {
     }
 
     // Test: unicode_string_nomatch_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_string_nomatch_index() {
         run_test(&dedent!(
@@ -171,7 +171,7 @@ mod index_of {
     }
 
     // Test: char_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn char_index_1() {
         run_test(&dedent!(
@@ -182,7 +182,7 @@ mod index_of {
     }
 
     // Test: string_with_space_fullmatch
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_with_space_fullmatch() {
         run_test(&dedent!(
@@ -193,7 +193,7 @@ mod index_of {
     }
 
     // Test: string_with_space_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_with_space_index() {
         run_test(&dedent!(
@@ -204,7 +204,7 @@ mod index_of {
     }
 
     // Test: string_nomatch_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_nomatch_index() {
         run_test(&dedent!(
@@ -221,7 +221,7 @@ mod last_index_of {
     use dedent::dedent;
 
     // Test: empty_string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_string() {
         run_test(&dedent!(
@@ -232,7 +232,7 @@ mod last_index_of {
     }
 
     // Test: empty_argument
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_argument() {
         run_test(&dedent!(
@@ -243,7 +243,7 @@ mod last_index_of {
     }
 
     // Test: string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string() {
         run_test(&dedent!(
@@ -254,7 +254,7 @@ mod last_index_of {
     }
 
     // Test: string_nomatch
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_nomatch() {
         run_test(&dedent!(
@@ -265,7 +265,7 @@ mod last_index_of {
     }
 
     // Test: empty_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_index() {
         run_test(&dedent!(
@@ -276,7 +276,7 @@ mod last_index_of {
     }
 
     // Test: char_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn char_index() {
         run_test(&dedent!(
@@ -287,7 +287,7 @@ mod last_index_of {
     }
 
     // Test: unicode_char
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_char() {
         run_test(&dedent!(
@@ -298,7 +298,7 @@ mod last_index_of {
     }
 
     // Test: unicode_char_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_char_index() {
         run_test(&dedent!(
@@ -309,7 +309,7 @@ mod last_index_of {
     }
 
     // Test: unicode_string_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_string_index() {
         run_test(&dedent!(
@@ -320,7 +320,7 @@ mod last_index_of {
     }
 
     // Test: string_with_space_string_index
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_with_space_string_index() {
         run_test(&dedent!(
@@ -331,7 +331,7 @@ mod last_index_of {
     }
 
     // Test: string_with_space_string_nomatch
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_with_space_string_nomatch() {
         run_test(&dedent!(
@@ -342,7 +342,7 @@ mod last_index_of {
     }
 
     // Test: string_with_space_string_with_space_nomatch
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_with_space_string_with_space_nomatch() {
         run_test(&dedent!(
@@ -353,7 +353,7 @@ mod last_index_of {
     }
 
     // Test: string_with_space_fullmatch
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_with_space_fullmatch() {
         run_test(&dedent!(
@@ -364,7 +364,7 @@ mod last_index_of {
     }
 
     // Test: repeated_string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_string() {
         run_test(&dedent!(
@@ -381,7 +381,7 @@ mod ascii_casing {
     use dedent::dedent;
 
     // Test: lowerascii
-    #[ignore]
+    #[should_panic]
     #[test]
     fn lowerascii() {
         run_test(&dedent!(
@@ -392,7 +392,7 @@ mod ascii_casing {
     }
 
     // Test: lowerascii_unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn lowerascii_unicode() {
         run_test(&dedent!(
@@ -403,7 +403,7 @@ mod ascii_casing {
     }
 
     // Test: lowerascii_unicode_with_space
-    #[ignore]
+    #[should_panic]
     #[test]
     fn lowerascii_unicode_with_space() {
         run_test(&dedent!(
@@ -414,7 +414,7 @@ mod ascii_casing {
     }
 
     // Test: upperascii
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upperascii() {
         run_test(&dedent!(
@@ -425,7 +425,7 @@ mod ascii_casing {
     }
 
     // Test: upperascii_unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upperascii_unicode() {
         run_test(&dedent!(
@@ -436,7 +436,7 @@ mod ascii_casing {
     }
 
     // Test: upperascii_unicode_with_space
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upperascii_unicode_with_space() {
         run_test(&dedent!(
@@ -453,7 +453,7 @@ mod replace {
     use dedent::dedent;
 
     // Test: no_placeholder
-    #[ignore]
+    #[should_panic]
     #[test]
     fn no_placeholder() {
         run_test(&dedent!(
@@ -464,7 +464,7 @@ mod replace {
     }
 
     // Test: basic
-    #[ignore]
+    #[should_panic]
     #[test]
     fn basic() {
         run_test(&dedent!(
@@ -475,7 +475,7 @@ mod replace {
     }
 
     // Test: chained
-    #[ignore]
+    #[should_panic]
     #[test]
     fn chained() {
         run_test(&dedent!(
@@ -486,7 +486,7 @@ mod replace {
     }
 
     // Test: unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode() {
         run_test(&dedent!(
@@ -503,7 +503,7 @@ mod split {
     use dedent::dedent;
 
     // Test: empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -514,7 +514,7 @@ mod split {
     }
 
     // Test: zero_limit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn zero_limit() {
         run_test(&dedent!(
@@ -525,7 +525,7 @@ mod split {
     }
 
     // Test: one_limit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn one_limit() {
         run_test(&dedent!(
@@ -536,7 +536,7 @@ mod split {
     }
 
     // Test: unicode_negative_limit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_negative_limit() {
         run_test(&dedent!(
@@ -553,7 +553,7 @@ mod substring {
     use dedent::dedent;
 
     // Test: start
-    #[ignore]
+    #[should_panic]
     #[test]
     fn start() {
         run_test(&dedent!(
@@ -564,7 +564,7 @@ mod substring {
     }
 
     // Test: start_with_max_length
-    #[ignore]
+    #[should_panic]
     #[test]
     fn start_with_max_length() {
         run_test(&dedent!(
@@ -575,7 +575,7 @@ mod substring {
     }
 
     // Test: start_and_end
-    #[ignore]
+    #[should_panic]
     #[test]
     fn start_and_end() {
         run_test(&dedent!(
@@ -586,7 +586,7 @@ mod substring {
     }
 
     // Test: start_and_end_equal_value
-    #[ignore]
+    #[should_panic]
     #[test]
     fn start_and_end_equal_value() {
         run_test(&dedent!(
@@ -597,7 +597,7 @@ mod substring {
     }
 
     // Test: unicode_start_and_end
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_start_and_end() {
         run_test(&dedent!(
@@ -608,7 +608,7 @@ mod substring {
     }
 
     // Test: unicode_start_and_end_equal_value
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_start_and_end_equal_value() {
         run_test(&dedent!(
@@ -625,7 +625,7 @@ mod trim {
     use dedent::dedent;
 
     // Test: blank_spaces_escaped_chars
-    #[ignore]
+    #[should_panic]
     #[test]
     fn blank_spaces_escaped_chars() {
         run_test(&dedent!(
@@ -636,7 +636,7 @@ mod trim {
     }
 
     // Test: unicode_space_chars_1
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_space_chars_1() {
         run_test(&dedent!(
@@ -647,7 +647,7 @@ mod trim {
     }
 
     // Test: unicode_space_chars_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_space_chars_2() {
         run_test(&dedent!(
@@ -658,7 +658,7 @@ mod trim {
     }
 
     // Test: unicode_space_chars_3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_space_chars_3() {
         run_test(&dedent!(
@@ -669,7 +669,7 @@ mod trim {
     }
 
     // Test: unicode_no_trim
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_no_trim() {
         run_test(&dedent!(
@@ -686,7 +686,7 @@ mod join {
     use dedent::dedent;
 
     // Test: empty_separator
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_separator() {
         run_test(&dedent!(
@@ -697,7 +697,7 @@ mod join {
     }
 
     // Test: dash_separator
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dash_separator() {
         run_test(&dedent!(
@@ -708,7 +708,7 @@ mod join {
     }
 
     // Test: empty_string_empty_separator
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_string_empty_separator() {
         run_test(&dedent!(
@@ -719,7 +719,7 @@ mod join {
     }
 
     // Test: empty_string_dash_separator
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_string_dash_separator() {
         run_test(&dedent!(
@@ -736,7 +736,7 @@ mod quote {
     use dedent::dedent;
 
     // Test: multiline
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiline() {
         run_test(&dedent!(
@@ -747,7 +747,7 @@ mod quote {
     }
 
     // Test: escaped
-    #[ignore]
+    #[should_panic]
     #[test]
     fn escaped() {
         run_test(&dedent!(
@@ -758,7 +758,7 @@ mod quote {
     }
 
     // Test: backspace
-    #[ignore]
+    #[should_panic]
     #[test]
     fn backspace() {
         run_test(&dedent!(
@@ -769,7 +769,7 @@ mod quote {
     }
 
     // Test: form_feed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn form_feed() {
         run_test(&dedent!(
@@ -780,7 +780,7 @@ mod quote {
     }
 
     // Test: carriage_return
-    #[ignore]
+    #[should_panic]
     #[test]
     fn carriage_return() {
         run_test(&dedent!(
@@ -791,7 +791,7 @@ mod quote {
     }
 
     // Test: horizontal_tab
-    #[ignore]
+    #[should_panic]
     #[test]
     fn horizontal_tab() {
         run_test(&dedent!(
@@ -802,7 +802,7 @@ mod quote {
     }
 
     // Test: vertical_tab
-    #[ignore]
+    #[should_panic]
     #[test]
     fn vertical_tab() {
         run_test(&dedent!(
@@ -813,7 +813,7 @@ mod quote {
     }
 
     // Test: double_slash
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_slash() {
         run_test(&dedent!(
@@ -824,7 +824,7 @@ mod quote {
     }
 
     // Test: two_escape_sequences
-    #[ignore]
+    #[should_panic]
     #[test]
     fn two_escape_sequences() {
         run_test(&dedent!(
@@ -835,7 +835,7 @@ mod quote {
     }
 
     // Test: verbatim
-    #[ignore]
+    #[should_panic]
     #[test]
     fn verbatim() {
         run_test(&dedent!(
@@ -846,7 +846,7 @@ mod quote {
     }
 
     // Test: ends_with
-    #[ignore]
+    #[should_panic]
     #[test]
     fn ends_with() {
         run_test(&dedent!(
@@ -857,7 +857,7 @@ mod quote {
     }
 
     // Test: starts_with
-    #[ignore]
+    #[should_panic]
     #[test]
     fn starts_with() {
         run_test(&dedent!(
@@ -868,7 +868,7 @@ mod quote {
     }
 
     // Test: printable_unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn printable_unicode() {
         run_test(&dedent!(
@@ -879,7 +879,7 @@ mod quote {
     }
 
     // Test: mid_string_quote
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mid_string_quote() {
         run_test(&dedent!(
@@ -890,7 +890,7 @@ mod quote {
     }
 
     // Test: single_quote_with_double_quote
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quote_with_double_quote() {
         run_test(&dedent!(
@@ -901,7 +901,7 @@ mod quote {
     }
 
     // Test: size_unicode_char
-    #[ignore]
+    #[should_panic]
     #[test]
     fn size_unicode_char() {
         run_test(&dedent!(
@@ -912,7 +912,7 @@ mod quote {
     }
 
     // Test: size_unicode_string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn size_unicode_string() {
         run_test(&dedent!(
@@ -923,7 +923,7 @@ mod quote {
     }
 
     // Test: unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode() {
         run_test(&dedent!(
@@ -934,7 +934,7 @@ mod quote {
     }
 
     // Test: unicode_code_points
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_code_points() {
         run_test(&dedent!(
@@ -948,7 +948,7 @@ mod quote {
     }
 
     // Test: unicode_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode_2() {
         run_test(&dedent!(
@@ -959,7 +959,7 @@ mod quote {
     }
 
     // Test: empty_quote
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_quote() {
         run_test(&dedent!(
@@ -979,7 +979,7 @@ mod format {
     use dedent::dedent;
 
     // Test: no-op
-    #[ignore]
+    #[should_panic]
     #[test]
     fn no_op() {
         run_test(&dedent!(
@@ -993,7 +993,7 @@ mod format {
     }
 
     // Test: mid-string substitution
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mid_string_substitution() {
         run_test(&dedent!(
@@ -1007,7 +1007,7 @@ mod format {
     }
 
     // Test: percent escaping
-    #[ignore]
+    #[should_panic]
     #[test]
     fn percent_escaping() {
         run_test(&dedent!(
@@ -1021,7 +1021,7 @@ mod format {
     }
 
     // Test: substitution inside escaped percent signs
-    #[ignore]
+    #[should_panic]
     #[test]
     fn substitution_inside_escaped_percent_signs() {
         run_test(&dedent!(
@@ -1035,7 +1035,7 @@ mod format {
     }
 
     // Test: substitution with one escaped percent sign on the right
-    #[ignore]
+    #[should_panic]
     #[test]
     fn substitution_with_one_escaped_percent_sign_on_the_right() {
         run_test(&dedent!(
@@ -1049,7 +1049,7 @@ mod format {
     }
 
     // Test: substitution with one escaped percent sign on the left
-    #[ignore]
+    #[should_panic]
     #[test]
     fn substitution_with_one_escaped_percent_sign_on_the_left() {
         run_test(&dedent!(
@@ -1063,7 +1063,7 @@ mod format {
     }
 
     // Test: multiple substitutions
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiple_substitutions() {
         run_test(&dedent!(
@@ -1077,7 +1077,7 @@ mod format {
     }
 
     // Test: percent sign escape sequence support
-    #[ignore]
+    #[should_panic]
     #[test]
     fn percent_sign_escape_sequence_support() {
         run_test(&dedent!(
@@ -1091,7 +1091,7 @@ mod format {
     }
 
     // Test: fixed point formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn fixed_point_formatting_clause() {
         run_test(&dedent!(
@@ -1105,7 +1105,7 @@ mod format {
     }
 
     // Test: binary formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn binary_formatting_clause() {
         run_test(&dedent!(
@@ -1119,7 +1119,7 @@ mod format {
     }
 
     // Test: uint support for binary formatting
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint_support_for_binary_formatting() {
         run_test(&dedent!(
@@ -1133,7 +1133,7 @@ mod format {
     }
 
     // Test: bool support for binary formatting
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bool_support_for_binary_formatting() {
         run_test(&dedent!(
@@ -1147,7 +1147,7 @@ mod format {
     }
 
     // Test: octal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn octal_formatting_clause() {
         run_test(&dedent!(
@@ -1161,7 +1161,7 @@ mod format {
     }
 
     // Test: uint support for octal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint_support_for_octal_formatting_clause() {
         run_test(&dedent!(
@@ -1175,7 +1175,7 @@ mod format {
     }
 
     // Test: lowercase hexadecimal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn lowercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
@@ -1189,7 +1189,7 @@ mod format {
     }
 
     // Test: uppercase hexadecimal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uppercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
@@ -1203,7 +1203,7 @@ mod format {
     }
 
     // Test: unsigned support for hexadecimal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unsigned_support_for_hexadecimal_formatting_clause() {
         run_test(&dedent!(
@@ -1217,7 +1217,7 @@ mod format {
     }
 
     // Test: string support with hexadecimal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_support_with_hexadecimal_formatting_clause() {
         run_test(&dedent!(
@@ -1231,7 +1231,7 @@ mod format {
     }
 
     // Test: string support with uppercase hexadecimal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_support_with_uppercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
@@ -1245,7 +1245,7 @@ mod format {
     }
 
     // Test: byte support with hexadecimal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn byte_support_with_hexadecimal_formatting_clause() {
         run_test(&dedent!(
@@ -1259,7 +1259,7 @@ mod format {
     }
 
     // Test: byte support with uppercase hexadecimal formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn byte_support_with_uppercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
@@ -1273,7 +1273,7 @@ mod format {
     }
 
     // Test: scientific notation formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn scientific_notation_formatting_clause() {
         run_test(&dedent!(
@@ -1287,7 +1287,7 @@ mod format {
     }
 
     // Test: default precision for fixed-point clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn default_precision_for_fixed_point_clause() {
         run_test(&dedent!(
@@ -1301,7 +1301,7 @@ mod format {
     }
 
     // Test: default precision for scientific notation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn default_precision_for_scientific_notation() {
         run_test(&dedent!(
@@ -1315,7 +1315,7 @@ mod format {
     }
 
     // Test: NaN support for scientific notation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn nan_support_for_scientific_notation() {
         run_test(&dedent!(
@@ -1329,7 +1329,7 @@ mod format {
     }
 
     // Test: positive infinity support for scientific notation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn positive_infinity_support_for_scientific_notation() {
         run_test(&dedent!(
@@ -1343,7 +1343,7 @@ mod format {
     }
 
     // Test: negative infinity support for scientific notation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn negative_infinity_support_for_scientific_notation() {
         run_test(&dedent!(
@@ -1357,7 +1357,7 @@ mod format {
     }
 
     // Test: NaN support for decimal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn nan_support_for_decimal() {
         run_test(&dedent!(
@@ -1371,7 +1371,7 @@ mod format {
     }
 
     // Test: positive infinity support for decimal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn positive_infinity_support_for_decimal() {
         run_test(&dedent!(
@@ -1385,7 +1385,7 @@ mod format {
     }
 
     // Test: negative infinity support for decimal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn negative_infinity_support_for_decimal() {
         run_test(&dedent!(
@@ -1399,7 +1399,7 @@ mod format {
     }
 
     // Test: NaN support for fixed-point
-    #[ignore]
+    #[should_panic]
     #[test]
     fn nan_support_for_fixed_point() {
         run_test(&dedent!(
@@ -1413,7 +1413,7 @@ mod format {
     }
 
     // Test: positive infinity support for fixed-point
-    #[ignore]
+    #[should_panic]
     #[test]
     fn positive_infinity_support_for_fixed_point() {
         run_test(&dedent!(
@@ -1427,7 +1427,7 @@ mod format {
     }
 
     // Test: negative infinity support for fixed-point
-    #[ignore]
+    #[should_panic]
     #[test]
     fn negative_infinity_support_for_fixed_point() {
         run_test(&dedent!(
@@ -1441,7 +1441,7 @@ mod format {
     }
 
     // Test: uint support for decimal clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint_support_for_decimal_clause() {
         run_test(&dedent!(
@@ -1455,7 +1455,7 @@ mod format {
     }
 
     // Test: null support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null_support_for_string() {
         run_test(&dedent!(
@@ -1469,7 +1469,7 @@ mod format {
     }
 
     // Test: int support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int_support_for_string() {
         run_test(&dedent!(
@@ -1483,7 +1483,7 @@ mod format {
     }
 
     // Test: bytes support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bytes_support_for_string() {
         run_test(&dedent!(
@@ -1497,7 +1497,7 @@ mod format {
     }
 
     // Test: type() support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_support_for_string() {
         run_test(&dedent!(
@@ -1511,7 +1511,7 @@ mod format {
     }
 
     // Test: timestamp support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn timestamp_support_for_string() {
         run_test(&dedent!(
@@ -1525,7 +1525,7 @@ mod format {
     }
 
     // Test: duration support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn duration_support_for_string() {
         run_test(&dedent!(
@@ -1539,7 +1539,7 @@ mod format {
     }
 
     // Test: list support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_support_for_string() {
         run_test(&dedent!(
@@ -1553,7 +1553,7 @@ mod format {
     }
 
     // Test: map support for string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_support_for_string() {
         run_test(&dedent!(
@@ -1567,7 +1567,7 @@ mod format {
     }
 
     // Test: map support (all key types)
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_support_all_key_types() {
         run_test(&dedent!(
@@ -1581,7 +1581,7 @@ mod format {
     }
 
     // Test: boolean support for %s
-    #[ignore]
+    #[should_panic]
     #[test]
     fn boolean_support_for_s() {
         run_test(&dedent!(
@@ -1595,7 +1595,7 @@ mod format {
     }
 
     // Test: dyntype support for numbers with string formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_numbers_with_string_formatting_clause() {
         run_test(&dedent!(
@@ -1609,7 +1609,7 @@ mod format {
     }
 
     // Test: dyntype support for integer formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_integer_formatting_clause() {
         run_test(&dedent!(
@@ -1623,7 +1623,7 @@ mod format {
     }
 
     // Test: dyntype support for integer formatting clause (unsigned)
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_integer_formatting_clause_unsigned() {
         run_test(&dedent!(
@@ -1637,7 +1637,7 @@ mod format {
     }
 
     // Test: dyntype support for hex formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_hex_formatting_clause() {
         run_test(&dedent!(
@@ -1651,7 +1651,7 @@ mod format {
     }
 
     // Test: dyntype support for hex formatting clause (uppercase)
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_hex_formatting_clause_uppercase() {
         run_test(&dedent!(
@@ -1665,7 +1665,7 @@ mod format {
     }
 
     // Test: dyntype support for unsigned hex formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_unsigned_hex_formatting_clause() {
         run_test(&dedent!(
@@ -1679,7 +1679,7 @@ mod format {
     }
 
     // Test: dyntype support for fixed-point formatting clause
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_fixed_point_formatting_clause() {
         run_test(&dedent!(
@@ -1693,7 +1693,7 @@ mod format {
     }
 
     // Test: dyntype support for scientific notation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_scientific_notation() {
         run_test(&dedent!(
@@ -1707,7 +1707,7 @@ mod format {
     }
 
     // Test: dyntype NaN/infinity support
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_nan_infinity_support() {
         run_test(&dedent!(
@@ -1721,7 +1721,7 @@ mod format {
     }
 
     // Test: dyntype support for timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_timestamp() {
         run_test(&dedent!(
@@ -1735,7 +1735,7 @@ mod format {
     }
 
     // Test: dyntype support for duration
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_duration() {
         run_test(&dedent!(
@@ -1749,7 +1749,7 @@ mod format {
     }
 
     // Test: dyntype support for lists
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_lists() {
         run_test(&dedent!(
@@ -1763,7 +1763,7 @@ mod format {
     }
 
     // Test: dyntype support for maps
-    #[ignore]
+    #[should_panic]
     #[test]
     fn dyntype_support_for_maps() {
         run_test(&dedent!(
@@ -1777,7 +1777,7 @@ mod format {
     }
 
     // Test: string substitution in a string variable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string_substitution_in_a_string_variable() {
         run_test(&dedent!(
@@ -1799,7 +1799,7 @@ mod format {
     }
 
     // Test: multiple substitutions in a string variable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiple_substitutions_in_a_string_variable() {
         run_test(&dedent!(
@@ -1821,7 +1821,7 @@ mod format {
     }
 
     // Test: substitution inside escaped percent signs in a string variable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn substitution_inside_escaped_percent_signs_in_a_string_variable() {
         run_test(&dedent!(
@@ -1843,7 +1843,7 @@ mod format {
     }
 
     // Test: fixed point formatting clause in a string variable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn fixed_point_formatting_clause_in_a_string_variable() {
         run_test(&dedent!(
@@ -1865,7 +1865,7 @@ mod format {
     }
 
     // Test: binary formatting clause in a string variable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn binary_formatting_clause_in_a_string_variable() {
         run_test(&dedent!(
@@ -1887,7 +1887,7 @@ mod format {
     }
 
     // Test: scientific notation formatting clause in a string variable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn scientific_notation_formatting_clause_in_a_string_variable() {
         run_test(&dedent!(
@@ -1909,7 +1909,7 @@ mod format {
     }
 
     // Test: default precision for fixed-point clause in a string variable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn default_precision_for_fixed_point_clause_in_a_string_variable() {
         run_test(&dedent!(
@@ -1931,7 +1931,7 @@ mod format {
     }
 
     // Test: format_%f_insignificant_zeroes_removed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_insignificant_zeroes_removed() {
         run_test(&dedent!(
@@ -1945,7 +1945,7 @@ mod format {
     }
 
     // Test: format_%f_positive_round_to_whole_number
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_positive_round_to_whole_number() {
         run_test(&dedent!(
@@ -1959,7 +1959,7 @@ mod format {
     }
 
     // Test: format_%f_negative_truncate_to_whole_number
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_negative_truncate_to_whole_number() {
         run_test(&dedent!(
@@ -1973,7 +1973,7 @@ mod format {
     }
 
     // Test: format_%f_halfway_round_up_to_nearest_even
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_halfway_round_up_to_nearest_even() {
         run_test(&dedent!(
@@ -1987,7 +1987,7 @@ mod format {
     }
 
     // Test: format_%f_halfway_truncate_to_nearest_even
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_halfway_truncate_to_nearest_even() {
         run_test(&dedent!(
@@ -2001,7 +2001,7 @@ mod format {
     }
 
     // Test: format_%f_positive_round_up
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_positive_round_up() {
         run_test(&dedent!(
@@ -2015,7 +2015,7 @@ mod format {
     }
 
     // Test: format_%f_positive_round_down
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_positive_round_down() {
         run_test(&dedent!(
@@ -2029,7 +2029,7 @@ mod format {
     }
 
     // Test: format_%f_negative_round_up
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_negative_round_up() {
         run_test(&dedent!(
@@ -2043,7 +2043,7 @@ mod format {
     }
 
     // Test: format_%f_negative_round_down
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_negative_round_down() {
         run_test(&dedent!(
@@ -2057,7 +2057,7 @@ mod format {
     }
 
     // Test: format_%f_zero_padding
-    #[ignore]
+    #[should_panic]
     #[test]
     fn format_f_zero_padding() {
         run_test(&dedent!(

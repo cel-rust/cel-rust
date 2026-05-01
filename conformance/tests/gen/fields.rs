@@ -66,7 +66,7 @@ mod map_fields {
     }
 
     // Test: map_key_mixed_numbers_double_key
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_double_key() {
         run_test(&dedent!(
@@ -91,7 +91,7 @@ mod map_fields {
     }
 
     // Test: map_key_mixed_numbers_uint_key
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_uint_key() {
         run_test(&dedent!(
@@ -103,7 +103,7 @@ mod map_fields {
     }
 
     // Test: map_key_mixed_numbers_int_key
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_int_key() {
         run_test(&dedent!(
@@ -628,7 +628,7 @@ mod quoted_map_fields {
     use dedent::dedent;
 
     // Test: field_access_slash
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_access_slash() {
         run_test(&dedent!(
@@ -640,7 +640,7 @@ mod quoted_map_fields {
     }
 
     // Test: field_access_dash
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_access_dash() {
         run_test(&dedent!(
@@ -652,7 +652,7 @@ mod quoted_map_fields {
     }
 
     // Test: field_access_dot
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_access_dot() {
         run_test(&dedent!(
@@ -675,7 +675,7 @@ mod quoted_map_fields {
     }
 
     // Test: has_field_dash
-    #[ignore]
+    #[should_panic]
     #[test]
     fn has_field_dash() {
         run_test(&dedent!(
@@ -687,7 +687,7 @@ mod quoted_map_fields {
     }
 
     // Test: has_field_dot
-    #[ignore]
+    #[should_panic]
     #[test]
     fn has_field_dot() {
         run_test(&dedent!(
@@ -706,7 +706,7 @@ mod qualified_identifier_resolution {
     use dedent::dedent;
 
     // Test: qualified_ident
-    #[ignore]
+    #[should_panic]
     #[test]
     fn qualified_ident() {
         run_test(&dedent!(
@@ -726,7 +726,7 @@ mod qualified_identifier_resolution {
     }
 
     // Test: map_field_select
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_field_select() {
         run_test(&dedent!(
@@ -762,7 +762,7 @@ mod qualified_identifier_resolution {
     }
 
     // Test: qualified_identifier_resolution_unchecked
-    #[ignore]
+    #[should_panic]
     #[test]
     fn qualified_identifier_resolution_unchecked() {
         run_test(&dedent!(
@@ -876,7 +876,7 @@ mod qualified_identifier_resolution {
     }
 
     // Test: ident_with_longest_prefix_check
-    #[ignore]
+    #[should_panic]
     #[test]
     fn ident_with_longest_prefix_check() {
         run_test(&dedent!(
@@ -955,7 +955,7 @@ mod qualified_identifier_resolution {
     }
 
     // Test: map_value_repeat_key
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_value_repeat_key() {
         run_test(&dedent!(
@@ -1039,7 +1039,7 @@ mod r#in {
     }
 
     // Test: mixed_numbers_and_keys_present
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_numbers_and_keys_present() {
         run_test(&dedent!(
@@ -1051,7 +1051,7 @@ mod r#in {
     }
 
     // Test: mixed_numbers_and_keys_absent
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_numbers_and_keys_absent() {
         run_test(&dedent!(

@@ -11,7 +11,7 @@ mod exists {
     use dedent::dedent;
 
     // Test: list_elem_all_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_all_true() {
         run_test(&dedent!(
@@ -23,7 +23,7 @@ mod exists {
     }
 
     // Test: list_elem_some_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_some_true() {
         run_test(&dedent!(
@@ -35,7 +35,7 @@ mod exists {
     }
 
     // Test: list_elem_none_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_none_true() {
         run_test(&dedent!(
@@ -47,7 +47,7 @@ mod exists {
     }
 
     // Test: list_elem_type_shortcircuit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_type_shortcircuit() {
         run_test(&dedent!(
@@ -59,7 +59,7 @@ mod exists {
     }
 
     // Test: list_elem_type_exhaustive
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_type_exhaustive() {
         run_test(&dedent!(
@@ -84,7 +84,7 @@ mod exists {
     }
 
     // Test: list_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_empty() {
         run_test(&dedent!(
@@ -96,7 +96,7 @@ mod exists {
     }
 
     // Test: map_key
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_key() {
         run_test(&dedent!(
@@ -108,7 +108,7 @@ mod exists {
     }
 
     // Test: not_map_key
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not_map_key() {
         run_test(&dedent!(
@@ -120,7 +120,7 @@ mod exists {
     }
 
     // Test: map_key_type_shortcircuit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_key_type_shortcircuit() {
         run_test(&dedent!(
@@ -132,7 +132,7 @@ mod exists {
     }
 
     // Test: map_key_type_exhaustive
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_key_type_exhaustive() {
         run_test(&dedent!(
@@ -151,7 +151,7 @@ mod all {
     use dedent::dedent;
 
     // Test: list_elem_all_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_all_true() {
         run_test(&dedent!(
@@ -163,7 +163,7 @@ mod all {
     }
 
     // Test: list_elem_some_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_some_true() {
         run_test(&dedent!(
@@ -175,7 +175,7 @@ mod all {
     }
 
     // Test: list_elem_none_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_none_true() {
         run_test(&dedent!(
@@ -187,7 +187,7 @@ mod all {
     }
 
     // Test: list_elem_type_shortcircuit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_type_shortcircuit() {
         run_test(&dedent!(
@@ -199,7 +199,7 @@ mod all {
     }
 
     // Test: list_elem_type_exhaustive
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_type_exhaustive() {
         run_test(&dedent!(
@@ -224,7 +224,7 @@ mod all {
     }
 
     // Test: list_elem_error_shortcircuit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_error_shortcircuit() {
         run_test(&dedent!(
@@ -249,7 +249,7 @@ mod all {
     }
 
     // Test: list_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_empty() {
         run_test(&dedent!(
@@ -261,7 +261,7 @@ mod all {
     }
 
     // Test: map_key
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_key() {
         run_test(&dedent!(
@@ -280,7 +280,7 @@ mod existsone {
     use dedent::dedent;
 
     // Test: list_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_empty() {
         run_test(&dedent!(
@@ -292,7 +292,7 @@ mod existsone {
     }
 
     // Test: list_one_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_one_true() {
         run_test(&dedent!(
@@ -304,7 +304,7 @@ mod existsone {
     }
 
     // Test: list_one_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_one_false() {
         run_test(&dedent!(
@@ -316,7 +316,7 @@ mod existsone {
     }
 
     // Test: list_none
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_none() {
         run_test(&dedent!(
@@ -328,7 +328,7 @@ mod existsone {
     }
 
     // Test: list_one
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_one() {
         run_test(&dedent!(
@@ -340,7 +340,7 @@ mod existsone {
     }
 
     // Test: list_many
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_many() {
         run_test(&dedent!(
@@ -352,7 +352,7 @@ mod existsone {
     }
 
     // Test: list_all
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_all() {
         run_test(&dedent!(
@@ -377,7 +377,7 @@ mod existsone {
     }
 
     // Test: map_one
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_one() {
         run_test(&dedent!(
@@ -396,7 +396,7 @@ mod transformlist {
     use dedent::dedent;
 
     // Test: empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -408,7 +408,7 @@ mod transformlist {
     }
 
     // Test: empty_filter
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_filter() {
         run_test(&dedent!(
@@ -420,7 +420,7 @@ mod transformlist {
     }
 
     // Test: one
-    #[ignore]
+    #[should_panic]
     #[test]
     fn one() {
         run_test(&dedent!(
@@ -435,7 +435,7 @@ mod transformlist {
     }
 
     // Test: one_filter
-    #[ignore]
+    #[should_panic]
     #[test]
     fn one_filter() {
         run_test(&dedent!(
@@ -450,7 +450,7 @@ mod transformlist {
     }
 
     // Test: many
-    #[ignore]
+    #[should_panic]
     #[test]
     fn many() {
         run_test(&dedent!(
@@ -467,7 +467,7 @@ mod transformlist {
     }
 
     // Test: many_filter
-    #[ignore]
+    #[should_panic]
     #[test]
     fn many_filter() {
         run_test(&dedent!(
@@ -516,7 +516,7 @@ mod transformmap {
     use dedent::dedent;
 
     // Test: empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -528,7 +528,7 @@ mod transformmap {
     }
 
     // Test: empty_filter
-    #[ignore]
+    #[should_panic]
     #[test]
     fn empty_filter() {
         run_test(&dedent!(
@@ -540,7 +540,7 @@ mod transformmap {
     }
 
     // Test: one
-    #[ignore]
+    #[should_panic]
     #[test]
     fn one() {
         run_test(&dedent!(
@@ -563,7 +563,7 @@ mod transformmap {
     }
 
     // Test: one_filter
-    #[ignore]
+    #[should_panic]
     #[test]
     fn one_filter() {
         run_test(&dedent!(
@@ -586,7 +586,7 @@ mod transformmap {
     }
 
     // Test: many
-    #[ignore]
+    #[should_panic]
     #[test]
     fn many() {
         run_test(&dedent!(
@@ -625,7 +625,7 @@ mod transformmap {
     }
 
     // Test: many_filter
-    #[ignore]
+    #[should_panic]
     #[test]
     fn many_filter() {
         run_test(&dedent!(

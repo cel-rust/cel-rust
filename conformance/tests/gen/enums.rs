@@ -11,7 +11,7 @@ mod legacy_proto2 {
     use dedent::dedent;
 
     // Test: literal_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_global() {
         run_test(&dedent!(
@@ -24,7 +24,7 @@ mod legacy_proto2 {
     }
 
     // Test: literal_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_nested() {
         run_test(&dedent!(
@@ -37,7 +37,7 @@ mod legacy_proto2 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -50,7 +50,7 @@ mod legacy_proto2 {
     }
 
     // Test: comparison
-    #[ignore]
+    #[should_panic]
     #[test]
     fn comparison() {
         run_test(&dedent!(
@@ -63,7 +63,7 @@ mod legacy_proto2 {
     }
 
     // Test: arithmetic
-    #[ignore]
+    #[should_panic]
     #[test]
     fn arithmetic() {
         run_test(&dedent!(
@@ -76,7 +76,7 @@ mod legacy_proto2 {
     }
 
     // Test: type_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_global() {
         run_test(&dedent!(
@@ -89,7 +89,7 @@ mod legacy_proto2 {
     }
 
     // Test: type_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_nested() {
         run_test(&dedent!(
@@ -102,7 +102,7 @@ mod legacy_proto2 {
     }
 
     // Test: select_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_default() {
         run_test(&dedent!(
@@ -115,7 +115,7 @@ mod legacy_proto2 {
     }
 
     // Test: field_type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_type() {
         run_test(&dedent!(
@@ -128,7 +128,7 @@ mod legacy_proto2 {
     }
 
     // Test: assign_standalone_name
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_name() {
         run_test(&dedent!(
@@ -147,7 +147,7 @@ mod legacy_proto2 {
     }
 
     // Test: assign_standalone_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int() {
         run_test(&dedent!(
@@ -198,7 +198,7 @@ mod legacy_proto2 {
     }
 
     // Test: access_repeated_enum
-    #[ignore]
+    #[should_panic]
     #[test]
     fn access_repeated_enum() {
         run_test(&dedent!(
@@ -213,7 +213,7 @@ mod legacy_proto2 {
     }
 
     // Test: assign_repeated_enum
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_repeated_enum() {
         run_test(&dedent!(
@@ -237,7 +237,7 @@ mod legacy_proto2 {
     }
 
     // Test: list_enum_as_list_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_enum_as_list_int() {
         run_test(&dedent!(
@@ -256,7 +256,7 @@ mod legacy_proto2 {
     }
 
     // Test: enum_as_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn enum_as_int() {
         run_test(&dedent!(
@@ -276,7 +276,7 @@ mod legacy_proto3 {
     use dedent::dedent;
 
     // Test: literal_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_global() {
         run_test(&dedent!(
@@ -289,7 +289,7 @@ mod legacy_proto3 {
     }
 
     // Test: literal_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_nested() {
         run_test(&dedent!(
@@ -302,7 +302,7 @@ mod legacy_proto3 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -315,7 +315,7 @@ mod legacy_proto3 {
     }
 
     // Test: comparison
-    #[ignore]
+    #[should_panic]
     #[test]
     fn comparison() {
         run_test(&dedent!(
@@ -328,7 +328,7 @@ mod legacy_proto3 {
     }
 
     // Test: arithmetic
-    #[ignore]
+    #[should_panic]
     #[test]
     fn arithmetic() {
         run_test(&dedent!(
@@ -341,7 +341,7 @@ mod legacy_proto3 {
     }
 
     // Test: type_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_global() {
         run_test(&dedent!(
@@ -354,7 +354,7 @@ mod legacy_proto3 {
     }
 
     // Test: type_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_nested() {
         run_test(&dedent!(
@@ -367,7 +367,7 @@ mod legacy_proto3 {
     }
 
     // Test: select_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_default() {
         run_test(&dedent!(
@@ -380,7 +380,7 @@ mod legacy_proto3 {
     }
 
     // Test: select
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select() {
         run_test(&dedent!(
@@ -411,7 +411,7 @@ mod legacy_proto3 {
     }
 
     // Test: select_big
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_big() {
         run_test(&dedent!(
@@ -442,7 +442,7 @@ mod legacy_proto3 {
     }
 
     // Test: select_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_neg() {
         run_test(&dedent!(
@@ -473,7 +473,7 @@ mod legacy_proto3 {
     }
 
     // Test: field_type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_type() {
         run_test(&dedent!(
@@ -486,7 +486,7 @@ mod legacy_proto3 {
     }
 
     // Test: assign_standalone_name
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_name() {
         run_test(&dedent!(
@@ -505,7 +505,7 @@ mod legacy_proto3 {
     }
 
     // Test: assign_standalone_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int() {
         run_test(&dedent!(
@@ -524,7 +524,7 @@ mod legacy_proto3 {
     }
 
     // Test: assign_standalone_int_big
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int_big() {
         run_test(&dedent!(
@@ -543,7 +543,7 @@ mod legacy_proto3 {
     }
 
     // Test: assign_standalone_int_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int_neg() {
         run_test(&dedent!(
@@ -594,7 +594,7 @@ mod legacy_proto3 {
     }
 
     // Test: access_repeated_enum
-    #[ignore]
+    #[should_panic]
     #[test]
     fn access_repeated_enum() {
         run_test(&dedent!(
@@ -609,7 +609,7 @@ mod legacy_proto3 {
     }
 
     // Test: assign_repeated_enum
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_repeated_enum() {
         run_test(&dedent!(
@@ -633,7 +633,7 @@ mod legacy_proto3 {
     }
 
     // Test: list_enum_as_list_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_enum_as_list_int() {
         run_test(&dedent!(
@@ -652,7 +652,7 @@ mod legacy_proto3 {
     }
 
     // Test: enum_as_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn enum_as_int() {
         run_test(&dedent!(
@@ -672,7 +672,7 @@ mod strong_proto2 {
     use dedent::dedent;
 
     // Test: literal_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_global() {
         run_test(&dedent!(
@@ -690,7 +690,7 @@ mod strong_proto2 {
     }
 
     // Test: literal_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_nested() {
         run_test(&dedent!(
@@ -708,7 +708,7 @@ mod strong_proto2 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -726,7 +726,7 @@ mod strong_proto2 {
     }
 
     // Test: comparison_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn comparison_true() {
         run_test(&dedent!(
@@ -739,7 +739,7 @@ mod strong_proto2 {
     }
 
     // Test: comparison_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn comparison_false() {
         run_test(&dedent!(
@@ -752,7 +752,7 @@ mod strong_proto2 {
     }
 
     // Test: type_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_global() {
         run_test(&dedent!(
@@ -765,7 +765,7 @@ mod strong_proto2 {
     }
 
     // Test: type_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_nested() {
         run_test(&dedent!(
@@ -780,7 +780,7 @@ mod strong_proto2 {
     }
 
     // Test: select_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_default() {
         run_test(&dedent!(
@@ -798,7 +798,7 @@ mod strong_proto2 {
     }
 
     // Test: field_type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_type() {
         run_test(&dedent!(
@@ -813,7 +813,7 @@ mod strong_proto2 {
     }
 
     // Test: assign_standalone_name
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_name() {
         run_test(&dedent!(
@@ -832,7 +832,7 @@ mod strong_proto2 {
     }
 
     // Test: assign_standalone_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int() {
         run_test(&dedent!(
@@ -851,7 +851,7 @@ mod strong_proto2 {
     }
 
     // Test: convert_symbol_to_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_symbol_to_int() {
         run_test(&dedent!(
@@ -888,7 +888,7 @@ mod strong_proto2 {
     }
 
     // Test: convert_int_inrange
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_int_inrange() {
         run_test(&dedent!(
@@ -906,7 +906,7 @@ mod strong_proto2 {
     }
 
     // Test: convert_int_big
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_int_big() {
         run_test(&dedent!(
@@ -924,7 +924,7 @@ mod strong_proto2 {
     }
 
     // Test: convert_int_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_int_neg() {
         run_test(&dedent!(
@@ -974,7 +974,7 @@ mod strong_proto2 {
     }
 
     // Test: convert_string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_string() {
         run_test(&dedent!(
@@ -1015,7 +1015,7 @@ mod strong_proto3 {
     use dedent::dedent;
 
     // Test: literal_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_global() {
         run_test(&dedent!(
@@ -1033,7 +1033,7 @@ mod strong_proto3 {
     }
 
     // Test: literal_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_nested() {
         run_test(&dedent!(
@@ -1051,7 +1051,7 @@ mod strong_proto3 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -1069,7 +1069,7 @@ mod strong_proto3 {
     }
 
     // Test: comparison_true
-    #[ignore]
+    #[should_panic]
     #[test]
     fn comparison_true() {
         run_test(&dedent!(
@@ -1082,7 +1082,7 @@ mod strong_proto3 {
     }
 
     // Test: comparison_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn comparison_false() {
         run_test(&dedent!(
@@ -1095,7 +1095,7 @@ mod strong_proto3 {
     }
 
     // Test: type_global
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_global() {
         run_test(&dedent!(
@@ -1108,7 +1108,7 @@ mod strong_proto3 {
     }
 
     // Test: type_nested
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_nested() {
         run_test(&dedent!(
@@ -1123,7 +1123,7 @@ mod strong_proto3 {
     }
 
     // Test: select_default
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_default() {
         run_test(&dedent!(
@@ -1141,7 +1141,7 @@ mod strong_proto3 {
     }
 
     // Test: select
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select() {
         run_test(&dedent!(
@@ -1177,7 +1177,7 @@ mod strong_proto3 {
     }
 
     // Test: select_big
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_big() {
         run_test(&dedent!(
@@ -1213,7 +1213,7 @@ mod strong_proto3 {
     }
 
     // Test: select_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select_neg() {
         run_test(&dedent!(
@@ -1249,7 +1249,7 @@ mod strong_proto3 {
     }
 
     // Test: field_type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_type() {
         run_test(&dedent!(
@@ -1264,7 +1264,7 @@ mod strong_proto3 {
     }
 
     // Test: assign_standalone_name
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_name() {
         run_test(&dedent!(
@@ -1283,7 +1283,7 @@ mod strong_proto3 {
     }
 
     // Test: assign_standalone_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int() {
         run_test(&dedent!(
@@ -1302,7 +1302,7 @@ mod strong_proto3 {
     }
 
     // Test: assign_standalone_int_big
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int_big() {
         run_test(&dedent!(
@@ -1321,7 +1321,7 @@ mod strong_proto3 {
     }
 
     // Test: assign_standalone_int_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn assign_standalone_int_neg() {
         run_test(&dedent!(
@@ -1340,7 +1340,7 @@ mod strong_proto3 {
     }
 
     // Test: convert_symbol_to_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_symbol_to_int() {
         run_test(&dedent!(
@@ -1377,7 +1377,7 @@ mod strong_proto3 {
     }
 
     // Test: convert_unnamed_to_int_select
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_unnamed_to_int_select() {
         run_test(&dedent!(
@@ -1407,7 +1407,7 @@ mod strong_proto3 {
     }
 
     // Test: convert_int_inrange
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_int_inrange() {
         run_test(&dedent!(
@@ -1425,7 +1425,7 @@ mod strong_proto3 {
     }
 
     // Test: convert_int_big
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_int_big() {
         run_test(&dedent!(
@@ -1443,7 +1443,7 @@ mod strong_proto3 {
     }
 
     // Test: convert_int_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_int_neg() {
         run_test(&dedent!(
@@ -1493,7 +1493,7 @@ mod strong_proto3 {
     }
 
     // Test: convert_string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn convert_string() {
         run_test(&dedent!(

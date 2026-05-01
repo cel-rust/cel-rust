@@ -33,7 +33,7 @@ mod size {
     }
 
     // Test: one_unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn one_unicode() {
         run_test(&dedent!(
@@ -56,7 +56,7 @@ mod size {
     }
 
     // Test: unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unicode() {
         run_test(&dedent!(

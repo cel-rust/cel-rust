@@ -11,7 +11,7 @@ mod int32 {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -37,7 +37,7 @@ mod int32 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -49,7 +49,7 @@ mod int32 {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -72,7 +72,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -90,7 +90,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_zero() {
         run_test(&dedent!(
@@ -108,7 +108,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto2_max
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_max() {
         run_test(&dedent!(
@@ -126,7 +126,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto2_min
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_min() {
         run_test(&dedent!(
@@ -158,7 +158,7 @@ mod int32 {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -171,7 +171,7 @@ mod int32 {
     }
 
     // Test: field_read_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_zero() {
         run_test(&dedent!(
@@ -184,7 +184,7 @@ mod int32 {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -197,7 +197,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -215,7 +215,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_zero() {
         run_test(&dedent!(
@@ -233,7 +233,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto3_max
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_max() {
         run_test(&dedent!(
@@ -251,7 +251,7 @@ mod int32 {
     }
 
     // Test: field_assign_proto3_min
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_min() {
         run_test(&dedent!(
@@ -283,7 +283,7 @@ mod int32 {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -296,7 +296,7 @@ mod int32 {
     }
 
     // Test: field_read_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_zero() {
         run_test(&dedent!(
@@ -309,7 +309,7 @@ mod int32 {
     }
 
     // Test: field_read_proto3_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_unset() {
         run_test(&dedent!(
@@ -329,7 +329,7 @@ mod int64 {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -355,7 +355,7 @@ mod int64 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -367,7 +367,7 @@ mod int64 {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -390,7 +390,7 @@ mod int64 {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -408,7 +408,7 @@ mod int64 {
     }
 
     // Test: field_assign_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_zero() {
         run_test(&dedent!(
@@ -426,7 +426,7 @@ mod int64 {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -444,7 +444,7 @@ mod int64 {
     }
 
     // Test: field_assign_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_zero() {
         run_test(&dedent!(
@@ -469,7 +469,7 @@ mod uint32 {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -495,7 +495,7 @@ mod uint32 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -507,7 +507,7 @@ mod uint32 {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -530,7 +530,7 @@ mod uint32 {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -548,7 +548,7 @@ mod uint32 {
     }
 
     // Test: field_assign_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_zero() {
         run_test(&dedent!(
@@ -566,7 +566,7 @@ mod uint32 {
     }
 
     // Test: field_assign_proto2_max
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_max() {
         run_test(&dedent!(
@@ -598,7 +598,7 @@ mod uint32 {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -616,7 +616,7 @@ mod uint32 {
     }
 
     // Test: field_assign_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_zero() {
         run_test(&dedent!(
@@ -634,7 +634,7 @@ mod uint32 {
     }
 
     // Test: field_assign_proto3_max
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_max() {
         run_test(&dedent!(
@@ -666,7 +666,7 @@ mod uint32 {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -679,7 +679,7 @@ mod uint32 {
     }
 
     // Test: field_read_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_zero() {
         run_test(&dedent!(
@@ -692,7 +692,7 @@ mod uint32 {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -712,7 +712,7 @@ mod uint64 {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -738,7 +738,7 @@ mod uint64 {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -750,7 +750,7 @@ mod uint64 {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -773,7 +773,7 @@ mod uint64 {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -791,7 +791,7 @@ mod uint64 {
     }
 
     // Test: field_assign_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_zero() {
         run_test(&dedent!(
@@ -809,7 +809,7 @@ mod uint64 {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -827,7 +827,7 @@ mod uint64 {
     }
 
     // Test: field_assign_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_zero() {
         run_test(&dedent!(
@@ -845,7 +845,7 @@ mod uint64 {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -858,7 +858,7 @@ mod uint64 {
     }
 
     // Test: field_read_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_zero() {
         run_test(&dedent!(
@@ -871,7 +871,7 @@ mod uint64 {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -891,7 +891,7 @@ mod float {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -903,7 +903,7 @@ mod float {
     }
 
     // Test: literal_not_double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_not_double() {
         run_test(&dedent!(
@@ -930,7 +930,7 @@ mod float {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -942,7 +942,7 @@ mod float {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -965,7 +965,7 @@ mod float {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -983,7 +983,7 @@ mod float {
     }
 
     // Test: field_assign_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_zero() {
         run_test(&dedent!(
@@ -1001,7 +1001,7 @@ mod float {
     }
 
     // Test: field_assign_proto2_subnorm
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_subnorm() {
         run_test(&dedent!(
@@ -1020,7 +1020,7 @@ mod float {
     }
 
     // Test: field_assign_proto2_round_to_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_round_to_zero() {
         run_test(&dedent!(
@@ -1039,7 +1039,7 @@ mod float {
     }
 
     // Test: field_assign_proto2_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_range() {
         run_test(&dedent!(
@@ -1058,7 +1058,7 @@ mod float {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -1071,7 +1071,7 @@ mod float {
     }
 
     // Test: field_read_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_zero() {
         run_test(&dedent!(
@@ -1084,7 +1084,7 @@ mod float {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -1097,7 +1097,7 @@ mod float {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -1115,7 +1115,7 @@ mod float {
     }
 
     // Test: field_assign_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_zero() {
         run_test(&dedent!(
@@ -1133,7 +1133,7 @@ mod float {
     }
 
     // Test: field_assign_proto2_subnorm
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_subnorm_1() {
         run_test(&dedent!(
@@ -1152,7 +1152,7 @@ mod float {
     }
 
     // Test: field_assign_proto3_round_to_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_round_to_zero() {
         run_test(&dedent!(
@@ -1170,7 +1170,7 @@ mod float {
     }
 
     // Test: field_assign_proto3_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_range() {
         run_test(&dedent!(
@@ -1189,7 +1189,7 @@ mod float {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -1202,7 +1202,7 @@ mod float {
     }
 
     // Test: field_read_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_zero() {
         run_test(&dedent!(
@@ -1215,7 +1215,7 @@ mod float {
     }
 
     // Test: field_read_proto3_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_unset() {
         run_test(&dedent!(
@@ -1235,7 +1235,7 @@ mod double {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -1261,7 +1261,7 @@ mod double {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -1273,7 +1273,7 @@ mod double {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -1296,7 +1296,7 @@ mod double {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -1314,7 +1314,7 @@ mod double {
     }
 
     // Test: field_assign_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_zero() {
         run_test(&dedent!(
@@ -1332,7 +1332,7 @@ mod double {
     }
 
     // Test: field_assign_proto2_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_range() {
         run_test(&dedent!(
@@ -1350,7 +1350,7 @@ mod double {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -1363,7 +1363,7 @@ mod double {
     }
 
     // Test: field_read_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_zero() {
         run_test(&dedent!(
@@ -1376,7 +1376,7 @@ mod double {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -1389,7 +1389,7 @@ mod double {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -1407,7 +1407,7 @@ mod double {
     }
 
     // Test: field_assign_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_zero() {
         run_test(&dedent!(
@@ -1425,7 +1425,7 @@ mod double {
     }
 
     // Test: field_assign_proto3_range
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_range() {
         run_test(&dedent!(
@@ -1443,7 +1443,7 @@ mod double {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -1456,7 +1456,7 @@ mod double {
     }
 
     // Test: field_read_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_zero() {
         run_test(&dedent!(
@@ -1469,7 +1469,7 @@ mod double {
     }
 
     // Test: field_read_proto3_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_unset() {
         run_test(&dedent!(
@@ -1489,7 +1489,7 @@ mod bool {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -1515,7 +1515,7 @@ mod bool {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -1527,7 +1527,7 @@ mod bool {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -1550,7 +1550,7 @@ mod bool {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -1568,7 +1568,7 @@ mod bool {
     }
 
     // Test: field_assign_proto2_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_false() {
         run_test(&dedent!(
@@ -1586,7 +1586,7 @@ mod bool {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -1604,7 +1604,7 @@ mod bool {
     }
 
     // Test: field_assign_proto3_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_false() {
         run_test(&dedent!(
@@ -1629,7 +1629,7 @@ mod string {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -1655,7 +1655,7 @@ mod string {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -1667,7 +1667,7 @@ mod string {
     }
 
     // Test: literal_unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_unicode() {
         run_test(&dedent!(
@@ -1679,7 +1679,7 @@ mod string {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -1702,7 +1702,7 @@ mod string {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -1720,7 +1720,7 @@ mod string {
     }
 
     // Test: field_assign_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_empty() {
         run_test(&dedent!(
@@ -1738,7 +1738,7 @@ mod string {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -1756,7 +1756,7 @@ mod string {
     }
 
     // Test: field_assign_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_empty() {
         run_test(&dedent!(
@@ -1781,7 +1781,7 @@ mod bytes {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -1807,7 +1807,7 @@ mod bytes {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -1819,7 +1819,7 @@ mod bytes {
     }
 
     // Test: literal_unicode
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_unicode() {
         run_test(&dedent!(
@@ -1831,7 +1831,7 @@ mod bytes {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -1854,7 +1854,7 @@ mod bytes {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -1872,7 +1872,7 @@ mod bytes {
     }
 
     // Test: field_assign_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_empty() {
         run_test(&dedent!(
@@ -1890,7 +1890,7 @@ mod bytes {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -1908,7 +1908,7 @@ mod bytes {
     }
 
     // Test: field_assign_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_empty() {
         run_test(&dedent!(
@@ -1933,7 +1933,7 @@ mod list {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -1965,7 +1965,7 @@ mod list {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -1977,7 +1977,7 @@ mod list {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -2016,7 +2016,7 @@ mod list {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -2037,7 +2037,7 @@ mod list {
     }
 
     // Test: field_assign_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_empty() {
         run_test(&dedent!(
@@ -2055,7 +2055,7 @@ mod list {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -2073,7 +2073,7 @@ mod list {
     }
 
     // Test: field_read_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_empty() {
         run_test(&dedent!(
@@ -2086,7 +2086,7 @@ mod list {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -2100,7 +2100,7 @@ mod list {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -2121,7 +2121,7 @@ mod list {
     }
 
     // Test: field_assign_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_empty() {
         run_test(&dedent!(
@@ -2139,7 +2139,7 @@ mod list {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -2157,7 +2157,7 @@ mod list {
     }
 
     // Test: field_read_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_empty() {
         run_test(&dedent!(
@@ -2170,7 +2170,7 @@ mod list {
     }
 
     // Test: field_read_proto3_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_unset() {
         run_test(&dedent!(
@@ -2191,7 +2191,7 @@ mod r#struct {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -2228,7 +2228,7 @@ mod r#struct {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -2240,7 +2240,7 @@ mod r#struct {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -2283,7 +2283,7 @@ mod r#struct {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -2310,7 +2310,7 @@ mod r#struct {
     }
 
     // Test: field_assign_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_empty() {
         run_test(&dedent!(
@@ -2343,7 +2343,7 @@ mod r#struct {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -2363,7 +2363,7 @@ mod r#struct {
     }
 
     // Test: field_read_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_empty() {
         run_test(&dedent!(
@@ -2376,7 +2376,7 @@ mod r#struct {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -2390,7 +2390,7 @@ mod r#struct {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -2417,7 +2417,7 @@ mod r#struct {
     }
 
     // Test: field_assign_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_empty() {
         run_test(&dedent!(
@@ -2450,7 +2450,7 @@ mod r#struct {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -2470,7 +2470,7 @@ mod r#struct {
     }
 
     // Test: field_read_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_empty() {
         run_test(&dedent!(
@@ -2483,7 +2483,7 @@ mod r#struct {
     }
 
     // Test: field_read_proto3_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_unset() {
         run_test(&dedent!(
@@ -2504,7 +2504,7 @@ mod value_null {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -2532,7 +2532,7 @@ mod value_null {
     }
 
     // Test: literal_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_unset() {
         run_test(&dedent!(
@@ -2544,7 +2544,7 @@ mod value_null {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -2567,7 +2567,7 @@ mod value_null {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -2585,7 +2585,7 @@ mod value_null {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -2598,7 +2598,7 @@ mod value_null {
     }
 
     // Test: field_read_proto2_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_unset() {
         run_test(&dedent!(
@@ -2611,7 +2611,7 @@ mod value_null {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -2629,7 +2629,7 @@ mod value_null {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -2642,7 +2642,7 @@ mod value_null {
     }
 
     // Test: field_read_proto3_unset
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_unset() {
         run_test(&dedent!(
@@ -2662,7 +2662,7 @@ mod value_number {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -2688,7 +2688,7 @@ mod value_number {
     }
 
     // Test: literal_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_zero() {
         run_test(&dedent!(
@@ -2700,7 +2700,7 @@ mod value_number {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -2723,7 +2723,7 @@ mod value_number {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -2741,7 +2741,7 @@ mod value_number {
     }
 
     // Test: field_assign_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_zero() {
         run_test(&dedent!(
@@ -2759,7 +2759,7 @@ mod value_number {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -2772,7 +2772,7 @@ mod value_number {
     }
 
     // Test: field_read_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_zero() {
         run_test(&dedent!(
@@ -2785,7 +2785,7 @@ mod value_number {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -2803,7 +2803,7 @@ mod value_number {
     }
 
     // Test: field_assign_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_zero() {
         run_test(&dedent!(
@@ -2821,7 +2821,7 @@ mod value_number {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -2834,7 +2834,7 @@ mod value_number {
     }
 
     // Test: field_read_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_zero() {
         run_test(&dedent!(
@@ -2854,7 +2854,7 @@ mod value_string {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -2880,7 +2880,7 @@ mod value_string {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -2892,7 +2892,7 @@ mod value_string {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -2915,7 +2915,7 @@ mod value_string {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -2933,7 +2933,7 @@ mod value_string {
     }
 
     // Test: field_assign_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_empty() {
         run_test(&dedent!(
@@ -2951,7 +2951,7 @@ mod value_string {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -2964,7 +2964,7 @@ mod value_string {
     }
 
     // Test: field_read_proto2_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_zero() {
         run_test(&dedent!(
@@ -2977,7 +2977,7 @@ mod value_string {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -2995,7 +2995,7 @@ mod value_string {
     }
 
     // Test: field_assign_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_empty() {
         run_test(&dedent!(
@@ -3013,7 +3013,7 @@ mod value_string {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -3026,7 +3026,7 @@ mod value_string {
     }
 
     // Test: field_read_proto3_zero
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_zero() {
         run_test(&dedent!(
@@ -3046,7 +3046,7 @@ mod value_bool {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -3072,7 +3072,7 @@ mod value_bool {
     }
 
     // Test: literal_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_false() {
         run_test(&dedent!(
@@ -3084,7 +3084,7 @@ mod value_bool {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -3107,7 +3107,7 @@ mod value_bool {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -3125,7 +3125,7 @@ mod value_bool {
     }
 
     // Test: field_assign_proto2_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_false() {
         run_test(&dedent!(
@@ -3143,7 +3143,7 @@ mod value_bool {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -3156,7 +3156,7 @@ mod value_bool {
     }
 
     // Test: field_read_proto2_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_false() {
         run_test(&dedent!(
@@ -3169,7 +3169,7 @@ mod value_bool {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -3187,7 +3187,7 @@ mod value_bool {
     }
 
     // Test: field_assign_proto3_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_false() {
         run_test(&dedent!(
@@ -3205,7 +3205,7 @@ mod value_bool {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -3218,7 +3218,7 @@ mod value_bool {
     }
 
     // Test: field_read_proto3_false
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_false() {
         run_test(&dedent!(
@@ -3238,7 +3238,7 @@ mod value_struct {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -3275,7 +3275,7 @@ mod value_struct {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -3287,7 +3287,7 @@ mod value_struct {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -3330,7 +3330,7 @@ mod value_struct {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -3357,7 +3357,7 @@ mod value_struct {
     }
 
     // Test: field_assign_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_empty() {
         run_test(&dedent!(
@@ -3375,7 +3375,7 @@ mod value_struct {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -3395,7 +3395,7 @@ mod value_struct {
     }
 
     // Test: field_read_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_empty() {
         run_test(&dedent!(
@@ -3408,7 +3408,7 @@ mod value_struct {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -3435,7 +3435,7 @@ mod value_struct {
     }
 
     // Test: field_assign_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_empty() {
         run_test(&dedent!(
@@ -3453,7 +3453,7 @@ mod value_struct {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -3473,7 +3473,7 @@ mod value_struct {
     }
 
     // Test: field_read_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_empty() {
         run_test(&dedent!(
@@ -3493,7 +3493,7 @@ mod value_list {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -3524,7 +3524,7 @@ mod value_list {
     }
 
     // Test: literal_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_empty() {
         run_test(&dedent!(
@@ -3536,7 +3536,7 @@ mod value_list {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -3569,7 +3569,7 @@ mod value_list {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -3590,7 +3590,7 @@ mod value_list {
     }
 
     // Test: field_assign_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2_empty() {
         run_test(&dedent!(
@@ -3608,7 +3608,7 @@ mod value_list {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -3626,7 +3626,7 @@ mod value_list {
     }
 
     // Test: field_read_proto2_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2_empty() {
         run_test(&dedent!(
@@ -3639,7 +3639,7 @@ mod value_list {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -3660,7 +3660,7 @@ mod value_list {
     }
 
     // Test: field_assign_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3_empty() {
         run_test(&dedent!(
@@ -3678,7 +3678,7 @@ mod value_list {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -3696,7 +3696,7 @@ mod value_list {
     }
 
     // Test: field_read_proto3_empty
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3_empty() {
         run_test(&dedent!(
@@ -3716,7 +3716,7 @@ mod any {
     use dedent::dedent;
 
     // Test: literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal() {
         run_test(&dedent!(
@@ -3760,7 +3760,7 @@ mod any {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -3791,7 +3791,7 @@ mod any {
     }
 
     // Test: field_assign_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto2() {
         run_test(&dedent!(
@@ -3814,7 +3814,7 @@ mod any {
     }
 
     // Test: field_read_proto2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto2() {
         run_test(&dedent!(
@@ -3832,7 +3832,7 @@ mod any {
     }
 
     // Test: field_assign_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_assign_proto3() {
         run_test(&dedent!(
@@ -3855,7 +3855,7 @@ mod any {
     }
 
     // Test: field_read_proto3
-    #[ignore]
+    #[should_panic]
     #[test]
     fn field_read_proto3() {
         run_test(&dedent!(
@@ -3880,7 +3880,7 @@ mod complex {
     use dedent::dedent;
 
     // Test: any_list_map
-    #[ignore]
+    #[should_panic]
     #[test]
     fn any_list_map() {
         run_test(&dedent!(

@@ -31,7 +31,7 @@ mod nest {
     }
 
     // Test: message_literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_literal() {
         run_test(&dedent!(
@@ -160,7 +160,7 @@ mod repeat {
     }
 
     // Test: not
-    #[ignore]
+    #[should_panic]
     #[test]
     fn not() {
         run_test(&dedent!(
@@ -173,7 +173,7 @@ mod repeat {
     }
 
     // Test: unary_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unary_neg() {
         run_test(&dedent!(
@@ -186,7 +186,7 @@ mod repeat {
     }
 
     // Test: select
-    #[ignore]
+    #[should_panic]
     #[test]
     fn select() {
         run_test(&dedent!(
@@ -236,7 +236,7 @@ mod repeat {
     }
 
     // Test: message_literal
-    #[ignore]
+    #[should_panic]
     #[test]
     fn message_literal() {
         run_test(&dedent!(
@@ -301,7 +301,7 @@ mod string_literals {
     }
 
     // Test: single_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -313,7 +313,7 @@ mod string_literals {
     }
 
     // Test: double_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -325,7 +325,7 @@ mod string_literals {
     }
 
     // Test: triple_single_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -337,7 +337,7 @@ mod string_literals {
     }
 
     // Test: triple_double_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -349,7 +349,7 @@ mod string_literals {
     }
 
     // Test: triple_single_quoted_unescaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_unescaped_punctuation() {
         run_test(&dedent!(
@@ -361,7 +361,7 @@ mod string_literals {
     }
 
     // Test: triple_double_quoted_unescaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_unescaped_punctuation() {
         run_test(&dedent!(
@@ -791,7 +791,7 @@ mod string_literals {
     }
 
     // Test: single_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -803,7 +803,7 @@ mod string_literals {
     }
 
     // Test: double_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -815,7 +815,7 @@ mod string_literals {
     }
 
     // Test: triple_single_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -827,7 +827,7 @@ mod string_literals {
     }
 
     // Test: triple_double_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -927,7 +927,7 @@ mod string_literals {
     }
 
     // Test: mixed_case_hex_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_single_quoted_escapes() {
         run_test(&dedent!(
@@ -939,7 +939,7 @@ mod string_literals {
     }
 
     // Test: mixed_case_hex_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_double_quoted_escapes() {
         run_test(&dedent!(
@@ -951,7 +951,7 @@ mod string_literals {
     }
 
     // Test: mixed_case_hex_triple_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_triple_single_quoted_escapes() {
         run_test(&dedent!(
@@ -963,7 +963,7 @@ mod string_literals {
     }
 
     // Test: mixed_case_hex_triple_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_triple_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1085,7 +1085,7 @@ mod string_literals {
     }
 
     // Test: raw_triple_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn raw_triple_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1097,7 +1097,7 @@ mod string_literals {
     }
 
     // Test: raw_triple_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn raw_triple_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1131,7 +1131,7 @@ mod string_literals {
     }
 
     // Test: upper_raw_triple_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upper_raw_triple_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1143,7 +1143,7 @@ mod string_literals {
     }
 
     // Test: upper_raw_triple_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upper_raw_triple_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1184,7 +1184,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted() {
         run_test(&dedent!(
@@ -1196,7 +1196,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted() {
         run_test(&dedent!(
@@ -1208,7 +1208,7 @@ mod bytes_literals {
     }
 
     // Test: single_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -1220,7 +1220,7 @@ mod bytes_literals {
     }
 
     // Test: double_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -1232,7 +1232,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -1244,7 +1244,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_escaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_escaped_punctuation() {
         run_test(&dedent!(
@@ -1256,7 +1256,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_unescaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_unescaped_punctuation() {
         run_test(&dedent!(
@@ -1268,7 +1268,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_unescaped_punctuation
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_unescaped_punctuation() {
         run_test(&dedent!(
@@ -1280,7 +1280,7 @@ mod bytes_literals {
     }
 
     // Test: single_quoted_escaped_special_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_escaped_special_control_characters() {
         run_test(&dedent!(
@@ -1292,7 +1292,7 @@ mod bytes_literals {
     }
 
     // Test: double_quoted_escaped_special_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_escaped_special_control_characters() {
         run_test(&dedent!(
@@ -1326,7 +1326,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_escaped_special_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_escaped_special_control_characters() {
         run_test(&dedent!(
@@ -1338,7 +1338,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_escaped_special_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_escaped_special_control_characters() {
         run_test(&dedent!(
@@ -1350,7 +1350,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_unescaped_special_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_unescaped_special_control_characters() {
         run_test(&dedent!(
@@ -1362,7 +1362,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_unescaped_special_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_unescaped_special_control_characters() {
         run_test(&dedent!(
@@ -1374,7 +1374,7 @@ mod bytes_literals {
     }
 
     // Test: single_quoted_escaped_line_feed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_escaped_line_feed() {
         run_test(&dedent!(
@@ -1386,7 +1386,7 @@ mod bytes_literals {
     }
 
     // Test: double_quoted_escaped_line_feed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_escaped_line_feed() {
         run_test(&dedent!(
@@ -1398,7 +1398,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_escaped_line_feed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_escaped_line_feed() {
         run_test(&dedent!(
@@ -1410,7 +1410,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_escaped_line_feed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_escaped_line_feed() {
         run_test(&dedent!(
@@ -1422,7 +1422,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_unescaped_line_feed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_unescaped_line_feed() {
         run_test(&dedent!(
@@ -1434,7 +1434,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_unescaped_line_feed
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_unescaped_line_feed() {
         run_test(&dedent!(
@@ -1446,7 +1446,7 @@ mod bytes_literals {
     }
 
     // Test: single_quoted_escaped_carriage_return
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_escaped_carriage_return() {
         run_test(&dedent!(
@@ -1458,7 +1458,7 @@ mod bytes_literals {
     }
 
     // Test: double_quoted_escaped_carriage_return
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_escaped_carriage_return() {
         run_test(&dedent!(
@@ -1470,7 +1470,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_escaped_carriage_return
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_escaped_carriage_return() {
         run_test(&dedent!(
@@ -1482,7 +1482,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_escaped_carriage_return
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_escaped_carriage_return() {
         run_test(&dedent!(
@@ -1494,7 +1494,7 @@ mod bytes_literals {
     }
 
     // Test: single_quoted_escaped_windows_line_end
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_escaped_windows_line_end() {
         run_test(&dedent!(
@@ -1506,7 +1506,7 @@ mod bytes_literals {
     }
 
     // Test: double_quoted_escaped_windows_line_end
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_escaped_windows_line_end() {
         run_test(&dedent!(
@@ -1518,7 +1518,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_escaped_windows_line_end
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_escaped_windows_line_end() {
         run_test(&dedent!(
@@ -1530,7 +1530,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_escaped_windows_line_end
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_escaped_windows_line_end() {
         run_test(&dedent!(
@@ -1586,7 +1586,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_escaped_all_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_escaped_all_control_characters() {
         run_test(&dedent!(
@@ -1598,7 +1598,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_escaped_all_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_escaped_all_control_characters() {
         run_test(&dedent!(
@@ -1610,7 +1610,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_unescaped_all_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_unescaped_all_control_characters() {
         run_test(&dedent!(
@@ -1622,7 +1622,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_unescaped_all_control_characters
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_unescaped_all_control_characters() {
         run_test(&dedent!(
@@ -1656,7 +1656,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_octal_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_octal_escapes() {
         run_test(&dedent!(
@@ -1668,7 +1668,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_octal_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_octal_escapes() {
         run_test(&dedent!(
@@ -1702,7 +1702,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_lower_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_lower_x_escapes() {
         run_test(&dedent!(
@@ -1714,7 +1714,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_lower_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_lower_x_escapes() {
         run_test(&dedent!(
@@ -1726,7 +1726,7 @@ mod bytes_literals {
     }
 
     // Test: single_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn single_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -1738,7 +1738,7 @@ mod bytes_literals {
     }
 
     // Test: double_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -1750,7 +1750,7 @@ mod bytes_literals {
     }
 
     // Test: triple_single_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_single_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -1762,7 +1762,7 @@ mod bytes_literals {
     }
 
     // Test: triple_double_quoted_upper_x_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn triple_double_quoted_upper_x_escapes() {
         run_test(&dedent!(
@@ -1774,7 +1774,7 @@ mod bytes_literals {
     }
 
     // Test: mixed_case_hex_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1786,7 +1786,7 @@ mod bytes_literals {
     }
 
     // Test: mixed_case_hex_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1798,7 +1798,7 @@ mod bytes_literals {
     }
 
     // Test: mixed_case_hex_triple_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_triple_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1810,7 +1810,7 @@ mod bytes_literals {
     }
 
     // Test: mixed_case_hex_triple_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn mixed_case_hex_triple_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1822,7 +1822,7 @@ mod bytes_literals {
     }
 
     // Test: raw_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn raw_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1834,7 +1834,7 @@ mod bytes_literals {
     }
 
     // Test: raw_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn raw_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1846,7 +1846,7 @@ mod bytes_literals {
     }
 
     // Test: raw_triple_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn raw_triple_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1858,7 +1858,7 @@ mod bytes_literals {
     }
 
     // Test: raw_triple_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn raw_triple_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1870,7 +1870,7 @@ mod bytes_literals {
     }
 
     // Test: upper_raw_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upper_raw_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1882,7 +1882,7 @@ mod bytes_literals {
     }
 
     // Test: upper_raw_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upper_raw_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1894,7 +1894,7 @@ mod bytes_literals {
     }
 
     // Test: upper_raw_triple_single_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upper_raw_triple_single_quoted_escapes() {
         run_test(&dedent!(
@@ -1906,7 +1906,7 @@ mod bytes_literals {
     }
 
     // Test: upper_raw_triple_double_quoted_escapes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn upper_raw_triple_double_quoted_escapes() {
         run_test(&dedent!(
@@ -1925,7 +1925,7 @@ mod whitespace {
     use dedent::dedent;
 
     // Test: spaces
-    #[ignore]
+    #[should_panic]
     #[test]
     fn spaces() {
         run_test(&dedent!(
@@ -1938,7 +1938,7 @@ mod whitespace {
     }
 
     // Test: tabs
-    #[ignore]
+    #[should_panic]
     #[test]
     fn tabs() {
         run_test(&dedent!(
@@ -1951,7 +1951,7 @@ mod whitespace {
     }
 
     // Test: new_lines
-    #[ignore]
+    #[should_panic]
     #[test]
     fn new_lines() {
         run_test(&dedent!(
@@ -1964,7 +1964,7 @@ mod whitespace {
     }
 
     // Test: new_pages
-    #[ignore]
+    #[should_panic]
     #[test]
     fn new_pages() {
         run_test(&dedent!(
@@ -1977,7 +1977,7 @@ mod whitespace {
     }
 
     // Test: carriage_returns
-    #[ignore]
+    #[should_panic]
     #[test]
     fn carriage_returns() {
         run_test(&dedent!(
@@ -1997,7 +1997,7 @@ mod comments {
     use dedent::dedent;
 
     // Test: new_line_terminated
-    #[ignore]
+    #[should_panic]
     #[test]
     fn new_line_terminated() {
         run_test(&dedent!(
@@ -2456,7 +2456,7 @@ mod struct_field_names {
     use dedent::dedent;
 
     // Test: as
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#as() {
         run_test(&dedent!(
@@ -2474,7 +2474,7 @@ mod struct_field_names {
     }
 
     // Test: break
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#break() {
         run_test(&dedent!(
@@ -2492,7 +2492,7 @@ mod struct_field_names {
     }
 
     // Test: const
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#const() {
         run_test(&dedent!(
@@ -2510,7 +2510,7 @@ mod struct_field_names {
     }
 
     // Test: continue
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#continue() {
         run_test(&dedent!(
@@ -2528,7 +2528,7 @@ mod struct_field_names {
     }
 
     // Test: else
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#else() {
         run_test(&dedent!(
@@ -2546,7 +2546,7 @@ mod struct_field_names {
     }
 
     // Test: for
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#for() {
         run_test(&dedent!(
@@ -2564,7 +2564,7 @@ mod struct_field_names {
     }
 
     // Test: function
-    #[ignore]
+    #[should_panic]
     #[test]
     fn function() {
         run_test(&dedent!(
@@ -2582,7 +2582,7 @@ mod struct_field_names {
     }
 
     // Test: if
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#if() {
         run_test(&dedent!(
@@ -2600,7 +2600,7 @@ mod struct_field_names {
     }
 
     // Test: import
-    #[ignore]
+    #[should_panic]
     #[test]
     fn import() {
         run_test(&dedent!(
@@ -2618,7 +2618,7 @@ mod struct_field_names {
     }
 
     // Test: let
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#let() {
         run_test(&dedent!(
@@ -2636,7 +2636,7 @@ mod struct_field_names {
     }
 
     // Test: loop
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#loop() {
         run_test(&dedent!(
@@ -2654,7 +2654,7 @@ mod struct_field_names {
     }
 
     // Test: package
-    #[ignore]
+    #[should_panic]
     #[test]
     fn package() {
         run_test(&dedent!(
@@ -2672,7 +2672,7 @@ mod struct_field_names {
     }
 
     // Test: namespace
-    #[ignore]
+    #[should_panic]
     #[test]
     fn namespace() {
         run_test(&dedent!(
@@ -2690,7 +2690,7 @@ mod struct_field_names {
     }
 
     // Test: return
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#return() {
         run_test(&dedent!(
@@ -2708,7 +2708,7 @@ mod struct_field_names {
     }
 
     // Test: var
-    #[ignore]
+    #[should_panic]
     #[test]
     fn var() {
         run_test(&dedent!(
@@ -2726,7 +2726,7 @@ mod struct_field_names {
     }
 
     // Test: void
-    #[ignore]
+    #[should_panic]
     #[test]
     fn void() {
         run_test(&dedent!(
@@ -2744,7 +2744,7 @@ mod struct_field_names {
     }
 
     // Test: while
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#while() {
         run_test(&dedent!(

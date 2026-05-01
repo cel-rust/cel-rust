@@ -11,7 +11,7 @@ mod timestamp_conversions {
     use dedent::dedent;
 
     // Test: toInt_timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn toint_timestamp() {
         run_test(&dedent!(
@@ -23,7 +23,7 @@ mod timestamp_conversions {
     }
 
     // Test: toString_timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn tostring_timestamp() {
         run_test(&dedent!(
@@ -35,7 +35,7 @@ mod timestamp_conversions {
     }
 
     // Test: toString_timestamp_nanos
-    #[ignore]
+    #[should_panic]
     #[test]
     fn tostring_timestamp_nanos() {
         run_test(&dedent!(
@@ -47,7 +47,7 @@ mod timestamp_conversions {
     }
 
     // Test: toType_timestamp
-    #[ignore]
+    #[should_panic]
     #[test]
     fn totype_timestamp() {
         run_test(&dedent!(
@@ -59,7 +59,7 @@ mod timestamp_conversions {
     }
 
     // Test: type_comparison
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_comparison() {
         run_test(&dedent!(
@@ -78,7 +78,7 @@ mod duration_conversions {
     use dedent::dedent;
 
     // Test: toString_duration
-    #[ignore]
+    #[should_panic]
     #[test]
     fn tostring_duration() {
         run_test(&dedent!(
@@ -90,7 +90,7 @@ mod duration_conversions {
     }
 
     // Test: toType_duration
-    #[ignore]
+    #[should_panic]
     #[test]
     fn totype_duration() {
         run_test(&dedent!(
@@ -102,7 +102,7 @@ mod duration_conversions {
     }
 
     // Test: type_comparison
-    #[ignore]
+    #[should_panic]
     #[test]
     fn type_comparison() {
         run_test(&dedent!(
@@ -238,7 +238,7 @@ mod timestamp_selectors_tz {
     use dedent::dedent;
 
     // Test: getDate
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getdate() {
         run_test(&dedent!(
@@ -250,7 +250,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_name_pos
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getdayofmonth_name_pos() {
         run_test(&dedent!(
@@ -262,7 +262,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_numerical_pos
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getdayofmonth_numerical_pos() {
         run_test(&dedent!(
@@ -274,7 +274,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_numerical_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getdayofmonth_numerical_neg() {
         run_test(&dedent!(
@@ -286,7 +286,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_name_neg
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getdayofmonth_name_neg() {
         run_test(&dedent!(
@@ -298,7 +298,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfWeek
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getdayofweek() {
         run_test(&dedent!(
@@ -310,7 +310,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfYear
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getdayofyear() {
         run_test(&dedent!(
@@ -322,7 +322,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getFullYear
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getfullyear() {
         run_test(&dedent!(
@@ -334,7 +334,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getHours
-    #[ignore]
+    #[should_panic]
     #[test]
     fn gethours() {
         run_test(&dedent!(
@@ -346,7 +346,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getMinutes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getminutes() {
         run_test(&dedent!(
@@ -358,7 +358,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getMonth
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getmonth() {
         run_test(&dedent!(
@@ -370,7 +370,7 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getSeconds
-    #[ignore]
+    #[should_panic]
     #[test]
     fn getseconds() {
         run_test(&dedent!(
@@ -502,7 +502,7 @@ mod timestamp_arithmetic {
     }
 
     // Test: add_time_to_duration
-    #[ignore]
+    #[should_panic]
     #[test]
     fn add_time_to_duration() {
         run_test(&dedent!(
@@ -737,7 +737,7 @@ mod duration_converters {
     }
 
     // Test: get_milliseconds
-    #[ignore]
+    #[should_panic]
     #[test]
     fn get_milliseconds() {
         run_test(&dedent!(
@@ -796,7 +796,7 @@ mod timestamp_range {
     use dedent::dedent;
 
     // Test: from_string_under
-    #[ignore]
+    #[should_panic]
     #[test]
     fn from_string_under() {
         run_test(&dedent!(
@@ -875,7 +875,7 @@ mod timestamp_range {
     }
 
     // Test: sub_time_duration_over
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sub_time_duration_over() {
         run_test(&dedent!(
@@ -889,7 +889,7 @@ mod timestamp_range {
     }
 
     // Test: sub_time_duration_under
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sub_time_duration_under() {
         run_test(&dedent!(
@@ -910,7 +910,7 @@ mod duration_range {
     use dedent::dedent;
 
     // Test: from_string_under
-    #[ignore]
+    #[should_panic]
     #[test]
     fn from_string_under() {
         run_test(&dedent!(
@@ -924,7 +924,7 @@ mod duration_range {
     }
 
     // Test: from_string_over
-    #[ignore]
+    #[should_panic]
     #[test]
     fn from_string_over() {
         run_test(&dedent!(
@@ -938,7 +938,7 @@ mod duration_range {
     }
 
     // Test: add_under
-    #[ignore]
+    #[should_panic]
     #[test]
     fn add_under() {
         run_test(&dedent!(
@@ -952,7 +952,7 @@ mod duration_range {
     }
 
     // Test: add_over
-    #[ignore]
+    #[should_panic]
     #[test]
     fn add_over() {
         run_test(&dedent!(
@@ -966,7 +966,7 @@ mod duration_range {
     }
 
     // Test: sub_under
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sub_under() {
         run_test(&dedent!(
@@ -980,7 +980,7 @@ mod duration_range {
     }
 
     // Test: sub_over
-    #[ignore]
+    #[should_panic]
     #[test]
     fn sub_over() {
         run_test(&dedent!(

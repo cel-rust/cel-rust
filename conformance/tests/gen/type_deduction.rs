@@ -10,7 +10,7 @@ mod constant_literals {
     use dedent::dedent;
 
     // Test: bool
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bool() {
         run_test(&dedent!(
@@ -29,7 +29,7 @@ mod constant_literals {
     }
 
     // Test: int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int() {
         run_test(&dedent!(
@@ -48,7 +48,7 @@ mod constant_literals {
     }
 
     // Test: uint
-    #[ignore]
+    #[should_panic]
     #[test]
     fn uint() {
         run_test(&dedent!(
@@ -67,7 +67,7 @@ mod constant_literals {
     }
 
     // Test: double
-    #[ignore]
+    #[should_panic]
     #[test]
     fn double() {
         run_test(&dedent!(
@@ -86,7 +86,7 @@ mod constant_literals {
     }
 
     // Test: string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn string() {
         run_test(&dedent!(
@@ -105,7 +105,7 @@ mod constant_literals {
     }
 
     // Test: bytes
-    #[ignore]
+    #[should_panic]
     #[test]
     fn bytes() {
         run_test(&dedent!(
@@ -124,7 +124,7 @@ mod constant_literals {
     }
 
     // Test: null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null() {
         run_test(&dedent!(
@@ -149,7 +149,7 @@ mod complex_initializers {
     use dedent::dedent;
 
     // Test: list
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list() {
         run_test(&dedent!(
@@ -172,7 +172,7 @@ mod complex_initializers {
     }
 
     // Test: map
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map() {
         run_test(&dedent!(
@@ -199,7 +199,7 @@ mod complex_initializers {
     }
 
     // Test: struct
-    #[ignore]
+    #[should_panic]
     #[test]
     fn r#struct() {
         run_test(&dedent!(
@@ -229,7 +229,7 @@ mod field_access {
     use dedent::dedent;
 
     // Test: int_field
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int_field() {
         run_test(&dedent!(
@@ -249,7 +249,7 @@ mod field_access {
     }
 
     // Test: repeated_int_field
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_int_field() {
         run_test(&dedent!(
@@ -269,7 +269,7 @@ mod field_access {
     }
 
     // Test: map_bool_int
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map_bool_int() {
         run_test(&dedent!(
@@ -292,7 +292,7 @@ mod field_access {
     }
 
     // Test: enum_field
-    #[ignore]
+    #[should_panic]
     #[test]
     fn enum_field() {
         run_test(&dedent!(
@@ -310,7 +310,7 @@ mod field_access {
     }
 
     // Test: repeated_enum_field
-    #[ignore]
+    #[should_panic]
     #[test]
     fn repeated_enum_field() {
         run_test(&dedent!(
@@ -330,7 +330,7 @@ mod field_access {
     }
 
     // Test: enum_map_field
-    #[ignore]
+    #[should_panic]
     #[test]
     fn enum_map_field() {
         run_test(&dedent!(
@@ -359,7 +359,7 @@ mod indexing {
     use dedent::dedent;
 
     // Test: list
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list() {
         run_test(&dedent!(
@@ -378,7 +378,7 @@ mod indexing {
     }
 
     // Test: map
-    #[ignore]
+    #[should_panic]
     #[test]
     fn map() {
         run_test(&dedent!(
@@ -403,7 +403,7 @@ mod functions {
     use dedent::dedent;
 
     // Test: nested_calls
-    #[ignore]
+    #[should_panic]
     #[test]
     fn nested_calls() {
         run_test(&dedent!(
@@ -422,7 +422,7 @@ mod functions {
     }
 
     // Test: function_result_type
-    #[ignore]
+    #[should_panic]
     #[test]
     fn function_result_type() {
         run_test(&dedent!(
@@ -456,7 +456,7 @@ mod flexible_type_parameter_assignment {
     use dedent::dedent;
 
     // Test: list_parameter
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_parameter() {
         run_test(&dedent!(
@@ -491,7 +491,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: list_parameter_order_independent
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_parameter_order_independent() {
         run_test(&dedent!(
@@ -526,7 +526,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: comprehension_type_var_aliasing
-    #[ignore]
+    #[should_panic]
     #[test]
     fn comprehension_type_var_aliasing() {
         run_test(&dedent!(
@@ -555,7 +555,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: overload_type_var_aliasing
-    #[ignore]
+    #[should_panic]
     #[test]
     fn overload_type_var_aliasing() {
         run_test(&dedent!(
@@ -580,7 +580,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: unconstrained_type_var_as_dyn
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unconstrained_type_var_as_dyn() {
         run_test(&dedent!(
@@ -597,7 +597,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: list_parameters_do_not_unify
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_parameters_do_not_unify() {
         run_test(&dedent!(
@@ -626,7 +626,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: optional_none
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_none() {
         run_test(&dedent!(
@@ -650,7 +650,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: optional_none_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_none_2() {
         run_test(&dedent!(
@@ -674,7 +674,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: optional_dyn_promotion
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_dyn_promotion() {
         run_test(&dedent!(
@@ -698,7 +698,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: optional_dyn_promotion_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_dyn_promotion_2() {
         run_test(&dedent!(
@@ -722,7 +722,7 @@ mod flexible_type_parameter_assignment {
     }
 
     // Test: optional_in_ternary
-    #[ignore]
+    #[should_panic]
     #[test]
     fn optional_in_ternary() {
         run_test(&dedent!(
@@ -748,7 +748,7 @@ mod wrappers {
     use dedent::dedent;
 
     // Test: wrapper_promotion
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_promotion() {
         run_test(&dedent!(
@@ -777,7 +777,7 @@ mod wrappers {
     }
 
     // Test: wrapper_promotion_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_promotion_2() {
         run_test(&dedent!(
@@ -806,7 +806,7 @@ mod wrappers {
     }
 
     // Test: wrapper_dyn_promotion
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_dyn_promotion() {
         run_test(&dedent!(
@@ -835,7 +835,7 @@ mod wrappers {
     }
 
     // Test: wrapper_dyn_promotion_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_dyn_promotion_2() {
         run_test(&dedent!(
@@ -864,7 +864,7 @@ mod wrappers {
     }
 
     // Test: wrapper_primitive_assignable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_primitive_assignable() {
         run_test(&dedent!(
@@ -889,7 +889,7 @@ mod wrappers {
     }
 
     // Test: wrapper_null_assignable
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_null_assignable() {
         run_test(&dedent!(
@@ -914,7 +914,7 @@ mod wrappers {
     }
 
     // Test: wrapper_ternary_parameter_assignment
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_ternary_parameter_assignment() {
         run_test(&dedent!(
@@ -939,7 +939,7 @@ mod wrappers {
     }
 
     // Test: wrapper_ternary_parameter_assignment_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn wrapper_ternary_parameter_assignment_2() {
         run_test(&dedent!(
@@ -970,7 +970,7 @@ mod type_parameters {
     use dedent::dedent;
 
     // Test: multiple_parameters_generality
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiple_parameters_generality() {
         run_test(&dedent!(
@@ -1011,7 +1011,7 @@ mod type_parameters {
     }
 
     // Test: multiple_parameters_generality_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiple_parameters_generality_2() {
         run_test(&dedent!(
@@ -1076,7 +1076,7 @@ mod type_parameters {
     }
 
     // Test: multiple_parameters_parameterized_ovl
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiple_parameters_parameterized_ovl() {
         run_test(&dedent!(
@@ -1112,7 +1112,7 @@ mod type_parameters {
     }
 
     // Test: multiple_parameters_parameterized_ovl_2
-    #[ignore]
+    #[should_panic]
     #[test]
     fn multiple_parameters_parameterized_ovl_2() {
         run_test(&dedent!(
@@ -1154,7 +1154,7 @@ mod legacy_nullable_types {
     use dedent::dedent;
 
     // Test: null_assignable_to_message_parameter_candidate
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null_assignable_to_message_parameter_candidate() {
         run_test(&dedent!(
@@ -1193,7 +1193,7 @@ mod legacy_nullable_types {
     }
 
     // Test: null_assignable_to_duration_parameter_candidate
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null_assignable_to_duration_parameter_candidate() {
         run_test(&dedent!(
@@ -1232,7 +1232,7 @@ mod legacy_nullable_types {
     }
 
     // Test: null_assignable_to_timestamp_parameter_candidate
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null_assignable_to_timestamp_parameter_candidate() {
         run_test(&dedent!(
@@ -1271,7 +1271,7 @@ mod legacy_nullable_types {
     }
 
     // Test: null_assignable_to_abstract_parameter_candidate
-    #[ignore]
+    #[should_panic]
     #[test]
     fn null_assignable_to_abstract_parameter_candidate() {
         run_test(&dedent!(

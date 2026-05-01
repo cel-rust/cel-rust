@@ -11,7 +11,7 @@ mod qualified {
     use dedent::dedent;
 
     // Test: self_eval_qualified_lookup
-    #[ignore]
+    #[should_panic]
     #[test]
     fn self_eval_qualified_lookup() {
         run_test(&dedent!(
@@ -38,7 +38,7 @@ mod namespace {
     use dedent::dedent;
 
     // Test: self_eval_container_lookup
-    #[ignore]
+    #[should_panic]
     #[test]
     fn self_eval_container_lookup() {
         run_test(&dedent!(
@@ -67,7 +67,7 @@ mod namespace {
     }
 
     // Test: self_eval_container_lookup_unchecked
-    #[ignore]
+    #[should_panic]
     #[test]
     fn self_eval_container_lookup_unchecked() {
         run_test(&dedent!(

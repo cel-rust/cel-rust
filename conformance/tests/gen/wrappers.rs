@@ -10,7 +10,7 @@ mod bool {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -25,7 +25,7 @@ mod bool {
     }
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -40,7 +40,7 @@ mod bool {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -61,7 +61,7 @@ mod int32 {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -76,7 +76,7 @@ mod int32 {
     }
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -91,7 +91,7 @@ mod int32 {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -112,7 +112,7 @@ mod int64 {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -127,7 +127,7 @@ mod int64 {
     }
 
     // Test: to_json_number
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json_number() {
         run_test(&dedent!(
@@ -142,7 +142,7 @@ mod int64 {
     }
 
     // Test: to_json_string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json_string() {
         run_test(&dedent!(
@@ -157,7 +157,7 @@ mod int64 {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -178,7 +178,7 @@ mod uint32 {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -193,7 +193,7 @@ mod uint32 {
     }
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -208,7 +208,7 @@ mod uint32 {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -229,7 +229,7 @@ mod uint64 {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -244,7 +244,7 @@ mod uint64 {
     }
 
     // Test: to_json_number
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json_number() {
         run_test(&dedent!(
@@ -259,7 +259,7 @@ mod uint64 {
     }
 
     // Test: to_json_string
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json_string() {
         run_test(&dedent!(
@@ -274,7 +274,7 @@ mod uint64 {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -295,7 +295,7 @@ mod float {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -310,7 +310,7 @@ mod float {
     }
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -325,7 +325,7 @@ mod float {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -346,7 +346,7 @@ mod double {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -361,7 +361,7 @@ mod double {
     }
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -376,7 +376,7 @@ mod double {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -397,7 +397,7 @@ mod bytes {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -412,7 +412,7 @@ mod bytes {
     }
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -427,7 +427,7 @@ mod bytes {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -448,7 +448,7 @@ mod string {
     use dedent::dedent;
 
     // Test: to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_any() {
         run_test(&dedent!(
@@ -463,7 +463,7 @@ mod string {
     }
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -478,7 +478,7 @@ mod string {
     }
 
     // Test: to_null
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_null() {
         run_test(&dedent!(
@@ -499,7 +499,7 @@ mod value {
     use dedent::dedent;
 
     // Test: default_to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn default_to_json() {
         run_test(&dedent!(
@@ -521,7 +521,7 @@ mod list_value {
     use dedent::dedent;
 
     // Test: literal_to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_to_any() {
         run_test(&dedent!(
@@ -542,7 +542,7 @@ mod r#struct {
     use dedent::dedent;
 
     // Test: literal_to_any
-    #[ignore]
+    #[should_panic]
     #[test]
     fn literal_to_any() {
         run_test(&dedent!(
@@ -563,7 +563,7 @@ mod field_mask {
     use dedent::dedent;
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -584,7 +584,7 @@ mod duration {
     use dedent::dedent;
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -605,7 +605,7 @@ mod timestamp {
     use dedent::dedent;
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(
@@ -626,7 +626,7 @@ mod empty {
     use dedent::dedent;
 
     // Test: to_json
-    #[ignore]
+    #[should_panic]
     #[test]
     fn to_json() {
         run_test(&dedent!(

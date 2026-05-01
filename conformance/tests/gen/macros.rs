@@ -202,7 +202,7 @@ mod all {
     }
 
     // Test: list_elem_error_shortcircuit
-    #[ignore]
+    #[should_panic]
     #[test]
     fn list_elem_error_shortcircuit() {
         run_test(&dedent!(

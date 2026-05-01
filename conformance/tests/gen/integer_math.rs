@@ -223,7 +223,7 @@ mod int64_math {
     }
 
     // Test: unary_minus_not_bool
-    #[ignore]
+    #[should_panic]
     #[test]
     fn unary_minus_not_bool() {
         run_test(&dedent!(
@@ -452,7 +452,7 @@ mod int64_math {
     }
 
     // Test: int64_min_negate
-    #[ignore]
+    #[should_panic]
     #[test]
     fn int64_min_negate() {
         run_test(&dedent!(
