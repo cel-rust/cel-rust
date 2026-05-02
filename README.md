@@ -53,3 +53,24 @@ Check out these other examples to learn how to use this library:
 - [Variables](./example/src/variables.rs) - Passing variables and using them in your program.
 - [Functions](./example/src/functions.rs) - Defining and using custom functions in your program.
 - [Concurrent Execution](./example/src/threads.rs) - Executing the same program concurrently.
+
+## Goals
+
+This project aims to be a 100% spec-compliant implementation of Common Expression Language (CEL) in Rust.
+
+### What This Means
+
+* **Fully aligns with the official CEL language specification:** Behavior, syntax, and semantics match the published CEL
+  spec.
+* **Compatible with other CEL implementations:** We ensure cross-runtime consistency with CEL implementations like
+  cel-go
+  and cel-python.
+* **Passes the CEL conformance test suite:** Every release is verified against the upstream test vectors provided by the
+  CEL
+  project.
+
+### What This Does Not Mean
+
+* We do not introduce new language features or diverge from the spec.
+* We do not modify CEL syntax or semantics, even if doing so could offer Rust-specific advantages.
+* Proposals to change CEL behavior must first be accepted in the upstream spec before adoption here.
