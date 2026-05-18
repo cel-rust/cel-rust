@@ -1389,17 +1389,34 @@ impl Value {
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
                 let key: CelString = select.field.as_str().into();
-                match left.get_type().kind() {
-                    Kind::Map => {
-                        if select.test {
-                            Ok(bool(
-                                left.as_container()
-                                    .ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
-                                    })?
-                                    .contains(&key)?,
-                            ))
-                        } else {
+
+                if select.test {
+                    match left.get_type().kind() {
+                        Kind::Map => Ok(bool(
+                            left.as_container()
+                                .ok_or_else(|| {
+                                    ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
+                                })?
+                                .contains(&key)?,
+                        )),
+                        #[cfg(feature = "structs")]
+                        Kind::Struct => {
+                            if let Some(indexer) = left.as_indexer() {
+                                Ok(bool(indexer.get(&key).is_ok()))
+                            } else {
+                                Ok(bool(false))
+                            }
+                        }
+                        _ => Ok(Cow::<dyn Val>::Owned(
+                            left.as_indexer()
+                                .ok_or_else(|| ExecutionError::NoSuchOverload)?
+                                .get(&key)?
+                                .into_owned(),
+                        )),
+                    }
+                } else {
+                    match left.get_type().kind() {
+                        Kind::Map => {
                             // todo avoid cloning when not needed
                             Ok(Cow::<dyn Val>::Owned(
                                 left.as_indexer()
@@ -1410,13 +1427,13 @@ impl Value {
                                     .into_owned(),
                             ))
                         }
+                        _ => Ok(Cow::<dyn Val>::Owned(
+                            left.as_indexer()
+                                .ok_or_else(|| ExecutionError::NoSuchOverload)?
+                                .get(&key)?
+                                .into_owned(),
+                        )),
                     }
-                    _ => Ok(Cow::<dyn Val>::Owned(
-                        left.as_indexer()
-                            .ok_or_else(|| ExecutionError::NoSuchOverload)?
-                            .get(&key)?
-                            .into_owned(),
-                    )),
                 }
             }
             Expr::List(list_expr) => {
@@ -2707,6 +2724,48 @@ mod tests {
                 Program::compile("cel.MyStruct { some: 'value', here: 'totally' }.here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
             assert_eq!(result, Ok(Value::String(Arc::new(String::from("totally")))));
+        }
+
+        #[test]
+        fn test_struct_has_macro() {
+            let mut env = Env::stdlib();
+            env.add_struct(
+                StructDef::new(String::from("cel.MyStruct"))
+                    .add_field("name".into(), types::STRING_TYPE)
+                    .add_field("value".into(), types::INT_TYPE),
+            );
+
+            let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
+            my_struct.add_field_value(
+                "name".to_owned(),
+                Cow::<dyn Val>::Owned(Box::new(CelString::from("test"))),
+            );
+            my_struct.add_field_value(
+                "value".to_owned(),
+                Cow::<dyn Val>::Owned(Box::new(CelInt::from(42))),
+            );
+
+            let mut context = Context::with_env(Arc::new(env));
+            context
+                .add_variable("my_var", Value::Struct(Arc::new(my_struct)))
+                .unwrap();
+
+            let program = Program::compile("has(my_var.name)").unwrap();
+            let result = program.execute(&context).unwrap();
+            assert_eq!(result, Value::Bool(true));
+
+            let program = Program::compile("has(my_var.missing)").unwrap();
+            let result = program.execute(&context).unwrap();
+            assert_eq!(result, Value::Bool(false));
+
+            let program =
+                Program::compile("has(cel.MyStruct{name: 'foo', value: 1}.name)").unwrap();
+            let result = program.execute(&context).unwrap();
+            assert_eq!(result, Value::Bool(true));
+
+            let program = Program::compile("has(cel.MyStruct{}.name)").unwrap();
+            let result = program.execute(&context).unwrap();
+            assert_eq!(result, Value::Bool(false));
         }
 
         #[test]
