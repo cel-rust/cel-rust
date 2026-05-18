@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0](https://github.com/cel-rust/cel-rust/compare/v0.13.0...v0.14.0) - 2026-05-18
+
+### Added
+
+- *(overloads)* `Optional` use proper overloads
+- *(traits)* `Zeroer` trait and impl
+- *(overloads)* type checking on `Opaque`'s type param
+- *(structs)* equality of `CeStruct` implemented
+- *(structs)* default values from definition
+- *(structs)* `Struct`s need to be known & adhere to `StructDef`
+- *(structs)* field access to structs
+- *(structs)* Adds 'dynamic' `CelStruct` support
+- *(structs)* Basic wiring for struct supports, both literal and `Val`
+- *(overloads)* `UInt` conversion function
+- *(overloads)* `Int` conversion function
+- *(overloads)* `Double` conversion function
+- *(overloads)* `String` conversion function
+- *(overloads)* ported `CelString`'s `matches`
+- *(overloads)* Added missing `duration_to_duration`
+- *(overloads)* No more `min` or `max` by default
+- *(overloads)* `Duration` overloads
+- *(overloads)* Added missing `timestamp_to_timestamp`
+- *(overloads)* `Timestamp` overloads
+- *(overloads)* `String::startsWith` & `::endsWith`
+- *(overloads)* [**breaking**] contains for string only, removed on containers
+- *(overloads)* `size` only impl. using overloads
+- *(overloads)* `DefaultMap` impl `Sizer` trait
+- *(overloads)* `DefaultList` impl `Sizer` trait
+- *(overloads)* `String` impl `Sizer` trait
+- *(overloads)* extracted `Sizer` trait & util fns for `Bytes`
+- *(overloads)* `Box<dyn Val>` downcastable to avoid cloning
+- *(overloads)* no need to previous `bytes` func
+- *(overloads)* `CelBytes::stdlib()` fns
+- *(overloads)* resolve qualified overloads
+- *(overloads)* dispatching member overloads
+- *(overloads)* Wire overload lookups in interpreter
+- *(overloads)* `Function` to use `Cow<dyn Val>`s
+- *(overloads)* Opening seam for `Env`
+- *(overloads)* mimic `Decl`'s wireframe of go for now
+
+### Fixed
+
+- `Val::get_type` lifetime fix
+- *(contains)* not on `bytes`
+- *(numbers)* fixed number type equals to allow for other number types
+
+### Other
+
+- :unnecessary_sort_by
+- Support has on struct fields
+- Try from struct into dyn val
+- Update structs feature gating and expose StructDef
+- no need to provide `Type` when `Val` is provided
+- [**breaking**] No more lifetimes on `Type`, `Env` et al
+- factory functions for `Type<'a>` proper lifetime
+- [**breaking**] `Type` is passed by ref only now
+- helper for binary_fns in overloads
+- *(overloads)* opened seam for type parameters & `Dyn`s
+- showing off `value::Downcast`'s usage
+- *(overloads)* `Function` takes ownership of args
+- DI'ed the stdlib into the `Env`
+- keep insertion ordering of overloads, as golang
+- less vec manipulations on overloads
+- member callsite to be simpler
+- [**breaking**] Have `FunctionContext` store actual `Val` args
+- `FunctionContext.this` uses `Cow<dyn Val>`
+- remove useless profile
+- no to ref lhs, easier code to read
+- Introduced `TraitSet = u16` type alias
+- Update CEL example version to 0.13.0 ([#278](https://github.com/cel-rust/cel-rust/pull/278))
+
 ## [0.13.0](https://github.com/cel-rust/cel-rust/compare/v0.12.0...v0.13.0) - 2026-02-18
 
 ### Added
