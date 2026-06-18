@@ -90,7 +90,34 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub(crate) fn add_variable_as_val<S>(&mut self, name: S, value: Box<dyn Val>)
+    /// Binds a variable to a custom [`Val`] implementation directly, without
+    /// going through the [`Value`] enum.
+    ///
+    /// [`add_variable`](Self::add_variable) and
+    /// [`add_variable_from_value`](Self::add_variable_from_value) convert their
+    /// input into a [`Value`], whose compound variants ([`Value::Map`],
+    /// [`Value::List`], and `Value::Struct`) hold eagerly-materialized contents.
+    /// For a value that should resolve its contents *on access* instead — e.g.
+    /// a large or recursive backing object (a protobuf message, a database
+    /// row) where member access maps to
+    /// [`Indexer::get`](crate::common::traits::Indexer::get) and is computed
+    /// lazily — implement [`Val`] and the relevant operator traits (such as
+    /// [`Indexer`](crate::common::traits::Indexer),
+    /// [`Iterable`](crate::common::traits::Iterable),
+    /// [`Sizer`](crate::common::traits::Sizer)) for your type and bind it here.
+    /// The built-in implementations in
+    /// [`common::types`](crate::common::types) (e.g. `DefaultMap`, `Struct`)
+    /// are the reference for what to implement.
+    ///
+    /// ```ignore
+    /// // `my_value` implements `Val` + `Indexer`, resolving fields on access.
+    /// let mut ctx = Context::default();
+    /// ctx.add_variable_as_val("input", Box::new(my_value));
+    /// let program = Program::compile("input.field")?;
+    /// // `input.field` calls `Indexer::get` on `my_value` only when evaluated.
+    /// let result = program.execute(&ctx)?;
+    /// ```
+    pub fn add_variable_as_val<S>(&mut self, name: S, value: Box<dyn Val>)
     where
         S: Into<String>,
     {
