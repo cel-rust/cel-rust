@@ -26,9 +26,8 @@ auth.claims.email_verified && resources.all(r, r.startsWith(auth.claims.email))
 
 Add `cel` to your `Cargo.toml`:
 
-```toml
-[dependencies]
-cel = "0.13.0"
+```shell
+cargo add cel
 ```
 
 Create and execute a simple CEL expression:
