@@ -438,7 +438,7 @@ impl Val for OpaqueVal {
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         Box::new(Self {
-            r#type: Type::new_opaque(self.val.runtime_type_name().to_owned()),
+            r#type: Type::new_opaque_type(self.val.runtime_type_name().to_owned()),
             val: self.val.clone(),
         })
     }
@@ -447,7 +447,7 @@ impl Val for OpaqueVal {
 impl OpaqueVal {
     fn new(val: Arc<dyn Opaque>) -> Self {
         Self {
-            r#type: Type::new_opaque(val.runtime_type_name().to_owned()),
+            r#type: Type::new_opaque_type(val.runtime_type_name().to_owned()),
             val,
         }
     }
