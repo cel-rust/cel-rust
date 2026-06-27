@@ -308,21 +308,11 @@ impl Type {
     }
 
     /// Creates a new opaque type with the given name.
-    pub fn new_opaque_type(name: &'static str) -> Type {
+    pub fn new_opaque_type<S: Into<Cow<'static, str>>>(name: S) -> Type {
         Type {
             kind: Kind::Opaque,
             parameters: Cow::Borrowed(&[]),
-            runtime_type_name: Cow::Borrowed(name),
-            trait_mask: 0,
-        }
-    }
-
-    /// Creates a new opaque type with the given owned name.
-    pub fn new_opaque(name: String) -> Type {
-        Type {
-            kind: Kind::Opaque,
-            parameters: Cow::Borrowed(&[]),
-            runtime_type_name: Cow::Owned(name),
+            runtime_type_name: name.into(),
             trait_mask: 0,
         }
     }
