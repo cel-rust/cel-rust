@@ -1347,7 +1347,7 @@ impl Value {
                         let args = args?;
                         let qualified_func = match &target.expr {
                             Expr::Ident(prefix) => {
-                                let qualified_name = format!("{prefix}.{}", &call.func_name);
+                                let qualified_name = format!("{prefix}.{}", call.func_name);
                                 if let Some(op) = ctx.env().find_overload(&qualified_name, &args) {
                                     return op(args);
                                 }
