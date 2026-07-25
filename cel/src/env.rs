@@ -71,6 +71,7 @@ impl Env {
         let mut env = Env::default();
         types::bytes::stdlib(&mut env);
         types::double::stdlib(&mut env);
+        types::r#dyn::stdlib(&mut env);
         types::int::stdlib(&mut env);
         types::list::stdlib(&mut env);
         types::map::stdlib(&mut env);
