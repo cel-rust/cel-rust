@@ -5,6 +5,9 @@ use std::borrow::Cow;
 /// `dyn` has no effect at runtime, it only signals to a type checker that its argument
 /// should be treated as dynamically typed. Returning the argument unchanged matches the
 /// `identity` binding cel-go declares for the same overload.
+// TODO: this overload needs to be parameterized once the type system carries type
+// parameters, so that the declared signature is `dyn(A) -> dyn` and a container
+// argument yields `list(dyn)` or `map(dyn, dyn)` rather than a bare `dyn`. See #244.
 fn to_dyn<'a>(mut args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     Ok(args.remove(0))
 }
