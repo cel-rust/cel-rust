@@ -1510,15 +1510,20 @@ impl Value {
                     // todo do not clone if not needed!
                     let value = Value::resolve_val(v, ctx)?.into_owned();
 
-                    if is_optional {
-                        if let Some(opt_val) = value.downcast_ref::<CelOptional>() {
-                            if let Some(inner) = opt_val.inner() {
-                                map.insert(key, inner.clone_as_boxed());
-                            }
-                        } else {
-                            map.insert(key, value);
+                    // An optional entry holding no value adds nothing, not even its key.
+                    let value = if is_optional {
+                        match value.downcast_ref::<CelOptional>() {
+                            Some(opt_val) => opt_val.inner().map(|inner| inner.clone_as_boxed()),
+                            None => Some(value),
                         }
                     } else {
+                        Some(value)
+                    };
+
+                    if let Some(value) = value {
+                        if map.contains_key(&key) {
+                            return Err(ExecutionError::DuplicateKey(Key::from(key).into()));
+                        }
                         map.insert(key, value);
                     }
                 }
@@ -1853,6 +1858,31 @@ mod tests {
         let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
+    }
+
+    #[test]
+    fn test_map_repeated_key() {
+        let context = Context::default();
+
+        for script in [
+            "{1: 'a', 1: 'b'}",
+            "{'a': 1, 'a': 2}",
+            "{true: 1, false: 2, true: 3}",
+        ] {
+            let value = Program::compile(script).unwrap().execute(&context);
+            assert!(
+                matches!(value, Err(ExecutionError::DuplicateKey(_))),
+                "{script} gave {value:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_map_distinct_keys() {
+        let context = Context::default();
+
+        let program = Program::compile("{1: 'a', 2: 'b', 'c': 3}").unwrap();
+        assert!(program.execute(&context).is_ok());
     }
 
     #[test]
@@ -2595,6 +2625,17 @@ mod tests {
                     map: Arc::from(expected_map)
                 }))
             );
+
+            // An entry holding no value adds no key, so it has none to repeat. Whether it
+            // should instead drop the earlier entry, as cel-go does, is left alone here.
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(r#"{"a": 1, ?"a": optional.none()}"#)
+                .expect("Must parse");
+            assert!(!matches!(
+                Value::resolve(&expr, &Context::default()),
+                Err(ExecutionError::DuplicateKey(_))
+            ));
 
             let expr = Parser::default()
                 .enable_optional_syntax(true)
