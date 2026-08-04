@@ -1,3 +1,5 @@
+use crate::common::types::CelString;
+use crate::common::value::Val;
 use crate::context::Context;
 use crate::magic::{Arguments, This};
 use crate::objects::{KeyRef, OptionalValue, Value};
@@ -52,6 +54,24 @@ impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     pub fn error<M: ToString>(&self, message: M) -> ExecutionError {
         ExecutionError::function_error(self.name, message)
     }
+}
+
+/// Looks up `field` on `container`, the way `.field`/`?.field` do internally - `None` if
+/// `container` isn't an indexable container or has no such field. Unlike a `Value`-typed
+/// parameter (or [`This`]/[`Arguments`]), which converts the whole argument and so clones every
+/// entry of a map or list, this clones only the resolved field.
+///
+/// # Example
+/// ```skip
+/// fn opt(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
+///     let field = /* ftx.args[1] as a string */;
+///     let container = ftx.args.first().ok_or_else(ExecutionError::missing_argument_or_target)?;
+///     Ok(field_of(container.as_ref(), &field).unwrap_or(Value::Null))
+/// }
+/// ```
+pub fn field_of(container: &dyn Val, field: &str) -> Option<Value> {
+    let key = CelString::from(field);
+    container.as_indexer()?.get(&key).ok().and_then(|v| Value::try_from(v.as_ref()).ok())
 }
 
 /// Calculates the size of either the target, or the provided args depending on how
@@ -285,8 +305,6 @@ pub fn matches(
         Err(err) => Err(ftx.error(format!("'{regex}' not a valid regex:\n{err}"))),
     }
 }
-
-use crate::common::value::Val;
 #[cfg(feature = "chrono")]
 pub use time::duration;
 
@@ -434,6 +452,8 @@ pub fn min(Arguments(args): Arguments) -> Result<Value> {
 mod tests {
     use crate::context::Context;
     use crate::tests::test_script;
+    use crate::{ExecutionError, FunctionContext, Value};
+    use std::collections::HashMap;
 
     fn assert_script(input: &(&str, &str)) {
         assert_eq!(test_script(input.1, None), Ok(true.into()), "{}", input.0);
@@ -446,6 +466,16 @@ mod tests {
             "{}",
             input.0
         );
+    }
+
+    fn opt(ftx: &FunctionContext) -> Result<Value, ExecutionError> {
+        let Some(Value::String(field)) =
+            ftx.args.get(1).and_then(|v| Value::try_from(v.as_ref()).ok())
+        else {
+            return Ok(Value::Null);
+        };
+        let Some(container) = ftx.args.first() else { return Ok(Value::Null) };
+        Ok(super::field_of(container.as_ref(), &field).unwrap_or(Value::Null))
     }
 
     #[test]
@@ -584,6 +614,24 @@ mod tests {
             context.add_function("min", super::min);
             let ctx = Some(context);
             let r = test_script(input.1, ctx);
+            assert_eq!(r, Ok(true.into()), "{}", input.0);
+        });
+    }
+
+    #[test]
+    fn test_field_of() {
+        [
+            ("present field", "opt(input, 'present') == 'v'"),
+            ("absent field", "opt(input, 'missing') == null"),
+            ("non-container target", "opt(1, 'present') == null"),
+        ]
+        .iter()
+        .for_each(|a| {
+            let input: &(&str, &str) = a;
+            let mut context = Context::default();
+            context.add_function("opt", opt);
+            context.add_variable_from_value("input", HashMap::from([("present", "v")]));
+            let r = test_script(input.1, Some(context));
             assert_eq!(r, Ok(true.into()), "{}", input.0);
         });
     }
