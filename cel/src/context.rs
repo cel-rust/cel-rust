@@ -2,7 +2,7 @@ use crate::common::value::Val;
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
-use crate::{Env, ExecutionError};
+use crate::{Env, ExecutionBudget, ExecutionError};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -38,11 +38,13 @@ pub enum Context<'a> {
         variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
         env: Arc<Env>,
+        budget: ExecutionBudget,
     },
     Child {
         parent: &'a Context<'a>,
         variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
+        budget: ExecutionBudget,
     },
 }
 
@@ -152,6 +154,7 @@ impl<'a> Context<'a> {
                 variables,
                 parent,
                 resolver,
+                ..
             } => resolver
                 .and_then(|r| {
                     r.resolve(name)
@@ -212,11 +215,51 @@ impl<'a> Context<'a> {
         Value::resolve_all(exprs, self)
     }
 
+    /// Returns the per-invocation execution budget attached to this context.
+    pub fn execution_budget(&self) -> ExecutionBudget {
+        match self {
+            Context::Root { budget, .. } | Context::Child { budget, .. } => *budget,
+        }
+    }
+
+    /// Sets the per-invocation execution budget on this context.
+    ///
+    /// Prefer [`Program::execute_with_budget`](crate::Program::execute_with_budget)
+    /// when you want to apply a budget without mutating a shared context.
+    pub fn set_execution_budget(&mut self, budget: ExecutionBudget) {
+        match self {
+            Context::Root { budget: slot, .. } | Context::Child { budget: slot, .. } => {
+                *slot = budget;
+            }
+        }
+    }
+
+    /// Returns a child context that uses `budget` for this invocation.
+    ///
+    /// The original context is not mutated. Variables, functions, and the
+    /// environment are resolved through the parent chain.
+    pub fn with_execution_budget(&'a self, budget: ExecutionBudget) -> Context<'a> {
+        Context::Child {
+            parent: self,
+            variables: Default::default(),
+            resolver: None,
+            budget,
+        }
+    }
+
+    /// Checks the attached execution budget and returns
+    /// [`ExecutionError::DeadlineExceeded`] when it has expired.
+    #[inline]
+    pub fn check_execution_budget(&self) -> Result<(), ExecutionError> {
+        self.execution_budget().check()
+    }
+
     pub fn new_inner_scope(&self) -> Context<'_> {
         Context::Child {
             parent: self,
             variables: Default::default(),
             resolver: None,
+            budget: self.execution_budget(),
         }
     }
 
@@ -237,6 +280,7 @@ impl<'a> Context<'a> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            budget: ExecutionBudget::unlimited(),
         }
     }
 
@@ -246,6 +290,7 @@ impl<'a> Context<'a> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            budget: ExecutionBudget::unlimited(),
         }
     }
 }
@@ -257,6 +302,7 @@ impl Default for Context<'_> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            budget: ExecutionBudget::unlimited(),
         }
     }
 }

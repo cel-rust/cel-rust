@@ -44,6 +44,32 @@ fn main() {
 }
 ```
 
+### Execution budgets
+
+Evaluation can take an optional per-invocation monotonic [`ExecutionBudget`](https://docs.rs/cel/latest/cel/struct.ExecutionBudget.html).
+The budget covers evaluation only (not compilation), is checked cooperatively by
+the interpreter, and does not mutate a compiled `Program`:
+
+```rust
+use cel::{Context, ExecutionBudget, Program};
+use std::time::Duration;
+
+let program = Program::compile("items.map(x, x + 1)").unwrap();
+let mut context = Context::default();
+context.add_variable_from_value("items", vec![1i64; 10_000]);
+
+let budget = ExecutionBudget::with_timeout(Duration::from_millis(5));
+match program.execute_with_budget(&context, budget) {
+    Ok(value) => println!("{value:?}"),
+    Err(cel::ExecutionError::DeadlineExceeded) => println!("timed out"),
+    Err(err) => panic!("{err}"),
+}
+```
+
+Host callbacks and other work that does not return to the interpreter cannot be
+preempted mid-call. This is complementary to CEL cost limiting (see
+[cel-rust#56](https://github.com/cel-rust/cel-rust/issues/56)).
+
 ### Examples
 
 Check out these other examples to learn how to use this library:

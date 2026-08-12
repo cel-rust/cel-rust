@@ -19,11 +19,13 @@ use thiserror::Error;
 
 mod macros;
 
+mod budget;
 pub mod common;
 pub mod context;
 mod env;
 pub mod parser;
 
+pub use budget::ExecutionBudget;
 pub use common::ast::IdedExpr;
 use common::ast::SelectExpr;
 pub use context::Context;
@@ -129,6 +131,10 @@ pub enum ExecutionError {
     Overflow(&'static str, Value, Value),
     #[error("Index out of bounds: {0:?}")]
     IndexOutOfBounds(Value),
+    /// Indicates that the per-invocation monotonic execution budget expired
+    /// before evaluation completed.
+    #[error("Execution deadline exceeded")]
+    DeadlineExceeded,
     #[error("InternalError: {0:?}")]
     InternalError(String),
 }
@@ -171,6 +177,10 @@ impl ExecutionError {
     pub fn missing_argument_or_target() -> Self {
         ExecutionError::MissingArgumentOrTarget
     }
+
+    pub fn deadline_exceeded() -> Self {
+        ExecutionError::DeadlineExceeded
+    }
 }
 
 #[derive(Debug)]
@@ -188,6 +198,20 @@ impl Program {
 
     pub fn execute(&self, context: &Context) -> ResolveResult {
         Value::resolve(&self.expression, context)
+    }
+
+    /// Execute this program with a per-invocation [`ExecutionBudget`].
+    ///
+    /// The budget is applied through a temporary child scope and does not
+    /// mutate `context` or this compiled [`Program`]. Concurrent executions of
+    /// the same program may use independent budgets.
+    pub fn execute_with_budget(
+        &self,
+        context: &Context<'_>,
+        budget: ExecutionBudget,
+    ) -> ResolveResult {
+        let scoped = context.with_execution_budget(budget);
+        Value::resolve(&self.expression, &scoped)
     }
 
     /// Returns the variables and functions referenced by the CEL program
@@ -315,5 +339,126 @@ mod tests {
             let res = test_script(script, Some(ctx));
             assert_eq!(res, error.into(), "{name}");
         }
+    }
+
+    #[test]
+    fn execution_budget_unlimited_preserves_behavior() {
+        let program = Program::compile("[1, 2, 3].map(x, x * 2)").unwrap();
+        let ctx = Context::default();
+        assert_eq!(
+            program.execute(&ctx).unwrap(),
+            Value::List(vec![2i64.into(), 4i64.into(), 6i64.into()].into())
+        );
+        assert_eq!(
+            program
+                .execute_with_budget(&ctx, crate::ExecutionBudget::unlimited())
+                .unwrap(),
+            Value::List(vec![2i64.into(), 4i64.into(), 6i64.into()].into())
+        );
+    }
+
+    #[test]
+    fn execution_budget_zero_is_already_expired() {
+        let program = Program::compile("1 + 1").unwrap();
+        let ctx = Context::default();
+        let err = program
+            .execute_with_budget(
+                &ctx,
+                crate::ExecutionBudget::with_timeout(std::time::Duration::ZERO),
+            )
+            .unwrap_err();
+        assert_eq!(err, ExecutionError::DeadlineExceeded);
+    }
+
+    #[test]
+    fn execution_budget_interrupts_comprehension() {
+        let program = Program::compile("items.map(x, x + 1)").unwrap();
+        let mut ctx = Context::default();
+        ctx.add_variable_from_value("items", vec![1i64; 100_000]);
+
+        let started = std::time::Instant::now();
+        let err = program
+            .execute_with_budget(
+                &ctx,
+                crate::ExecutionBudget::with_timeout(std::time::Duration::from_millis(1)),
+            )
+            .unwrap_err();
+        let elapsed = started.elapsed();
+
+        assert_eq!(err, ExecutionError::DeadlineExceeded);
+        assert!(
+            elapsed < std::time::Duration::from_secs(1),
+            "expensive comprehension should return promptly, took {elapsed:?}"
+        );
+    }
+
+    #[test]
+    fn execution_budget_is_per_invocation() {
+        let program = Program::compile("items.map(x, x + 1)").unwrap();
+        let mut ctx = Context::default();
+        ctx.add_variable_from_value("items", vec![1i64; 10_000]);
+
+        let err = program
+            .execute_with_budget(
+                &ctx,
+                crate::ExecutionBudget::with_timeout(std::time::Duration::ZERO),
+            )
+            .unwrap_err();
+        assert_eq!(err, ExecutionError::DeadlineExceeded);
+
+        // A later unlimited execution must still succeed; timeouts do not poison the program.
+        let value = program.execute(&ctx).unwrap();
+        assert!(matches!(value, Value::List(_)));
+    }
+
+    #[test]
+    fn execution_budget_does_not_mutate_shared_context() {
+        let program = Program::compile("1 + 1").unwrap();
+        let ctx = Context::default();
+        assert!(ctx.execution_budget().is_unlimited());
+
+        let _ = program
+            .execute_with_budget(
+                &ctx,
+                crate::ExecutionBudget::with_timeout(std::time::Duration::ZERO),
+            )
+            .unwrap_err();
+
+        assert!(ctx.execution_budget().is_unlimited());
+        assert_eq!(program.execute(&ctx).unwrap(), Value::Int(2));
+    }
+
+    #[test]
+    fn execution_budget_concurrent_timeout_and_success() {
+        use std::sync::Arc;
+        use std::thread;
+
+        let program = Arc::new(Program::compile("items.map(x, x + 1)").unwrap());
+
+        let timeout_program = Arc::clone(&program);
+        let timeout_thread = thread::spawn(move || {
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("items", vec![1i64; 10_000]);
+            timeout_program.execute_with_budget(
+                &ctx,
+                crate::ExecutionBudget::with_timeout(std::time::Duration::ZERO),
+            )
+        });
+
+        let success_program = Arc::clone(&program);
+        let success_thread = thread::spawn(move || {
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("items", vec![1i64; 32]);
+            success_program.execute(&ctx)
+        });
+
+        assert_eq!(
+            timeout_thread.join().unwrap().unwrap_err(),
+            ExecutionError::DeadlineExceeded
+        );
+        assert!(matches!(
+            success_thread.join().unwrap().unwrap(),
+            Value::List(_)
+        ));
     }
 }

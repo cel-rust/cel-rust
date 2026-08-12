@@ -1007,6 +1007,7 @@ impl Value {
         expr: &'a Expression,
         ctx: &'a Context<'a>,
     ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        ctx.check_execution_budget()?;
         match &expr.expr {
             Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
@@ -1328,12 +1329,14 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let args = args?;
+                        ctx.check_execution_budget()?;
                         if let Some(op) = ctx.env().find_overload(&call.func_name, &args) {
                             return op(args);
                         }
                         let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
                         })?;
+                        ctx.check_execution_budget()?;
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
                         let v = (func)(&mut ctx)?;
                         Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
@@ -1345,6 +1348,7 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let args = args?;
+                        ctx.check_execution_budget()?;
                         let qualified_func = match &target.expr {
                             Expr::Ident(prefix) => {
                                 let qualified_name = format!("{prefix}.{}", call.func_name);
@@ -1360,6 +1364,7 @@ impl Value {
                                 let target = Value::resolve_val(target, ctx)?;
                                 let mut args = args;
                                 args.insert(0, target);
+                                ctx.check_execution_budget()?;
                                 if let Some(op) =
                                     ctx.env().find_member_overload(&call.func_name, &args)
                                 {
@@ -1376,6 +1381,7 @@ impl Value {
                             }
                             Some(func) => (None, func, args),
                         };
+                        ctx.check_execution_budget()?;
                         let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
                         // todo fix this to _not_ use `Value`
                         let v = (func)(&mut ctx)?;
@@ -1497,6 +1503,7 @@ impl Value {
                     .ok_or(ExecutionError::NoSuchOverload)?
                     .iter();
                 while let Some(item) = items.next() {
+                    ctx.check_execution_budget()?;
                     if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
                         break;
                     }
