@@ -87,7 +87,7 @@ impl traits::Adder for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }
@@ -105,9 +105,9 @@ impl traits::Comparer for Int {
         } else if let Some(d) = rhs.downcast_ref::<CelDouble>() {
             Ok((*self.inner() as f64)
                 .partial_cmp(d.inner())
-                .ok_or(ExecutionError::NoSuchOverload)?)
+                .ok_or_else(ExecutionError::unresolved_overload)?)
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }
@@ -126,7 +126,7 @@ impl traits::Divider for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }
@@ -145,7 +145,7 @@ impl traits::Modder for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }
@@ -161,7 +161,7 @@ impl traits::Multiplier for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }
@@ -181,7 +181,7 @@ impl traits::Subtractor for Int {
                     .ok_or_else(|| ExecutionError::Overflow("sub", self.0.into(), i.0.into()))?,
             ))))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }

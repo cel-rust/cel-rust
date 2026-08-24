@@ -3,7 +3,6 @@ use crate::common::types::bool::Bool;
 use crate::common::types::*;
 use crate::common::value::Val;
 use crate::context::Context;
-use crate::ExecutionError::NoSuchOverload;
 use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -1036,7 +1035,9 @@ impl Value {
                                     (Err(_), Some(true)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
                                     }
-                                    (left, _) => Err(left.err().unwrap_or(NoSuchOverload)),
+                                    (left, _) => Err(left
+                                        .err()
+                                        .unwrap_or_else(ExecutionError::unresolved_overload)),
                                 }
                             };
                         }
@@ -1055,7 +1056,9 @@ impl Value {
                                     (Err(_), Some(false)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
                                     }
-                                    (left, _) => Err(left.err().unwrap_or(NoSuchOverload)),
+                                    (left, _) => Err(left
+                                        .err()
+                                        .unwrap_or_else(ExecutionError::unresolved_overload)),
                                 }
                             };
                         }
@@ -1093,11 +1096,11 @@ impl Value {
                             let result = match value {
                                 Cow::Borrowed(val) => val
                                     .as_indexer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .ok_or_else(ExecutionError::unresolved_overload)?
                                     .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()),
                                 Cow::Owned(val) => val
                                     .into_indexer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .ok_or_else(ExecutionError::unresolved_overload)?
                                     .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref())
                                     .map(Cow::Owned),
                             };
@@ -1142,7 +1145,7 @@ impl Value {
                                     CelOptional::of(
                                         operand
                                             .as_indexer()
-                                            .ok_or(NoSuchOverload)?
+                                            .ok_or_else(ExecutionError::unresolved_overload)?
                                             .get(field)?
                                             .clone_as_boxed(),
                                     )
@@ -1237,19 +1240,14 @@ impl Value {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(bool(
-                                lhs.as_comparer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .compare(rhs.as_ref())?
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     == Ordering::Less,
                             ));
                         }
                         operators::LESS_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if lhs
-                                .as_comparer()
-                                .ok_or(ExecutionError::NoSuchOverload)?
-                                .compare(rhs.as_ref())?
+                            return if compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                 == Ordering::Greater
                             {
                                 Ok(bool(false))
@@ -1261,19 +1259,14 @@ impl Value {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(bool(
-                                lhs.as_comparer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .compare(rhs.as_ref())?
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     == Ordering::Greater,
                             ));
                         }
                         operators::GREATER_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if lhs
-                                .as_comparer()
-                                .ok_or(ExecutionError::NoSuchOverload)?
-                                .compare(rhs.as_ref())?
+                            return if compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                 == Ordering::Less
                             {
                                 Ok(bool(false))
@@ -1287,7 +1280,7 @@ impl Value {
                             return if let Some(container) = rhs.as_container() {
                                 Ok(bool(container.contains(lhs.as_ref())?))
                             } else {
-                                Err(ExecutionError::NoSuchOverload)
+                                Err(ExecutionError::unresolved_overload())
                             };
                         }
                         _ => (),
@@ -1300,14 +1293,14 @@ impl Value {
                             return expr
                                 .downcast_ref::<CelBool>()
                                 .map(Bool::negate)
-                                .ok_or(ExecutionError::NoSuchOverload)
+                                .ok_or_else(ExecutionError::unresolved_overload)
                                 .map(|b| bool(b.into_inner()));
                         }
                         operators::NEGATE => {
                             let val = Value::resolve_val(&call.args[0], ctx)?;
                             return Ok(Cow::<dyn Val>::Owned(
                                 val.as_negator()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
+                                    .ok_or_else(ExecutionError::unresolved_overload)?
                                     .negate()?,
                             ));
                         }
@@ -1331,9 +1324,21 @@ impl Value {
                         if let Some(op) = ctx.env().find_overload(&call.func_name, &args) {
                             return op(args);
                         }
-                        let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
-                            ExecutionError::UndeclaredReference(call.func_name.clone().into())
-                        })?;
+                        let func = match ctx.get_function(call.func_name.as_str()) {
+                            Some(func) => func,
+                            None if ctx.env().has_overload(&call.func_name) => {
+                                return Err(ExecutionError::overload_for_values(
+                                    &call.func_name,
+                                    args.iter().map(|arg| arg.as_ref()),
+                                    false,
+                                ));
+                            }
+                            None => {
+                                return Err(ExecutionError::UndeclaredReference(
+                                    call.func_name.clone().into(),
+                                ));
+                            }
+                        };
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
                         let v = (func)(&mut ctx)?;
                         Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
@@ -1351,7 +1356,17 @@ impl Value {
                                 if let Some(op) = ctx.env().find_overload(&qualified_name, &args) {
                                     return op(args);
                                 }
-                                ctx.get_function(&qualified_name)
+                                match ctx.get_function(&qualified_name) {
+                                    Some(func) => Some(func),
+                                    None if ctx.env().has_overload(&qualified_name) => {
+                                        return Err(ExecutionError::overload_for_values(
+                                            &qualified_name,
+                                            args.iter().map(|arg| arg.as_ref()),
+                                            false,
+                                        ));
+                                    }
+                                    None => None,
+                                }
                             }
                             _ => None,
                         };
@@ -1365,13 +1380,23 @@ impl Value {
                                 {
                                     return op(args);
                                 }
+                                let overload_error = ExecutionError::overload_for_values(
+                                    &call.func_name,
+                                    args.iter().map(|arg| arg.as_ref()),
+                                    true,
+                                );
+                                let has_member_overload =
+                                    ctx.env().has_member_overload(&call.func_name);
                                 let target = args.remove(0);
-                                let func =
-                                    ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
-                                        ExecutionError::UndeclaredReference(
+                                let func = match ctx.get_function(call.func_name.as_str()) {
+                                    Some(func) => func,
+                                    None if has_member_overload => return Err(overload_error),
+                                    None => {
+                                        return Err(ExecutionError::UndeclaredReference(
                                             call.func_name.clone().into(),
-                                        )
-                                    })?;
+                                        ));
+                                    }
+                                };
                                 (Some(target), func, args)
                             }
                             Some(func) => (None, func, args),
@@ -1409,7 +1434,7 @@ impl Value {
                         }
                         _ => Ok(Cow::<dyn Val>::Owned(
                             left.as_indexer()
-                                .ok_or_else(|| ExecutionError::NoSuchOverload)?
+                                .ok_or_else(ExecutionError::unresolved_overload)?
                                 .get(&key)?
                                 .into_owned(),
                         )),
@@ -1429,7 +1454,7 @@ impl Value {
                         }
                         _ => Ok(Cow::<dyn Val>::Owned(
                             left.as_indexer()
-                                .ok_or_else(|| ExecutionError::NoSuchOverload)?
+                                .ok_or_else(ExecutionError::unresolved_overload)?
                                 .get(&key)?
                                 .into_owned(),
                         )),
@@ -1494,7 +1519,7 @@ impl Value {
 
                 let mut items = iter
                     .as_iterable()
-                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .ok_or_else(ExecutionError::unresolved_overload)?
                     .iter();
                 while let Some(item) = items.next() {
                     if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
@@ -1552,12 +1577,24 @@ fn bool<'a>(boolean: bool) -> Cow<'a, dyn Val> {
     Cow::<dyn Val>::Owned(Box::new(CelBool::from(boolean)))
 }
 
+fn compare_values(
+    operator: &str,
+    lhs: &dyn Val,
+    rhs: &dyn Val,
+) -> Result<Ordering, ExecutionError> {
+    let context = ExecutionError::overload_for_values(operator, [lhs, rhs], false);
+    lhs.as_comparer()
+        .ok_or_else(ExecutionError::unresolved_overload)
+        .and_then(|comparer| comparer.compare(rhs))
+        .map_err(|error| error.with_overload_context(context))
+}
+
 fn try_bool(val: Result<Cow<dyn Val>, ExecutionError>) -> Result<bool, ExecutionError> {
     match val {
         Ok(val) => val
             .downcast_ref::<CelBool>()
             .map(|b| *b.inner())
-            .ok_or(ExecutionError::NoSuchOverload),
+            .ok_or_else(ExecutionError::unresolved_overload),
         Err(err) => Result::Err(err),
     }
 }

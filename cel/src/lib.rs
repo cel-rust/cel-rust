@@ -14,6 +14,7 @@
 extern crate core;
 
 use std::convert::TryFrom;
+use std::fmt;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -62,6 +63,65 @@ pub mod extractors {
     pub use crate::magic::{IntoFunction, IntoResolveResult};
 }
 
+/// Details about an operator or function call for which no overload matched.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct OverloadError {
+    function: Option<Arc<String>>,
+    argument_types: Arc<[String]>,
+    member_function: bool,
+}
+
+impl OverloadError {
+    fn new(function: &str, argument_types: Vec<String>, member_function: bool) -> Self {
+        Self {
+            function: Some(Arc::new(function.to_owned())),
+            argument_types: argument_types.into(),
+            member_function,
+        }
+    }
+
+    /// Returns the operator or function name, when it is known.
+    pub fn function(&self) -> Option<&str> {
+        self.function.as_deref().map(String::as_str)
+    }
+
+    /// Returns the runtime types of the arguments supplied to the call.
+    ///
+    /// For a member function, the first type is the receiver type.
+    pub fn argument_types(&self) -> &[String] {
+        &self.argument_types
+    }
+
+    /// Returns whether the overload was invoked using member-call syntax.
+    pub fn is_member_function(&self) -> bool {
+        self.member_function
+    }
+}
+
+impl fmt::Display for OverloadError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Some(function) = &self.function else {
+            return f.write_str("No such overload");
+        };
+
+        let signature = if self.member_function && !self.argument_types.is_empty() {
+            format!(
+                "{}.({})",
+                self.argument_types[0],
+                self.argument_types[1..].join(", ")
+            )
+        } else {
+            format!("({})", self.argument_types.join(", "))
+        };
+        write!(
+            f,
+            "found no matching overload for '{function}' applied to '{signature}'"
+        )
+    }
+}
+
+impl std::error::Error for OverloadError {}
+
 #[derive(Error, Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum ExecutionError {
@@ -83,8 +143,8 @@ pub enum ExecutionError {
     NoSuchKey(Arc<String>),
     /// Indicates that the script used an existing operator or function with
     /// values of one or more types for which no overload was declared.
-    #[error("No such overload")]
-    NoSuchOverload,
+    #[error("{0}")]
+    NoSuchOverload(OverloadError),
     /// Indicates that the script attempted to reference an undeclared variable
     /// method, or function.
     #[error("Undeclared reference to '{0}'")]
@@ -134,6 +194,42 @@ pub enum ExecutionError {
 }
 
 impl ExecutionError {
+    /// Creates an error for a global function or operator with no matching overload.
+    pub fn no_such_overload(function: &str, argument_types: Vec<String>) -> Self {
+        ExecutionError::NoSuchOverload(OverloadError::new(function, argument_types, false))
+    }
+
+    /// Creates an error for a member function with no matching overload.
+    ///
+    /// The receiver type must be the first entry in `argument_types`.
+    pub fn no_such_member_overload(function: &str, argument_types: Vec<String>) -> Self {
+        ExecutionError::NoSuchOverload(OverloadError::new(function, argument_types, true))
+    }
+
+    pub(crate) fn unresolved_overload() -> Self {
+        ExecutionError::NoSuchOverload(OverloadError::default())
+    }
+
+    pub(crate) fn overload_for_values<'a>(
+        function: &str,
+        arguments: impl IntoIterator<Item = &'a dyn common::value::Val>,
+        member_function: bool,
+    ) -> Self {
+        let argument_types = arguments
+            .into_iter()
+            .map(|argument| argument.get_type().name().to_owned())
+            .collect();
+        let overload = OverloadError::new(function, argument_types, member_function);
+        ExecutionError::NoSuchOverload(overload)
+    }
+
+    pub(crate) fn with_overload_context(self, context: ExecutionError) -> Self {
+        match self {
+            ExecutionError::NoSuchOverload(_) => context,
+            error => error,
+        }
+    }
+
     pub fn no_such_key(name: &str) -> Self {
         ExecutionError::NoSuchKey(Arc::new(name.to_string()))
     }
@@ -269,7 +365,7 @@ mod tests {
         assert_output("arr[0] == 1", Ok(true.into()));
 
         // Test that we cannot index into a string
-        assert_output("str[0]", Err(ExecutionError::NoSuchOverload));
+        assert_output("str[0]", Err(ExecutionError::unresolved_overload()));
     }
 
     #[test]
@@ -315,5 +411,45 @@ mod tests {
             let res = test_script(script, Some(ctx));
             assert_eq!(res, error.into(), "{name}");
         }
+    }
+
+    #[test]
+    fn no_such_overload_reports_the_call_and_runtime_types() {
+        let tests = [
+            (
+                "1 > \"1\"",
+                "found no matching overload for '_>_' applied to '(int, string)'",
+            ),
+            (
+                "size(1, 2)",
+                "found no matching overload for 'size' applied to '(int, int)'",
+            ),
+            (
+                "\"foobar\".contains(1)",
+                "found no matching overload for 'contains' applied to 'string.(int)'",
+            ),
+        ];
+
+        for (script, expected) in tests {
+            let error = test_script(script, None).expect_err(script);
+            assert_eq!(error.to_string(), expected, "{script}");
+        }
+
+        assert_eq!(
+            test_script("missing(1)", None),
+            Err(ExecutionError::undeclared_reference("missing"))
+        );
+        assert_eq!(
+            test_script("\"foobar\".missing(1)", None),
+            Err(ExecutionError::undeclared_reference("missing"))
+        );
+
+        let error = test_script("\"foobar\".contains(1)", None).unwrap_err();
+        let ExecutionError::NoSuchOverload(overload) = error else {
+            panic!("expected a no-such-overload error");
+        };
+        assert_eq!(overload.function(), Some("contains"));
+        assert_eq!(overload.argument_types(), ["string", "int"]);
+        assert!(overload.is_member_function());
     }
 }

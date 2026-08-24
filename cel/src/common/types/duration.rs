@@ -82,7 +82,7 @@ impl Comparer for Duration {
         if let Some(rhs) = rhs.downcast_ref::<Duration>() {
             Ok(self.0.cmp(&rhs.0))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }
@@ -97,7 +97,7 @@ impl Subtractor for Duration {
                     .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
             ))))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }

@@ -81,7 +81,7 @@ impl Comparer for Bytes {
         if let Some(bytes) = other.downcast_ref::<Bytes>() {
             Ok(self.0.cmp(&bytes.0))
         } else {
-            Err(crate::ExecutionError::NoSuchOverload)
+            Err(crate::ExecutionError::unresolved_overload())
         }
     }
 }

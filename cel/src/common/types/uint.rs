@@ -107,9 +107,9 @@ impl Comparer for UInt {
         } else if let Some(rhs) = rhs.downcast_ref::<CelDouble>() {
             Ok((*self.inner() as f64)
                 .partial_cmp(rhs.inner())
-                .ok_or(ExecutionError::NoSuchOverload)?)
+                .ok_or_else(ExecutionError::unresolved_overload)?)
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }

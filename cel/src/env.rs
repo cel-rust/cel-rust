@@ -124,6 +124,12 @@ impl Env {
         }
     }
 
+    pub(crate) fn has_overload(&self, name: &str) -> bool {
+        self.functions
+            .get(name)
+            .is_some_and(|function| function.has_overload(false))
+    }
+
     /// Adds a member function overload to the environment.
     ///
     /// A member function is one that is called using the receiver syntax (e.g., `x.matches(y)`).
@@ -168,6 +174,12 @@ impl Env {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(true, args),
         }
+    }
+
+    pub(crate) fn has_member_overload(&self, name: &str) -> bool {
+        self.functions
+            .get(name)
+            .is_some_and(|function| function.has_overload(true))
     }
 
     /// Adds a custom struct definition to the environment.

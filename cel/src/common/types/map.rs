@@ -3,7 +3,6 @@ use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Kind, Type};
 use crate::common::value::Val;
 use crate::common::{traits, types};
 use crate::ExecutionError;
-use crate::ExecutionError::NoSuchOverload;
 use std::borrow::{Borrow, Cow};
 use std::cmp::Ordering;
 use std::collections::hash_map::Keys;
@@ -105,7 +104,7 @@ impl Indexer for DefaultMap {
         } else if let Some(b) = key.downcast_ref::<CelBool>() {
             b as &dyn AsKeyRef
         } else {
-            return Err(NoSuchOverload);
+            return Err(ExecutionError::unresolved_overload());
         };
 
         self.0

@@ -91,19 +91,19 @@ impl Comparer for Double {
             Ok(self
                 .0
                 .partial_cmp(&rhs.0)
-                .ok_or(ExecutionError::NoSuchOverload)?)
+                .ok_or_else(ExecutionError::unresolved_overload)?)
         } else if let Some(rhs) = rhs.downcast_ref::<CelInt>() {
             Ok(self
                 .0
                 .partial_cmp(&(*rhs.inner() as f64))
-                .ok_or(ExecutionError::NoSuchOverload)?)
+                .ok_or_else(ExecutionError::unresolved_overload)?)
         } else if let Some(rhs) = rhs.downcast_ref::<CelUInt>() {
             Ok(self
                 .0
                 .partial_cmp(&(*rhs.inner() as f64))
-                .ok_or(ExecutionError::NoSuchOverload)?)
+                .ok_or_else(ExecutionError::unresolved_overload)?)
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::unresolved_overload())
         }
     }
 }
