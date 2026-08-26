@@ -176,14 +176,32 @@ impl ExecutionError {
 #[derive(Debug)]
 pub struct Program {
     expression: Expression,
+    source_info: Arc<common::ast::SourceInfo>,
 }
 
 impl Program {
     pub fn compile(source: &str) -> Result<Program, ParseErrors> {
         let parser = Parser::default();
         parser
-            .parse(source)
-            .map(|expression| Program { expression })
+            .parse_with_source_info(source)
+            .map(|(expression, source_info)| Program {
+                expression,
+                source_info,
+            })
+    }
+
+    /// Where every node of this program was written, in the source it was
+    /// compiled from.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use cel::Program;
+    /// let program = Program::compile("a.b").unwrap();
+    /// let root = program.expression();
+    /// assert_eq!(program.source_info().offset_for(root.id), Some((1, 1)));
+    /// ```
+    pub fn source_info(&self) -> &common::ast::SourceInfo {
+        &self.source_info
     }
 
     pub fn execute(&self, context: &Context) -> ResolveResult {
