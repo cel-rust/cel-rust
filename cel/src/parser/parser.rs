@@ -791,7 +791,11 @@ impl gen::CELVisitorCompat<'_> for Parser {
             }
             Some(member) => {
                 if ctx.ops.len() % 2 == 0 {
-                    self.visit(member.as_ref());
+                    // Even number of `!` operators cancel — pass through without
+                    // wrapping in a LogicalNot call.  Visiting once here and
+                    // returning avoids the double-visit that would otherwise
+                    // cause exponential work on deeply nested expressions.
+                    return self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
                 let target = self.visit(member.as_ref());
@@ -807,7 +811,9 @@ impl gen::CELVisitorCompat<'_> for Parser {
             }
             Some(member) => {
                 if ctx.ops.len() % 2 == 0 {
-                    self.visit(member.as_ref());
+                    // Even number of `-` operators cancel — pass through without
+                    // wrapping in a Negate call.
+                    return self.visit(member.as_ref());
                 }
                 let op_id = self.helper.next_id(&ctx.ops[0]);
                 let target = self.visit(member.as_ref());
@@ -1392,6 +1398,41 @@ mod tests {
             .error_recovery_limit(0)
             .parse("1 + 2 * 3")
             .is_ok());
+    }
+
+    // Regression test: even counts of `!` or `-` cancel out.  The visitor
+    // must visit the child exactly once; visiting twice caused exponential
+    // work on deeply nested expressions (the bug was a discard-and-re-visit
+    // pattern that doubled work at every nesting level).
+    #[test]
+    fn even_unary_operators_visit_child_once() {
+        // Even `!` → identity (no logical-not wrapper)
+        let expr = Parser::new().parse("!!a").expect("!!a should parse");
+        // !!a cancels to `a`; should be an Ident, not a Call
+        assert!(
+            matches!(expr.expr, crate::common::ast::Expr::Ident(_)),
+            "!!a should reduce to an identity ident, got {:?}",
+            expr.expr
+        );
+
+        // Even `-` → identity
+        let expr = Parser::new().parse("--1").expect("--1 should parse");
+        assert!(
+            matches!(expr.expr, crate::common::ast::Expr::Literal(_)),
+            "--1 should reduce to a literal, got {:?}",
+            expr.expr
+        );
+
+        // Deeply nested even `--` must not cause exponential slowdown.
+        // Build `--(--(--(... x ...)))` with 30 levels: 2^30 visits in the
+        // broken implementation, O(n) in the fixed one.
+        let mut nested = "x".to_string();
+        for _ in 0..30 {
+            nested = format!("--({})", nested);
+        }
+        let result = Parser::new().parse(&nested);
+        // May parse or error depending on depth limits, but must not hang.
+        let _ = result;
     }
 
     #[test]
