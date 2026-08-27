@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.4](https://github.com/cel-rust/cel-rust/compare/v0.14.3...v0.14.4) - 2026-08-27
+
+### Fixed
+
+- *(parser)* `.x` correctly produces `Ident(".x")`.
+- *(parser)* reject reserved keywords
+- *(parser)* even unary operator cancel out ([#316](https://github.com/cel-rust/cel-rust/pull/316))
+
 ## [0.14.3](https://github.com/cel-rust/cel-rust/compare/v0.14.2...v0.14.3) - 2026-08-15
 
 ### Added
