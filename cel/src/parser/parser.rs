@@ -557,6 +557,32 @@ impl<'a, T: Recognizer<'a>> ErrorListener<'a, T> for ParserErrorListener {
     }
 }
 
+/// Returns true when `name` is a reserved word that may not be used as a plain
+/// identifier or function name.  Mirrors the `reservedIds` check in cel-go.
+/// Note: `in`, `true`, `false`, `null` are grammar-level keywords that the
+/// lexer never produces as IDENTIFIER tokens, so they are not listed here.
+fn is_reserved_id(name: &str) -> bool {
+    matches!(
+        name,
+        "as" | "break"
+            | "const"
+            | "continue"
+            | "else"
+            | "for"
+            | "function"
+            | "if"
+            | "import"
+            | "let"
+            | "loop"
+            | "package"
+            | "namespace"
+            | "return"
+            | "var"
+            | "void"
+            | "while"
+    )
+}
+
 impl Default for Parser {
     fn default() -> Self {
         Self::new()
@@ -927,9 +953,18 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 IdedExpr::default()
             }
             Some(id) => {
-                let ident = id.clone().text;
-                self.helper
-                    .next_expr(id.deref(), Expr::Ident(ident.to_string()))
+                let mut ident = id.clone().text.to_string();
+                if ctx.leadingDot.is_some() {
+                    ident = format!(".{ident}");
+                }
+                if is_reserved_id(ident.trim_start_matches('.')) {
+                    return self.report_error::<ParseError, _>(
+                        id.deref(),
+                        None,
+                        format!("reserved identifier: {ident}"),
+                    );
+                }
+                self.helper.next_expr(id.deref(), Expr::Ident(ident))
             }
         }
     }
@@ -938,7 +973,15 @@ impl gen::CELVisitorCompat<'_> for Parser {
         match &ctx.id {
             None => IdedExpr::default(),
             Some(id) => {
-                let mut id = id.get_text().to_string();
+                let raw = id.get_text().to_string();
+                if is_reserved_id(&raw) {
+                    return self.report_error::<ParseError, _>(
+                        id.deref(),
+                        None,
+                        format!("reserved identifier: {raw}"),
+                    );
+                }
+                let mut id = raw;
                 if ctx.leadingDot.is_some() {
                     id = format!(".{id}");
                 }
@@ -1398,6 +1441,61 @@ mod tests {
             .error_recovery_limit(0)
             .parse("1 + 2 * 3")
             .is_ok());
+    }
+
+    #[test]
+    fn leading_dot_ident() {
+        let expr = Parser::new()
+            .parse(".x")
+            .expect(".x should parse as a leading-dot ident");
+        assert!(
+            matches!(&expr.expr, crate::common::ast::Expr::Ident(s) if s == ".x"),
+            "expected Ident(\".x\"), got {:?}",
+            expr.expr
+        );
+    }
+
+    #[test]
+    fn reserved_identifiers_are_rejected() {
+        // These are valid IDENTIFIER tokens in the lexer but must be rejected
+        // post-parse by the visitor (mirrors cel-go's reservedIds check).
+        // `in`, `true`, `false`, `null` are grammar-level keywords rejected
+        // earlier — they never reach the visitor.
+        for kw in &[
+            "as",
+            "break",
+            "const",
+            "continue",
+            "else",
+            "for",
+            "function",
+            "if",
+            "import",
+            "let",
+            "loop",
+            "package",
+            "namespace",
+            "return",
+            "var",
+            "void",
+            "while",
+        ] {
+            let err = Parser::new().parse(kw).expect_err(&format!(
+                "`{kw}` should be rejected as a reserved identifier"
+            ));
+            assert!(
+                format!("{err}").contains("reserved identifier"),
+                "expected reserved identifier error for `{kw}`, got: {err}"
+            );
+        }
+        // Also rejected when used as a function name
+        let err = Parser::new()
+            .parse("namespace(1)")
+            .expect_err("`namespace(1)` should fail");
+        assert!(
+            format!("{err}").contains("reserved identifier"),
+            "expected reserved identifier error, got: {err}"
+        );
     }
 
     // Regression test: even counts of `!` or `-` cancel out.  The visitor
