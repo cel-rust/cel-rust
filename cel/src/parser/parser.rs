@@ -953,8 +953,11 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 IdedExpr::default()
             }
             Some(id) => {
-                let ident = id.clone().text.to_string();
-                if is_reserved_id(&ident) {
+                let mut ident = id.clone().text.to_string();
+                if ctx.leadingDot.is_some() {
+                    ident = format!(".{ident}");
+                }
+                if is_reserved_id(ident.trim_start_matches('.')) {
                     return self.report_error::<ParseError, _>(
                         id.deref(),
                         None,
@@ -1438,6 +1441,18 @@ mod tests {
             .error_recovery_limit(0)
             .parse("1 + 2 * 3")
             .is_ok());
+    }
+
+    #[test]
+    fn leading_dot_ident() {
+        let expr = Parser::new()
+            .parse(".x")
+            .expect(".x should parse as a leading-dot ident");
+        assert!(
+            matches!(&expr.expr, crate::common::ast::Expr::Ident(s) if s == ".x"),
+            "expected Ident(\".x\"), got {:?}",
+            expr.expr
+        );
     }
 
     #[test]
