@@ -36,8 +36,8 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 pub struct MacroExprHelper<'a> {
-    helper: &'a mut ParserHelper,
-    id: u64,
+    pub(crate) helper: &'a mut ParserHelper,
+    pub(crate) id: u64,
 }
 
 impl MacroExprHelper<'_> {
@@ -1205,8 +1205,8 @@ impl gen::CELVisitorCompat<'_> for Parser {
 }
 
 pub struct ParserHelper {
-    source_info: SourceInfo,
-    next_id: u64,
+    pub(crate) source_info: SourceInfo,
+    pub(crate) next_id: u64,
 }
 
 impl Default for ParserHelper {
@@ -2246,8 +2246,8 @@ ERROR: <input>:1:10: unsupported syntax '[?'
                 enable_optional_syntax: false,
             },
             TestInfo {
-            i: "a.?b[?0] && a[?c]",
-            p: r#"_&&_(
+                i: "a.?b[?0] && a[?c]",
+                p: r#"_&&_(
     _[?_](
         _?._(
             a^#1:*expr.Expr_IdentExpr#,
@@ -2260,37 +2260,37 @@ ERROR: <input>:1:10: unsupported syntax '[?'
         c^#8:*expr.Expr_IdentExpr#
     )^#7:*expr.Expr_CallExpr#
 )^#9:*expr.Expr_CallExpr#"#,
-            e: "",
-            enable_optional_syntax: true,
-        },
-        TestInfo {
-            i: "{?'key': value}",
-            p: r#"{
+                e: "",
+                enable_optional_syntax: true,
+            },
+            TestInfo {
+                i: "{?'key': value}",
+                p: r#"{
     ?"key"^#3:*expr.Constant_StringValue#:value^#4:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#"#,
-            e: "",
-            enable_optional_syntax: true,
-        },
-        TestInfo {
-            i: "[?a, ?b]",
-            p: r#"[
+                e: "",
+                enable_optional_syntax: true,
+            },
+            TestInfo {
+                i: "[?a, ?b]",
+                p: r#"[
     a^#2:*expr.Expr_IdentExpr#,
     b^#3:*expr.Expr_IdentExpr#
 ]^#1:*expr.Expr_ListExpr#"#,
-            e: "",
-            enable_optional_syntax: true,
-        },
-        TestInfo {
-            i: "[?a[?b]]",
-            p: r#"[
+                e: "",
+                enable_optional_syntax: true,
+            },
+            TestInfo {
+                i: "[?a[?b]]",
+                p: r#"[
     _[?_](
         a^#2:*expr.Expr_IdentExpr#,
         b^#4:*expr.Expr_IdentExpr#
     )^#3:*expr.Expr_CallExpr#
 ]^#1:*expr.Expr_ListExpr#"#,
-            e: "",
-            enable_optional_syntax: true,
-        },
+                e: "",
+                enable_optional_syntax: true,
+            },
             TestInfo {
                 i: "[?a, ?b]",
                 p: "",
@@ -2335,6 +2335,14 @@ ERROR: <input>:1:24: unsupported syntax '?'
                 e: "ERROR: <input>:1:7: argument must be a simple name
 | 1.all(2, 3)
 | ......^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "foo(a,b,)",
+                p: "",
+                e: "ERROR: <input>:1:9: Syntax error: mismatched input ')' expecting {'[', '{', '(', '.', '-', '!', 'true', 'false', 'null', NUM_FLOAT, NUM_INT, NUM_UINT, STRING, BYTES, IDENTIFIER}
+| foo(a,b,)
+| ........^",
                 ..Default::default()
             },
         ];

@@ -32,6 +32,10 @@ dhat = { version = "0.3.3" }
 name = "runtime"
 harness = false
 
+[[bench]]
+name = "parser"
+harness = false
+
 [features]
 default = ["regex", "chrono"]
 structs = []
