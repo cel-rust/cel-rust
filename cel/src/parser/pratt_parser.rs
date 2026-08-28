@@ -266,7 +266,7 @@ impl<'a> Lexer<'a> {
         if self.pos >= self.length {
             return false;
         }
-        self.bytes[self.pos].to_ascii_lowercase() == b.to_ascii_lowercase()
+        self.bytes[self.pos].eq_ignore_ascii_case(&b)
     }
 
     fn consume_byte(&mut self, b: u8) -> bool {
@@ -395,14 +395,14 @@ impl<'a> Lexer<'a> {
             if b == b'\\' {
                 escaped = !escaped;
             } else {
-                if !escaped && pos + 3 <= self.length {
-                    if self.bytes[pos] == quote
-                        && self.bytes[pos + 1] == quote
-                        && self.bytes[pos + 2] == quote
-                    {
-                        self.pos = pos + 3;
-                        return true;
-                    }
+                if !escaped
+                    && pos + 3 <= self.length
+                    && self.bytes[pos] == quote
+                    && self.bytes[pos + 1] == quote
+                    && self.bytes[pos + 2] == quote
+                {
+                    self.pos = pos + 3;
+                    return true;
                 }
                 escaped = false;
             }
@@ -1089,7 +1089,7 @@ impl PrattLogicManager {
         self.ops.push(op_id);
     }
 
-    fn to_expr(mut self) -> IdedExpr {
+    fn into_expr(mut self) -> IdedExpr {
         if self.terms.len() == 1 {
             self.terms.pop().expect("expected at least one term")
         } else if self.variadic_asts {
@@ -1259,19 +1259,18 @@ impl<'a> PrattParserWorker<'a> {
         self.curr_tok = Token::default();
         self.peek_tok = self.next_significant_token(true);
         let out = self.parse_expr();
-        if !self.recursion_limit_exceeded && !self.is_recovery_limit_exceeded() {
-            if self.peek_tok.kind != TokenKind::TokEnd {
-                if self.peek_tok.kind != TokenKind::TokError {
-                    let peek = self.peek_tok;
-                    let text = self.token_text(&peek);
-                    let err_msg =
-                        format!("Syntax error: mismatched input '{text}' expecting <EOF>");
-                    self.report_error(&peek, err_msg);
-                }
-                while self.peek_tok.kind != TokenKind::TokEnd && !self.is_recovery_limit_exceeded()
-                {
-                    self.next_token();
-                }
+        if !self.recursion_limit_exceeded
+            && !self.is_recovery_limit_exceeded()
+            && self.peek_tok.kind != TokenKind::TokEnd
+        {
+            if self.peek_tok.kind != TokenKind::TokError {
+                let peek = self.peek_tok;
+                let text = self.token_text(&peek);
+                let err_msg = format!("Syntax error: mismatched input '{text}' expecting <EOF>");
+                self.report_error(&peek, err_msg);
+            }
+            while self.peek_tok.kind != TokenKind::TokEnd && !self.is_recovery_limit_exceeded() {
+                self.next_token();
             }
         }
         if self.is_recovery_limit_exceeded() {
@@ -1571,7 +1570,7 @@ impl<'a> PrattParserWorker<'a> {
         let mut lhs = self.parse_selector_chain();
         loop {
             let tok = self.peek_tok.kind;
-            if tok == TokenKind::TokQuestion && min_prec <= 0 {
+            if tok == TokenKind::TokQuestion && min_prec == 0 {
                 lhs = self.parse_ternary(lhs);
                 continue;
             }
@@ -1634,7 +1633,7 @@ impl<'a> PrattParserWorker<'a> {
             let op_id = self.next_id(&op_tok);
             l.add_term(op_id, rhs);
         }
-        l.to_expr()
+        l.into_expr()
     }
 
     fn parse_selector_chain(&mut self) -> IdedExpr {
@@ -2144,10 +2143,8 @@ impl<'a> PrattParserWorker<'a> {
             };
         }
         let id_text = self.normalize_ident(&id_tok, false);
-        if id_tok.kind == TokenKind::TokReservedWord {
-            if RESERVED_IDS.contains(&id_text.as_str()) {
-                self.report_error(&id_tok, format!("reserved identifier: {id_text}"));
-            }
+        if id_tok.kind == TokenKind::TokReservedWord && RESERVED_IDS.contains(&id_text.as_str()) {
+            self.report_error(&id_tok, format!("reserved identifier: {id_text}"));
         }
         let mut name = id_text;
         if leading_dot {
