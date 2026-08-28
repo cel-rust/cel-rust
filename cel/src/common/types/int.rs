@@ -87,7 +87,9 @@ impl traits::Adder for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::unresolved_overload())
+            Err(ExecutionError::unsupported_binary_operator(
+                "add", self, other,
+            ))
         }
     }
 }
@@ -105,9 +107,9 @@ impl traits::Comparer for Int {
         } else if let Some(d) = rhs.downcast_ref::<CelDouble>() {
             Ok((*self.inner() as f64)
                 .partial_cmp(d.inner())
-                .ok_or_else(ExecutionError::unresolved_overload)?)
+                .ok_or_else(|| ExecutionError::values_not_comparable(self, rhs))?)
         } else {
-            Err(ExecutionError::unresolved_overload())
+            Err(ExecutionError::values_not_comparable(self, rhs))
         }
     }
 }
@@ -126,7 +128,9 @@ impl traits::Divider for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::unresolved_overload())
+            Err(ExecutionError::unsupported_binary_operator(
+                "div", self, rhs,
+            ))
         }
     }
 }
@@ -145,7 +149,9 @@ impl traits::Modder for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::unresolved_overload())
+            Err(ExecutionError::unsupported_binary_operator(
+                "rem", self, rhs,
+            ))
         }
     }
 }
@@ -161,7 +167,9 @@ impl traits::Multiplier for Int {
             let b: Box<dyn Val> = Box::new(t);
             Ok(Cow::Owned(b))
         } else {
-            Err(ExecutionError::unresolved_overload())
+            Err(ExecutionError::unsupported_binary_operator(
+                "mul", self, rhs,
+            ))
         }
     }
 }
@@ -181,7 +189,9 @@ impl traits::Subtractor for Int {
                     .ok_or_else(|| ExecutionError::Overflow("sub", self.0.into(), i.0.into()))?,
             ))))
         } else {
-            Err(ExecutionError::unresolved_overload())
+            Err(ExecutionError::unsupported_binary_operator(
+                "sub", self, rhs,
+            ))
         }
     }
 }

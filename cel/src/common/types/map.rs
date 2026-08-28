@@ -104,7 +104,10 @@ impl Indexer for DefaultMap {
         } else if let Some(b) = key.downcast_ref::<CelBool>() {
             b as &dyn AsKeyRef
         } else {
-            return Err(ExecutionError::unresolved_overload());
+            return Err(ExecutionError::UnexpectedType {
+                got: key.get_type().name().to_owned(),
+                want: "map key".to_owned(),
+            });
         };
 
         self.0

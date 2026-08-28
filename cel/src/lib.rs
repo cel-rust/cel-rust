@@ -64,9 +64,9 @@ pub mod extractors {
 }
 
 /// Details about an operator or function call for which no overload matched.
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct OverloadError {
-    function: Option<Arc<String>>,
+    function: Arc<String>,
     argument_types: Arc<[String]>,
     member_function: bool,
 }
@@ -74,15 +74,15 @@ pub struct OverloadError {
 impl OverloadError {
     fn new(function: &str, argument_types: Vec<String>, member_function: bool) -> Self {
         Self {
-            function: Some(Arc::new(function.to_owned())),
+            function: Arc::new(function.to_owned()),
             argument_types: argument_types.into(),
             member_function,
         }
     }
 
-    /// Returns the operator or function name, when it is known.
-    pub fn function(&self) -> Option<&str> {
-        self.function.as_deref().map(String::as_str)
+    /// Returns the operator or function name.
+    pub fn function(&self) -> &str {
+        self.function.as_str()
     }
 
     /// Returns the runtime types of the arguments supplied to the call.
@@ -100,10 +100,6 @@ impl OverloadError {
 
 impl fmt::Display for OverloadError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Some(function) = &self.function else {
-            return f.write_str("No such overload");
-        };
-
         let signature = if self.member_function && !self.argument_types.is_empty() {
             format!(
                 "{}.({})",
@@ -115,7 +111,8 @@ impl fmt::Display for OverloadError {
         };
         write!(
             f,
-            "found no matching overload for '{function}' applied to '{signature}'"
+            "found no matching overload for '{}' applied to '{signature}'",
+            self.function
         )
     }
 }
@@ -206,10 +203,6 @@ impl ExecutionError {
         ExecutionError::NoSuchOverload(OverloadError::new(function, argument_types, true))
     }
 
-    pub(crate) fn unresolved_overload() -> Self {
-        ExecutionError::NoSuchOverload(OverloadError::default())
-    }
-
     pub(crate) fn overload_for_values<'a>(
         function: &str,
         arguments: impl IntoIterator<Item = &'a dyn common::value::Val>,
@@ -225,9 +218,34 @@ impl ExecutionError {
 
     pub(crate) fn with_overload_context(self, context: ExecutionError) -> Self {
         match self {
-            ExecutionError::NoSuchOverload(_) => context,
+            ExecutionError::NoSuchOverload(_)
+            | ExecutionError::ValuesNotComparable(_, _)
+            | ExecutionError::UnsupportedKeyType(_)
+            | ExecutionError::UnexpectedType { .. } => context,
             error => error,
         }
+    }
+
+    pub(crate) fn values_not_comparable(
+        lhs: &dyn common::value::Val,
+        rhs: &dyn common::value::Val,
+    ) -> Self {
+        ExecutionError::ValuesNotComparable(
+            Value::try_from(lhs).unwrap_or(Value::Null),
+            Value::try_from(rhs).unwrap_or(Value::Null),
+        )
+    }
+
+    pub(crate) fn unsupported_binary_operator(
+        operator: &'static str,
+        lhs: &dyn common::value::Val,
+        rhs: &dyn common::value::Val,
+    ) -> Self {
+        ExecutionError::UnsupportedBinaryOperator(
+            operator,
+            Value::try_from(lhs).unwrap_or(Value::Null),
+            Value::try_from(rhs).unwrap_or(Value::Null),
+        )
     }
 
     pub fn no_such_key(name: &str) -> Self {
@@ -365,7 +383,13 @@ mod tests {
         assert_output("arr[0] == 1", Ok(true.into()));
 
         // Test that we cannot index into a string
-        assert_output("str[0]", Err(ExecutionError::unresolved_overload()));
+        assert_output(
+            "str[0]",
+            Err(ExecutionError::no_such_overload(
+                "_[_]",
+                vec!["string".to_owned(), "int".to_owned()],
+            )),
+        );
     }
 
     #[test]
@@ -448,7 +472,7 @@ mod tests {
         let ExecutionError::NoSuchOverload(overload) = error else {
             panic!("expected a no-such-overload error");
         };
-        assert_eq!(overload.function(), Some("contains"));
+        assert_eq!(overload.function(), "contains");
         assert_eq!(overload.argument_types(), ["string", "int"]);
         assert!(overload.is_member_function());
     }
