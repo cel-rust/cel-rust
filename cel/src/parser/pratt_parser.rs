@@ -164,8 +164,23 @@ const KEYWORDS: &[(&str, TokenKind)] = &[
 ];
 
 const RESERVED_IDS: &[&str] = &[
-    "as", "break", "const", "continue", "else", "for", "function", "if", "import", "let", "loop",
-    "package", "namespace", "return", "var", "void", "while",
+    "as",
+    "break",
+    "const",
+    "continue",
+    "else",
+    "for",
+    "function",
+    "if",
+    "import",
+    "let",
+    "loop",
+    "package",
+    "namespace",
+    "return",
+    "var",
+    "void",
+    "while",
 ];
 
 fn is_ident_trailing(b: u8) -> bool {
@@ -940,9 +955,7 @@ fn unescape(value: &str, is_bytes: bool) -> Result<Vec<u8>, String> {
         let (_, next_c) = match chars.next() {
             Some(p) => p,
             None => {
-                return Err(
-                    "unable to unescape string, found '\\' as last character".to_string()
-                )
+                return Err("unable to unescape string, found '\\' as last character".to_string())
             }
         };
         match next_c {
@@ -989,8 +1002,8 @@ fn unescape(value: &str, is_bytes: bool) -> Result<Vec<u8>, String> {
                 if is_bytes && (next_c == 'x' || next_c == 'X') {
                     buf.push(v as u8);
                 } else {
-                    let ch =
-                        char::from_u32(v).ok_or_else(|| "invalid unicode code point".to_string())?;
+                    let ch = char::from_u32(v)
+                        .ok_or_else(|| "invalid unicode code point".to_string())?;
                     let mut b = [0u8; 4];
                     let s = ch.encode_utf8(&mut b);
                     buf.extend_from_slice(s.as_bytes());
@@ -1013,8 +1026,8 @@ fn unescape(value: &str, is_bytes: bool) -> Result<Vec<u8>, String> {
                 if is_bytes {
                     buf.push(v as u8);
                 } else {
-                    let ch =
-                        char::from_u32(v).ok_or_else(|| "invalid unicode code point".to_string())?;
+                    let ch = char::from_u32(v)
+                        .ok_or_else(|| "invalid unicode code point".to_string())?;
                     let mut b = [0u8; 4];
                     let s = ch.encode_utf8(&mut b);
                     buf.extend_from_slice(s.as_bytes());
@@ -1121,7 +1134,6 @@ impl PrattLogicManager {
 
 #[derive(Debug, Clone, Copy)]
 pub struct PrattParser {
-
     pub max_recursion_depth: u16,
     pub error_recovery_limit: u32,
     pub error_reporting_limit: u32,
@@ -1252,7 +1264,8 @@ impl<'a> PrattParserWorker<'a> {
                 if self.peek_tok.kind != TokenKind::TokError {
                     let peek = self.peek_tok;
                     let text = self.token_text(&peek);
-                    let err_msg = format!("Syntax error: mismatched input '{text}' expecting <EOF>");
+                    let err_msg =
+                        format!("Syntax error: mismatched input '{text}' expecting <EOF>");
                     self.report_error(&peek, err_msg);
                 }
                 while self.peek_tok.kind != TokenKind::TokEnd && !self.is_recovery_limit_exceeded()
@@ -1592,7 +1605,10 @@ impl<'a> PrattParserWorker<'a> {
         let q_tok = self.next_token();
         let op_id = self.next_id(&q_tok);
         let true_expr = self.parse_binary_and_ternary(1);
-        if !self.expect(TokenKind::TokColon, "expected ':' in conditional expression") {
+        if !self.expect(
+            TokenKind::TokColon,
+            "expected ':' in conditional expression",
+        ) {
             return lhs;
         }
         let false_expr = self.parse_binary_and_ternary(0);
