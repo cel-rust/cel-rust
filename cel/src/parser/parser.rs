@@ -144,15 +144,33 @@ impl Parser {
 
     /// Enables backtick-escaped field identifiers (``` `foo.bar` ```).
     ///
-    /// Only `false` (the default) is implemented today — with the flag off,
-    /// the parser rejects any `` `…` ``-quoted identifier with an
-    /// `"unsupported syntax: '`'"` parse error, matching cel-go's
-    /// `EnableIdentEscapeSyntax(false)` behavior (`parser/parser.go:161`).
-    /// Turning the flag on is not yet wired; it will still reject the
-    /// syntax until the unescape support lands.
+    /// With the flag off (the default) the parser rejects any `` `…` ``
+    /// -quoted identifier with an `"unsupported syntax: '`'"` parse error.
+    /// With the flag on the surrounding backticks are stripped and the
+    /// contents are used verbatim as the field name — matching cel-go's
+    /// `EnableIdentEscapeSyntax` (`parser/parser.go:161`).
     pub fn enable_ident_escape_syntax(mut self, enable: bool) -> Self {
         self.enable_ident_escape_syntax = enable;
         self
+    }
+
+    /// Returns the field name for an `escapeIdent` context, mirroring
+    /// cel-go's `normalizeIdent` (`parser/parser.go:161`). Returns an error
+    /// message string if the escape syntax is used without opting in.
+    fn normalize_ident(&self, ctx: &EscapeIdentContextAll<'_>) -> Result<String, &'static str> {
+        match ctx {
+            EscapeIdentContextAll::SimpleIdentifierContext(ident) => Ok(ident.get_text()),
+            EscapeIdentContextAll::EscapedIdentifierContext(ident) => {
+                if !self.enable_ident_escape_syntax {
+                    return Err("unsupported syntax: '`'");
+                }
+                let raw = ident.get_text();
+                // Grammar guarantees a leading and trailing backtick plus at
+                // least one interior char, so this slice is always safe.
+                Ok(raw[1..raw.len() - 1].to_string())
+            }
+            EscapeIdentContextAll::Error(_) => Err("unsupported ident kind"),
+        }
     }
 
     fn new_logic_manager(&self, func: &str, term: IdedExpr) -> LogicManager {
@@ -298,19 +316,13 @@ impl Parser {
                     continue;
                 }
                 Some(ident) => {
-                    if matches!(
-                        ident.as_ref(),
-                        EscapeIdentContextAll::EscapedIdentifierContext(_)
-                    ) && !self.enable_ident_escape_syntax
-                    {
-                        self.report_error::<ParseError, _>(
-                            field.start().deref(),
-                            None,
-                            "unsupported syntax: '`'",
-                        );
-                        continue;
-                    }
-                    let field_name = ident.get_text().to_string();
+                    let field_name = match self.normalize_ident(ident.as_ref()) {
+                        Ok(name) => name,
+                        Err(msg) => {
+                            self.report_error::<ParseError, _>(field.start().deref(), None, msg);
+                            continue;
+                        }
+                    };
                     let value = self.visit(ctx.values[i].as_ref());
                     let is_optional = match (&field.opt, self.enable_optional_syntax) {
                         (Some(opt), false) => {
@@ -900,18 +912,12 @@ impl gen::CELVisitorCompat<'_> for Parser {
     fn visit_Select(&mut self, ctx: &SelectContext<'_>) -> Self::Return {
         if let (Some(member), Some(id), Some(op)) = (&ctx.member(), &ctx.id, &ctx.op) {
             let operand = self.visit(member.as_ref());
-            if matches!(
-                id.as_ref(),
-                EscapeIdentContextAll::EscapedIdentifierContext(_)
-            ) && !self.enable_ident_escape_syntax
-            {
-                return self.report_error::<ParseError, _>(
-                    op.as_ref(),
-                    None,
-                    "unsupported syntax: '`'",
-                );
-            }
-            let field = id.get_text();
+            let field = match self.normalize_ident(id.as_ref()) {
+                Ok(f) => f,
+                Err(msg) => {
+                    return self.report_error::<ParseError, _>(op.as_ref(), None, msg);
+                }
+            };
             if let Some(_opt) = &ctx.opt {
                 return if self.enable_optional_syntax {
                     let field_literal = self.helper.next_expr(
@@ -1542,6 +1548,24 @@ mod tests {
             format!("{err}").contains("reserved identifier"),
             "expected reserved identifier error, got: {err}"
         );
+    }
+
+    #[test]
+    fn backtick_field_selector_strips_backticks_when_enabled() {
+        // With the flag on the parser should accept the source and lower it
+        // to a plain `Select` whose field is the unescaped identifier.
+        let expr = Parser::new()
+            .enable_ident_escape_syntax(true)
+            .parse("{'a/b': 1}.`a/b`")
+            .expect("should parse with ident-escape enabled");
+        // The outermost node is the Select — walk in and find its field.
+        fn field_of(expr: &crate::common::ast::Expr) -> Option<&str> {
+            match expr {
+                crate::common::ast::Expr::Select(sel) => Some(&sel.field),
+                _ => None,
+            }
+        }
+        assert_eq!(field_of(&expr.expr), Some("a/b"));
     }
 
     #[test]
