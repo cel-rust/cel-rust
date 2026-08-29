@@ -1,4 +1,4 @@
-use cel::parser::{Parser, PrattParser};
+use cel::parser::Parser;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 
 struct BenchTestInfo {
@@ -178,28 +178,49 @@ fn new_antlr_parser() -> Parser {
         .max_recursion_depth(512)
 }
 
-fn new_pratt_parser() -> PrattParser {
-    PrattParser::default()
+#[cfg(feature = "parser_pratt")]
+fn new_pratt_parser() -> cel::parser::PrattParser {
+    cel::parser::PrattParser::default()
         .enable_optional_syntax(true)
         .enable_ident_escape_syntax(true)
         .max_recursion_depth(512)
 }
 
+#[derive(Debug)]
+#[non_exhaustive]
+enum BackendParser {
+    #[allow(clippy::upper_case_acronyms)]
+    ANTLR,
+    Pratt,
+}
+
 pub fn benchmark_by_category(c: &mut Criterion) {
     let categories = bench_categories();
 
-    for mode in ["antlr", "pratt"] {
-        let mut group = c.benchmark_group(format!("by_category/{mode}"));
+    let backends = if cfg!(feature = "parser_pratt") {
+        vec![BackendParser::ANTLR, BackendParser::Pratt]
+    } else {
+        vec![BackendParser::ANTLR]
+    };
+
+    for backend in backends {
+        let mut group = c.benchmark_group(format!("by_category/{backend:?}"));
         for cat in &categories {
             group.bench_function(BenchmarkId::from_parameter(cat.name), |b| {
                 b.iter(|| {
                     for tc in &cat.cases {
-                        let is_err = if mode == "antlr" {
-                            let parser = new_antlr_parser();
-                            parser.parse(black_box(&tc.input)).is_err()
-                        } else {
-                            let parser = new_pratt_parser();
-                            parser.parse(black_box(&tc.input)).is_err()
+                        let is_err = match backend {
+                            BackendParser::ANTLR => {
+                                let parser = new_antlr_parser();
+                                parser.parse(black_box(&tc.input)).is_err()
+                            }
+                            #[cfg(feature = "parser_pratt")]
+                            BackendParser::Pratt => {
+                                let parser = new_pratt_parser();
+                                parser.parse(black_box(&tc.input)).is_err()
+                            }
+                            #[allow(unreachable_patterns)]
+                            _ => panic!("Unsupported parser {backend:?}"),
                         };
                         assert_eq!(is_err, tc.expect_err, "Failed test case: {}", tc.input);
                     }
@@ -225,6 +246,7 @@ pub fn benchmark_by_category_comparison(c: &mut Criterion) {
             });
         });
 
+        #[cfg(feature = "parser_pratt")]
         group.bench_function("pratt", |b| {
             b.iter(|| {
                 for tc in &cat.cases {
