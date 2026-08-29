@@ -27,9 +27,12 @@ pub fn run_test(simple_test_textproto: &str) {
     );
 
     // Use the parser directly so we can enable optional syntax (`.?`,
-    // `[?…]`, `{?k: v}`), which `Program::compile` leaves off by default.
+    // `[?…]`, `{?k: v}`) and backtick-escaped identifiers (`` `foo.bar` ``),
+    // which `Program::compile` leaves off by default. Matches cel-go's own
+    // conformance runner (`conformance/conformance_test.go:87,95`).
     let program = Parser::default()
         .enable_optional_syntax(true)
+        .enable_ident_escape_syntax(true)
         .parse(&test.expr)
         .expect("Failed to compile CEL expression");
 

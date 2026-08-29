@@ -337,7 +337,6 @@ mod self_eval_nonzeroish {
     }
 
     // Test: self_eval_int_hex_negative
-    #[should_panic]
     #[test]
     fn self_eval_int_hex_negative() {
         run_test(&dedent!(

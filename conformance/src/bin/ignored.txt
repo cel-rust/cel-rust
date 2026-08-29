@@ -1,4 +1,3 @@
-basic::self_eval_nonzeroish::self_eval_int_hex_negative
 bindings_ext::bind::bind_nested
 bindings_ext::bind::boolean_literal
 bindings_ext::bind::macro_exists
@@ -422,11 +421,6 @@ fields::qualified_identifier_resolution::map_field_select
 fields::qualified_identifier_resolution::map_value_repeat_key
 fields::qualified_identifier_resolution::qualified_ident
 fields::qualified_identifier_resolution::qualified_identifier_resolution_unchecked
-fields::quoted_map_fields::field_access_dash
-fields::quoted_map_fields::field_access_dot
-fields::quoted_map_fields::field_access_slash
-fields::quoted_map_fields::has_field_dash
-fields::quoted_map_fields::has_field_dot
 fields::r#in::mixed_numbers_and_keys_absent
 fields::r#in::mixed_numbers_and_keys_present
 integer_math::int64_math::int64_min_negate

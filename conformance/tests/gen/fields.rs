@@ -628,7 +628,6 @@ mod quoted_map_fields {
     use dedent::dedent;
 
     // Test: field_access_slash
-    #[should_panic]
     #[test]
     fn field_access_slash() {
         run_test(&dedent!(
@@ -640,7 +639,6 @@ mod quoted_map_fields {
     }
 
     // Test: field_access_dash
-    #[should_panic]
     #[test]
     fn field_access_dash() {
         run_test(&dedent!(
@@ -652,7 +650,6 @@ mod quoted_map_fields {
     }
 
     // Test: field_access_dot
-    #[should_panic]
     #[test]
     fn field_access_dot() {
         run_test(&dedent!(
@@ -675,7 +672,6 @@ mod quoted_map_fields {
     }
 
     // Test: has_field_dash
-    #[should_panic]
     #[test]
     fn has_field_dash() {
         run_test(&dedent!(
@@ -687,7 +683,6 @@ mod quoted_map_fields {
     }
 
     // Test: has_field_dot
-    #[should_panic]
     #[test]
     fn has_field_dot() {
         run_test(&dedent!(
