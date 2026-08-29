@@ -294,7 +294,6 @@ mod r#dyn {
     use dedent::dedent;
 
     // Test: dyn_heterogeneous_list
-    #[should_panic]
     #[test]
     fn dyn_heterogeneous_list() {
         run_test(&dedent!(
@@ -612,7 +611,6 @@ mod r#type {
     use dedent::dedent;
 
     // Test: bool
-    #[should_panic]
     #[test]
     fn bool() {
         run_test(&dedent!(
@@ -624,7 +622,6 @@ mod r#type {
     }
 
     // Test: bool_denotation
-    #[should_panic]
     #[test]
     fn bool_denotation() {
         run_test(&dedent!(
@@ -650,7 +647,6 @@ mod r#type {
     }
 
     // Test: int
-    #[should_panic]
     #[test]
     fn int() {
         run_test(&dedent!(
@@ -662,7 +658,6 @@ mod r#type {
     }
 
     // Test: int_denotation
-    #[should_panic]
     #[test]
     fn int_denotation() {
         run_test(&dedent!(
@@ -674,7 +669,6 @@ mod r#type {
     }
 
     // Test: eq_same
-    #[should_panic]
     #[test]
     fn eq_same() {
         run_test(&dedent!(
@@ -686,7 +680,6 @@ mod r#type {
     }
 
     // Test: uint
-    #[should_panic]
     #[test]
     fn uint() {
         run_test(&dedent!(
@@ -698,7 +691,6 @@ mod r#type {
     }
 
     // Test: uint_denotation
-    #[should_panic]
     #[test]
     fn uint_denotation() {
         run_test(&dedent!(
@@ -710,7 +702,6 @@ mod r#type {
     }
 
     // Test: double
-    #[should_panic]
     #[test]
     fn double() {
         run_test(&dedent!(
@@ -722,7 +713,6 @@ mod r#type {
     }
 
     // Test: double_denotation
-    #[should_panic]
     #[test]
     fn double_denotation() {
         run_test(&dedent!(
@@ -734,7 +724,6 @@ mod r#type {
     }
 
     // Test: null_type
-    #[should_panic]
     #[test]
     fn null_type() {
         run_test(&dedent!(
@@ -746,7 +735,6 @@ mod r#type {
     }
 
     // Test: null_type_denotation
-    #[should_panic]
     #[test]
     fn null_type_denotation() {
         run_test(&dedent!(
@@ -758,7 +746,6 @@ mod r#type {
     }
 
     // Test: string
-    #[should_panic]
     #[test]
     fn string() {
         run_test(&dedent!(
@@ -770,7 +757,6 @@ mod r#type {
     }
 
     // Test: string_denotation
-    #[should_panic]
     #[test]
     fn string_denotation() {
         run_test(&dedent!(
@@ -782,7 +768,6 @@ mod r#type {
     }
 
     // Test: bytes
-    #[should_panic]
     #[test]
     fn bytes() {
         run_test(&dedent!(
@@ -794,7 +779,6 @@ mod r#type {
     }
 
     // Test: bytes_denotation
-    #[should_panic]
     #[test]
     fn bytes_denotation() {
         run_test(&dedent!(
@@ -806,7 +790,6 @@ mod r#type {
     }
 
     // Test: list
-    #[should_panic]
     #[test]
     fn list() {
         run_test(&dedent!(
@@ -818,7 +801,6 @@ mod r#type {
     }
 
     // Test: list_denotation
-    #[should_panic]
     #[test]
     fn list_denotation() {
         run_test(&dedent!(
@@ -830,7 +812,6 @@ mod r#type {
     }
 
     // Test: lists_monomorphic
-    #[should_panic]
     #[test]
     fn lists_monomorphic() {
         run_test(&dedent!(
@@ -842,7 +823,6 @@ mod r#type {
     }
 
     // Test: map
-    #[should_panic]
     #[test]
     fn map() {
         run_test(&dedent!(
@@ -854,7 +834,6 @@ mod r#type {
     }
 
     // Test: map_denotation
-    #[should_panic]
     #[test]
     fn map_denotation() {
         run_test(&dedent!(
@@ -866,7 +845,6 @@ mod r#type {
     }
 
     // Test: map_monomorphic
-    #[should_panic]
     #[test]
     fn map_monomorphic() {
         run_test(&dedent!(
@@ -878,7 +856,6 @@ mod r#type {
     }
 
     // Test: eq_diff
-    #[should_panic]
     #[test]
     fn eq_diff() {
         run_test(&dedent!(
@@ -890,7 +867,6 @@ mod r#type {
     }
 
     // Test: neq_same
-    #[should_panic]
     #[test]
     fn neq_same() {
         run_test(&dedent!(
@@ -902,7 +878,6 @@ mod r#type {
     }
 
     // Test: neq_diff
-    #[should_panic]
     #[test]
     fn neq_diff() {
         run_test(&dedent!(
@@ -914,7 +889,6 @@ mod r#type {
     }
 
     // Test: meta
-    #[should_panic]
     #[test]
     fn meta() {
         run_test(&dedent!(
@@ -926,7 +900,6 @@ mod r#type {
     }
 
     // Test: type
-    #[should_panic]
     #[test]
     fn r#type() {
         run_test(&dedent!(
@@ -938,7 +911,6 @@ mod r#type {
     }
 
     // Test: type_denotation
-    #[should_panic]
     #[test]
     fn type_denotation() {
         run_test(&dedent!(
@@ -950,7 +922,6 @@ mod r#type {
     }
 
     // Test: type_type
-    #[should_panic]
     #[test]
     fn type_type() {
         run_test(&dedent!(

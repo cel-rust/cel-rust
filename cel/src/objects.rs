@@ -899,6 +899,9 @@ impl TryFrom<&dyn Val> for Value {
                     ),
                 }))
             }
+            Kind::Type => Ok(Value::String(Arc::new(
+                v.downcast_ref::<CelType>().unwrap().name().to_string(),
+            ))),
             Kind::Opaque => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
                 None => v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
                 Some(opt) => {

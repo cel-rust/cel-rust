@@ -47,7 +47,6 @@ mod timestamp_conversions {
     }
 
     // Test: toType_timestamp
-    #[should_panic]
     #[test]
     fn totype_timestamp() {
         run_test(&dedent!(
@@ -90,7 +89,6 @@ mod duration_conversions {
     }
 
     // Test: toType_duration
-    #[should_panic]
     #[test]
     fn totype_duration() {
         run_test(&dedent!(
