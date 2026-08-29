@@ -1,4 +1,3 @@
-basic::self_eval_nonzeroish::self_eval_int_hex_negative
 bindings_ext::bind::bind_nested
 bindings_ext::bind::boolean_literal
 bindings_ext::bind::macro_exists

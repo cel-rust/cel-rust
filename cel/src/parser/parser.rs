@@ -1075,13 +1075,20 @@ impl gen::CELVisitorCompat<'_> for Parser {
     }
 
     fn visit_Int(&mut self, ctx: &IntContext<'_>) -> Self::Return {
-        let string = ctx.get_text();
         if let Some(token) = ctx.tok.as_ref() {
-            let val = match if let Some(string) = string.strip_prefix("0x") {
-                i64::from_str_radix(string, 16)
+            // Strip `0x` from the numeric token first, then re-attach the
+            // sign — otherwise `-0x…` would be handed to a base-10 parser.
+            let raw = token.get_text();
+            let (radix, digits) = match raw.strip_prefix("0x") {
+                Some(rest) => (16, rest),
+                None => (10, raw),
+            };
+            let signed = if ctx.sign.is_some() {
+                format!("-{digits}")
             } else {
-                string.parse::<i64>()
-            } {
+                digits.to_string()
+            };
+            let val = match i64::from_str_radix(&signed, radix) {
                 Ok(v) => v,
                 Err(e) => return self.report_error(token, Some(e), "invalid int literal"),
             };
