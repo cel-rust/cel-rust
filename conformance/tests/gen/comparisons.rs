@@ -33,7 +33,6 @@ mod eq_literal {
     }
 
     // Test: eq_int_uint
-    #[should_panic]
     #[test]
     fn eq_int_uint() {
         run_test(&dedent!(
@@ -45,7 +44,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_int_uint
-    #[should_panic]
     #[test]
     fn not_eq_int_uint() {
         run_test(&dedent!(
@@ -57,7 +55,6 @@ mod eq_literal {
     }
 
     // Test: eq_int_double
-    #[should_panic]
     #[test]
     fn eq_int_double() {
         run_test(&dedent!(
@@ -69,7 +66,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_int_double
-    #[should_panic]
     #[test]
     fn not_eq_int_double() {
         run_test(&dedent!(
@@ -103,7 +99,6 @@ mod eq_literal {
     }
 
     // Test: eq_uint_int
-    #[should_panic]
     #[test]
     fn eq_uint_int() {
         run_test(&dedent!(
@@ -115,7 +110,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_uint_int
-    #[should_panic]
     #[test]
     fn not_eq_uint_int() {
         run_test(&dedent!(
@@ -127,7 +121,6 @@ mod eq_literal {
     }
 
     // Test: eq_uint_double
-    #[should_panic]
     #[test]
     fn eq_uint_double() {
         run_test(&dedent!(
@@ -139,7 +132,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_uint_double
-    #[should_panic]
     #[test]
     fn not_eq_uint_double() {
         run_test(&dedent!(
@@ -184,7 +176,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_int_double_nan
-    #[should_panic]
     #[test]
     fn not_eq_int_double_nan() {
         run_test(&dedent!(
@@ -196,7 +187,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_uint_double_nan
-    #[should_panic]
     #[test]
     fn not_eq_uint_double_nan() {
         run_test(&dedent!(
@@ -208,7 +198,6 @@ mod eq_literal {
     }
 
     // Test: eq_double_int
-    #[should_panic]
     #[test]
     fn eq_double_int() {
         run_test(&dedent!(
@@ -220,7 +209,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_double_int
-    #[should_panic]
     #[test]
     fn not_eq_double_int() {
         run_test(&dedent!(
@@ -232,7 +220,6 @@ mod eq_literal {
     }
 
     // Test: eq_double_uint
-    #[should_panic]
     #[test]
     fn eq_double_uint() {
         run_test(&dedent!(
@@ -244,7 +231,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_double_uint
-    #[should_panic]
     #[test]
     fn not_eq_double_uint() {
         run_test(&dedent!(
@@ -670,7 +656,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_bool_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_bool_null() {
         run_test(&dedent!(
@@ -682,7 +667,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_bytes_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_bytes_null() {
         run_test(&dedent!(
@@ -694,7 +678,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_double_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_double_null() {
         run_test(&dedent!(
@@ -706,7 +689,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_duration_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_duration_null() {
         run_test(&dedent!(
@@ -718,7 +700,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_int_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_int_null() {
         run_test(&dedent!(
@@ -730,7 +711,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_list_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_list_null() {
         run_test(&dedent!(
@@ -742,7 +722,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_map_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_map_null() {
         run_test(&dedent!(
@@ -780,7 +759,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_string_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_string_null() {
         run_test(&dedent!(
@@ -826,7 +804,6 @@ mod eq_literal {
     }
 
     // Test: eq_dyn_int_uint
-    #[should_panic]
     #[test]
     fn eq_dyn_int_uint() {
         run_test(&dedent!(
@@ -838,7 +815,6 @@ mod eq_literal {
     }
 
     // Test: eq_dyn_int_double
-    #[should_panic]
     #[test]
     fn eq_dyn_int_double() {
         run_test(&dedent!(
@@ -850,7 +826,6 @@ mod eq_literal {
     }
 
     // Test: eq_dyn_uint_int
-    #[should_panic]
     #[test]
     fn eq_dyn_uint_int() {
         run_test(&dedent!(
@@ -862,7 +837,6 @@ mod eq_literal {
     }
 
     // Test: eq_dyn_uint_double
-    #[should_panic]
     #[test]
     fn eq_dyn_uint_double() {
         run_test(&dedent!(
@@ -874,7 +848,6 @@ mod eq_literal {
     }
 
     // Test: eq_dyn_double_int
-    #[should_panic]
     #[test]
     fn eq_dyn_double_int() {
         run_test(&dedent!(
@@ -886,7 +859,6 @@ mod eq_literal {
     }
 
     // Test: eq_dyn_double_uint
-    #[should_panic]
     #[test]
     fn eq_dyn_double_uint() {
         run_test(&dedent!(
@@ -898,7 +870,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_int_uint
-    #[should_panic]
     #[test]
     fn not_eq_dyn_int_uint() {
         run_test(&dedent!(
@@ -910,7 +881,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_int_double
-    #[should_panic]
     #[test]
     fn not_eq_dyn_int_double() {
         run_test(&dedent!(
@@ -922,7 +892,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_uint_int
-    #[should_panic]
     #[test]
     fn not_eq_dyn_uint_int() {
         run_test(&dedent!(
@@ -934,7 +903,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_uint_double
-    #[should_panic]
     #[test]
     fn not_eq_dyn_uint_double() {
         run_test(&dedent!(
@@ -946,7 +914,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_double_int
-    #[should_panic]
     #[test]
     fn not_eq_dyn_double_int() {
         run_test(&dedent!(
@@ -958,7 +925,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_double_uint
-    #[should_panic]
     #[test]
     fn not_eq_dyn_double_uint() {
         run_test(&dedent!(
@@ -1785,7 +1751,6 @@ mod ne_literal {
     }
 
     // Test: ne_int_double
-    #[should_panic]
     #[test]
     fn ne_int_double() {
         run_test(&dedent!(
@@ -1797,7 +1762,6 @@ mod ne_literal {
     }
 
     // Test: not_ne_int_double
-    #[should_panic]
     #[test]
     fn not_ne_int_double() {
         run_test(&dedent!(
@@ -1809,7 +1773,6 @@ mod ne_literal {
     }
 
     // Test: ne_int_uint
-    #[should_panic]
     #[test]
     fn ne_int_uint() {
         run_test(&dedent!(
@@ -1821,7 +1784,6 @@ mod ne_literal {
     }
 
     // Test: not_ne_int_uint
-    #[should_panic]
     #[test]
     fn not_ne_int_uint() {
         run_test(&dedent!(
@@ -1855,7 +1817,6 @@ mod ne_literal {
     }
 
     // Test: ne_uint_double
-    #[should_panic]
     #[test]
     fn ne_uint_double() {
         run_test(&dedent!(
@@ -1867,7 +1828,6 @@ mod ne_literal {
     }
 
     // Test: not_ne_uint_double
-    #[should_panic]
     #[test]
     fn not_ne_uint_double() {
         run_test(&dedent!(
@@ -1901,7 +1861,6 @@ mod ne_literal {
     }
 
     // Test: not_ne_int_double_nan
-    #[should_panic]
     #[test]
     fn not_ne_int_double_nan() {
         run_test(&dedent!(
@@ -1913,7 +1872,6 @@ mod ne_literal {
     }
 
     // Test: not_ne_uint_double_nan
-    #[should_panic]
     #[test]
     fn not_ne_uint_double_nan() {
         run_test(&dedent!(
@@ -1936,7 +1894,6 @@ mod ne_literal {
     }
 
     // Test: ne_double_int
-    #[should_panic]
     #[test]
     fn ne_double_int() {
         run_test(&dedent!(
@@ -1948,7 +1905,6 @@ mod ne_literal {
     }
 
     // Test: not_ne_double_int
-    #[should_panic]
     #[test]
     fn not_ne_double_int() {
         run_test(&dedent!(
@@ -1960,7 +1916,6 @@ mod ne_literal {
     }
 
     // Test: ne_double_uint
-    #[should_panic]
     #[test]
     fn ne_double_uint() {
         run_test(&dedent!(
@@ -1972,7 +1927,6 @@ mod ne_literal {
     }
 
     // Test: not_ne_double_uint
-    #[should_panic]
     #[test]
     fn not_ne_double_uint() {
         run_test(&dedent!(
@@ -2654,7 +2608,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_int_uint
-    #[should_panic]
     #[test]
     fn lt_dyn_int_uint() {
         run_test(&dedent!(
@@ -2666,7 +2619,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_int_double
-    #[should_panic]
     #[test]
     fn lt_dyn_int_double() {
         run_test(&dedent!(
@@ -2678,7 +2630,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_uint_int
-    #[should_panic]
     #[test]
     fn lt_dyn_uint_int() {
         run_test(&dedent!(
@@ -2690,7 +2641,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_uint_double
-    #[should_panic]
     #[test]
     fn lt_dyn_uint_double() {
         run_test(&dedent!(
@@ -2702,7 +2652,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_double_int
-    #[should_panic]
     #[test]
     fn lt_dyn_double_int() {
         run_test(&dedent!(
@@ -2714,7 +2663,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_double_uint
-    #[should_panic]
     #[test]
     fn lt_dyn_double_uint() {
         run_test(&dedent!(
@@ -2726,7 +2674,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_int_uint
-    #[should_panic]
     #[test]
     fn not_lt_dyn_int_uint() {
         run_test(&dedent!(
@@ -2738,7 +2685,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_int_double
-    #[should_panic]
     #[test]
     fn not_lt_dyn_int_double() {
         run_test(&dedent!(
@@ -2750,7 +2696,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_uint_int
-    #[should_panic]
     #[test]
     fn not_lt_dyn_uint_int() {
         run_test(&dedent!(
@@ -2762,7 +2707,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_uint_double
-    #[should_panic]
     #[test]
     fn not_lt_dyn_uint_double() {
         run_test(&dedent!(
@@ -2774,7 +2718,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_double_int
-    #[should_panic]
     #[test]
     fn not_lt_dyn_double_int() {
         run_test(&dedent!(
@@ -2786,7 +2729,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_double_uint
-    #[should_panic]
     #[test]
     fn not_lt_dyn_double_uint() {
         run_test(&dedent!(
@@ -2798,7 +2740,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_int_big_uint
-    #[should_panic]
     #[test]
     fn lt_dyn_int_big_uint() {
         run_test(&dedent!(
@@ -2810,7 +2751,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_small_int_uint
-    #[should_panic]
     #[test]
     fn lt_dyn_small_int_uint() {
         run_test(&dedent!(
@@ -2822,7 +2762,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_int_big_lossy_double
-    #[should_panic]
     #[test]
     fn not_lt_dyn_int_big_lossy_double() {
         run_test(&dedent!(
@@ -2834,7 +2773,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_int_big_lossy_double
-    #[should_panic]
     #[test]
     fn lt_dyn_int_big_lossy_double() {
         run_test(&dedent!(
@@ -2846,7 +2784,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_int_small_double
-    #[should_panic]
     #[test]
     fn not_lt_dyn_int_small_double() {
         run_test(&dedent!(
@@ -2858,7 +2795,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_int_small_lossy_double
-    #[should_panic]
     #[test]
     fn not_lt_dyn_int_small_lossy_double() {
         run_test(&dedent!(
@@ -2870,7 +2806,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_uint_small_int
-    #[should_panic]
     #[test]
     fn not_lt_dyn_uint_small_int() {
         run_test(&dedent!(
@@ -2882,7 +2817,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_big_uint_int
-    #[should_panic]
     #[test]
     fn not_lt_dyn_big_uint_int() {
         run_test(&dedent!(
@@ -2894,7 +2828,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_uint_small_double
-    #[should_panic]
     #[test]
     fn not_lt_dyn_uint_small_double() {
         run_test(&dedent!(
@@ -2906,7 +2839,6 @@ mod lt_literal {
     }
 
     // Test: lt_dyn_uint_big_double
-    #[should_panic]
     #[test]
     fn lt_dyn_uint_big_double() {
         run_test(&dedent!(
@@ -2918,7 +2850,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_big_double_uint
-    #[should_panic]
     #[test]
     fn not_lt_dyn_big_double_uint() {
         run_test(&dedent!(
@@ -2930,7 +2861,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_big_double_int
-    #[should_panic]
     #[test]
     fn not_lt_dyn_big_double_int() {
         run_test(&dedent!(
@@ -2942,7 +2872,6 @@ mod lt_literal {
     }
 
     // Test: not_lt_dyn_small_double_int
-    #[should_panic]
     #[test]
     fn not_lt_dyn_small_double_int() {
         run_test(&dedent!(
@@ -3193,7 +3122,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_int_uint
-    #[should_panic]
     #[test]
     fn gt_dyn_int_uint() {
         run_test(&dedent!(
@@ -3205,7 +3133,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_int_double
-    #[should_panic]
     #[test]
     fn gt_dyn_int_double() {
         run_test(&dedent!(
@@ -3217,7 +3144,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_uint_int
-    #[should_panic]
     #[test]
     fn gt_dyn_uint_int() {
         run_test(&dedent!(
@@ -3229,7 +3155,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_uint_double
-    #[should_panic]
     #[test]
     fn gt_dyn_uint_double() {
         run_test(&dedent!(
@@ -3241,7 +3166,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_double_int
-    #[should_panic]
     #[test]
     fn gt_dyn_double_int() {
         run_test(&dedent!(
@@ -3253,7 +3177,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_double_uint
-    #[should_panic]
     #[test]
     fn gt_dyn_double_uint() {
         run_test(&dedent!(
@@ -3265,7 +3188,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_int_uint
-    #[should_panic]
     #[test]
     fn not_gt_dyn_int_uint() {
         run_test(&dedent!(
@@ -3277,7 +3199,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_int_double
-    #[should_panic]
     #[test]
     fn not_gt_dyn_int_double() {
         run_test(&dedent!(
@@ -3289,7 +3210,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_uint_int
-    #[should_panic]
     #[test]
     fn not_gt_dyn_uint_int() {
         run_test(&dedent!(
@@ -3301,7 +3221,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_uint_double
-    #[should_panic]
     #[test]
     fn not_gt_dyn_uint_double() {
         run_test(&dedent!(
@@ -3313,7 +3232,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_double_int
-    #[should_panic]
     #[test]
     fn not_gt_dyn_double_int() {
         run_test(&dedent!(
@@ -3325,7 +3243,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_double_uint
-    #[should_panic]
     #[test]
     fn not_gt_dyn_double_uint() {
         run_test(&dedent!(
@@ -3337,7 +3254,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_int_big_uint
-    #[should_panic]
     #[test]
     fn not_gt_dyn_int_big_uint() {
         run_test(&dedent!(
@@ -3349,7 +3265,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_small_int_uint
-    #[should_panic]
     #[test]
     fn not_gt_dyn_small_int_uint() {
         run_test(&dedent!(
@@ -3361,7 +3276,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_int_big_double
-    #[should_panic]
     #[test]
     fn not_gt_dyn_int_big_double() {
         run_test(&dedent!(
@@ -3373,7 +3287,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_int_small_lossy_double
-    #[should_panic]
     #[test]
     fn not_gt_dyn_int_small_lossy_double() {
         run_test(&dedent!(
@@ -3386,7 +3299,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_int_small_lossy_double_greater
-    #[should_panic]
     #[test]
     fn gt_dyn_int_small_lossy_double_greater() {
         run_test(&dedent!(
@@ -3398,7 +3310,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_uint_small_int
-    #[should_panic]
     #[test]
     fn gt_dyn_uint_small_int() {
         run_test(&dedent!(
@@ -3410,7 +3321,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_big_uint_int
-    #[should_panic]
     #[test]
     fn gt_dyn_big_uint_int() {
         run_test(&dedent!(
@@ -3422,7 +3332,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_uint_small_double
-    #[should_panic]
     #[test]
     fn gt_dyn_uint_small_double() {
         run_test(&dedent!(
@@ -3434,7 +3343,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_uint_big_double
-    #[should_panic]
     #[test]
     fn not_gt_dyn_uint_big_double() {
         run_test(&dedent!(
@@ -3446,7 +3354,6 @@ mod gt_literal {
     }
 
     // Test: gt_dyn_big_double_uint
-    #[should_panic]
     #[test]
     fn gt_dyn_big_double_uint() {
         run_test(&dedent!(
@@ -3458,7 +3365,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_big_double_int
-    #[should_panic]
     #[test]
     fn not_gt_dyn_big_double_int() {
         run_test(&dedent!(
@@ -3470,7 +3376,6 @@ mod gt_literal {
     }
 
     // Test: not_gt_dyn_small_double_int
-    #[should_panic]
     #[test]
     fn not_gt_dyn_small_double_int() {
         run_test(&dedent!(
@@ -3776,7 +3681,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_int_uint
-    #[should_panic]
     #[test]
     fn lte_dyn_int_uint() {
         run_test(&dedent!(
@@ -3788,7 +3692,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_int_double
-    #[should_panic]
     #[test]
     fn lte_dyn_int_double() {
         run_test(&dedent!(
@@ -3800,7 +3703,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_uint_int
-    #[should_panic]
     #[test]
     fn lte_dyn_uint_int() {
         run_test(&dedent!(
@@ -3812,7 +3714,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_uint_double
-    #[should_panic]
     #[test]
     fn lte_dyn_uint_double() {
         run_test(&dedent!(
@@ -3824,7 +3725,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_double_int
-    #[should_panic]
     #[test]
     fn lte_dyn_double_int() {
         run_test(&dedent!(
@@ -3836,7 +3736,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_double_uint
-    #[should_panic]
     #[test]
     fn lte_dyn_double_uint() {
         run_test(&dedent!(
@@ -3848,7 +3747,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_int_uint
-    #[should_panic]
     #[test]
     fn not_lte_dyn_int_uint() {
         run_test(&dedent!(
@@ -3860,7 +3758,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_int_double
-    #[should_panic]
     #[test]
     fn not_lte_dyn_int_double() {
         run_test(&dedent!(
@@ -3872,7 +3769,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_uint_int
-    #[should_panic]
     #[test]
     fn not_lte_dyn_uint_int() {
         run_test(&dedent!(
@@ -3884,7 +3780,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_uint_double
-    #[should_panic]
     #[test]
     fn not_lte_dyn_uint_double() {
         run_test(&dedent!(
@@ -3896,7 +3791,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_double_int
-    #[should_panic]
     #[test]
     fn not_lte_dyn_double_int() {
         run_test(&dedent!(
@@ -3908,7 +3802,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_double_uint
-    #[should_panic]
     #[test]
     fn not_lte_dyn_double_uint() {
         run_test(&dedent!(
@@ -3920,7 +3813,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_int_big_uint
-    #[should_panic]
     #[test]
     fn lte_dyn_int_big_uint() {
         run_test(&dedent!(
@@ -3932,7 +3824,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_small_int_uint
-    #[should_panic]
     #[test]
     fn lte_dyn_small_int_uint() {
         run_test(&dedent!(
@@ -3944,7 +3835,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_int_big_double
-    #[should_panic]
     #[test]
     fn lte_dyn_int_big_double() {
         run_test(&dedent!(
@@ -3956,7 +3846,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_int_small_lossy_double
-    #[should_panic]
     #[test]
     fn lte_dyn_int_small_lossy_double() {
         run_test(&dedent!(
@@ -3969,7 +3858,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_int_small_lossy_double_less
-    #[should_panic]
     #[test]
     fn not_lte_dyn_int_small_lossy_double_less() {
         run_test(&dedent!(
@@ -3981,7 +3869,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_uint_small_int
-    #[should_panic]
     #[test]
     fn not_lte_dyn_uint_small_int() {
         run_test(&dedent!(
@@ -3993,7 +3880,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_big_uint_int
-    #[should_panic]
     #[test]
     fn not_lte_dyn_big_uint_int() {
         run_test(&dedent!(
@@ -4005,7 +3891,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_uint_small_double
-    #[should_panic]
     #[test]
     fn not_lte_dyn_uint_small_double() {
         run_test(&dedent!(
@@ -4017,7 +3902,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_uint_big_double
-    #[should_panic]
     #[test]
     fn lte_dyn_uint_big_double() {
         run_test(&dedent!(
@@ -4029,7 +3913,6 @@ mod lte_literal {
     }
 
     // Test: not_lte_dyn_big_double_uint
-    #[should_panic]
     #[test]
     fn not_lte_dyn_big_double_uint() {
         run_test(&dedent!(
@@ -4041,7 +3924,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_big_double_int
-    #[should_panic]
     #[test]
     fn lte_dyn_big_double_int() {
         run_test(&dedent!(
@@ -4053,7 +3935,6 @@ mod lte_literal {
     }
 
     // Test: lte_dyn_small_double_int
-    #[should_panic]
     #[test]
     fn lte_dyn_small_double_int() {
         run_test(&dedent!(
@@ -4381,7 +4262,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_int_uint
-    #[should_panic]
     #[test]
     fn gte_dyn_int_uint() {
         run_test(&dedent!(
@@ -4393,7 +4273,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_int_double
-    #[should_panic]
     #[test]
     fn gte_dyn_int_double() {
         run_test(&dedent!(
@@ -4405,7 +4284,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_uint_int
-    #[should_panic]
     #[test]
     fn gte_dyn_uint_int() {
         run_test(&dedent!(
@@ -4417,7 +4295,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_uint_double
-    #[should_panic]
     #[test]
     fn gte_dyn_uint_double() {
         run_test(&dedent!(
@@ -4429,7 +4306,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_double_int
-    #[should_panic]
     #[test]
     fn gte_dyn_double_int() {
         run_test(&dedent!(
@@ -4441,7 +4317,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_double_uint
-    #[should_panic]
     #[test]
     fn gte_dyn_double_uint() {
         run_test(&dedent!(
@@ -4453,7 +4328,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_int_uint
-    #[should_panic]
     #[test]
     fn not_gte_dyn_int_uint() {
         run_test(&dedent!(
@@ -4465,7 +4339,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_int_double
-    #[should_panic]
     #[test]
     fn not_gte_dyn_int_double() {
         run_test(&dedent!(
@@ -4477,7 +4350,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_uint_int
-    #[should_panic]
     #[test]
     fn not_gte_dyn_uint_int() {
         run_test(&dedent!(
@@ -4489,7 +4361,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_uint_double
-    #[should_panic]
     #[test]
     fn not_gte_dyn_uint_double() {
         run_test(&dedent!(
@@ -4501,7 +4372,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_double_int
-    #[should_panic]
     #[test]
     fn not_gte_dyn_double_int() {
         run_test(&dedent!(
@@ -4513,7 +4383,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_double_uint
-    #[should_panic]
     #[test]
     fn not_gte_dyn_double_uint() {
         run_test(&dedent!(
@@ -4525,7 +4394,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_int_big_uint
-    #[should_panic]
     #[test]
     fn not_gte_dyn_int_big_uint() {
         run_test(&dedent!(
@@ -4537,7 +4405,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_small_int_uint
-    #[should_panic]
     #[test]
     fn not_gte_dyn_small_int_uint() {
         run_test(&dedent!(
@@ -4549,7 +4416,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_int_big_lossy_double
-    #[should_panic]
     #[test]
     fn gte_dyn_int_big_lossy_double() {
         run_test(&dedent!(
@@ -4561,7 +4427,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_int_big_double
-    #[should_panic]
     #[test]
     fn not_gte_dyn_int_big_double() {
         run_test(&dedent!(
@@ -4573,7 +4438,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_int_small_lossy_double_equal
-    #[should_panic]
     #[test]
     fn gte_dyn_int_small_lossy_double_equal() {
         run_test(&dedent!(
@@ -4586,7 +4450,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_int_small_lossy_double_greater
-    #[should_panic]
     #[test]
     fn gte_dyn_int_small_lossy_double_greater() {
         run_test(&dedent!(
@@ -4598,7 +4461,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_uint_small_int
-    #[should_panic]
     #[test]
     fn gte_dyn_uint_small_int() {
         run_test(&dedent!(
@@ -4610,7 +4472,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_big_uint_int
-    #[should_panic]
     #[test]
     fn gte_dyn_big_uint_int() {
         run_test(&dedent!(
@@ -4622,7 +4483,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_uint_small_double
-    #[should_panic]
     #[test]
     fn gte_dyn_uint_small_double() {
         run_test(&dedent!(
@@ -4634,7 +4494,6 @@ mod gte_literal {
     }
 
     // Test: not_gte_dyn_uint_big_double
-    #[should_panic]
     #[test]
     fn not_gte_dyn_uint_big_double() {
         run_test(&dedent!(
@@ -4646,7 +4505,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_big_double_uint
-    #[should_panic]
     #[test]
     fn gte_dyn_big_double_uint() {
         run_test(&dedent!(
@@ -4658,7 +4516,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_big_double_int
-    #[should_panic]
     #[test]
     fn gte_dyn_big_double_int() {
         run_test(&dedent!(
@@ -4670,7 +4527,6 @@ mod gte_literal {
     }
 
     // Test: gte_dyn_small_double_int
-    #[should_panic]
     #[test]
     fn gte_dyn_small_double_int() {
         run_test(&dedent!(

@@ -135,7 +135,6 @@ mod index {
     }
 
     // Test: zero_based_uint
-    #[should_panic]
     #[test]
     fn zero_based_uint() {
         run_test(&dedent!(
@@ -364,7 +363,6 @@ mod r#in {
     }
 
     // Test: double_in_ints
-    #[should_panic]
     #[test]
     fn double_in_ints() {
         run_test(&dedent!(
@@ -376,7 +374,6 @@ mod r#in {
     }
 
     // Test: uint_in_ints
-    #[should_panic]
     #[test]
     fn uint_in_ints() {
         run_test(&dedent!(
@@ -388,7 +385,6 @@ mod r#in {
     }
 
     // Test: int_in_doubles
-    #[should_panic]
     #[test]
     fn int_in_doubles() {
         run_test(&dedent!(
@@ -400,7 +396,6 @@ mod r#in {
     }
 
     // Test: uint_in_doubles
-    #[should_panic]
     #[test]
     fn uint_in_doubles() {
         run_test(&dedent!(
@@ -412,7 +407,6 @@ mod r#in {
     }
 
     // Test: int_in_uints
-    #[should_panic]
     #[test]
     fn int_in_uints() {
         run_test(&dedent!(
@@ -424,7 +418,6 @@ mod r#in {
     }
 
     // Test: double_in_uints
-    #[should_panic]
     #[test]
     fn double_in_uints() {
         run_test(&dedent!(

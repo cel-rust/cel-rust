@@ -160,7 +160,6 @@ mod repeat {
     }
 
     // Test: not
-    #[should_panic]
     #[test]
     fn not() {
         run_test(&dedent!(
@@ -173,7 +172,6 @@ mod repeat {
     }
 
     // Test: unary_neg
-    #[should_panic]
     #[test]
     fn unary_neg() {
         run_test(&dedent!(
