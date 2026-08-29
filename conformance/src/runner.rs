@@ -6,7 +6,8 @@
 
 use cel::context::Context;
 use cel::objects::Value as CelValue;
-use cel::{Env, Program};
+use cel::parser::Parser;
+use cel::{Env, Value};
 
 use crate::proto::cel::expr::conformance::test::{simple_test::ResultMatcher, SimpleTest};
 use crate::textproto::parse_textproto_to_prost;
@@ -25,7 +26,12 @@ pub fn run_test(simple_test_textproto: &str) {
         "Type checking not available (check_only test)"
     );
 
-    let program = Program::compile(&test.expr).expect("Failed to compile CEL expression");
+    // Use the parser directly so we can enable optional syntax (`.?`,
+    // `[?…]`, `{?k: v}`), which `Program::compile` leaves off by default.
+    let program = Parser::default()
+        .enable_optional_syntax(true)
+        .parse(&test.expr)
+        .expect("Failed to compile CEL expression");
 
     // Build context with bindings.
     let env = Env::stdlib();
@@ -60,7 +66,7 @@ pub fn run_test(simple_test_textproto: &str) {
         }
     }
 
-    let result = program.execute(&context);
+    let result = Value::resolve(&program, &context);
 
     // Check the result against the expected result.
     match &test.result_matcher {

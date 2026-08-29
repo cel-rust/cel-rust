@@ -28,6 +28,17 @@ impl Val for Optional {
         &super::OPTIONAL_TYPE
     }
 
+    fn equals(&self, other: &dyn Val) -> bool {
+        let Some(other) = other.downcast_ref::<Optional>() else {
+            return false;
+        };
+        match (self.option(), other.option()) {
+            (None, None) => true,
+            (Some(a), Some(b)) => a.equals(b),
+            _ => false,
+        }
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         match &self.0 {
             None => Box::new(Optional(None)),
@@ -274,5 +285,39 @@ mod tests {
     fn optional_or_value_rejects_non_optional_receiver() {
         let err = optional_or_value(vec![non_optional(), non_optional()]).unwrap_err();
         assert!(matches!(err, ExecutionError::NoSuchOverload));
+    }
+
+    #[test]
+    fn equals_two_nones() {
+        assert!(Optional::none().equals(&Optional::none()));
+    }
+
+    #[test]
+    fn equals_same_some() {
+        let a = Optional::of(Box::new(CelInt::from(1)));
+        let b = Optional::of(Box::new(CelInt::from(1)));
+        assert!(a.equals(&b));
+    }
+
+    #[test]
+    fn not_equals_none_vs_some() {
+        let a = Optional::none();
+        let b = Optional::of(Box::new(CelInt::from(1)));
+        assert!(!a.equals(&b));
+        assert!(!b.equals(&a));
+    }
+
+    #[test]
+    fn not_equals_different_somes() {
+        let a = Optional::of(Box::new(CelInt::from(1)));
+        let b = Optional::of(Box::new(CelInt::from(2)));
+        assert!(!a.equals(&b));
+    }
+
+    #[test]
+    fn not_equals_non_optional() {
+        let a = Optional::of(Box::new(CelInt::from(1)));
+        let b = CelInt::from(1);
+        assert!(!a.equals(&b));
     }
 }
