@@ -133,16 +133,19 @@ fn optional_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, E
     let mut args = args;
     args.remove(0)
         .downcast_ref::<Optional>()
-        .expect("must be `CelOptional`")
+        .ok_or(ExecutionError::NoSuchOverload)?
         .option()
         .map(|v| Cow::Owned(v.to_owned()))
         .ok_or_else(|| ExecutionError::function_error("value", "optional.none() dereference"))
 }
 
 fn optional_has_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, OPTIONAL_TYPE, |opt: &Optional| {
-        Ok(Box::new(CelBool::from(opt.option().is_some())))
-    })
+    let has = args[0]
+        .downcast_ref::<Optional>()
+        .ok_or(ExecutionError::NoSuchOverload)?
+        .option()
+        .is_some();
+    Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(has))))
 }
 
 fn optional_or_optional<'a>(
@@ -153,7 +156,7 @@ fn optional_or_optional<'a>(
     let this = args.remove(0);
     if this
         .downcast_ref::<Optional>()
-        .expect("Must be an `Optional`")
+        .ok_or(ExecutionError::NoSuchOverload)?
         .option()
         .is_some()
     {
@@ -171,7 +174,7 @@ fn optional_or_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>
     Ok(args
         .remove(0)
         .downcast_ref::<Optional>()
-        .expect("must be `CelOptional`")
+        .ok_or(ExecutionError::NoSuchOverload)?
         .option()
         .map(|v| Cow::Owned(v.to_owned()))
         .unwrap_or(other))
@@ -230,6 +233,7 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::common::types::{self, CelInt, CelString};
 
     #[test]
@@ -238,5 +242,37 @@ mod tests {
         assert!(types::OPTIONAL_TYPE.is_assignable(&s));
         let i = CelInt::from(42);
         assert!(types::OPTIONAL_TYPE.is_assignable(&i));
+    }
+
+    fn non_optional() -> Cow<'static, dyn Val> {
+        Cow::<dyn Val>::Owned(Box::new(CelInt::from(42)))
+    }
+
+    fn some_optional() -> Cow<'static, dyn Val> {
+        Cow::<dyn Val>::Owned(Box::new(Optional::of(Box::new(CelInt::from(1)))))
+    }
+
+    #[test]
+    fn optional_value_rejects_non_optional_receiver() {
+        let err = optional_value(vec![non_optional()]).unwrap_err();
+        assert!(matches!(err, ExecutionError::NoSuchOverload));
+    }
+
+    #[test]
+    fn optional_has_value_rejects_non_optional_receiver() {
+        let err = optional_has_value(vec![non_optional()]).unwrap_err();
+        assert!(matches!(err, ExecutionError::NoSuchOverload));
+    }
+
+    #[test]
+    fn optional_or_optional_rejects_non_optional_receiver() {
+        let err = optional_or_optional(vec![non_optional(), some_optional()]).unwrap_err();
+        assert!(matches!(err, ExecutionError::NoSuchOverload));
+    }
+
+    #[test]
+    fn optional_or_value_rejects_non_optional_receiver() {
+        let err = optional_or_value(vec![non_optional(), non_optional()]).unwrap_err();
+        assert!(matches!(err, ExecutionError::NoSuchOverload));
     }
 }
