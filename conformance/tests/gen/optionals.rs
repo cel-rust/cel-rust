@@ -103,7 +103,6 @@ mod optionals {
     }
 
     // Test: map_absent_key_absent_field_none
-    #[should_panic]
     #[test]
     fn map_absent_key_absent_field_none() {
         run_test(&dedent!(
@@ -128,7 +127,6 @@ mod optionals {
     }
 
     // Test: map_undefined_entry_hasValue
-    #[should_panic]
     #[test]
     fn map_undefined_entry_hasvalue() {
         run_test(&dedent!(
@@ -210,7 +208,6 @@ mod optionals {
     }
 
     // Test: map_optindex_hasValue
-    #[should_panic]
     #[test]
     fn map_optindex_hasvalue() {
         run_test(&dedent!(
@@ -222,7 +219,6 @@ mod optionals {
     }
 
     // Test: has_map_optindex
-    #[should_panic]
     #[test]
     fn has_map_optindex() {
         run_test(&dedent!(
@@ -234,7 +230,6 @@ mod optionals {
     }
 
     // Test: has_map_optindex_field
-    #[should_panic]
     #[test]
     fn has_map_optindex_field() {
         run_test(&dedent!(
@@ -290,7 +285,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_4
-    #[should_panic]
     #[test]
     fn optional_chaining_4() {
         run_test(&dedent!(
@@ -302,7 +296,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_5
-    #[should_panic]
     #[test]
     fn optional_chaining_5() {
         run_test(&dedent!(
@@ -314,7 +307,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_6
-    #[should_panic]
     #[test]
     fn optional_chaining_6() {
         run_test(&dedent!(
@@ -326,7 +318,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_7
-    #[should_panic]
     #[test]
     fn optional_chaining_7() {
         run_test(&dedent!(
@@ -338,7 +329,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_8
-    #[should_panic]
     #[test]
     fn optional_chaining_8() {
         run_test(&dedent!(
@@ -350,7 +340,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_9
-    #[should_panic]
     #[test]
     fn optional_chaining_9() {
         run_test(&dedent!(
@@ -375,7 +364,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_11
-    #[should_panic]
     #[test]
     fn optional_chaining_11() {
         run_test(&dedent!(
@@ -419,7 +407,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_13
-    #[should_panic]
     #[test]
     fn optional_chaining_13() {
         run_test(&dedent!(
@@ -438,7 +425,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_14
-    #[should_panic]
     #[test]
     fn optional_chaining_14() {
         run_test(&dedent!(
@@ -461,7 +447,6 @@ mod optionals {
     }
 
     // Test: optional_chaining_16
-    #[should_panic]
     #[test]
     fn optional_chaining_16() {
         run_test(&dedent!(
@@ -567,7 +552,6 @@ mod optionals {
     }
 
     // Test: optional_empty_map_optindex_hasValue
-    #[should_panic]
     #[test]
     fn optional_empty_map_optindex_hasvalue() {
         run_test(&dedent!(
@@ -888,7 +872,6 @@ mod optionals {
     }
 
     // Test: map_optional_select_has
-    #[should_panic]
     #[test]
     fn map_optional_select_has() {
         run_test(&dedent!(
