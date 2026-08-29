@@ -249,7 +249,6 @@ mod optionals {
     }
 
     // Test: type
-    #[should_panic]
     #[test]
     fn r#type() {
         run_test(&dedent!(
@@ -804,7 +803,6 @@ mod optionals {
     }
 
     // Test: optional_eq_none_none
-    #[should_panic]
     #[test]
     fn optional_eq_none_none() {
         run_test(&dedent!(
@@ -838,7 +836,6 @@ mod optionals {
     }
 
     // Test: optional_eq_int_int
-    #[should_panic]
     #[test]
     fn optional_eq_int_int() {
         run_test(&dedent!(
@@ -850,7 +847,6 @@ mod optionals {
     }
 
     // Test: optional_ne_none_none
-    #[should_panic]
     #[test]
     fn optional_ne_none_none() {
         run_test(&dedent!(
@@ -884,7 +880,6 @@ mod optionals {
     }
 
     // Test: optional_ne_int_int
-    #[should_panic]
     #[test]
     fn optional_ne_int_int() {
         run_test(&dedent!(

@@ -39,6 +39,7 @@ impl CelType {
                 | "list"
                 | "map"
                 | "null_type"
+                | "optional_type"
                 | "string"
                 | "type"
                 | "uint"
