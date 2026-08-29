@@ -1154,7 +1154,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
     fn visit_Bytes(&mut self, ctx: &BytesContext<'_>) -> Self::Return {
         if let Some(token) = ctx.tok.as_deref() {
             let string = ctx.get_text();
-            match parse::parse_bytes(&string[2..string.len() - 1]) {
+            match parse::parse_bytes(&string) {
                 Ok(bytes) => self
                     .helper
                     .next_expr(token, Expr::Literal(LiteralValue::Bytes(bytes.into()))),
@@ -1496,6 +1496,37 @@ mod tests {
             format!("{err}").contains("reserved identifier"),
             "expected reserved identifier error, got: {err}"
         );
+    }
+
+    #[test]
+    fn reserved_identifiers_are_valid_as_field_selectors() {
+        // Per cel-spec, reserved words CAN be used as field-selector names in
+        // Select expressions (`.as`, `.while`, etc.) — the reserved-id check
+        // only applies to bare identifiers and function names.
+        for kw in &[
+            "as",
+            "break",
+            "const",
+            "continue",
+            "else",
+            "for",
+            "function",
+            "if",
+            "import",
+            "let",
+            "loop",
+            "package",
+            "namespace",
+            "return",
+            "var",
+            "void",
+            "while",
+        ] {
+            let expr = format!("{{ '{kw}': 1 }}.{kw}");
+            Parser::new()
+                .parse(&expr)
+                .unwrap_or_else(|e| panic!("`{expr}` should parse but got: {e}"));
+        }
     }
 
     // Regression test: even counts of `!` or `-` cancel out.  The visitor
