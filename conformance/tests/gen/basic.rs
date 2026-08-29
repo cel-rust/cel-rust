@@ -393,7 +393,6 @@ mod self_eval_nonzeroish {
     }
 
     // Test: self_eval_ascii_escape_seq
-    #[should_panic]
     #[test]
     fn self_eval_ascii_escape_seq() {
         run_test(&dedent!(
