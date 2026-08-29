@@ -39,6 +39,7 @@ harness = false
 [features]
 default = ["regex", "chrono"]
 structs = []
+parser_pratt = []
 bytes = ["dep:bytes"]
 json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
