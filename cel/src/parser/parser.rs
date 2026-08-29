@@ -7,13 +7,14 @@ use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType,
     CalcContext, CalcContextAttrs, ConditionalAndContext, ConditionalOrContext,
     ConstantLiteralContext, ConstantLiteralContextAttrs, CreateListContext, CreateMessageContext,
-    CreateStructContext, DoubleContext, ExprContext, Field_initializer_listContext,
-    GlobalCallContext, IdentContext, IndexContext, IndexContextAttrs, IntContext,
-    ListInitContextAll, LogicalNotContext, LogicalNotContextAttrs, MapInitializerListContextAll,
-    MemberCallContext, MemberCallContextAttrs, MemberExprContext, MemberExprContextAttrs,
-    NegateContext, NegateContextAttrs, NestedContext, NullContext, OptFieldContextAttrs,
-    PrimaryExprContext, PrimaryExprContextAttrs, RelationContext, RelationContextAttrs,
-    SelectContext, SelectContextAttrs, StartContext, StartContextAttrs, StringContext, UintContext,
+    CreateStructContext, DoubleContext, EscapeIdentContextAll, ExprContext,
+    Field_initializer_listContext, GlobalCallContext, IdentContext, IndexContext,
+    IndexContextAttrs, IntContext, ListInitContextAll, LogicalNotContext, LogicalNotContextAttrs,
+    MapInitializerListContextAll, MemberCallContext, MemberCallContextAttrs, MemberExprContext,
+    MemberExprContextAttrs, NegateContext, NegateContextAttrs, NestedContext, NullContext,
+    OptFieldContextAttrs, PrimaryExprContext, PrimaryExprContextAttrs, RelationContext,
+    RelationContextAttrs, SelectContext, SelectContextAttrs, StartContext, StartContextAttrs,
+    StringContext, UintContext,
 };
 use crate::parser::{gen, macros, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
@@ -105,6 +106,7 @@ pub struct Parser {
     max_recursion_depth: u16,
     error_recovery_limit: u32,
     enable_optional_syntax: bool,
+    enable_ident_escape_syntax: bool,
 }
 
 impl Parser {
@@ -118,6 +120,7 @@ impl Parser {
             max_recursion_depth: 96,
             error_recovery_limit: 30,
             enable_optional_syntax: false,
+            enable_ident_escape_syntax: false,
         }
     }
 
@@ -136,6 +139,19 @@ impl Parser {
 
     pub fn enable_optional_syntax(mut self, enable: bool) -> Self {
         self.enable_optional_syntax = enable;
+        self
+    }
+
+    /// Enables backtick-escaped field identifiers (``` `foo.bar` ```).
+    ///
+    /// Only `false` (the default) is implemented today — with the flag off,
+    /// the parser rejects any `` `…` ``-quoted identifier with an
+    /// `"unsupported syntax: '`'"` parse error, matching cel-go's
+    /// `EnableIdentEscapeSyntax(false)` behavior (`parser/parser.go:161`).
+    /// Turning the flag on is not yet wired; it will still reject the
+    /// syntax until the unescape support lands.
+    pub fn enable_ident_escape_syntax(mut self, enable: bool) -> Self {
+        self.enable_ident_escape_syntax = enable;
         self
     }
 
@@ -282,6 +298,18 @@ impl Parser {
                     continue;
                 }
                 Some(ident) => {
+                    if matches!(
+                        ident.as_ref(),
+                        EscapeIdentContextAll::EscapedIdentifierContext(_)
+                    ) && !self.enable_ident_escape_syntax
+                    {
+                        self.report_error::<ParseError, _>(
+                            field.start().deref(),
+                            None,
+                            "unsupported syntax: '`'",
+                        );
+                        continue;
+                    }
                     let field_name = ident.get_text().to_string();
                     let value = self.visit(ctx.values[i].as_ref());
                     let is_optional = match (&field.opt, self.enable_optional_syntax) {
@@ -872,6 +900,17 @@ impl gen::CELVisitorCompat<'_> for Parser {
     fn visit_Select(&mut self, ctx: &SelectContext<'_>) -> Self::Return {
         if let (Some(member), Some(id), Some(op)) = (&ctx.member(), &ctx.id, &ctx.op) {
             let operand = self.visit(member.as_ref());
+            if matches!(
+                id.as_ref(),
+                EscapeIdentContextAll::EscapedIdentifierContext(_)
+            ) && !self.enable_ident_escape_syntax
+            {
+                return self.report_error::<ParseError, _>(
+                    op.as_ref(),
+                    None,
+                    "unsupported syntax: '`'",
+                );
+            }
             let field = id.get_text();
             if let Some(_opt) = &ctx.opt {
                 return if self.enable_optional_syntax {
@@ -1502,6 +1541,20 @@ mod tests {
         assert!(
             format!("{err}").contains("reserved identifier"),
             "expected reserved identifier error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn backtick_field_selector_is_rejected_by_default() {
+        // Per cel-spec (matching cel-go `parser/parser.go:161` with
+        // `EnableIdentEscapeSyntax(false)`), the parser must reject
+        // backtick-quoted field selectors unless the feature is opted in.
+        let err = Parser::new()
+            .parse("{'a/b': 1}.`a/b`")
+            .expect_err("backtick selector must be rejected");
+        assert!(
+            format!("{err}").contains("unsupported syntax: '`'"),
+            "expected `unsupported syntax` error, got: {err}"
         );
     }
 

@@ -426,6 +426,7 @@ fields::quoted_map_fields::field_access_dot
 fields::quoted_map_fields::field_access_slash
 fields::quoted_map_fields::has_field_dash
 fields::quoted_map_fields::has_field_dot
+fields::quoted_map_fields::has_field_slash
 fields::r#in::mixed_numbers_and_keys_absent
 fields::r#in::mixed_numbers_and_keys_present
 integer_math::int64_math::int64_min_negate

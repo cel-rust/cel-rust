@@ -664,6 +664,7 @@ mod quoted_map_fields {
     }
 
     // Test: has_field_slash
+    #[should_panic]
     #[test]
     fn has_field_slash() {
         run_test(&dedent!(
