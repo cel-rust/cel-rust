@@ -27,14 +27,12 @@ impl Deref for Double {
     }
 }
 
-impl super::CelValType for Double {
-    fn cel_type() -> &'static Type {
-        &super::DOUBLE_TYPE
-    }
-}
-
 impl Val for Double {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::DOUBLE_TYPE
     }
 

@@ -85,7 +85,7 @@ pub(crate) use impl_conversions;
 /// The syntax carries the CEL name (defaults to the Rust fn ident), the
 /// overload id (defaults to `"{fn_ident}_{receiver_cel_type_name}"`), the
 /// receiver + argument types (Rust types that implement
-/// [`CelValType`](crate::common::types::CelValType)), and the CEL type of the
+/// [`Val`](crate::common::value::Val)), and the CEL type of the
 /// result.
 ///
 /// # Shape
@@ -162,7 +162,7 @@ macro_rules! add_member_overload {
             // answering to; a mismatch is a bug in the fn, not in the call.
             ::std::debug_assert_eq!(
                 __result.get_type(),
-                <$ret as $crate::common::types::CelValType>::cel_type(),
+                <$ret as $crate::common::value::Val>::cel_type(),
                 "`{}` returned a {}",
                 ::std::stringify!($fn),
                 __result.get_type().name(),
@@ -176,7 +176,7 @@ macro_rules! add_member_overload {
         let __id: ::std::string::String = ::std::format!(
             "{}_{}",
             ::std::stringify!($fn),
-            <$this as $crate::common::types::CelValType>::cel_type().name(),
+            <$this as $crate::common::value::Val>::cel_type().name(),
         );
 
         // Apply overrides. Each trailing `key = "value"` rebinds one local.
@@ -187,9 +187,9 @@ macro_rules! add_member_overload {
         $env.add_member_overload(
             &__name,
             &__id,
-            <$this as $crate::common::types::CelValType>::cel_type().to_owned(),
+            <$this as $crate::common::value::Val>::cel_type().to_owned(),
             ::std::vec![
-                $( <$other as $crate::common::types::CelValType>::cel_type().to_owned() ),*
+                $( <$other as $crate::common::value::Val>::cel_type().to_owned() ),*
             ],
             __wrapper,
         )
@@ -285,7 +285,7 @@ macro_rules! add_overload {
             )?;
             ::std::debug_assert_eq!(
                 __result.get_type(),
-                <$ret as $crate::common::types::CelValType>::cel_type(),
+                <$ret as $crate::common::value::Val>::cel_type(),
                 "`{}` returned a {}",
                 ::std::stringify!($fn),
                 __result.get_type().name(),
@@ -298,7 +298,7 @@ macro_rules! add_overload {
         let __id: ::std::string::String = ::std::format!(
             "{}_{}",
             ::std::stringify!($fn),
-            <$first as $crate::common::types::CelValType>::cel_type().name(),
+            <$first as $crate::common::value::Val>::cel_type().name(),
         );
         $( $crate::__member_overload_option!(__name, __id, $key = $val); )*
 
@@ -306,8 +306,8 @@ macro_rules! add_overload {
             &__name,
             &__id,
             ::std::vec![
-                <$first as $crate::common::types::CelValType>::cel_type().to_owned()
-                $(, <$rest as $crate::common::types::CelValType>::cel_type().to_owned() )*
+                <$first as $crate::common::value::Val>::cel_type().to_owned()
+                $(, <$rest as $crate::common::value::Val>::cel_type().to_owned() )*
             ],
             __wrapper,
         )
@@ -330,7 +330,7 @@ macro_rules! add_overload {
             let __result: $crate::common::value::CowVal<'b, 'v> = $fn()?;
             ::std::debug_assert_eq!(
                 __result.get_type(),
-                <$ret as $crate::common::types::CelValType>::cel_type(),
+                <$ret as $crate::common::value::Val>::cel_type(),
                 "`{}` returned a {}",
                 ::std::stringify!($fn),
                 __result.get_type().name(),

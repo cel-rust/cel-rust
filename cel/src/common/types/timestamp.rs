@@ -22,14 +22,12 @@ impl Timestamp {
     }
 }
 
-impl super::CelValType for Timestamp {
-    fn cel_type() -> &'static Type {
-        &super::TIMESTAMP_TYPE
-    }
-}
-
 impl Val for Timestamp {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::TIMESTAMP_TYPE
     }
 
