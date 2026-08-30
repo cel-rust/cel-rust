@@ -23,9 +23,9 @@ pub(crate) mod type_val;
 pub(crate) mod uint;
 
 use crate::common::traits::TraitSet;
-use crate::common::value::{Builtin, BuiltinRef, Val};
 #[cfg(feature = "chrono")]
-use crate::common::value::{CowVal, StaticVal};
+use crate::common::value::CowVal;
+use crate::common::value::{Builtin, BuiltinRef, Val};
 pub use bool::Bool as CelBool;
 pub use bytes::Bytes as CelBytes;
 pub use double::Double as CelDouble;
@@ -357,6 +357,17 @@ impl Type {
     }
 }
 
+/// Maps a concrete `Val` implementation to its runtime `Type`.
+///
+/// Used by the [`add_member_overload!`](crate::add_member_overload) macro so
+/// the caller can spell out the CEL type of each argument as the Rust type
+/// name (e.g. `String`) rather than referencing the `Type` constant
+/// (`STRING_TYPE`) directly. Implement this trait for any custom `Val` type
+/// that should be usable in that macro.
+pub trait CelValType: Val {
+    fn cel_type() -> &'static Type;
+}
+
 /// Moves a built-in value out of its box without copying it.
 ///
 /// Hands the box back untouched when the value is not one of the built-in
@@ -384,26 +395,6 @@ impl<'v> Builtin<'v> {
             #[cfg(feature = "structs")]
             Builtin::Struct(s) => Box::new(s),
         }
-    }
-}
-
-#[cfg(feature = "chrono")]
-type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
-
-/// Applies `func` to the single `'static` argument of type `A`.
-#[cfg(feature = "chrono")]
-fn unary_fn<'b, 'v, A: StaticVal>(
-    args: Vec<CowVal<'b, 'v>>,
-    type_a: Type,
-    func: UnaryFn<A>,
-) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    let arg = &args[0];
-    match arg.downcast_ref::<A>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: arg.get_type().name().to_string(),
-            want: type_a.name().to_string(),
-        }),
-        Some(arg) => Ok(CowVal::Owned(func(arg)?)),
     }
 }
 
