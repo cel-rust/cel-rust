@@ -237,30 +237,26 @@ fn full_year<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionE
     Ok(Cow::Owned(CelInt::from(this.inner().year() as i64)))
 }
 
-fn timestamp<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::STRING_TYPE, |value: &CelString| {
-        Ok(Box::new(Timestamp::from(
-            chrono::DateTime::parse_from_rfc3339(value.inner())
-                .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
-        )))
-    })
+fn timestamp_from_string<'a>(
+    this: Cow<'a, CelString>,
+) -> Result<Cow<'a, Timestamp>, ExecutionError> {
+    Ok(Cow::Owned(Timestamp::from(
+        chrono::DateTime::parse_from_rfc3339(this.inner())
+            .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
+    )))
+}
+
+fn timestamp_from_timestamp<'a>(
+    this: Cow<'a, Timestamp>,
+) -> Result<Cow<'a, Timestamp>, ExecutionError> {
+    Ok(this)
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "timestamp",
-        "string_to_timestamp",
-        vec![super::STRING_TYPE],
-        timestamp,
-    )
-    .expect("Must be unique");
-    env.add_overload(
-        "timestamp",
-        "timestamp_to_timestamp",
-        vec![super::TIMESTAMP_TYPE],
-        super::noop,
-    )
-    .expect("Must be unique");
+    crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Timestamp,
+        name = "timestamp", id = "string_to_timestamp");
+    crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
+        name = "timestamp", id = "timestamp_to_timestamp");
     crate::add_member_overload!(env, fn full_year: (Timestamp) -> CelInt,
         name = "getFullYear", id = "timestamp_to_year");
     crate::add_member_overload!(env, fn month: (Timestamp) -> CelInt,

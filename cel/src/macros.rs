@@ -216,16 +216,16 @@ macro_rules! __member_overload_extract {
     ($iter:ident, $ty:ty) => {{
         let __arg = $iter.next().ok_or($crate::ExecutionError::NoSuchOverload)?;
         match __arg {
-                ::std::borrow::Cow::Borrowed(v) => ::std::borrow::Cow::Borrowed(
-                    v.downcast_ref::<$ty>()
-                        .ok_or($crate::ExecutionError::NoSuchOverload)?,
-                ),
-                ::std::borrow::Cow::Owned(b) => ::std::borrow::Cow::Owned(*<
-                    ::std::boxed::Box<dyn $crate::common::value::Val>
-                        as $crate::common::value::Downcast
-                >::downcast::<$ty>(b)
-                .map_err(|_| $crate::ExecutionError::NoSuchOverload)?),
-            }
+                    ::std::borrow::Cow::Borrowed(v) => ::std::borrow::Cow::Borrowed(
+                        v.downcast_ref::<$ty>()
+                            .ok_or($crate::ExecutionError::NoSuchOverload)?,
+                    ),
+                    ::std::borrow::Cow::Owned(b) => ::std::borrow::Cow::Owned(*<
+                        ::std::boxed::Box<dyn $crate::common::value::Val>
+                            as $crate::common::value::Downcast
+                    >::downcast::<$ty>(b)
+                    .map_err(|_| $crate::ExecutionError::NoSuchOverload)?),
+                }
     }};
 }
 
@@ -241,4 +241,134 @@ macro_rules! __member_overload_option {
         let $id_bind: ::std::string::String = ::std::string::String::from($val);
     };
 }
+
+/// Register a global (non-member) function overload on an `Env` from a typed
+/// Rust `fn` item, generating the arg-downcast wrapper at expansion time.
+///
+/// Mirrors [`add_member_overload!`] but delegates to `Env::add_overload` and
+/// treats every parameter as a regular arg (no `this`-receiver split).
+///
+/// # Shape
+///
+/// ```ignore
+/// add_overload!(
+///     env,
+///     fn <fn_ident>: (<Arg>*) -> <Ret>
+///     [, name = "<cel-name>"]
+///     [, id   = "<overload-id>"]
+/// );
+/// ```
+///
+/// The referenced fn must have the signature
+/// `for<'a> fn(Cow<'a, Arg>*) -> Result<Cow<'a, Ret>, ExecutionError>`.
+///
+/// Zero-argument overloads are supported: use `()` for the parameter list.
+///
+/// # Default naming
+///
+/// * `name` defaults to the fn ident.
+/// * `id` defaults to `"{fn_ident}_{first_arg_cel_type_name}"` when the
+///   overload takes at least one argument, and to `"{fn_ident}"` when it
+///   takes none.
+///
+/// Either may be overridden via trailing `name = "..."` / `id = "..."`
+/// key-value args, in either order.
+#[macro_export]
+macro_rules! add_overload {
+    // Non-empty arg list.
+    (
+        $env:expr,
+        fn $fn:ident : ( $first:ty $(, $rest:ty )* $(,)? ) -> $ret:ty
+        $(, $key:ident = $val:literal )*
+        $(,)?
+    ) => {{
+        fn __wrapper<'a>(
+            args: ::std::vec::Vec<
+                ::std::borrow::Cow<'a, dyn $crate::common::value::Val>,
+            >,
+        ) -> ::std::result::Result<
+            ::std::borrow::Cow<'a, dyn $crate::common::value::Val>,
+            $crate::ExecutionError,
+        > {
+            let mut __iter = args.into_iter();
+            let __result: ::std::borrow::Cow<'a, $ret> = $fn(
+                $crate::__member_overload_extract!(__iter, $first)
+                $(, $crate::__member_overload_extract!(__iter, $rest) )*
+            )?;
+            ::std::result::Result::Ok(match __result {
+                ::std::borrow::Cow::Borrowed(v) =>
+                    ::std::borrow::Cow::<'a, dyn $crate::common::value::Val>::Borrowed(
+                        v as &dyn $crate::common::value::Val,
+                    ),
+                ::std::borrow::Cow::Owned(v) => {
+                    let __boxed: ::std::boxed::Box<
+                        dyn $crate::common::value::Val,
+                    > = ::std::boxed::Box::new(v);
+                    ::std::borrow::Cow::<'a, dyn $crate::common::value::Val>::Owned(__boxed)
+                }
+            })
+        }
+
+        let __name: ::std::string::String =
+            ::std::string::String::from(::std::stringify!($fn));
+        let __id: ::std::string::String = ::std::format!(
+            "{}_{}",
+            ::std::stringify!($fn),
+            <$first as $crate::common::types::CelValType>::cel_type().name(),
+        );
+        $( $crate::__member_overload_option!(__name, __id, $key = $val); )*
+
+        $env.add_overload(
+            &__name,
+            &__id,
+            ::std::vec![
+                <$first as $crate::common::types::CelValType>::cel_type().to_owned()
+                $(, <$rest as $crate::common::types::CelValType>::cel_type().to_owned() )*
+            ],
+            __wrapper,
+        )
+        .expect("Must be unique id");
+    }};
+
+    // Zero-argument overload.
+    (
+        $env:expr,
+        fn $fn:ident : ( ) -> $ret:ty
+        $(, $key:ident = $val:literal )*
+        $(,)?
+    ) => {{
+        fn __wrapper<'a>(
+            _args: ::std::vec::Vec<
+                ::std::borrow::Cow<'a, dyn $crate::common::value::Val>,
+            >,
+        ) -> ::std::result::Result<
+            ::std::borrow::Cow<'a, dyn $crate::common::value::Val>,
+            $crate::ExecutionError,
+        > {
+            let __result: ::std::borrow::Cow<'a, $ret> = $fn()?;
+            ::std::result::Result::Ok(match __result {
+                ::std::borrow::Cow::Borrowed(v) =>
+                    ::std::borrow::Cow::<'a, dyn $crate::common::value::Val>::Borrowed(
+                        v as &dyn $crate::common::value::Val,
+                    ),
+                ::std::borrow::Cow::Owned(v) => {
+                    let __boxed: ::std::boxed::Box<
+                        dyn $crate::common::value::Val,
+                    > = ::std::boxed::Box::new(v);
+                    ::std::borrow::Cow::<'a, dyn $crate::common::value::Val>::Owned(__boxed)
+                }
+            })
+        }
+
+        let __name: ::std::string::String =
+            ::std::string::String::from(::std::stringify!($fn));
+        let __id: ::std::string::String =
+            ::std::string::String::from(::std::stringify!($fn));
+        $( $crate::__member_overload_option!(__name, __id, $key = $val); )*
+
+        $env.add_overload(&__name, &__id, ::std::vec::Vec::new(), __wrapper)
+            .expect("Must be unique id");
+    }};
+}
+
 pub(crate) use impl_handler;

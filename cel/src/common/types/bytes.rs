@@ -1,6 +1,6 @@
 use crate::common::traits::{Sizer, Zeroer};
 use crate::common::types::{CelInt, CelString, Type};
-use crate::common::value::{Downcast, Val};
+use crate::common::value::Val;
 use crate::Value;
 use crate::{common::traits, ExecutionError};
 use std::borrow::Cow;
@@ -135,48 +135,21 @@ impl<'a> TryFrom<&'a dyn Val> for &'a [u8] {
     }
 }
 
-fn bytes_to_bytes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    Ok(args.remove(0))
+fn bytes_from_bytes<'a>(this: Cow<'a, Bytes>) -> Result<Cow<'a, Bytes>, ExecutionError> {
+    Ok(this)
 }
 
-fn string_to_bytes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let arg = args.remove(0).into_owned();
-    match arg.downcast::<CelString>() {
-        Ok(arg) => {
-            let value = arg.into_inner().into_bytes();
-            Ok(Cow::<dyn Val>::Owned(Box::new(Bytes::from(value))))
-        }
-        Err(e) => Err(ExecutionError::UnexpectedType {
-            got: e.get_type().name().to_owned(),
-            want: "Bytes".to_owned(),
-        }),
-    }
+fn bytes_from_string<'a>(this: Cow<'a, CelString>) -> Result<Cow<'a, Bytes>, ExecutionError> {
+    Ok(Cow::Owned(Bytes::from(this.inner().as_bytes().to_vec())))
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "bytes",
-        "string_to_bytes",
-        vec![super::STRING_TYPE],
-        string_to_bytes,
-    )
-    .expect("Must be unique id");
-    env.add_overload(
-        "bytes",
-        "bytes_to_bytes",
-        vec![super::BYTES_TYPE],
-        bytes_to_bytes,
-    )
-    .expect("Must be unique id");
-    env.add_overload(
-        "size",
-        "size_bytes",
-        vec![super::BYTES_TYPE],
-        traits::adapter::sizer_size,
-    )
-    .expect("Must be unique id");
+    crate::add_overload!(env, fn bytes_from_string: (CelString) -> Bytes,
+        name = "bytes", id = "string_to_bytes");
+    crate::add_overload!(env, fn bytes_from_bytes: (Bytes) -> Bytes,
+        name = "bytes", id = "bytes_to_bytes");
+    crate::add_overload!(env, fn size: (Bytes) -> CelInt,
+        name = "size", id = "size_bytes");
     crate::add_member_overload!(env, fn size: (Bytes) -> CelInt,
         id = "bytes_size");
 }

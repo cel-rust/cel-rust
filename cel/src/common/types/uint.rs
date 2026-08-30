@@ -1,6 +1,6 @@
 use crate::common::traits::{Adder, Comparer, Divider, Modder, Multiplier, Subtractor, Zeroer};
-use crate::common::types::{CelDouble, CelInt, CelString, Kind, Type};
-use crate::common::value::{Downcast, Val};
+use crate::common::types::{CelDouble, CelInt, CelString, Type};
+use crate::common::value::Val;
 use crate::{ExecutionError, Value};
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -24,6 +24,12 @@ impl Deref for UInt {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl super::CelValType for UInt {
+    fn cel_type() -> &'static Type {
+        &super::UINT_TYPE
     }
 }
 
@@ -247,50 +253,37 @@ impl<'a> TryFrom<&'a dyn Val> for &'a u64 {
     }
 }
 
-fn uint<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let arg = args.remove(0).into_owned();
-    let ret: Result<Box<UInt>, Box<dyn Val>> = match arg.get_type().kind() {
-        Kind::UInt => arg.downcast::<UInt>(),
-        Kind::Int => arg
-            .downcast::<CelInt>()
-            .map(|arg| Box::new(UInt::from(*arg.inner() as u64))),
-        Kind::Double => arg
-            .downcast::<CelDouble>()
-            .map(|arg| Box::new(UInt::from(*arg.inner() as u64))),
-        Kind::String => match arg.downcast::<CelString>() {
-            Err(arg) => Err(arg),
-            Ok(arg) => match arg.inner().parse::<u64>() {
-                Ok(arg) => Ok(Box::new(UInt::from(arg))),
-                Err(e) => {
-                    return Err(ExecutionError::FunctionError {
-                        function: "int".to_owned(),
-                        message: format!("string parse error: {e}"),
-                    })
-                }
-            },
-        },
-        _ => Err(arg),
-    };
+fn uint_from_uint<'a>(this: Cow<'a, UInt>) -> Result<Cow<'a, UInt>, ExecutionError> {
+    Ok(this)
+}
 
-    match ret {
-        Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
-        Err(arg) => Err(ExecutionError::FunctionError {
-            function: "double".to_owned(),
-            message: format!("cannot convert {arg:?} to double"),
-        }),
-    }
+fn uint_from_int<'a>(this: Cow<'a, CelInt>) -> Result<Cow<'a, UInt>, ExecutionError> {
+    Ok(Cow::Owned(UInt::from(*this.inner() as u64)))
+}
+
+fn uint_from_double<'a>(this: Cow<'a, CelDouble>) -> Result<Cow<'a, UInt>, ExecutionError> {
+    Ok(Cow::Owned(UInt::from(*this.inner() as u64)))
+}
+
+fn uint_from_string<'a>(this: Cow<'a, CelString>) -> Result<Cow<'a, UInt>, ExecutionError> {
+    this.inner()
+        .parse::<u64>()
+        .map(|v| Cow::Owned(UInt::from(v)))
+        .map_err(|e| ExecutionError::FunctionError {
+            function: "uint".to_owned(),
+            message: format!("string parse error: {e}"),
+        })
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload("uint", "uint64_to_uint64", vec![super::UINT_TYPE], uint)
-        .expect("Must be unique id");
-    env.add_overload("uint", "int64_to_uint64", vec![super::INT_TYPE], uint)
-        .expect("Must be unique id");
-    env.add_overload("uint", "double_to_uint64", vec![super::DOUBLE_TYPE], uint)
-        .expect("Must be unique id");
-    env.add_overload("uint", "string_to_uint64", vec![super::STRING_TYPE], uint)
-        .expect("Must be unique id");
+    crate::add_overload!(env, fn uint_from_uint: (UInt) -> UInt,
+        name = "uint", id = "uint64_to_uint64");
+    crate::add_overload!(env, fn uint_from_int: (CelInt) -> UInt,
+        name = "uint", id = "int64_to_uint64");
+    crate::add_overload!(env, fn uint_from_double: (CelDouble) -> UInt,
+        name = "uint", id = "double_to_uint64");
+    crate::add_overload!(env, fn uint_from_string: (CelString) -> UInt,
+        name = "uint", id = "string_to_uint64");
 }
 
 #[cfg(test)]

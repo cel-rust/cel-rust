@@ -163,29 +163,23 @@ fn hours<'a>(this: Cow<'a, Duration>) -> Result<Cow<'a, CelInt>, ExecutionError>
     Ok(Cow::Owned(CelInt::from(this.inner().num_hours())))
 }
 
-fn duration<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::STRING_TYPE, |value: &CelString| {
-        let (_, duration) = crate::duration::parse_duration(value.inner())
-            .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
-        Ok(Box::new(Duration::from(duration)))
-    })
+fn duration_from_string<'a>(this: Cow<'a, CelString>) -> Result<Cow<'a, Duration>, ExecutionError> {
+    let (_, d) = crate::duration::parse_duration(this.inner())
+        .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
+    Ok(Cow::Owned(Duration::from(d)))
+}
+
+fn duration_from_duration<'a>(
+    this: Cow<'a, Duration>,
+) -> Result<Cow<'a, Duration>, ExecutionError> {
+    Ok(this)
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "duration",
-        "string_to_duration",
-        vec![super::STRING_TYPE],
-        duration,
-    )
-    .expect("Must be unique");
-    env.add_overload(
-        "duration",
-        "duration_to_duration",
-        vec![super::DURATION_TYPE],
-        super::noop,
-    )
-    .expect("Must be unique");
+    crate::add_overload!(env, fn duration_from_string: (CelString) -> Duration,
+        name = "duration", id = "string_to_duration");
+    crate::add_overload!(env, fn duration_from_duration: (Duration) -> Duration,
+        name = "duration", id = "duration_to_duration");
     crate::add_member_overload!(env, fn hours: (Duration) -> CelInt,
         name = "getHours", id = "duration_to_hours");
     crate::add_member_overload!(env, fn minutes: (Duration) -> CelInt,
