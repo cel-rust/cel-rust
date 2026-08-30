@@ -355,17 +355,6 @@ impl Type {
     }
 }
 
-/// Maps a concrete `Val` implementation to its runtime `Type`.
-///
-/// Used by the [`add_member_overload!`](crate::add_member_overload) macro so
-/// the caller can spell out the CEL type of each argument as the Rust type
-/// name (e.g. `String`) rather than referencing the `Type` constant
-/// (`STRING_TYPE`) directly. Implement this trait for any custom `Val` type
-/// that should be usable in that macro.
-pub trait CelValType: Val {
-    fn cel_type() -> &'static Type;
-}
-
 /// Moves a built-in value out of its box without copying it.
 ///
 /// Hands the box back untouched when the value is not one of the built-in

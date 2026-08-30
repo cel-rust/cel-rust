@@ -50,14 +50,12 @@ impl Deref for Bytes<'_> {
     }
 }
 
-impl super::CelValType for Bytes<'_> {
-    fn cel_type() -> &'static Type {
-        &super::BYTES_TYPE
-    }
-}
-
 impl<'a> Val for Bytes<'a> {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::BYTES_TYPE
     }
 

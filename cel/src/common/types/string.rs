@@ -56,14 +56,12 @@ impl Deref for String<'_> {
     }
 }
 
-impl super::CelValType for String<'_> {
-    fn cel_type() -> &'static Type {
-        &super::STRING_TYPE
-    }
-}
-
 impl<'a> Val for String<'a> {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::STRING_TYPE
     }
 

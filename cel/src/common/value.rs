@@ -50,6 +50,29 @@ use std::ops::Deref;
 pub trait Val: Debug + Send + Sync {
     fn get_type(&self) -> &Type;
 
+    /// Returns the runtime `Type` of this Val as a statically-callable
+    /// associated function (no `self`).
+    ///
+    /// Used by the [`add_overload!`](crate::add_overload) and
+    /// [`add_member_overload!`](crate::add_member_overload) macros to
+    /// derive the argument / return types of a registered overload from
+    /// the Rust type of a fn parameter.
+    ///
+    /// The default panics; override on any Val type that should be usable
+    /// in those macros. Types whose runtime `Type` varies per-instance
+    /// (e.g. `Struct`, whose type name depends on the value) cannot
+    /// provide a meaningful implementation and inherit the default.
+    fn cel_type() -> &'static Type
+    where
+        Self: Sized,
+    {
+        panic!(
+            "`Val::cel_type()` not implemented for `{}` — override on your Val impl to use it \
+             with the overload-registration macros",
+            std::any::type_name::<Self>()
+        )
+    }
+
     // Accessors for operators that produce values carry a `'v` that `Self`
     // outlives, so that the operator's result can be bounded by the
     // operand's own lifetime rather than by the borrow `'b`.
