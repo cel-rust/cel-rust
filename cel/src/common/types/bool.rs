@@ -31,6 +31,10 @@ impl Deref for Bool {
 
 impl Val for Bool {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::BOOL_TYPE
     }
 
