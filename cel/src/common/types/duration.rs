@@ -26,14 +26,12 @@ impl Deref for Duration {
     }
 }
 
-impl super::CelValType for Duration {
-    fn cel_type() -> &'static Type {
-        &super::DURATION_TYPE
-    }
-}
-
 impl Val for Duration {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::DURATION_TYPE
     }
 
