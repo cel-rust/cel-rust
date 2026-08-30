@@ -1,5 +1,4 @@
 use crate::common::traits;
-use crate::ExecutionError;
 use std::any::Any;
 use std::borrow::Cow;
 
@@ -378,27 +377,4 @@ fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
         return Ok(temp_container.take().unwrap());
     }
     Err(value)
-}
-
-type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
-
-fn unary_fn<'a, A: Val>(
-    args: Vec<Cow<'a, dyn Val>>,
-    type_a: Type,
-    func: UnaryFn<A>,
-) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let arg = &args[0];
-    match arg.downcast_ref::<A>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: arg.get_type().name().to_string(),
-            want: type_a.name().to_string(),
-        }),
-        Some(arg) => Ok(Cow::<dyn Val>::Owned(func(arg)?)),
-    }
-}
-
-fn noop<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let ts = args.remove(0);
-    Ok(ts)
 }
