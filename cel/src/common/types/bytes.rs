@@ -50,6 +50,12 @@ impl Deref for Bytes<'_> {
     }
 }
 
+impl super::CelValType for Bytes<'_> {
+    fn cel_type() -> &'static Type {
+        &super::BYTES_TYPE
+    }
+}
+
 impl<'a> Val for Bytes<'a> {
     fn get_type(&self) -> &Type {
         &super::BYTES_TYPE
@@ -243,14 +249,12 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         traits::adapter::sizer_size,
     )
     .expect("Must be unique id");
-    env.add_member_overload(
-        "size",
-        "bytes_size",
-        super::BYTES_TYPE,
-        vec![],
-        traits::adapter::sizer_size,
-    )
-    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn size: (Bytes) -> CelInt,
+        id = "bytes_size");
+}
+
+fn size<'b, 'v>(this: &Bytes<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(CowVal::owned(this.size()))
 }
 
 #[cfg(test)]

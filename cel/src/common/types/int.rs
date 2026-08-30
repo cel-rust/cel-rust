@@ -28,6 +28,12 @@ impl Deref for Int {
     }
 }
 
+impl super::CelValType for Int {
+    fn cel_type() -> &'static Type {
+        &super::INT_TYPE
+    }
+}
+
 impl Val for Int {
     fn get_type(&self) -> &Type {
         &super::INT_TYPE
