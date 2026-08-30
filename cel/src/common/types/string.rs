@@ -30,6 +30,12 @@ impl Deref for String {
     }
 }
 
+impl super::CelValType for String {
+    fn cel_type() -> &'static Type {
+        &super::STRING_TYPE
+    }
+}
+
 impl Val for String {
     fn get_type(&self) -> &Type {
         &super::STRING_TYPE
@@ -137,62 +143,43 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
     }
 }
 
-fn string_contains<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let target = &args[0];
-    let arg = &args[1];
-    match target.downcast_ref::<String>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: target.get_type().name().to_string(),
-            want: super::STRING_TYPE.name().to_string(),
-        }),
-        Some(s) => match arg.downcast_ref::<String>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg.get_type().name().to_string(),
-                want: super::STRING_TYPE.name().to_string(),
-            }),
-            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
-                s.contains(needle.inner()),
-            )))),
-        },
-    }
+fn contains<'a>(
+    this: Cow<'a, String>,
+    needle: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    Ok(Cow::Owned(CelBool::from(this.contains(needle.inner()))))
 }
 
-fn ends_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |target: &String, needle: &String| {
-            Ok(Box::new(CelBool::from(target.ends_with(needle.inner()))))
-        },
-    )
+fn ends_with<'a>(
+    this: Cow<'a, String>,
+    needle: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    Ok(Cow::Owned(CelBool::from(this.ends_with(needle.inner()))))
 }
 
-fn starts_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |target: &String, needle: &String| {
-            Ok(Box::new(CelBool::from(target.starts_with(needle.inner()))))
-        },
-    )
+fn starts_with<'a>(
+    this: Cow<'a, String>,
+    needle: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    Ok(Cow::Owned(CelBool::from(this.starts_with(needle.inner()))))
+}
+
+fn size<'a>(this: Cow<'a, String>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned((this.inner().len() as i64).into()))
 }
 
 #[cfg(feature = "regex")]
-fn matches<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |this: &String, regex: &String| match regex::Regex::new(regex.inner()) {
-            Ok(re) => Ok(Box::new(CelBool::from(re.is_match(this.inner())))),
-            Err(err) => Err(ExecutionError::FunctionError {
-                function: "matches".to_string(),
-                message: format!("'{}' not a valid regex:\n{err}", regex.inner()),
-            }),
-        },
-    )
+fn matches<'a>(
+    this: Cow<'a, String>,
+    re: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    match regex::Regex::new(re.inner()) {
+        Ok(re) => Ok(Cow::Owned(CelBool::from(re.is_match(this.inner())))),
+        Err(err) => Err(ExecutionError::FunctionError {
+            function: "matches".to_string(),
+            message: format!("'{}' not a valid regex:\n{err}", re.inner()),
+        }),
+    }
 }
 
 fn string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
@@ -273,22 +260,9 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         .expect("Must be unique id");
     }
 
-    env.add_member_overload(
-        "contains",
-        "contains_string",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        string_contains,
-    )
-    .expect("Must be unique id");
-    env.add_member_overload(
-        "endsWith",
-        "ends_with_string",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        ends_with_string,
-    )
-    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn contains: (String, String) -> CelBool);
+    crate::add_member_overload!(env, fn ends_with: (String, String) -> CelBool,
+        name = "endsWith");
     env.add_overload(
         "size",
         "size_string",
@@ -296,31 +270,12 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         traits::adapter::sizer_size,
     )
     .expect("Must be unique id");
-    env.add_member_overload(
-        "size",
-        "string_size",
-        super::STRING_TYPE,
-        vec![],
-        traits::adapter::sizer_size,
-    )
-    .expect("Must be unique id");
-    env.add_member_overload(
-        "startsWith",
-        "starts_with_string",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        starts_with_string,
-    )
-    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn size: (String) -> CelInt,
+        id = "string_size");
+    crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool,
+        name = "startsWith");
     #[cfg(feature = "regex")]
-    env.add_member_overload(
-        "matches",
-        "matches",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        matches,
-    )
-    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn matches: (String, String) -> CelBool);
 }
 
 #[cfg(test)]
