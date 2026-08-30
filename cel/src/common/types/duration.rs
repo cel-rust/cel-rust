@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
-use crate::common::types::{CelInt, Type};
+use crate::common::types::{CelInt, CelString, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use std::any::Any;
@@ -186,29 +186,21 @@ fn hours<'b, 'v>(this: &Duration) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().num_hours())))
 }
 
-fn duration<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    super::string_fn(args, |value: &str| {
-        let (_, duration) = crate::duration::parse_duration(value)
-            .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
-        Ok(Box::new(Duration::from(duration)))
-    })
+fn duration_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let (_, d) = crate::duration::parse_duration(this.inner())
+        .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
+    Ok(CowVal::owned(Duration::from(d)))
+}
+
+fn duration_from_duration<'b, 'v>(this: &Duration) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(CowVal::owned(*this))
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "duration",
-        "string_to_duration",
-        vec![super::STRING_TYPE],
-        duration,
-    )
-    .expect("Must be unique");
-    env.add_overload(
-        "duration",
-        "duration_to_duration",
-        vec![super::DURATION_TYPE],
-        super::noop,
-    )
-    .expect("Must be unique");
+    crate::add_overload!(env, fn duration_from_string: (CelString) -> Duration,
+        name = "duration", id = "string_to_duration");
+    crate::add_overload!(env, fn duration_from_duration: (Duration) -> Duration,
+        name = "duration", id = "duration_to_duration");
     crate::add_member_overload!(env, fn hours: (Duration) -> CelInt,
         name = "getHours", id = "duration_to_hours");
     crate::add_member_overload!(env, fn minutes: (Duration) -> CelInt,

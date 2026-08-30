@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
-use crate::common::types::{CelDuration, CelInt, Type};
+use crate::common::types::{CelDuration, CelInt, CelString, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use chrono::{Datelike, Days, Months};
@@ -258,30 +258,22 @@ fn full_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError>
     Ok(CowVal::owned(CelInt::from(this.inner().year() as i64)))
 }
 
-fn timestamp<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    super::string_fn(args, |value: &str| {
-        Ok(Box::new(Timestamp::from(
-            chrono::DateTime::parse_from_rfc3339(value)
-                .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
-        )))
-    })
+fn timestamp_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(CowVal::owned(Timestamp::from(
+        chrono::DateTime::parse_from_rfc3339(this.inner())
+            .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
+    )))
+}
+
+fn timestamp_from_timestamp<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(CowVal::owned(this.clone()))
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "timestamp",
-        "string_to_timestamp",
-        vec![super::STRING_TYPE],
-        timestamp,
-    )
-    .expect("Must be unique");
-    env.add_overload(
-        "timestamp",
-        "timestamp_to_timestamp",
-        vec![super::TIMESTAMP_TYPE],
-        super::noop,
-    )
-    .expect("Must be unique");
+    crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Timestamp,
+        name = "timestamp", id = "string_to_timestamp");
+    crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
+        name = "timestamp", id = "timestamp_to_timestamp");
     crate::add_member_overload!(env, fn full_year: (Timestamp) -> CelInt,
         name = "getFullYear", id = "timestamp_to_year");
     crate::add_member_overload!(env, fn month: (Timestamp) -> CelInt,

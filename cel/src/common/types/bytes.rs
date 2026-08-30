@@ -211,10 +211,6 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a [u8] {
     }
 }
 
-fn bytes_to_bytes<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(args.remove(0))
-}
-
 fn string_to_bytes<'b, 'v>(
     mut args: Vec<CowVal<'b, 'v>>,
 ) -> Result<CowVal<'b, 'v>, ExecutionError> {
@@ -228,6 +224,7 @@ fn string_to_bytes<'b, 'v>(
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    // Hand-written: both keep the caller's bytes in place. See `string_to_bytes`.
     env.add_overload(
         "bytes",
         "string_to_bytes",
@@ -239,16 +236,11 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         "bytes",
         "bytes_to_bytes",
         vec![super::BYTES_TYPE],
-        bytes_to_bytes,
+        super::noop,
     )
     .expect("Must be unique id");
-    env.add_overload(
-        "size",
-        "size_bytes",
-        vec![super::BYTES_TYPE],
-        traits::adapter::sizer_size,
-    )
-    .expect("Must be unique id");
+    crate::add_overload!(env, fn size: (Bytes) -> CelInt,
+        name = "size", id = "size_bytes");
     crate::add_member_overload!(env, fn size: (Bytes) -> CelInt,
         id = "bytes_size");
 }

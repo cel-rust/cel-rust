@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Divider, Multiplier, Negator, Subtractor, Zeroer};
-use crate::common::types::{CelInt, CelString, CelUInt, Kind, Type};
+use crate::common::types::{CelInt, CelString, CelUInt, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use std::any::Any;
@@ -24,6 +24,12 @@ impl Deref for Double {
 
     fn deref(&self) -> &Self::Target {
         &self.0
+    }
+}
+
+impl super::CelValType for Double {
+    fn cel_type() -> &'static Type {
+        &super::DOUBLE_TYPE
     }
 }
 
@@ -227,57 +233,37 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a f64 {
     }
 }
 
-fn double<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    let arg = args.remove(0);
-    if arg.downcast_ref::<Double>().is_some() {
-        return Ok(arg);
-    }
-    let converted: Option<f64> =
-        match arg.get_type().kind() {
-            Kind::Int => arg.downcast_ref::<CelInt>().map(|i| *i.inner() as f64),
-            Kind::UInt => arg.downcast_ref::<CelUInt>().map(|u| *u.inner() as f64),
-            Kind::String => {
-                match arg.downcast_ref::<CelString>() {
-                    None => None,
-                    Some(s) => Some(s.inner().parse::<f64>().map_err(|e| {
-                        ExecutionError::FunctionError {
-                            function: "double".to_owned(),
-                            message: format!("string parse error: {e}"),
-                        }
-                    })?),
-                }
-            }
-            _ => None,
-        };
+fn double_from_double<'b, 'v>(this: &Double) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(CowVal::owned(*this))
+}
 
-    match converted {
-        Some(value) => Ok(CowVal::owned(Double::from(value))),
-        None => Err(ExecutionError::FunctionError {
+fn double_from_int<'b, 'v>(this: &CelInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(CowVal::owned(Double::from(*this.inner() as f64)))
+}
+
+fn double_from_uint<'b, 'v>(this: &CelUInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(CowVal::owned(Double::from(*this.inner() as f64)))
+}
+
+fn double_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    this.inner()
+        .parse::<f64>()
+        .map(|v| CowVal::owned(Double::from(v)))
+        .map_err(|e| ExecutionError::FunctionError {
             function: "double".to_owned(),
-            message: format!("cannot convert {:?} to double", arg.as_ref()),
-        }),
-    }
+            message: format!("string parse error: {e}"),
+        })
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "double",
-        "double_to_double",
-        vec![super::DOUBLE_TYPE],
-        double,
-    )
-    .expect("Must be unique id");
-    env.add_overload("double", "int64_to_double", vec![super::INT_TYPE], double)
-        .expect("Must be unique id");
-    env.add_overload("double", "uint64_to_double", vec![super::UINT_TYPE], double)
-        .expect("Must be unique id");
-    env.add_overload(
-        "double",
-        "string_to_double",
-        vec![super::STRING_TYPE],
-        double,
-    )
-    .expect("Must be unique id");
+    crate::add_overload!(env, fn double_from_double: (Double) -> Double,
+        name = "double", id = "double_to_double");
+    crate::add_overload!(env, fn double_from_int: (CelInt) -> Double,
+        name = "double", id = "int64_to_double");
+    crate::add_overload!(env, fn double_from_uint: (CelUInt) -> Double,
+        name = "double", id = "uint64_to_double");
+    crate::add_overload!(env, fn double_from_string: (CelString) -> Double,
+        name = "double", id = "string_to_double");
 }
 
 #[cfg(test)]

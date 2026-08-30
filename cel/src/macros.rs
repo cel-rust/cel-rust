@@ -221,4 +221,132 @@ macro_rules! __member_overload_option {
         let $id_bind: ::std::string::String = ::std::string::String::from($val);
     };
 }
+
+/// Register a global (non-member) function overload on an `Env` from a typed
+/// Rust `fn` item, generating the arg-downcast wrapper at expansion time.
+///
+/// Mirrors [`add_member_overload!`] but delegates to `Env::add_overload` and
+/// treats every parameter as a regular arg (no `this`-receiver split).
+///
+/// # Shape
+///
+/// ```ignore
+/// add_overload!(
+///     env,
+///     fn <fn_ident>: (<Arg>*) -> <Ret>
+///     [, name = "<cel-name>"]
+///     [, id   = "<overload-id>"]
+/// );
+/// ```
+///
+/// The referenced fn must have the signature
+/// `for<'b, 'v> fn(&Arg*) -> Result<CowVal<'b, 'v>, ExecutionError>`. As with
+/// [`add_member_overload!`], the arguments arrive by reference, so the result
+/// cannot borrow from them.
+///
+/// Zero-argument overloads are supported: use `()` for the parameter list.
+///
+/// # Default naming
+///
+/// * `name` defaults to the fn ident.
+/// * `id` defaults to `"{fn_ident}_{first_arg_cel_type_name}"` when the
+///   overload takes at least one argument, and to `"{fn_ident}"` when it
+///   takes none.
+///
+/// Either may be overridden via trailing `name = "..."` / `id = "..."`
+/// key-value args, in either order.
+#[macro_export]
+macro_rules! add_overload {
+    // Non-empty arg list.
+    (
+        $env:expr,
+        fn $fn:ident : ( $first:ty $(, $rest:ty )* $(,)? ) -> $ret:ty
+        $(, $key:ident = $val:literal )*
+        $(,)?
+    ) => {{
+        fn __wrapper<'b, 'v>(
+            args: ::std::vec::Vec<$crate::common::value::CowVal<'b, 'v>>,
+        ) -> ::std::result::Result<
+            $crate::common::value::CowVal<'b, 'v>,
+            $crate::ExecutionError,
+        > {
+            let __no_overload = || {
+                $crate::ExecutionError::no_such_overload(
+                    ::std::stringify!($fn),
+                    args.iter()
+                        .map(|a| a.get_type().name().to_owned())
+                        .collect(),
+                )
+            };
+            let mut __at = 0usize;
+            let __result: $crate::common::value::CowVal<'b, 'v> = $fn(
+                $crate::__member_overload_extract!(args, __at, $first, __no_overload)
+                $(, $crate::__member_overload_extract!(args, __at, $rest, __no_overload) )*
+            )?;
+            ::std::debug_assert_eq!(
+                __result.get_type(),
+                <$ret as $crate::common::types::CelValType>::cel_type(),
+                "`{}` returned a {}",
+                ::std::stringify!($fn),
+                __result.get_type().name(),
+            );
+            ::std::result::Result::Ok(__result)
+        }
+
+        let __name: ::std::string::String =
+            ::std::string::String::from(::std::stringify!($fn));
+        let __id: ::std::string::String = ::std::format!(
+            "{}_{}",
+            ::std::stringify!($fn),
+            <$first as $crate::common::types::CelValType>::cel_type().name(),
+        );
+        $( $crate::__member_overload_option!(__name, __id, $key = $val); )*
+
+        $env.add_overload(
+            &__name,
+            &__id,
+            ::std::vec![
+                <$first as $crate::common::types::CelValType>::cel_type().to_owned()
+                $(, <$rest as $crate::common::types::CelValType>::cel_type().to_owned() )*
+            ],
+            __wrapper,
+        )
+        .expect("Must be unique id");
+    }};
+
+    // Zero-argument overload.
+    (
+        $env:expr,
+        fn $fn:ident : ( ) -> $ret:ty
+        $(, $key:ident = $val:literal )*
+        $(,)?
+    ) => {{
+        fn __wrapper<'b, 'v>(
+            _args: ::std::vec::Vec<$crate::common::value::CowVal<'b, 'v>>,
+        ) -> ::std::result::Result<
+            $crate::common::value::CowVal<'b, 'v>,
+            $crate::ExecutionError,
+        > {
+            let __result: $crate::common::value::CowVal<'b, 'v> = $fn()?;
+            ::std::debug_assert_eq!(
+                __result.get_type(),
+                <$ret as $crate::common::types::CelValType>::cel_type(),
+                "`{}` returned a {}",
+                ::std::stringify!($fn),
+                __result.get_type().name(),
+            );
+            ::std::result::Result::Ok(__result)
+        }
+
+        let __name: ::std::string::String =
+            ::std::string::String::from(::std::stringify!($fn));
+        let __id: ::std::string::String =
+            ::std::string::String::from(::std::stringify!($fn));
+        $( $crate::__member_overload_option!(__name, __id, $key = $val); )*
+
+        $env.add_overload(&__name, &__id, ::std::vec::Vec::new(), __wrapper)
+            .expect("Must be unique id");
+    }};
+}
+
 pub(crate) use impl_handler;
