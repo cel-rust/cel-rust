@@ -353,6 +353,17 @@ impl Type {
     }
 }
 
+/// Maps a concrete `Val` implementation to its runtime `Type`.
+///
+/// Used by the [`add_member_overload!`](crate::add_member_overload) macro so
+/// the caller can spell out the CEL type of each argument as the Rust type
+/// name (e.g. `String`) rather than referencing the `Type` constant
+/// (`STRING_TYPE`) directly. Implement this trait for any custom `Val` type
+/// that should be usable in that macro.
+pub trait CelValType: Val {
+    fn cel_type() -> &'static Type;
+}
+
 /// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`
 /// Will return `Result::Ok` if the type check succeeded with the actual Box to the
 /// `Box<T>`. `Result::Err` with the `Box<dyn Val>` back to the caller should the type check
@@ -370,7 +381,6 @@ fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
 }
 
 type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
-type BinaryFn<A, B> = fn(&A, &B) -> Result<Box<dyn Val>, ExecutionError>;
 
 fn unary_fn<'a, A: Val>(
     args: Vec<Cow<'a, dyn Val>>,
@@ -384,29 +394,6 @@ fn unary_fn<'a, A: Val>(
             want: type_a.name().to_string(),
         }),
         Some(arg) => Ok(Cow::<dyn Val>::Owned(func(arg)?)),
-    }
-}
-
-fn binary_fn<'a, A: Val, B: Val>(
-    args: Vec<Cow<'a, dyn Val>>,
-    type_a: Type,
-    type_b: Type,
-    func: BinaryFn<A, B>,
-) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let arg1 = &args[0];
-    let arg2 = &args[1];
-    match arg1.downcast_ref::<A>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: arg1.get_type().name().to_string(),
-            want: type_a.name().to_string(),
-        }),
-        Some(arg1) => match arg2.downcast_ref::<B>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg2.get_type().name().to_string(),
-                want: type_b.name().to_string(),
-            }),
-            Some(arg2) => Ok(Cow::<dyn Val>::Owned(func(arg1, arg2)?)),
-        },
     }
 }
 
