@@ -27,14 +27,12 @@ impl Deref for UInt {
     }
 }
 
-impl super::CelValType for UInt {
-    fn cel_type() -> &'static Type {
-        &super::UINT_TYPE
-    }
-}
-
 impl Val for UInt {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::UINT_TYPE
     }
 

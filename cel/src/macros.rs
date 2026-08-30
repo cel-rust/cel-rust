@@ -106,7 +106,7 @@ pub(crate) use impl_conversions;
 /// The syntax carries the CEL name (defaults to the Rust fn ident), the
 /// overload id (defaults to `"{fn_ident}_{first_arg_cel_type_name}"`), the
 /// receiver + argument types (Rust types that implement
-/// [`CelValType`](crate::common::types::CelValType)), and the return type.
+/// [`Val`](crate::common::value::Val)), and the return type.
 ///
 /// # Shape
 ///
@@ -186,7 +186,7 @@ macro_rules! add_member_overload {
         let __id: ::std::string::String = ::std::format!(
             "{}_{}",
             ::std::stringify!($fn),
-            <$this as $crate::common::types::CelValType>::cel_type().name(),
+            <$this as $crate::common::value::Val>::cel_type().name(),
         );
 
         // Apply overrides. Each trailing `key = "value"` rebinds one local.
@@ -197,9 +197,9 @@ macro_rules! add_member_overload {
         $env.add_member_overload(
             &__name,
             &__id,
-            <$this as $crate::common::types::CelValType>::cel_type().to_owned(),
+            <$this as $crate::common::value::Val>::cel_type().to_owned(),
             ::std::vec![
-                $( <$other as $crate::common::types::CelValType>::cel_type().to_owned() ),*
+                $( <$other as $crate::common::value::Val>::cel_type().to_owned() ),*
             ],
             __wrapper,
         )
@@ -216,16 +216,16 @@ macro_rules! __member_overload_extract {
     ($iter:ident, $ty:ty) => {{
         let __arg = $iter.next().ok_or($crate::ExecutionError::NoSuchOverload)?;
         match __arg {
-                    ::std::borrow::Cow::Borrowed(v) => ::std::borrow::Cow::Borrowed(
-                        v.downcast_ref::<$ty>()
-                            .ok_or($crate::ExecutionError::NoSuchOverload)?,
-                    ),
-                    ::std::borrow::Cow::Owned(b) => ::std::borrow::Cow::Owned(*<
-                        ::std::boxed::Box<dyn $crate::common::value::Val>
-                            as $crate::common::value::Downcast
-                    >::downcast::<$ty>(b)
-                    .map_err(|_| $crate::ExecutionError::NoSuchOverload)?),
-                }
+                                    ::std::borrow::Cow::Borrowed(v) => ::std::borrow::Cow::Borrowed(
+                                        v.downcast_ref::<$ty>()
+                                            .ok_or($crate::ExecutionError::NoSuchOverload)?,
+                                    ),
+                                    ::std::borrow::Cow::Owned(b) => ::std::borrow::Cow::Owned(*<
+                                        ::std::boxed::Box<dyn $crate::common::value::Val>
+                                            as $crate::common::value::Downcast
+                                    >::downcast::<$ty>(b)
+                                    .map_err(|_| $crate::ExecutionError::NoSuchOverload)?),
+                                }
     }};
 }
 
@@ -314,7 +314,7 @@ macro_rules! add_overload {
         let __id: ::std::string::String = ::std::format!(
             "{}_{}",
             ::std::stringify!($fn),
-            <$first as $crate::common::types::CelValType>::cel_type().name(),
+            <$first as $crate::common::value::Val>::cel_type().name(),
         );
         $( $crate::__member_overload_option!(__name, __id, $key = $val); )*
 
@@ -322,8 +322,8 @@ macro_rules! add_overload {
             &__name,
             &__id,
             ::std::vec![
-                <$first as $crate::common::types::CelValType>::cel_type().to_owned()
-                $(, <$rest as $crate::common::types::CelValType>::cel_type().to_owned() )*
+                <$first as $crate::common::value::Val>::cel_type().to_owned()
+                $(, <$rest as $crate::common::value::Val>::cel_type().to_owned() )*
             ],
             __wrapper,
         )
