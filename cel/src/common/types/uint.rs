@@ -252,12 +252,36 @@ fn uint<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionEr
     let arg = args.remove(0).into_owned();
     let ret: Result<Box<UInt>, Box<dyn Val>> = match arg.get_type().kind() {
         Kind::UInt => arg.downcast::<UInt>(),
-        Kind::Int => arg
-            .downcast::<CelInt>()
-            .map(|arg| Box::new(UInt::from(*arg.inner() as u64))),
-        Kind::Double => arg
-            .downcast::<CelDouble>()
-            .map(|arg| Box::new(UInt::from(*arg.inner() as u64))),
+        Kind::Int => match arg.downcast::<CelInt>() {
+            Err(arg) => Err(arg),
+            Ok(arg) => match u64::try_from(*arg.inner()) {
+                Ok(value) => Ok(Box::new(UInt::from(value))),
+                Err(_) => {
+                    return Err(ExecutionError::FunctionError {
+                        function: "uint".to_owned(),
+                        message: "unsigned integer overflow".to_owned(),
+                    });
+                }
+            },
+        },
+        Kind::Double => match arg.downcast::<CelDouble>() {
+            Err(arg) => Err(arg),
+            Ok(arg) => {
+                let value = *arg.inner();
+                // Double to uint conversions are limited to [0, maxUint).
+                // 'u64::MAX as f64' rounds up to 2^64 and the largest double below that
+                // is 2^64 - 2^11, so the check also keeps 'value as u64' from saturating.
+                // NaN, -infinity and infinity will also be rejected.
+                if !(value >= 0.0 && value < (u64::MAX as f64)) {
+                    return Err(ExecutionError::FunctionError {
+                        function: "uint".to_owned(),
+                        message: "unsigned integer overflow".to_owned(),
+                    });
+                }
+
+                Ok(Box::new(UInt::from(value as u64)))
+            }
+        },
         Kind::String => match arg.downcast::<CelString>() {
             Err(arg) => Err(arg),
             Ok(arg) => match arg.inner().parse::<u64>() {
@@ -295,9 +319,12 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 
 #[cfg(test)]
 mod tests {
-    use crate::common::{
-        types::{CelDouble, CelInt, CelString, CelUInt},
-        value::Val,
+    use crate::{
+        common::{
+            types::{CelDouble, CelInt, CelString, CelUInt},
+            value::Val,
+        },
+        Context, Program,
     };
 
     #[test]
@@ -310,5 +337,82 @@ mod tests {
         assert!(!uint.equals(&CelDouble::from(42.2)));
         assert!(!uint.equals(&CelDouble::from(f64::NAN)));
         assert!(!uint.equals(&CelString::from("42")));
+    }
+
+    #[test]
+    fn test_conversion_boundaries() {
+        let context = Context::default();
+
+        // uint(double) -> uint
+        let program = Program::compile("uint(0.0)").unwrap();
+        let value = program.execute(&context).unwrap();
+        assert_eq!(value, 0u64.into());
+
+        // uint(double) -> uint
+        // For double upper boundary we cannot test u64::MAX (2^64 - 1) since f64
+        // cannot hold that integer value. The closest integer value below is:
+        // 2^64 - 2^11 == 18446744073709549568
+        let program = Program::compile("uint(18446744073709549568.0)").unwrap();
+        let value = program.execute(&context).unwrap();
+        assert_eq!(value, 18446744073709549568u64.into());
+
+        // uint(int) -> uint
+        let program = Program::compile("uint(0)").unwrap();
+        let value = program.execute(&context).unwrap();
+        assert_eq!(value, 0u64.into());
+
+        // uint(int) -> uint
+        // i64::MAX == 2^63 - 1 == 9223372036854775807
+        let program = Program::compile("uint(9223372036854775807)").unwrap();
+        let value = program.execute(&context).unwrap();
+        assert_eq!(value, 9223372036854775807u64.into());
+    }
+
+    #[test]
+    fn test_conversion_errors() {
+        let context = Context::default();
+
+        let program = Program::compile("uint(-1)").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "uint(-1) should return error, got {result:?}"
+        );
+
+        let program = Program::compile("uint(-1.0)").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "uint(-1.0) should return error, got {result:?}"
+        );
+
+        // (u64::MAX + 1) == 2^64 == 18446744073709551616
+        let program = Program::compile("uint(18446744073709551616.0)").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "uint(18446744073709551616.0) should return error, got {result:?}"
+        );
+
+        let program = Program::compile("uint(double('NaN'))").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "uint(double('NaN')) should return error, got {result:?}"
+        );
+
+        let program = Program::compile("uint(double('infinity'))").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "uint(double('infinity')) should return error, got {result:?}"
+        );
+
+        let program = Program::compile("uint(double('-infinity'))").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "uint(double('-infinity')) should return error, got {result:?}"
+        );
     }
 }
