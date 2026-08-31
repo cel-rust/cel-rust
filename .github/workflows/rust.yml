@@ -28,10 +28,19 @@ jobs:
         run: cargo clippy --all-features --all-targets -- -D warnings
       - name: Run tests
         run: |
-          cargo test --verbose
-          cargo test --verbose --features json
-          cargo test --verbose --features regex
-          cargo test --verbose --features chrono
+          cargo test -p cel --verbose
+          cargo test -p cel --verbose --features json
+          cargo test -p cel --verbose --features regex
+          cargo test -p cel --verbose --features chrono
+          cargo test -p cel --verbose --features structs
+  conformance:
+    name: Conformance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+      - name: Run conformance tests
+        run: cargo test -p conformance --release
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest

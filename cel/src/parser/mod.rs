@@ -10,6 +10,12 @@ mod macros;
 mod parse;
 #[allow(non_snake_case)]
 mod parser;
+#[cfg(feature = "parser_pratt")]
+#[doc(hidden)]
+pub mod pratt_parser;
 
 pub use parser::*;
+#[cfg(feature = "parser_pratt")]
+#[doc(hidden)]
+pub use pratt_parser::PrattParser;
 pub use references::ExpressionReferences;

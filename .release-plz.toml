@@ -20,5 +20,11 @@ release = false
 publish = false
 changelog_update = false
 
+[[package]]
+name = "conformance"
+release = false
+publish = false
+changelog_update = false
+
 [changelog]
 protect_breaking_commits = true # always include commits with breaking changes in the changelog

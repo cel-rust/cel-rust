@@ -28,6 +28,17 @@ impl Val for Optional {
         &super::OPTIONAL_TYPE
     }
 
+    fn equals(&self, other: &dyn Val) -> bool {
+        let Some(other) = other.downcast_ref::<Optional>() else {
+            return false;
+        };
+        match (self.option(), other.option()) {
+            (None, None) => true,
+            (Some(a), Some(b)) => a.equals(b),
+            _ => false,
+        }
+    }
+
     fn clone_as_boxed(&self) -> Box<dyn Val> {
         match &self.0 {
             None => Box::new(Optional(None)),
@@ -130,30 +141,39 @@ fn optional_of_non_zero_value<'a>(
 fn optional_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     // TODO: This can be optimized to avoid cloning and "just" pass the `Cow`
     // but we either need to deal with the `Arc` case or wait until that's all ripped out!
+    let overload_error =
+        ExecutionError::overload_for_values("value", args.iter().map(|arg| arg.as_ref()), true);
     let mut args = args;
     args.remove(0)
         .downcast_ref::<Optional>()
-        .expect("must be `CelOptional`")
+        .ok_or(overload_error)?
         .option()
         .map(|v| Cow::Owned(v.to_owned()))
         .ok_or_else(|| ExecutionError::function_error("value", "optional.none() dereference"))
 }
 
 fn optional_has_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, OPTIONAL_TYPE, |opt: &Optional| {
-        Ok(Box::new(CelBool::from(opt.option().is_some())))
-    })
+    let overload_error =
+        ExecutionError::overload_for_values("hasValue", args.iter().map(|arg| arg.as_ref()), true);
+    let has = args[0]
+        .downcast_ref::<Optional>()
+        .ok_or(overload_error)?
+        .option()
+        .is_some();
+    Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(has))))
 }
 
 fn optional_or_optional<'a>(
     args: Vec<Cow<'a, dyn Val>>,
 ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    let overload_error =
+        ExecutionError::overload_for_values("or", args.iter().map(|arg| arg.as_ref()), true);
     let mut args = args;
     let other = args.remove(1);
     let this = args.remove(0);
     if this
         .downcast_ref::<Optional>()
-        .expect("Must be an `Optional`")
+        .ok_or(overload_error)?
         .option()
         .is_some()
     {
@@ -166,12 +186,14 @@ fn optional_or_optional<'a>(
 fn optional_or_value<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
     // TODO: This can be optimized to avoid cloning and "just" pass the `Cow`
     // but we either need to deal with the `Arc` case or wait until that's all ripped out!
+    let overload_error =
+        ExecutionError::overload_for_values("orValue", args.iter().map(|arg| arg.as_ref()), true);
     let mut args = args;
     let other = args.remove(1);
     Ok(args
         .remove(0)
         .downcast_ref::<Optional>()
-        .expect("must be `CelOptional`")
+        .ok_or(overload_error)?
         .option()
         .map(|v| Cow::Owned(v.to_owned()))
         .unwrap_or(other))
@@ -230,6 +252,7 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::common::types::{self, CelInt, CelString};
 
     #[test]
@@ -238,5 +261,91 @@ mod tests {
         assert!(types::OPTIONAL_TYPE.is_assignable(&s));
         let i = CelInt::from(42);
         assert!(types::OPTIONAL_TYPE.is_assignable(&i));
+    }
+
+    fn non_optional() -> Cow<'static, dyn Val> {
+        Cow::<dyn Val>::Owned(Box::new(CelInt::from(42)))
+    }
+
+    fn some_optional() -> Cow<'static, dyn Val> {
+        Cow::<dyn Val>::Owned(Box::new(Optional::of(Box::new(CelInt::from(1)))))
+    }
+
+    #[test]
+    fn optional_value_rejects_non_optional_receiver() {
+        let err = optional_value(vec![non_optional()]).unwrap_err();
+        let ExecutionError::NoSuchOverload(overload) = err else {
+            panic!("expected a no-such-overload error");
+        };
+        assert_eq!(overload.function(), "value");
+        assert_eq!(overload.argument_types(), ["int"]);
+        assert!(overload.is_member_function());
+    }
+
+    #[test]
+    fn optional_has_value_rejects_non_optional_receiver() {
+        let err = optional_has_value(vec![non_optional()]).unwrap_err();
+        let ExecutionError::NoSuchOverload(overload) = err else {
+            panic!("expected a no-such-overload error");
+        };
+        assert_eq!(overload.function(), "hasValue");
+        assert_eq!(overload.argument_types(), ["int"]);
+        assert!(overload.is_member_function());
+    }
+
+    #[test]
+    fn optional_or_optional_rejects_non_optional_receiver() {
+        let err = optional_or_optional(vec![non_optional(), some_optional()]).unwrap_err();
+        let ExecutionError::NoSuchOverload(overload) = err else {
+            panic!("expected a no-such-overload error");
+        };
+        assert_eq!(overload.function(), "or");
+        assert_eq!(overload.argument_types(), ["int", "optional_type"]);
+        assert!(overload.is_member_function());
+    }
+
+    #[test]
+    fn optional_or_value_rejects_non_optional_receiver() {
+        let err = optional_or_value(vec![non_optional(), non_optional()]).unwrap_err();
+        let ExecutionError::NoSuchOverload(overload) = err else {
+            panic!("expected a no-such-overload error");
+        };
+        assert_eq!(overload.function(), "orValue");
+        assert_eq!(overload.argument_types(), ["int", "int"]);
+        assert!(overload.is_member_function());
+    }
+
+    #[test]
+    fn equals_two_nones() {
+        assert!(Optional::none().equals(&Optional::none()));
+    }
+
+    #[test]
+    fn equals_same_some() {
+        let a = Optional::of(Box::new(CelInt::from(1)));
+        let b = Optional::of(Box::new(CelInt::from(1)));
+        assert!(a.equals(&b));
+    }
+
+    #[test]
+    fn not_equals_none_vs_some() {
+        let a = Optional::none();
+        let b = Optional::of(Box::new(CelInt::from(1)));
+        assert!(!a.equals(&b));
+        assert!(!b.equals(&a));
+    }
+
+    #[test]
+    fn not_equals_different_somes() {
+        let a = Optional::of(Box::new(CelInt::from(1)));
+        let b = Optional::of(Box::new(CelInt::from(2)));
+        assert!(!a.equals(&b));
+    }
+
+    #[test]
+    fn not_equals_non_optional() {
+        let a = Optional::of(Box::new(CelInt::from(1)));
+        let b = CelInt::from(1);
+        assert!(!a.equals(&b));
     }
 }

@@ -19,6 +19,7 @@ pub(crate) mod string;
 pub(crate) mod r#struct;
 #[cfg(feature = "chrono")]
 pub(crate) mod timestamp;
+pub(crate) mod type_val;
 pub(crate) mod uint;
 
 use crate::common::traits::TraitSet;
@@ -39,6 +40,7 @@ pub use r#struct::Struct as CelStruct;
 pub use string::String as CelString;
 #[cfg(feature = "chrono")]
 pub use timestamp::Timestamp as CelTimestamp;
+pub use type_val::CelType;
 pub use uint::UInt as CelUInt;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]

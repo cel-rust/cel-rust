@@ -1,3 +1,4 @@
+use crate::common::types::CelType;
 use crate::common::value::Val;
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
@@ -176,7 +177,8 @@ impl<'a> Context<'a> {
                     variables
                         .get(name)
                         .map(|v| Cow::<dyn Val>::Borrowed(v.as_ref()))
-                }),
+                })
+                .or_else(|| CelType::for_ident(name).map(|t| Cow::<dyn Val>::Owned(Box::new(t)))),
         }
     }
 

@@ -898,6 +898,9 @@ impl TryFrom<&dyn Val> for Value {
                     ),
                 }))
             }
+            Kind::Type => Ok(Value::String(Arc::new(
+                v.downcast_ref::<CelType>().unwrap().name().to_string(),
+            ))),
             Kind::Opaque => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
                 None => v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
                 Some(opt) => {
@@ -1130,11 +1133,6 @@ impl Value {
                         operators::OPT_SELECT => {
                             let operand = Value::resolve_val(&call.args[0], ctx)?;
                             let field_literal = Value::resolve_val(&call.args[1], ctx)?;
-                            let overload_error = ExecutionError::overload_for_values(
-                                &call.func_name,
-                                [operand.as_ref(), field_literal.as_ref()],
-                                false,
-                            );
                             let field = match field_literal.get_type().kind() {
                                 Kind::String => field_literal
                                     .downcast_ref::<CelString>()
@@ -1146,31 +1144,23 @@ impl Value {
                                     ))
                                 }
                             };
-                            return Ok(Cow::<dyn Val>::Owned(Box::new(
-                                if let Some(opt) = operand.as_ref().downcast_ref::<CelOptional>() {
-                                    opt.map(|operand| {
-                                        operand
-                                            .as_indexer()
-                                            .map(|i| {
-                                                i.get(field)
-                                                    .map(|v| v.clone_as_boxed())
-                                                    .unwrap_or(CelOptional::none().clone_as_boxed())
-                                            })
-                                            .unwrap_or(CelOptional::none().clone_as_boxed())
-                                    })
+                            // Unwrap outer optional if present — a `None`
+                            // short-circuits to `Optional::none()`. Otherwise
+                            // the operand is the target itself. A missing
+                            // key/field maps to `Optional::none()` per
+                            // cel-spec (mirrors OPT_INDEX semantics).
+                            let target: Option<&dyn Val> =
+                                if let Some(opt) = operand.downcast_ref::<CelOptional>() {
+                                    opt.option()
                                 } else {
-                                    CelOptional::of(
-                                        operand
-                                            .as_indexer()
-                                            .ok_or_else(|| overload_error.clone())?
-                                            .get(field)
-                                            .map_err(|error| {
-                                                error.with_overload_context(overload_error)
-                                            })?
-                                            .clone_as_boxed(),
-                                    )
-                                },
-                            )));
+                                    Some(operand.as_ref())
+                                };
+                            let result = target
+                                .and_then(|v| v.as_indexer())
+                                .and_then(|i| i.get(field).ok())
+                                .map(|v| CelOptional::of(v.clone_as_boxed()))
+                                .unwrap_or_else(CelOptional::none);
+                            return Ok(Cow::<dyn Val>::Owned(Box::new(result)));
                         }
                         // END OF SPECIAL CASES
 
@@ -1453,6 +1443,47 @@ impl Value {
                 let key: CelString = select.field.as_str().into();
                 let overload_error =
                     ExecutionError::overload_for_values("_._", [left.as_ref(), &key], false);
+
+                // Plain `.field` on an `Optional` propagates optional-ness
+                // per cel-spec — matches cel-go `applyQualifiers` at
+                // `interpreter/attributes.go:1259` where an initial optional
+                // operand makes the whole qualifier chain optional. `has()`
+                // (test=true) on the same shape returns Bool(false) when the
+                // chain is empty.
+                if let Some(opt) = left.downcast_ref::<CelOptional>() {
+                    // Optional::none() short-circuits — the chain stops.
+                    // Otherwise unwrap and access the field. A missing key on
+                    // a real container maps to Optional::none(); a field
+                    // access on a value that isn't a container at all
+                    // (Null, Int, …) is an error, matching cel-go's
+                    // `errorOnBadPresenceTest=true` mode which the cel-spec
+                    // conformance runner enables (see
+                    // `interpreter/attributes.go:1382` and
+                    // `conformance/conformance_test.go:87`).
+                    return match opt.option() {
+                        None => {
+                            if select.test {
+                                Ok(bool(false))
+                            } else {
+                                Ok(Cow::<dyn Val>::Owned(Box::new(CelOptional::none())))
+                            }
+                        }
+                        Some(inner) => {
+                            let indexer = inner.as_indexer().ok_or_else(|| {
+                                ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
+                            })?;
+                            if select.test {
+                                Ok(bool(indexer.get(&key).is_ok()))
+                            } else {
+                                let result = match indexer.get(&key) {
+                                    Ok(v) => CelOptional::of(v.clone_as_boxed()),
+                                    Err(_) => CelOptional::none(),
+                                };
+                                Ok(Cow::<dyn Val>::Owned(Box::new(result)))
+                            }
+                        }
+                    };
+                }
 
                 if select.test {
                     match left.get_type().kind() {
