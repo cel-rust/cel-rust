@@ -281,8 +281,8 @@ fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionErr
     match ret {
         Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
         Err(arg) => Err(ExecutionError::FunctionError {
-            function: "double".to_owned(),
-            message: format!("cannot convert {arg:?} to double"),
+            function: "int".to_owned(),
+            message: format!("cannot convert {arg:?} to int"),
         }),
     }
 }

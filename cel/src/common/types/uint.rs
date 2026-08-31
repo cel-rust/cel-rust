@@ -288,7 +288,7 @@ fn uint<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionEr
                 Ok(arg) => Ok(Box::new(UInt::from(arg))),
                 Err(e) => {
                     return Err(ExecutionError::FunctionError {
-                        function: "int".to_owned(),
+                        function: "uint".to_owned(),
                         message: format!("string parse error: {e}"),
                     })
                 }
@@ -300,8 +300,8 @@ fn uint<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionEr
     match ret {
         Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
         Err(arg) => Err(ExecutionError::FunctionError {
-            function: "double".to_owned(),
-            message: format!("cannot convert {arg:?} to double"),
+            function: "uint".to_owned(),
+            message: format!("cannot convert {arg:?} to uint"),
         }),
     }
 }
