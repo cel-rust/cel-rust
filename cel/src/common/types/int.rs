@@ -231,12 +231,38 @@ fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionErr
     let arg = args.remove(0).into_owned();
     let ret: Result<Box<Int>, Box<dyn Val>> = match arg.get_type().kind() {
         Kind::Int => arg.downcast::<Int>(),
-        Kind::UInt => arg
-            .downcast::<CelUInt>()
-            .map(|arg| Box::new(Int::from(*arg.inner() as i64))),
-        Kind::Double => arg
-            .downcast::<CelDouble>()
-            .map(|arg| Box::new(Int::from(*arg.inner() as i64))),
+        Kind::UInt => match arg.downcast::<CelUInt>() {
+            Err(arg) => Err(arg),
+            Ok(arg) => match i64::try_from(*arg.inner()) {
+                Ok(value) => Ok(Box::new(Int::from(value))),
+                Err(_) => {
+                    return Err(ExecutionError::FunctionError {
+                        function: "int".to_owned(),
+                        message: "integer overflow".to_owned(),
+                    });
+                }
+            },
+        },
+        Kind::Double => match arg.downcast::<CelDouble>() {
+            Err(arg) => Err(arg),
+            Ok(arg) => {
+                let value = *arg.inner();
+                // Double to int conversions are limited to (minInt, maxInt) non-inclusive.
+                // 'i64::MAX as f64' rounds up to 2^63, and the largest double below that
+                // is 2^63 - 2^10, so the check also keeps 'value as i64' from saturating.
+                // 'i64::MIN as f64' is exactly -(2^63), so the exclusive lower bound
+                // rejects a double that i64 could actually hold. NaN, -infinity and
+                // infinity will also be rejected.
+                if !(value > (i64::MIN as f64) && value < (i64::MAX as f64)) {
+                    return Err(ExecutionError::FunctionError {
+                        function: "int".to_owned(),
+                        message: "integer overflow".to_owned(),
+                    });
+                }
+
+                Ok(Box::new(Int::from(value as i64)))
+            }
+        },
         Kind::String => match arg.downcast::<CelString>() {
             Err(arg) => Err(arg),
             Ok(arg) => match arg.inner().parse::<i64>() {
@@ -255,8 +281,8 @@ fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionErr
     match ret {
         Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
         Err(arg) => Err(ExecutionError::FunctionError {
-            function: "double".to_owned(),
-            message: format!("cannot convert {arg:?} to double"),
+            function: "int".to_owned(),
+            message: format!("cannot convert {arg:?} to int"),
         }),
     }
 }
@@ -277,6 +303,7 @@ mod tests {
     use crate::common::traits::Comparer;
     use crate::common::types::{CelDouble, CelInt, CelString, CelUInt};
     use crate::common::value::Val;
+    use crate::{Context, Program};
     use std::cmp::Ordering::{Equal, Greater, Less};
 
     #[test]
@@ -300,5 +327,92 @@ mod tests {
         assert!(!int.equals(&CelDouble::from(f64::NAN)));
         assert!(!neg.equals(&CelDouble::from(f64::NAN)));
         assert!(!int.equals(&CelString::from("42")));
+    }
+
+    #[test]
+    fn test_conversion_boundaries() {
+        let context = Context::default();
+
+        // int(double) -> int
+        // Accepted doubles are those in (-2^63, 2^63) exclusive. The upper bound
+        // is 2^63 rather than i64::MAX because f64 cannot hold i64::MAX.
+        // The largest double below 2^63 is:
+        // 2^63 - 2^10 == 9223372036854774784
+        let program = Program::compile("int(9223372036854774784.0)").unwrap();
+        let value = program.execute(&context).unwrap();
+        assert_eq!(value, 9223372036854774784i64.into());
+
+        // int(double) -> int
+        // The smallest double above -2^63 is:
+        // -(2^63) + 2^10 == -9223372036854774784
+        let program = Program::compile("int(-9223372036854774784.0)").unwrap();
+        let value = program.execute(&context).unwrap();
+        assert_eq!(value, (-9223372036854774784i64).into());
+
+        // int(uint) -> int
+        // i64::MAX == (2^63 - 1) is the largest uint that still fits in an int
+        let program = Program::compile("int(9223372036854775807u)").unwrap();
+        let value = program.execute(&context).unwrap();
+        assert_eq!(value, 9223372036854775807i64.into());
+    }
+
+    #[test]
+    fn test_conversion_errors() {
+        let context = Context::default();
+
+        // int(double) -> int
+        // -2^63 is exactly representable as f64 and equals i64::MIN, but the
+        // lower bound is exclusive, so it should not convert:
+        // -(2^63) == -9223372036854775808
+        let program = Program::compile("int(-9223372036854775808.0)").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "int(-9223372036854775808.0) should return error, got {result:?}"
+        );
+
+        // int(double) -> int
+        // i64::MAX == 2^63 - 1 == 9223372036854775807 cannot be held by f64,
+        // so this literal rounds up to 2^63, which is outside the accepted range.
+        let program = Program::compile("int(9223372036854775807.0)").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "int(9223372036854775807.0) should return error, got {result:?}"
+        );
+
+        // int(double) -> int
+        let program = Program::compile("int(double('NaN'))").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "int(double('NaN')) should return error, got {result:?}"
+        );
+
+        // int(double) -> int
+        let program = Program::compile("int(double('infinity'))").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "int(double('infinity')) should return error, got {result:?}"
+        );
+
+        // int(double) -> int
+        let program = Program::compile("int(double('-infinity'))").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "int(double('-infinity')) should return error, got {result:?}"
+        );
+
+        // int(uint) -> int
+        // One above the largest uint that fits in an int:
+        // (i64::MAX + 1) == 2^63 == 9223372036854775808
+        let program = Program::compile("int(9223372036854775808u)").unwrap();
+        let result = program.execute(&context);
+        assert!(
+            result.is_err(),
+            "int(9223372036854775808u) should return error, got {result:?}"
+        );
     }
 }
