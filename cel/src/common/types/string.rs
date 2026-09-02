@@ -84,7 +84,7 @@ impl Comparer for String {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
             Ok(self.0.cmp(&rhs.0))
         } else {
-            Err(ExecutionError::NoSuchOverload)
+            Err(ExecutionError::values_not_comparable(self, rhs))
         }
     }
 }

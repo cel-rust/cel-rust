@@ -899,13 +899,41 @@ mod tests {
     #[test]
     fn no_bool_coercion() {
         [
-            ("string || bool", "'' || false", "No such overload"),
-            ("int || bool", "1 || false", "No such overload"),
-            ("int || bool", "1u || false", "No such overload"),
-            ("float || bool", "0.1|| false", "No such overload"),
-            ("list || bool", "[] || false", "No such overload"),
-            ("map || bool", "{} || false", "No such overload"),
-            ("null || bool", "null || false", "No such overload"),
+            (
+                "string || bool",
+                "'' || false",
+                "found no matching overload for '_||_' applied to '(string, bool)'",
+            ),
+            (
+                "int || bool",
+                "1 || false",
+                "found no matching overload for '_||_' applied to '(int, bool)'",
+            ),
+            (
+                "uint || bool",
+                "1u || false",
+                "found no matching overload for '_||_' applied to '(uint, bool)'",
+            ),
+            (
+                "double || bool",
+                "0.1|| false",
+                "found no matching overload for '_||_' applied to '(double, bool)'",
+            ),
+            (
+                "list || bool",
+                "[] || false",
+                "found no matching overload for '_||_' applied to '(list, bool)'",
+            ),
+            (
+                "map || bool",
+                "{} || false",
+                "found no matching overload for '_||_' applied to '(map, bool)'",
+            ),
+            (
+                "null || bool",
+                "null || false",
+                "found no matching overload for '_||_' applied to '(null_type, bool)'",
+            ),
         ]
         .iter()
         .for_each(assert_error)
