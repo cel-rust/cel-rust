@@ -18,6 +18,8 @@ use std::sync::Arc;
 use thiserror::Error;
 
 mod macros;
+#[doc(hidden)]
+pub use macros::to_camel_case;
 
 pub mod common;
 pub mod context;
