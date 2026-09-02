@@ -238,7 +238,19 @@ impl Parser {
         }
     }
 
-    pub fn parse(mut self, source: &str) -> Result<IdedExpr, ParseErrors> {
+    /// Parse, discarding the source info. See [`Parser::parse_with_source_info`].
+    pub fn parse(self, source: &str) -> Result<IdedExpr, ParseErrors> {
+        self.parse_with_source_info(source).map(|(expr, _)| expr)
+    }
+
+    /// Parse, returning the source info alongside the expression.
+    ///
+    /// The offsets are computed for every node while parsing; this is the only
+    /// way to reach them on the success path.
+    pub fn parse_with_source_info(
+        mut self,
+        source: &str,
+    ) -> Result<(IdedExpr, Arc<SourceInfo>), ParseErrors> {
         let parse_errors = Rc::new(RefCell::new(Vec::<ParseError>::new()));
         let stream = InputStream::new(source);
         let mut lexer = gen::CELLexer::new(stream);
@@ -281,7 +293,8 @@ impl Parser {
         errors.sort_by_key(|a| a.pos);
 
         if errors.is_empty() {
-            r.map_err(|e| ParseErrors { errors: vec![e] })
+            r.map(|expr| (expr, source_info.clone()))
+                .map_err(|e| ParseErrors { errors: vec![e] })
         } else {
             Err(ParseErrors {
                 errors: errors
