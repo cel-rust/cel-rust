@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.5](https://github.com/cel-rust/cel-rust/compare/v0.14.4...v0.14.5) - 2026-09-02
+
+### Added
+
+- *(parser)* flag to support indent escaping syntax
+- *(optional)* Impl. equals contract
+- *(parser)* bytes literal parsing fixes, to cel spec
+- *(stdlib)* `type` overloads added ([#330](https://github.com/cel-rust/cel-rust/pull/330))
+- *(parser)* Pratt parser behind `parser_pratt` feature flag
+
+### Fixed
+
+- *(types)* reject out-of-range int() and uint() conversions ([#336](https://github.com/cel-rust/cel-rust/pull/336))
+- *(parser)* properly _not_ support backticks in idents
+- *(parser)* support negative hex literals
+- *(optional)* chaining is properly supported now
+
+### Other
+
+- Merge pull request #326 from alexsnaps/pratt-feature
+- Add Pratt Parser - an efficient alternative to ANTLR based parser
+
 ## [0.14.4](https://github.com/cel-rust/cel-rust/compare/v0.14.3...v0.14.4) - 2026-08-27
 
 ### Fixed
