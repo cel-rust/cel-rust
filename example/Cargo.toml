@@ -52,6 +52,10 @@ name = "example-var-resolver"
 path = "src/resolver.rs"
 
 [[bin]]
+name = "example-interrupt"
+path = "src/interrupt.rs"
+
+[[bin]]
 name = "example-serde"
 path = "src/serde.rs"
 
