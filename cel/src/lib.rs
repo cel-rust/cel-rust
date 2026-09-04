@@ -36,6 +36,8 @@ pub mod functions;
 mod magic;
 pub mod objects;
 mod resolvers;
+pub mod runtime;
+pub use runtime::{Deadline, Interrupt, RuntimeOptions};
 
 #[cfg(feature = "chrono")]
 mod duration;
@@ -188,6 +190,17 @@ pub enum ExecutionError {
     IndexOutOfBounds(Value),
     #[error("InternalError: {0:?}")]
     InternalError(String),
+    /// The [`Interrupt`] handle set on the [`Context`] reported an interruption.
+    ///
+    /// This error is fatal: it is never absorbed by `||`, `&&`, or optional accessors.
+    #[error("operation interrupted")]
+    Interrupted,
+    /// The evaluation performed more comprehension iterations than allowed by
+    /// [`RuntimeOptions::with_max_iterations`].
+    ///
+    /// This error is fatal: it is never absorbed by `||`, `&&`, or optional accessors.
+    #[error("iteration budget of {limit} exceeded")]
+    IterationBudgetExceeded { limit: u64 },
 }
 
 impl ExecutionError {
@@ -245,6 +258,15 @@ impl ExecutionError {
             operator,
             Value::try_from(lhs).unwrap_or(Value::Null),
             Value::try_from(rhs).unwrap_or(Value::Null),
+        )
+    }
+
+    /// Whether this error aborts the evaluation as a whole rather than the
+    /// sub-expression that raised it.
+    pub(crate) fn is_fatal(&self) -> bool {
+        matches!(
+            self,
+            ExecutionError::Interrupted | ExecutionError::IterationBudgetExceeded { .. }
         )
     }
 
