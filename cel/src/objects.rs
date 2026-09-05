@@ -850,70 +850,72 @@ impl From<Value> for ResolveResult {
     }
 }
 
+/// The error returned when a `dyn Val` has no `Value` representation.
+fn no_value_repr(v: &dyn Val) -> ExecutionError {
+    ExecutionError::UnexpectedType {
+        got: v.get_type().name().to_string(),
+        want: "a type representable as `Value`".to_string(),
+    }
+}
+
+/// Downcasts a `dyn Val` to the built-in type its [`Kind`] implies.
+///
+/// `Val` is public and not sealed, so a foreign implementation may report a
+/// `Kind` without being the built-in value that carries it - a custom lazy list
+/// reports `Kind::List` but is not a [`CelList`]. Those reach `Value` as an
+/// error, not a panic.
+fn built_in<T: Val>(v: &dyn Val) -> Result<&T, ExecutionError> {
+    v.downcast_ref::<T>().ok_or_else(|| no_value_repr(v))
+}
+
 impl TryFrom<&dyn Val> for Value {
     type Error = ExecutionError;
     fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
         match v.get_type().kind() {
-            Kind::Boolean => Ok(Value::Bool(*v.downcast_ref::<CelBool>().unwrap().inner())),
-            Kind::Int => Ok(Value::Int(*v.downcast_ref::<CelInt>().unwrap().inner())),
-            Kind::UInt => Ok(Value::UInt(*v.downcast_ref::<CelUInt>().unwrap().inner())),
-            Kind::Double => Ok(Value::Float(
-                *v.downcast_ref::<CelDouble>().unwrap().inner(),
-            )),
+            Kind::Boolean => Ok(Value::Bool(*built_in::<CelBool>(v)?.inner())),
+            Kind::Int => Ok(Value::Int(*built_in::<CelInt>(v)?.inner())),
+            Kind::UInt => Ok(Value::UInt(*built_in::<CelUInt>(v)?.inner())),
+            Kind::Double => Ok(Value::Float(*built_in::<CelDouble>(v)?.inner())),
             Kind::String => Ok(Value::String(Arc::new(
-                v.downcast_ref::<CelString>().unwrap().inner().to_string(),
+                built_in::<CelString>(v)?.inner().to_string(),
             ))),
             Kind::NullType => Ok(Value::Null),
             Kind::Bytes => Ok(Value::Bytes(Arc::new(
-                v.downcast_ref::<CelBytes>().unwrap().inner().to_vec(),
+                built_in::<CelBytes>(v)?.inner().to_vec(),
             ))),
             #[cfg(feature = "chrono")]
-            Kind::Duration => Ok(Value::Duration(
-                *v.downcast_ref::<CelDuration>().unwrap().inner(),
-            )),
+            Kind::Duration => Ok(Value::Duration(*built_in::<CelDuration>(v)?.inner())),
             #[cfg(feature = "chrono")]
-            Kind::Timestamp => {
-                let ts = v.downcast_ref::<CelTimestamp>().unwrap().inner();
-                Ok(Value::Timestamp(*ts))
-            }
+            Kind::Timestamp => Ok(Value::Timestamp(*built_in::<CelTimestamp>(v)?.inner())),
             Kind::List => {
-                let list = v.downcast_ref::<CelList>().unwrap().inner();
-                Ok(Value::List(Arc::new(
-                    list.iter()
-                        .map(|i| i.as_ref().try_into().expect("Not a Value list item"))
-                        .collect(),
-                )))
+                let list = built_in::<CelList>(v)?.inner();
+                let items = list
+                    .iter()
+                    .map(|i| Value::try_from(i.as_ref()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Value::List(Arc::new(items)))
             }
             Kind::Map => {
-                let map = v.downcast_ref::<CelMap>().unwrap().inner();
+                let map = built_in::<CelMap>(v)?.inner();
+                let entries = map
+                    .iter()
+                    .map(|(k, v)| Ok((Key::from(k.clone()), Value::try_from(v.as_ref())?)))
+                    .collect::<Result<HashMap<_, _>, ExecutionError>>()?;
                 Ok(Value::Map(Map {
-                    map: Arc::new(
-                        map.iter()
-                            .map(|(k, v)| {
-                                (
-                                    Key::from(k.clone()),
-                                    Value::try_from(v.as_ref()).expect("Not a Value map value"),
-                                )
-                            })
-                            .collect(),
-                    ),
+                    map: Arc::new(entries),
                 }))
             }
             Kind::Type => Ok(Value::String(Arc::new(
-                v.downcast_ref::<CelType>().unwrap().name().to_string(),
+                built_in::<CelType>(v)?.name().to_string(),
             ))),
             Kind::Opaque => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
-                None => v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
-                Some(opt) => {
-                    let opt: Option<Result<Value, _>> = opt.option().map(|v| v.try_into());
-                    match opt {
-                        None => Arc::new(OptionalValue::none()),
-                        Some(t) => match t {
-                            Ok(v) => Arc::new(OptionalValue::of(v)),
-                            Err(_) => Arc::new(OptionalValue::none()),
-                        },
-                    }
-                }
+                None => built_in::<OpaqueVal>(v)?.clone_inner(),
+                // A present optional whose value has no `Value` representation is
+                // an error, not an absent one.
+                Some(opt) => match opt.option() {
+                    None => Arc::new(OptionalValue::none()),
+                    Some(v) => Arc::new(OptionalValue::of(Value::try_from(v)?)),
+                },
             })),
             _ => {
                 #[cfg(feature = "structs")]
@@ -932,12 +934,7 @@ impl TryFrom<&dyn Val> for Value {
                 if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
                     Ok(Value::Opaque(opaque.val.clone()))
                 } else {
-                    Err(ExecutionError::UnexpectedType {
-                        got: v.get_type().name().to_string(),
-                        want:
-                            "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
-                                .to_string(),
-                    })
+                    Err(no_value_repr(v))
                 }
             }
         }
@@ -1827,7 +1824,10 @@ fn checked_op(
 
 #[cfg(test)]
 mod tests {
-    use crate::{objects::Key, Context, ExecutionError, Program, Value};
+    use crate::common::traits::Sizer;
+    use crate::common::types::{CelInt, Type, LIST_TYPE};
+    use crate::common::value::Val;
+    use crate::{objects::Key, Context, ExecutionError, Program, ResolveResult, Value};
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -2863,5 +2863,100 @@ mod tests {
             let result = program.execute(&context).unwrap();
             assert_eq!(result, Value::String(Arc::new("test 42".to_owned())));
         }
+    }
+    /// A custom type on the `dyn Val` path, as `Type::new_opaque_type` invites.
+    #[derive(Debug)]
+    struct Ip(Type, String);
+
+    impl Ip {
+        fn new(addr: &str) -> Self {
+            Ip(Type::new_opaque_type("net.IP"), addr.to_owned())
+        }
+    }
+
+    impl Val for Ip {
+        fn get_type(&self) -> &Type {
+            &self.0
+        }
+
+        fn equals(&self, other: &dyn Val) -> bool {
+            other.downcast_ref::<Ip>().is_some_and(|o| o.1 == self.1)
+        }
+
+        fn clone_as_boxed(&self) -> Box<dyn Val> {
+            Box::new(Ip::new(&self.1))
+        }
+    }
+
+    /// A list whose contents are resolved on access rather than materialized,
+    /// the shape `Context::add_variable_as_val` was made public for.
+    #[derive(Debug)]
+    struct LazyList(Vec<i64>);
+
+    impl Sizer for LazyList {
+        fn size(&self) -> CelInt {
+            CelInt::from(self.0.len() as i64)
+        }
+    }
+
+    impl Val for LazyList {
+        fn get_type(&self) -> &Type {
+            &LIST_TYPE
+        }
+
+        fn as_sizer(&self) -> Option<&dyn Sizer> {
+            Some(self)
+        }
+
+        fn clone_as_boxed(&self) -> Box<dyn Val> {
+            Box::new(LazyList(self.0.clone()))
+        }
+    }
+
+    fn context_with_custom_vals() -> Context<'static> {
+        let mut context = Context::default();
+        context.add_variable_as_val("ip", Box::new(Ip::new("1.2.3.4")));
+        context.add_variable_as_val("lazy", Box::new(LazyList(vec![1, 2])));
+        context
+    }
+
+    fn execute(expr: &str) -> ResolveResult {
+        Program::compile(expr)
+            .unwrap()
+            .execute(&context_with_custom_vals())
+    }
+
+    /// A `Val` a caller implemented has no `Value` representation. Reaching the
+    /// result of `Program::execute` it must be reported through the `Result`
+    /// that call already returns.
+    #[test]
+    fn custom_val_as_result_is_an_error() {
+        for expr in [
+            "ip",
+            "[ip]",
+            "[[ip]]",
+            "{'k': ip}",
+            "lazy",
+            "optional.of(ip)",
+        ] {
+            assert!(
+                matches!(execute(expr), Err(ExecutionError::UnexpectedType { .. })),
+                "`{expr}` should report an unexpected type, got {:?}",
+                execute(expr)
+            );
+        }
+    }
+
+    /// ... while the same values stay usable within an expression, which is the
+    /// whole point of implementing `Val`.
+    #[test]
+    fn custom_val_within_an_expression_still_evaluates() {
+        assert_eq!(execute("ip == ip"), Ok(Value::Bool(true)));
+        assert_eq!(execute("size(lazy)"), Ok(Value::Int(2)));
+        assert_eq!(execute("optional.of(ip).hasValue()"), Ok(Value::Bool(true)));
+        assert_eq!(
+            execute("optional.of(ip).value() == ip"),
+            Ok(Value::Bool(true))
+        );
     }
 }
