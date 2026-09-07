@@ -248,16 +248,16 @@ macro_rules! __member_overload_extract {
     ($iter:ident, $ty:ty) => {{
         let __arg = $iter.next().ok_or($crate::ExecutionError::NoSuchOverload)?;
         match __arg {
-            ::std::borrow::Cow::Borrowed(v) => ::std::borrow::Cow::Borrowed(
-                v.downcast_ref::<$ty>()
-                    .ok_or($crate::ExecutionError::NoSuchOverload)?,
-            ),
-            ::std::borrow::Cow::Owned(b) => ::std::borrow::Cow::Owned(*<
-                ::std::boxed::Box<dyn $crate::common::value::Val>
-                    as $crate::common::value::Downcast
-            >::downcast::<$ty>(b)
-            .map_err(|_| $crate::ExecutionError::NoSuchOverload)?),
-        }
+                                    ::std::borrow::Cow::Borrowed(v) => ::std::borrow::Cow::Borrowed(
+                                        v.downcast_ref::<$ty>()
+                                            .ok_or($crate::ExecutionError::NoSuchOverload)?,
+                                    ),
+                                    ::std::borrow::Cow::Owned(b) => ::std::borrow::Cow::Owned(*<
+                                        ::std::boxed::Box<dyn $crate::common::value::Val>
+                                            as $crate::common::value::Downcast
+                                    >::downcast::<$ty>(b)
+                                    .map_err(|_| $crate::ExecutionError::NoSuchOverload)?),
+                                }
     }};
 }
 
@@ -440,7 +440,7 @@ mod tests {
     //! is truly id-based (not a coincidence).
     use crate::common::types::{self, CelBool, CelInt, CelString};
     use crate::common::value::Val;
-    use crate::{ExecutionError, Env};
+    use crate::{Env, ExecutionError};
     use std::borrow::Cow;
 
     // --- Fixture fns used across the tests below. -----------------------
@@ -471,9 +471,7 @@ mod tests {
         Ok(Cow::Owned(CelInt::from(0)))
     }
 
-    fn noop(
-        _args: Vec<Cow<'_, dyn Val>>,
-    ) -> Result<Cow<'_, dyn Val>, ExecutionError> {
+    fn noop(_args: Vec<Cow<'_, dyn Val>>) -> Result<Cow<'_, dyn Val>, ExecutionError> {
         let boxed: Box<dyn Val> = Box::new(CelInt::from(0));
         Ok(Cow::Owned(boxed))
     }
@@ -588,15 +586,14 @@ mod tests {
         let mut env = Env::default();
         crate::add_overload!(env, fn ping2: (CelString, CelString) -> CelInt);
         // Expected cel-cpp signature: `ping2(string,string)`
-        assert!(
-            env.add_overload(
+        assert!(env
+            .add_overload(
                 "ping2",
                 "ping2(string,string)",
                 vec![types::STRING_TYPE, types::STRING_TYPE],
                 noop,
             )
-            .is_err(),
-        );
+            .is_err(),);
     }
 
     #[test]
@@ -604,9 +601,7 @@ mod tests {
         let mut env = Env::default();
         crate::add_overload!(env, fn ping0: () -> CelInt);
         // Expected cel-cpp signature: `ping0()`
-        assert!(
-            env.add_overload("ping0", "ping0()", vec![], noop).is_err(),
-        );
+        assert!(env.add_overload("ping0", "ping0()", vec![], noop).is_err(),);
     }
 
     #[test]
@@ -622,20 +617,18 @@ mod tests {
         // Sanity: the un-renamed id `ping(string)` is NOT registered under
         // this name. Use disjoint arg types so the only possible collision
         // vector is the id string itself.
-        assert!(
-            env.add_overload("renamed", "ping(string)", vec![types::INT_TYPE], noop)
-                .is_ok(),
-        );
+        assert!(env
+            .add_overload("renamed", "ping(string)", vec![types::INT_TYPE], noop)
+            .is_ok(),);
     }
 
     #[test]
     fn add_overload_explicit_id_wins_over_default() {
         let mut env = Env::default();
         crate::add_overload!(env, fn ping: (CelString) -> CelInt, id = "explicit");
-        assert!(
-            env.add_overload("ping", "explicit", vec![types::STRING_TYPE], noop)
-                .is_err(),
-        );
+        assert!(env
+            .add_overload("ping", "explicit", vec![types::STRING_TYPE], noop)
+            .is_err(),);
     }
 
     // --- add_member_overload! default id ------------------------------
@@ -645,10 +638,9 @@ mod tests {
         let mut env = Env::default();
         crate::add_member_overload!(env, fn ping: (CelString) -> CelInt);
         // Expected cel-cpp signature: `string.ping()`
-        assert!(
-            env.add_member_overload("ping", "string.ping()", types::STRING_TYPE, vec![], noop)
-                .is_err(),
-        );
+        assert!(env
+            .add_member_overload("ping", "string.ping()", types::STRING_TYPE, vec![], noop)
+            .is_err(),);
     }
 
     #[test]
@@ -656,16 +648,15 @@ mod tests {
         let mut env = Env::default();
         crate::add_member_overload!(env, fn ping2: (CelString, CelString) -> CelInt);
         // Expected cel-cpp signature: `string.ping2(string)`
-        assert!(
-            env.add_member_overload(
+        assert!(env
+            .add_member_overload(
                 "ping2",
                 "string.ping2(string)",
                 types::STRING_TYPE,
                 vec![types::STRING_TYPE],
                 noop,
             )
-            .is_err(),
-        );
+            .is_err(),);
     }
 
     #[test]
@@ -674,25 +665,23 @@ mod tests {
         crate::add_member_overload!(env, fn ping2_bool: (CelString, CelString) -> CelBool,
             name = "endsWith");
         // Expected cel-cpp signature: `string.endsWith(string)`
-        assert!(
-            env.add_member_overload(
+        assert!(env
+            .add_member_overload(
                 "endsWith",
                 "string.endsWith(string)",
                 types::STRING_TYPE,
                 vec![types::STRING_TYPE],
                 noop,
             )
-            .is_err(),
-        );
+            .is_err(),);
     }
 
     #[test]
     fn add_member_overload_explicit_id_wins_over_default() {
         let mut env = Env::default();
         crate::add_member_overload!(env, fn ping: (CelString) -> CelInt, id = "explicit");
-        assert!(
-            env.add_member_overload("ping", "explicit", types::STRING_TYPE, vec![], noop)
-                .is_err(),
-        );
+        assert!(env
+            .add_member_overload("ping", "explicit", types::STRING_TYPE, vec![], noop)
+            .is_err(),);
     }
 }
