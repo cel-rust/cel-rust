@@ -1,8 +1,8 @@
-use crate::common::traits::{self, Adder, Comparer, Sizer, Zeroer};
-use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelUInt, Kind, Type};
+use crate::common::traits::{Adder, Comparer, Sizer, Zeroer};
+use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelUInt, Type};
 #[cfg(feature = "chrono")]
 use crate::common::types::{CelDuration, CelTimestamp};
-use crate::common::value::{Downcast, Val};
+use crate::common::value::Val;
 use crate::ExecutionError;
 use std::borrow::Cow;
 use std::cmp::Ordering;
@@ -32,6 +32,10 @@ impl Deref for String {
 
 impl Val for String {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::STRING_TYPE
     }
 
@@ -137,190 +141,112 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
     }
 }
 
-fn string_contains<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let target = &args[0];
-    let arg = &args[1];
-    match target.downcast_ref::<String>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: target.get_type().name().to_string(),
-            want: super::STRING_TYPE.name().to_string(),
-        }),
-        Some(s) => match arg.downcast_ref::<String>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg.get_type().name().to_string(),
-                want: super::STRING_TYPE.name().to_string(),
-            }),
-            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
-                s.contains(needle.inner()),
-            )))),
-        },
-    }
+fn contains<'a>(
+    this: Cow<'a, String>,
+    needle: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    Ok(Cow::Owned(CelBool::from(this.contains(needle.inner()))))
 }
 
-fn ends_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |target: &String, needle: &String| {
-            Ok(Box::new(CelBool::from(target.ends_with(needle.inner()))))
-        },
-    )
+fn ends_with<'a>(
+    this: Cow<'a, String>,
+    needle: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    Ok(Cow::Owned(CelBool::from(this.ends_with(needle.inner()))))
 }
 
-fn starts_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |target: &String, needle: &String| {
-            Ok(Box::new(CelBool::from(target.starts_with(needle.inner()))))
-        },
-    )
+fn starts_with<'a>(
+    this: Cow<'a, String>,
+    needle: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    Ok(Cow::Owned(CelBool::from(this.starts_with(needle.inner()))))
 }
 
 #[cfg(feature = "regex")]
-fn matches<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |this: &String, regex: &String| match regex::Regex::new(regex.inner()) {
-            Ok(re) => Ok(Box::new(CelBool::from(re.is_match(this.inner())))),
-            Err(err) => Err(ExecutionError::FunctionError {
-                function: "matches".to_string(),
-                message: format!("'{}' not a valid regex:\n{err}", regex.inner()),
-            }),
-        },
-    )
-}
-
-fn string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let arg = args.remove(0).into_owned();
-    let ret: Result<Box<String>, Box<dyn Val>> = match arg.get_type().kind() {
-        Kind::String => arg.downcast::<String>(),
-        Kind::Int => arg
-            .downcast::<CelInt>()
-            .map(|arg| Box::new(String::from(arg.to_string()))),
-        Kind::UInt => arg
-            .downcast::<CelUInt>()
-            .map(|arg| Box::new(String::from(arg.to_string()))),
-        Kind::Double => arg
-            .downcast::<CelDouble>()
-            .map(|arg| Box::new(String::from(arg.to_string()))),
-        Kind::Bytes => arg.downcast::<CelBytes>().map(|arg| {
-            Box::new(String::from(
-                StdString::from_utf8_lossy(arg.inner()).as_ref(),
-            ))
-        }),
-        #[cfg(feature = "chrono")]
-        Kind::Timestamp => arg
-            .downcast::<CelTimestamp>()
-            .map(|ts| Box::new(String::from(ts.inner().to_rfc3339()))),
-        #[cfg(feature = "chrono")]
-        Kind::Duration => arg
-            .downcast::<CelDuration>()
-            .map(|arg| Box::new(String::from(crate::duration::format_duration(arg.inner())))),
-        _ => Err(arg),
-    };
-    match ret {
-        Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
-        Err(arg) => Err(ExecutionError::FunctionError {
-            function: "string".to_owned(),
-            message: format!("cannot convert {arg:?} to string"),
+fn matches<'a>(
+    this: Cow<'a, String>,
+    re: Cow<'a, String>,
+) -> Result<Cow<'a, CelBool>, ExecutionError> {
+    match regex::Regex::new(re.inner()) {
+        Ok(re) => Ok(Cow::Owned(CelBool::from(re.is_match(this.inner())))),
+        Err(err) => Err(ExecutionError::FunctionError {
+            function: "matches".to_string(),
+            message: format!("'{}' not a valid regex:\n{err}", re.inner()),
         }),
     }
+}
+
+fn string_from_string<'a>(this: Cow<'a, String>) -> Result<Cow<'a, String>, ExecutionError> {
+    Ok(this)
+}
+
+fn string_from_int<'a>(this: Cow<'a, CelInt>) -> Result<Cow<'a, String>, ExecutionError> {
+    Ok(Cow::Owned(String::from(this.to_string())))
+}
+
+fn string_from_uint<'a>(this: Cow<'a, CelUInt>) -> Result<Cow<'a, String>, ExecutionError> {
+    Ok(Cow::Owned(String::from(this.to_string())))
+}
+
+fn string_from_double<'a>(this: Cow<'a, CelDouble>) -> Result<Cow<'a, String>, ExecutionError> {
+    Ok(Cow::Owned(String::from(this.to_string())))
+}
+
+fn string_from_bytes<'a>(this: Cow<'a, CelBytes>) -> Result<Cow<'a, String>, ExecutionError> {
+    Ok(Cow::Owned(String::from(
+        StdString::from_utf8_lossy(this.inner()).as_ref(),
+    )))
+}
+
+#[cfg(feature = "chrono")]
+fn string_from_timestamp<'a>(
+    this: Cow<'a, CelTimestamp>,
+) -> Result<Cow<'a, String>, ExecutionError> {
+    Ok(Cow::Owned(String::from(this.inner().to_rfc3339())))
+}
+
+#[cfg(feature = "chrono")]
+fn string_from_duration<'a>(this: Cow<'a, CelDuration>) -> Result<Cow<'a, String>, ExecutionError> {
+    Ok(Cow::Owned(String::from(crate::duration::format_duration(
+        this.inner(),
+    ))))
+}
+
+fn size<'a>(this: Cow<'a, String>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned((this.inner().len() as i64).into()))
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "string",
-        "string_to_string",
-        vec![super::STRING_TYPE],
-        string,
-    )
-    .expect("Must be unique id");
-    env.add_overload("string", "int64_to_string", vec![super::INT_TYPE], string)
-        .expect("Must be unique id");
-    env.add_overload("string", "uint64_to_string", vec![super::UINT_TYPE], string)
-        .expect("Must be unique id");
-    env.add_overload(
-        "string",
-        "double_to_string",
-        vec![super::DOUBLE_TYPE],
-        string,
-    )
-    .expect("Must be unique id");
-    env.add_overload("string", "bytes_to_string", vec![super::BYTES_TYPE], string)
-        .expect("Must be unique id");
+    crate::add_overload!(env, fn string_from_string: (String) -> String,
+        name = "string", id = "string_to_string");
+    crate::add_overload!(env, fn string_from_int: (CelInt) -> String,
+        name = "string", id = "int64_to_string");
+    crate::add_overload!(env, fn string_from_uint: (CelUInt) -> String,
+        name = "string", id = "uint64_to_string");
+    crate::add_overload!(env, fn string_from_double: (CelDouble) -> String,
+        name = "string", id = "double_to_string");
+    crate::add_overload!(env, fn string_from_bytes: (CelBytes) -> String,
+        name = "string", id = "bytes_to_string");
 
     #[cfg(feature = "chrono")]
     {
-        env.add_overload(
-            "string",
-            "timestamp_to_string",
-            vec![super::TIMESTAMP_TYPE],
-            string,
-        )
-        .expect("Must be unique id");
-        env.add_overload(
-            "string",
-            "duration_to_string",
-            vec![super::DURATION_TYPE],
-            string,
-        )
-        .expect("Must be unique id");
+        crate::add_overload!(env, fn string_from_timestamp: (CelTimestamp) -> String,
+            name = "string", id = "timestamp_to_string");
+        crate::add_overload!(env, fn string_from_duration: (CelDuration) -> String,
+            name = "string", id = "duration_to_string");
     }
 
-    env.add_member_overload(
-        "contains",
-        "contains_string",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        string_contains,
-    )
-    .expect("Must be unique id");
-    env.add_member_overload(
-        "endsWith",
-        "ends_with_string",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        ends_with_string,
-    )
-    .expect("Must be unique id");
-    env.add_overload(
-        "size",
-        "size_string",
-        vec![super::STRING_TYPE],
-        traits::adapter::sizer_size,
-    )
-    .expect("Must be unique id");
-    env.add_member_overload(
-        "size",
-        "string_size",
-        super::STRING_TYPE,
-        vec![],
-        traits::adapter::sizer_size,
-    )
-    .expect("Must be unique id");
-    env.add_member_overload(
-        "startsWith",
-        "starts_with_string",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        starts_with_string,
-    )
-    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn contains: (String, String) -> CelBool);
+    crate::add_member_overload!(env, fn ends_with: (String, String) -> CelBool,
+        name = "endsWith");
+    crate::add_overload!(env, fn size: (String) -> CelInt,
+        name = "size", id = "size_string");
+    crate::add_member_overload!(env, fn size: (String) -> CelInt,
+        id = "string_size");
+    crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool,
+        name = "startsWith");
     #[cfg(feature = "regex")]
-    env.add_member_overload(
-        "matches",
-        "matches",
-        super::STRING_TYPE,
-        vec![super::STRING_TYPE],
-        matches,
-    )
-    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn matches: (String, String) -> CelBool);
 }
 
 #[cfg(test)]

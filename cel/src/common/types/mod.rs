@@ -1,5 +1,4 @@
 use crate::common::traits;
-use crate::ExecutionError;
 use std::any::Any;
 use std::borrow::Cow;
 
@@ -367,51 +366,4 @@ fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
         return Ok(temp_container.take().unwrap());
     }
     Err(value)
-}
-
-type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
-type BinaryFn<A, B> = fn(&A, &B) -> Result<Box<dyn Val>, ExecutionError>;
-
-fn unary_fn<'a, A: Val>(
-    args: Vec<Cow<'a, dyn Val>>,
-    type_a: Type,
-    func: UnaryFn<A>,
-) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let arg = &args[0];
-    match arg.downcast_ref::<A>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: arg.get_type().name().to_string(),
-            want: type_a.name().to_string(),
-        }),
-        Some(arg) => Ok(Cow::<dyn Val>::Owned(func(arg)?)),
-    }
-}
-
-fn binary_fn<'a, A: Val, B: Val>(
-    args: Vec<Cow<'a, dyn Val>>,
-    type_a: Type,
-    type_b: Type,
-    func: BinaryFn<A, B>,
-) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let arg1 = &args[0];
-    let arg2 = &args[1];
-    match arg1.downcast_ref::<A>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: arg1.get_type().name().to_string(),
-            want: type_a.name().to_string(),
-        }),
-        Some(arg1) => match arg2.downcast_ref::<B>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg2.get_type().name().to_string(),
-                want: type_b.name().to_string(),
-            }),
-            Some(arg2) => Ok(Cow::<dyn Val>::Owned(func(arg1, arg2)?)),
-        },
-    }
-}
-
-fn noop<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let ts = args.remove(0);
-    Ok(ts)
 }
