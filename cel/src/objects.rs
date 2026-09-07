@@ -991,17 +991,46 @@ impl TryFrom<Value> for Box<dyn Val> {
 
 impl Value {
     pub fn resolve_all(expr: &[Expression], ctx: &Context) -> ResolveResult {
-        let mut res = Vec::with_capacity(expr.len());
-        for expr in expr {
-            res.push(Value::resolve(expr, ctx)?);
-        }
-        Ok(Value::List(res.into()))
+        Self::with_frame(ctx, |ctx| {
+            let mut res = Vec::with_capacity(expr.len());
+            for expr in expr {
+                res.push(Self::resolve_val(expr, ctx)?.as_ref().try_into()?);
+            }
+            Ok(Value::List(res.into()))
+        })
     }
 
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
-        Self::resolve_val(expr, ctx)?.as_ref().try_into()
+        Self::with_frame(ctx, |ctx| Self::resolve_val(expr, ctx)?.as_ref().try_into())
     }
 
+    /// Runs `f` within the evaluation frame of `ctx`, creating one if this is
+    /// the outermost entry point of the evaluation.
+    ///
+    /// Re-entrant calls (a custom function resolving an expression, or running
+    /// a nested program) find the existing frame and share its budget and
+    /// interrupt handle. Only the call that created the frame applies the
+    /// abort backstop, so a nested call cannot observe and discard an abort.
+    fn with_frame<T>(
+        ctx: &Context,
+        f: impl FnOnce(&Context) -> Result<T, ExecutionError>,
+    ) -> Result<T, ExecutionError> {
+        if ctx.frame().is_some() {
+            return f(ctx);
+        }
+        let ctx = ctx.new_frame_scope();
+        let result = f(&ctx);
+        ctx.frame()
+            .expect("frame scope carries a frame")
+            .finish(result)
+    }
+
+    /// Evaluates `expr` within the evaluation frame of `ctx`, if any.
+    ///
+    /// Unlike [`resolve`](Self::resolve), this does not create a frame when
+    /// called outside of an evaluation: interruption and the iteration budget
+    /// only apply when a frame exists, so prefer [`resolve`](Self::resolve) or
+    /// [`Program::execute`](crate::Program::execute) as entry points.
     #[inline(always)]
     pub fn resolve_val<'a>(
         expr: &'a Expression,
@@ -1022,7 +1051,10 @@ impl Value {
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            let left = try_bool(Value::resolve_val(&call.args[0], ctx));
+                            let left = match try_bool(Value::resolve_val(&call.args[0], ctx)) {
+                                Err(e) if e.is_fatal() => return Err(e),
+                                left => left,
+                            };
                             return if Ok(true) == left {
                                 Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
                             } else {
@@ -1041,7 +1073,10 @@ impl Value {
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = try_bool(Value::resolve_val(&call.args[0], ctx));
+                            let left = match try_bool(Value::resolve_val(&call.args[0], ctx)) {
+                                Err(e) if e.is_fatal() => return Err(e),
+                                left => left,
+                            };
                             return if Ok(false) == left {
                                 Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
                             } else {
@@ -1106,6 +1141,7 @@ impl Value {
                                     Ok(val) => Cow::<dyn Val>::Owned(Box::new(CelOptional::from(
                                         val.clone_as_boxed(),
                                     ))),
+                                    Err(e) if e.is_fatal() => return Err(e),
                                     Err(_) => Cow::<dyn Val>::Owned(Box::new(CelOptional::none())),
                                 })
                             } else {
@@ -1137,11 +1173,12 @@ impl Value {
                                 } else {
                                     Some(operand.as_ref())
                                 };
-                            let result = target
-                                .and_then(|v| v.as_indexer())
-                                .and_then(|i| i.get(field).ok())
-                                .map(|v| CelOptional::of(v.clone_as_boxed()))
-                                .unwrap_or_else(CelOptional::none);
+                            let result =
+                                match target.and_then(|v| v.as_indexer()).map(|i| i.get(field)) {
+                                    Some(Ok(v)) => CelOptional::of(v.clone_as_boxed()),
+                                    Some(Err(e)) if e.is_fatal() => return Err(e),
+                                    _ => CelOptional::none(),
+                                };
                             return Ok(Cow::<dyn Val>::Owned(Box::new(result)));
                         }
                         // END OF SPECIAL CASES
@@ -1307,9 +1344,10 @@ impl Value {
                             ));
                         }
                         operators::NOT_STRICTLY_FALSE => {
-                            return Ok(bool(
-                                try_bool(Value::resolve_val(&call.args[0], ctx)).unwrap_or(true),
-                            ));
+                            return match try_bool(Value::resolve_val(&call.args[0], ctx)) {
+                                Err(e) if e.is_fatal() => Err(e),
+                                res => Ok(bool(res.unwrap_or(true))),
+                            };
                         }
                         _ => (),
                     }
@@ -1418,6 +1456,7 @@ impl Value {
                             } else {
                                 let result = match indexer.get(&key) {
                                     Ok(v) => CelOptional::of(v.clone_as_boxed()),
+                                    Err(e) if e.is_fatal() => return Err(e),
                                     Err(_) => CelOptional::none(),
                                 };
                                 Ok(Cow::<dyn Val>::Owned(Box::new(result)))
@@ -1525,6 +1564,7 @@ impl Value {
             Expr::Comprehension(comprehension) => {
                 let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
                 let iter = Value::resolve_val(&comprehension.iter_range, ctx)?;
+                let frame = ctx.frame();
                 let mut ctx = ctx.new_inner_scope();
                 ctx.add_variable_as_val(&comprehension.accu_var, accu_init.clone_as_boxed());
 
@@ -1533,6 +1573,9 @@ impl Value {
                     .ok_or(ExecutionError::NoSuchOverload)?
                     .iter();
                 while let Some(item) = items.next() {
+                    if let Some(frame) = frame {
+                        frame.tick()?;
+                    }
                     if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
                         break;
                     }

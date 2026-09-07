@@ -52,6 +52,21 @@ impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     pub fn error<M: ToString>(&self, message: M) -> ExecutionError {
         ExecutionError::function_error(self.name, message)
     }
+
+    /// Polls the [`Interrupt`](crate::Interrupt) handle of the current evaluation.
+    ///
+    /// Returns `false` when no handle was set with
+    /// [`Context::set_interrupt`](crate::Context::set_interrupt). Long-running
+    /// functions can poll this to return early; once it has returned `true`, the
+    /// evaluation fails with
+    /// [`ExecutionError::Interrupted`](crate::ExecutionError::Interrupted)
+    /// regardless of what the function returns.
+    pub fn is_interrupted(&self) -> bool {
+        self.ptx
+            .frame()
+            .map(|frame| frame.observe_interrupt())
+            .unwrap_or(false)
+    }
 }
 
 /// Calculates the size of either the target, or the provided args depending on how

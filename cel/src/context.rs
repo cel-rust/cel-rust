@@ -3,6 +3,7 @@ use crate::common::value::Val;
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
+use crate::runtime::{Frame, Interrupt};
 use crate::{Env, ExecutionError};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -33,17 +34,30 @@ use std::sync::Arc;
 ///                  ↑
 /// Only in scope for the duration of the map expression
 ///
+/// # Interruption
+///
+/// An evaluation can be cancelled cooperatively by setting an [`Interrupt`]
+/// handle with [`set_interrupt`](Self::set_interrupt), and bounded by an
+/// iteration budget configured on the [`Env`] through
+/// [`RuntimeOptions`](crate::RuntimeOptions). See the [`runtime`](crate::runtime)
+/// module for details.
+#[non_exhaustive]
 pub enum Context<'a> {
+    #[non_exhaustive]
     Root {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
+        interrupt: Option<&'a dyn Interrupt>,
         env: Arc<Env>,
     },
+    #[non_exhaustive]
     Child {
         parent: &'a Context<'a>,
         variables: BTreeMap<String, Box<dyn Val>>,
         resolver: Option<&'a dyn VariableResolver>,
+        interrupt: Option<&'a dyn Interrupt>,
+        frame: Option<Frame<'a>>,
     },
 }
 
@@ -143,6 +157,71 @@ impl<'a> Context<'a> {
         }
     }
 
+    /// Sets the [`Interrupt`] handle polled while evaluating comprehensions.
+    ///
+    /// The handle is consulted for every evaluation performed with this context
+    /// (or a scope derived from it) until it is replaced. When it reports an
+    /// interruption, evaluation fails with
+    /// [`ExecutionError::Interrupted`](crate::ExecutionError::Interrupted).
+    ///
+    /// # Example
+    /// ```
+    /// use cel::{Context, ExecutionError, Program};
+    /// use std::sync::atomic::{AtomicBool, Ordering};
+    ///
+    /// let cancelled = AtomicBool::new(false);
+    /// let mut ctx = Context::default();
+    /// ctx.set_interrupt(&cancelled);
+    ///
+    /// let program = Program::compile("[1, 2, 3].all(x, x > 0)").unwrap();
+    /// assert_eq!(program.execute(&ctx), Ok(true.into()));
+    ///
+    /// cancelled.store(true, Ordering::Relaxed);
+    /// assert_eq!(program.execute(&ctx), Err(ExecutionError::Interrupted));
+    /// ```
+    pub fn set_interrupt(&mut self, i: &'a dyn Interrupt) {
+        match self {
+            Context::Root { interrupt, .. } => {
+                *interrupt = Some(i);
+            }
+            Context::Child { interrupt, .. } => {
+                *interrupt = Some(i);
+            }
+        }
+    }
+
+    /// The nearest [`Interrupt`] handle set on this context or one of its parents.
+    fn interrupt(&self) -> Option<&'a dyn Interrupt> {
+        match self {
+            Context::Root { interrupt, .. } => *interrupt,
+            Context::Child {
+                interrupt, parent, ..
+            } => interrupt.or_else(|| parent.interrupt()),
+        }
+    }
+
+    /// The [`Frame`] of the evaluation this context takes part in, if any.
+    pub(crate) fn frame(&self) -> Option<&Frame<'a>> {
+        match self {
+            Context::Root { .. } => None,
+            Context::Child { frame, parent, .. } => frame.as_ref().or_else(|| parent.frame()),
+        }
+    }
+
+    /// Creates an inner scope carrying a fresh [`Frame`] for a new evaluation.
+    ///
+    /// Callers must check [`frame`](Self::frame) first: a nested evaluation must
+    /// share the frame of the evaluation it runs within, not start its own.
+    pub(crate) fn new_frame_scope(&self) -> Context<'_> {
+        Context::Child {
+            parent: self,
+            variables: Default::default(),
+            resolver: None,
+            interrupt: None,
+            frame: Some(Frame::new(self.env().options(), self.interrupt())),
+        }
+    }
+
     pub fn get_variable<S>(&'a self, name: S) -> Option<Cow<'a, dyn Val>>
     where
         S: AsRef<str>,
@@ -153,6 +232,7 @@ impl<'a> Context<'a> {
                 variables,
                 parent,
                 resolver,
+                ..
             } => resolver
                 .and_then(|r| {
                     r.resolve(name)
@@ -219,6 +299,8 @@ impl<'a> Context<'a> {
             parent: self,
             variables: Default::default(),
             resolver: None,
+            interrupt: None,
+            frame: None,
         }
     }
 
@@ -239,6 +321,7 @@ impl<'a> Context<'a> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            interrupt: None,
         }
     }
 
@@ -248,6 +331,7 @@ impl<'a> Context<'a> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            interrupt: None,
         }
     }
 }
@@ -259,6 +343,7 @@ impl Default for Context<'_> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            interrupt: None,
         }
     }
 }
