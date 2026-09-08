@@ -129,6 +129,9 @@ pub enum ExecutionError {
     Overflow(&'static str, Value, Value),
     #[error("Index out of bounds: {0:?}")]
     IndexOutOfBounds(Value),
+    /// Indicates that a map literal declared the same key more than once.
+    #[error("Failed with repeated key: {0:?}")]
+    DuplicateKey(Value),
     #[error("InternalError: {0:?}")]
     InternalError(String),
 }
