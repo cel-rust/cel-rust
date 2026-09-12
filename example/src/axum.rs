@@ -81,7 +81,7 @@ async fn list_todos(State(AppContext { todos, .. }): State<AppContext>) -> impl 
 }
 
 // The policy engine for our TODOs app
-struct PolicyDecider(Context<'static>);
+struct PolicyDecider(Context<'static, 'static>);
 
 impl PolicyDecider {
     // Start with a wrapper around the default Context

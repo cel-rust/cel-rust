@@ -1,8 +1,8 @@
 use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
-use crate::common::types::{CelInt, CelString, Type};
-use crate::common::value::Val;
+use crate::common::types::{CelInt, Type};
+use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
-use std::borrow::Cow;
+use std::any::Any;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -31,7 +31,10 @@ impl Val for Duration {
         &super::DURATION_TYPE
     }
 
-    fn as_adder(&self) -> Option<&dyn Adder> {
+    fn as_adder<'b, 'v>(&'b self) -> Option<&'b (dyn Adder + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -39,7 +42,10 @@ impl Val for Duration {
         Some(self)
     }
 
-    fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+    fn as_subtractor<'b, 'v>(&'b self) -> Option<&'b (dyn Subtractor + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -53,20 +59,32 @@ impl Val for Duration {
             .is_some_and(|other| self.0 == other.0)
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(Duration(self.0))
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
+        Box::new(*self)
+    }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
     }
 }
 
+impl StaticVal for Duration {}
+
 impl Adder for Duration {
-    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, crate::ExecutionError> {
+    fn add<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<Duration>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(Duration(
+            Ok(CowVal::owned(Duration(
                 // todo report the proper values in the error
                 self.0
                     .checked_add(&rhs.0)
                     .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
-            ))))
+            )))
         } else {
             Err(crate::ExecutionError::UnsupportedBinaryOperator(
                 "add",
@@ -88,14 +106,17 @@ impl Comparer for Duration {
 }
 
 impl Subtractor for Duration {
-    fn sub<'a>(&'a self, rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn sub<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<Duration>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(Duration(
+            Ok(CowVal::owned(Duration(
                 // todo report the proper values in the error
                 self.0
                     .checked_sub(&rhs.0)
                     .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
-            ))))
+            )))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
@@ -120,10 +141,10 @@ impl From<Duration> for chrono::Duration {
     }
 }
 
-impl TryFrom<Box<dyn Val>> for chrono::Duration {
-    type Error = Box<dyn Val>;
+impl<'v> TryFrom<Box<dyn Val + 'v>> for chrono::Duration {
+    type Error = Box<dyn Val + 'v>;
 
-    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+    fn try_from(value: Box<dyn Val + 'v>) -> Result<Self, Self::Error> {
         if let Some(d) = value.downcast_ref::<Duration>() {
             return Ok(d.0);
         }
@@ -131,9 +152,9 @@ impl TryFrom<Box<dyn Val>> for chrono::Duration {
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a chrono::Duration {
-    type Error = &'a dyn Val;
-    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a chrono::Duration {
+    type Error = &'a (dyn Val + 'v);
+    fn try_from(value: &'a (dyn Val + 'v)) -> Result<Self, Self::Error> {
         if let Some(d) = value.downcast_ref::<Duration>() {
             return Ok(&d.0);
         }
@@ -141,33 +162,33 @@ impl<'a> TryFrom<&'a dyn Val> for &'a chrono::Duration {
     }
 }
 
-fn millis<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn millis<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
         Ok(Box::new(CelInt::from(ts.inner().num_milliseconds())))
     })
 }
 
-fn seconds<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn seconds<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
         Ok(Box::new(CelInt::from(ts.inner().num_seconds())))
     })
 }
 
-fn minutes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn minutes<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
         Ok(Box::new(CelInt::from(ts.inner().num_minutes())))
     })
 }
 
-fn hours<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn hours<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
         Ok(Box::new(CelInt::from(ts.inner().num_hours())))
     })
 }
 
-fn duration<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::STRING_TYPE, |value: &CelString| {
-        let (_, duration) = crate::duration::parse_duration(value.inner())
+fn duration<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    super::string_fn(args, |value: &str| {
+        let (_, duration) = crate::duration::parse_duration(value)
             .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
         Ok(Box::new(Duration::from(duration)))
     })

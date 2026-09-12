@@ -1,6 +1,5 @@
 use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelNull, CelString, CelUInt};
-use crate::common::value::Val;
-use std::borrow::Cow;
+use crate::common::value::CowVal;
 use std::collections::BTreeMap;
 
 pub mod operators;
@@ -43,25 +42,27 @@ pub enum Expr {
 #[derive(Clone, Debug, PartialEq)]
 pub enum LiteralValue {
     Boolean(CelBool),
-    Bytes(CelBytes),
+    Bytes(CelBytes<'static>),
     Double(CelDouble),
     Int(CelInt),
     Null,
-    String(CelString),
+    String(CelString<'static>),
     UInt(CelUInt),
 }
 
+static NULL: CelNull = CelNull;
+
 impl LiteralValue {
-    pub fn to_val<'a>(&'a self) -> Cow<'a, dyn Val> {
-        // todo refactor to return Cow::Borrowed
-        match &self {
-            LiteralValue::Boolean(b) => Cow::Borrowed(b),
-            LiteralValue::Bytes(b) => Cow::Borrowed(b),
-            LiteralValue::Double(f) => Cow::Borrowed(f),
-            LiteralValue::Int(i) => Cow::Borrowed(i),
-            LiteralValue::Null => Cow::<dyn Val>::Owned(Box::new(CelNull)),
-            LiteralValue::String(s) => Cow::Borrowed(s),
-            LiteralValue::UInt(ui) => Cow::Borrowed(ui),
+    /// The literal as a value borrowed from the AST: no allocation.
+    pub fn to_val<'b, 'v>(&'b self) -> CowVal<'b, 'v> {
+        match self {
+            LiteralValue::Boolean(b) => CowVal::Borrowed(b),
+            LiteralValue::Bytes(b) => CowVal::Borrowed(b),
+            LiteralValue::Double(f) => CowVal::Borrowed(f),
+            LiteralValue::Int(i) => CowVal::Borrowed(i),
+            LiteralValue::Null => CowVal::Borrowed(&NULL),
+            LiteralValue::String(s) => CowVal::Borrowed(s),
+            LiteralValue::UInt(ui) => CowVal::Borrowed(ui),
         }
     }
 }

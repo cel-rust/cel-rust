@@ -1,47 +1,47 @@
 use crate::common::traits::{Adder, Container, Indexer, Iterable, Sizer, Zeroer};
 use crate::common::types::{CelInt, CelUInt, Kind, Type};
-use crate::common::value::Val;
+use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
 use crate::common::{traits, types};
 use crate::ExecutionError;
-use std::any::Any;
-use std::borrow::Cow;
 use std::ops::Deref;
 
+/// A CEL list whose elements may borrow data for `'v`.
 #[derive(Debug, Default)]
-pub struct DefaultList(Vec<Box<dyn Val>>);
+pub struct DefaultList<'v>(Vec<Box<dyn Val + 'v>>);
 
-impl DefaultList {
-    pub fn into_inner(self) -> Vec<Box<dyn Val>> {
+impl<'v> DefaultList<'v> {
+    pub fn into_inner(self) -> Vec<Box<dyn Val + 'v>> {
         self.0
     }
 
-    pub fn inner(&self) -> &[Box<dyn Val>] {
+    pub fn inner(&self) -> &[Box<dyn Val + 'v>] {
         &self.0
-    }
-
-    fn clone(&self) -> Self {
-        let mut vec = Vec::with_capacity(self.0.len());
-        for i in self.0.iter().map(|i| i.clone_as_boxed()) {
-            vec.push(i);
-        }
-        Self(vec)
     }
 }
 
-impl Deref for DefaultList {
-    type Target = [Box<dyn Val>];
+impl<'v> Clone for DefaultList<'v> {
+    fn clone(&self) -> Self {
+        Self(self.0.clone())
+    }
+}
+
+impl<'v> Deref for DefaultList<'v> {
+    type Target = [Box<dyn Val + 'v>];
 
     fn deref(&self) -> &Self::Target {
         self.inner()
     }
 }
 
-impl Val for DefaultList {
+impl<'v> Val for DefaultList<'v> {
     fn get_type(&self) -> &Type {
         &types::LIST_TYPE
     }
 
-    fn as_adder(&self) -> Option<&dyn Adder> {
+    fn as_adder<'b, 'w>(&'b self) -> Option<&'b (dyn Adder + 'w)>
+    where
+        Self: 'w,
+    {
         Some(self)
     }
 
@@ -49,15 +49,24 @@ impl Val for DefaultList {
         Some(self)
     }
 
-    fn as_indexer(&self) -> Option<&dyn Indexer> {
+    fn as_indexer<'b, 'w>(&'b self) -> Option<&'b (dyn Indexer + 'w)>
+    where
+        Self: 'w,
+    {
         Some(self)
     }
 
-    fn into_indexer(self: Box<Self>) -> Option<Box<dyn Indexer>> {
+    fn into_indexer<'w>(self: Box<Self>) -> Option<Box<dyn Indexer + 'w>>
+    where
+        Self: 'w,
+    {
         Some(self)
     }
 
-    fn as_iterable(&self) -> Option<&dyn Iterable> {
+    fn as_iterable<'b, 'w>(&'b self) -> Option<&'b (dyn Iterable + 'w)>
+    where
+        Self: 'w,
+    {
         Some(self)
     }
 
@@ -70,31 +79,56 @@ impl Val for DefaultList {
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
-        other
-            .downcast_ref::<Self>()
-            .is_some_and(|other| self.0 == other.0)
+        other.downcast_ref::<DefaultList>().is_some_and(|other| {
+            self.0.len() == other.0.len()
+                && self
+                    .0
+                    .iter()
+                    .zip(other.0.iter())
+                    .all(|(a, b)| a.equals(b.as_ref()))
+        })
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
+    fn clone_as_boxed<'w>(&self) -> Box<dyn Val + 'w>
+    where
+        Self: 'w,
+    {
         Box::new(self.clone())
+    }
+
+    fn as_builtin<'b, 'w>(&'b self) -> BuiltinRef<'b, 'w>
+    where
+        Self: 'w,
+    {
+        BuiltinRef::List(self)
+    }
+
+    fn into_builtin<'w>(self: Box<Self>) -> Option<Builtin<'w>>
+    where
+        Self: 'w,
+    {
+        Some(Builtin::List(*self))
     }
 }
 
-impl Adder for DefaultList {
-    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+impl<'v> Adder for DefaultList<'v> {
+    fn add<'b, 'w>(&'b self, rhs: &(dyn Val + 'w)) -> Result<CowVal<'b, 'w>, ExecutionError>
+    where
+        Self: 'w,
+    {
         let mut rhs = rhs
             .as_iterable()
             .ok_or(ExecutionError::NoSuchOverload)?
             .iter();
-        let mut list = self.clone();
+        let mut list: Vec<Box<dyn Val + 'w>> = self.0.iter().map(|i| i.clone_as_boxed()).collect();
         while let Some(other) = rhs.next() {
-            list.0.push(other.clone_as_boxed());
+            list.push(other.clone_as_boxed());
         }
-        Ok(Cow::<dyn Val>::Owned(Box::new(list)))
+        Ok(CowVal::owned(DefaultList(list)))
     }
 }
 
-impl Container for DefaultList {
+impl Container for DefaultList<'_> {
     fn contains(&self, value: &dyn Val) -> Result<bool, ExecutionError> {
         for i in &self.0 {
             if i.equals(value) {
@@ -105,135 +139,125 @@ impl Container for DefaultList {
     }
 }
 
-impl Indexer for DefaultList {
-    fn get<'a>(&'a self, idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        match idx.get_type().kind() {
-            Kind::Int => {
-                let idx: i64 = *idx
-                    .downcast_ref::<CelInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
-                    .inner();
-                Ok(Cow::Borrowed(
-                    self.0
-                        .get(idx as usize)
-                        .ok_or_else(|| ExecutionError::IndexOutOfBounds(idx.into()))?
-                        .as_ref(),
-                ))
-            }
-            Kind::UInt => {
-                let idx: u64 = *idx
-                    .downcast_ref::<CelUInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
-                    .inner();
-                Ok(Cow::Borrowed(
-                    self.0
-                        .get(idx as usize)
-                        .ok_or_else(|| ExecutionError::IndexOutOfBounds(idx.into()))?
-                        .as_ref(),
-                ))
-            }
-            _ => Err(ExecutionError::UnexpectedType {
-                got: idx.get_type().runtime_type_name.to_string(),
-                want: format!(
-                    "{}|{}",
-                    types::INT_TYPE.runtime_type_name,
-                    types::UINT_TYPE.runtime_type_name
-                ),
-            }),
+fn index(idx: &dyn Val) -> Result<usize, ExecutionError> {
+    match idx.get_type().kind() {
+        Kind::Int => {
+            let idx: i64 = *idx
+                .downcast_ref::<CelInt>()
+                .ok_or(ExecutionError::NoSuchOverload)?
+                .inner();
+            usize::try_from(idx).map_err(|_| ExecutionError::IndexOutOfBounds(idx.into()))
         }
-    }
-
-    fn steal(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
-        let mut list = self;
-        match idx.get_type().kind() {
-            Kind::Int => {
-                let idx: i64 = *idx
-                    .downcast_ref::<CelInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
-                    .inner();
-                if idx < 0 || idx as usize >= list.0.len() {
-                    return Err(ExecutionError::IndexOutOfBounds(idx.into()));
-                }
-                Ok(list.0.remove(idx as usize))
-            }
-            Kind::UInt => {
-                let idx: u64 = *idx
-                    .downcast_ref::<CelUInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
-                    .inner();
-                if idx as usize >= list.0.len() {
-                    return Err(ExecutionError::IndexOutOfBounds(idx.into()));
-                }
-                Ok(list.0.remove(idx as usize))
-            }
-            _ => Err(ExecutionError::UnexpectedType {
-                got: idx.get_type().runtime_type_name.to_string(),
-                want: format!(
-                    "{}|{}",
-                    types::INT_TYPE.runtime_type_name,
-                    types::UINT_TYPE.runtime_type_name
-                ),
-            }),
+        Kind::UInt => {
+            let idx: u64 = *idx
+                .downcast_ref::<CelUInt>()
+                .ok_or(ExecutionError::NoSuchOverload)?
+                .inner();
+            usize::try_from(idx).map_err(|_| ExecutionError::IndexOutOfBounds(idx.into()))
         }
+        _ => Err(ExecutionError::UnexpectedType {
+            got: idx.get_type().runtime_type_name.to_string(),
+            want: format!(
+                "{}|{}",
+                types::INT_TYPE.runtime_type_name,
+                types::UINT_TYPE.runtime_type_name
+            ),
+        }),
     }
 }
 
-impl Iterable for DefaultList {
-    fn iter<'a>(&'a self) -> Box<dyn super::traits::Iterator<'a> + 'a> {
+fn out_of_bounds(idx: &dyn Val) -> ExecutionError {
+    ExecutionError::IndexOutOfBounds(idx.try_into().unwrap_or(crate::Value::Null))
+}
+
+impl<'v> Indexer for DefaultList<'v> {
+    fn get<'b, 'w>(&'b self, idx: &dyn Val) -> Result<CowVal<'b, 'w>, ExecutionError>
+    where
+        Self: 'w,
+    {
+        let i = index(idx)?;
+        self.0
+            .get(i)
+            .map(|v| CowVal::Borrowed(v.as_ref()))
+            .ok_or_else(|| out_of_bounds(idx))
+    }
+
+    fn steal<'w>(self: Box<Self>, idx: &dyn Val) -> Result<Box<dyn Val + 'w>, ExecutionError>
+    where
+        Self: 'w,
+    {
+        let mut list = self;
+        let i = index(idx)?;
+        if i >= list.0.len() {
+            return Err(out_of_bounds(idx));
+        }
+        Ok(list.0.swap_remove(i))
+    }
+}
+
+impl<'v> Iterable for DefaultList<'v> {
+    fn iter<'b, 'w>(&'b self) -> Box<dyn traits::Iterator<'b, 'w> + 'b>
+    where
+        Self: 'w,
+    {
         Box::new(SliceIterator::new(self.0.as_slice()))
     }
 }
 
-impl Sizer for DefaultList {
+impl Sizer for DefaultList<'_> {
     fn size(&self) -> CelInt {
         (self.inner().len() as i64).into()
     }
 }
 
-impl Zeroer for DefaultList {
+impl Zeroer for DefaultList<'_> {
     fn is_zero_value(&self) -> bool {
         self.inner().is_empty()
     }
 }
 
-impl From<Vec<Box<dyn Val>>> for DefaultList {
-    fn from(v: Vec<Box<dyn Val>>) -> Self {
+impl<'v> From<Vec<Box<dyn Val + 'v>>> for DefaultList<'v> {
+    fn from(v: Vec<Box<dyn Val + 'v>>) -> Self {
         Self(v)
     }
 }
 
-impl TryFrom<Box<dyn Val>> for Vec<Box<dyn Val>> {
-    type Error = Box<dyn Val>;
+impl<'v> TryFrom<Box<dyn Val + 'v>> for Vec<Box<dyn Val + 'v>> {
+    type Error = Box<dyn Val + 'v>;
 
-    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
-        super::cast_boxed::<DefaultList>(value).map(|l| l.into_inner())
+    fn try_from(value: Box<dyn Val + 'v>) -> Result<Self, Self::Error> {
+        match super::into_builtin(value) {
+            Ok(Builtin::List(l)) => Ok(l.into_inner()),
+            Ok(other) => Err(other.into_boxed()),
+            Err(value) => Err(value),
+        }
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a [Box<dyn Val>] {
-    type Error = &'a dyn Val;
+impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a [Box<dyn Val + 'v>] {
+    type Error = &'a (dyn Val + 'v);
 
-    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
-        if let Some(list) = <dyn Any>::downcast_ref::<DefaultList>(value) {
+    fn try_from(value: &'a (dyn Val + 'v)) -> Result<Self, Self::Error> {
+        if let Some(list) = value.downcast_ref::<DefaultList>() {
             return Ok(list.inner());
         }
         Err(value)
     }
 }
 
-pub struct SliceIterator<'a> {
-    list: &'a [Box<dyn Val>],
+pub struct SliceIterator<'b, 'v> {
+    list: &'b [Box<dyn Val + 'v>],
     pos: usize,
 }
 
-impl<'a> SliceIterator<'a> {
-    fn new(list: &'a [Box<dyn Val>]) -> Self {
+impl<'b, 'v> SliceIterator<'b, 'v> {
+    fn new(list: &'b [Box<dyn Val + 'v>]) -> Self {
         Self { list, pos: 0 }
     }
 }
 
-impl<'a> traits::Iterator<'a> for SliceIterator<'a> {
-    fn next(&mut self) -> Option<&'a dyn Val> {
+impl<'b, 'v: 'w, 'w> traits::Iterator<'b, 'w> for SliceIterator<'b, 'v> {
+    fn next(&mut self) -> Option<&'b (dyn Val + 'w)> {
         if self.pos >= self.list.len() {
             None
         } else {
@@ -267,9 +291,8 @@ pub mod tests {
     use crate::common::traits::Indexer;
     use crate::common::types::list::DefaultList;
     use crate::common::types::{CelInt, CelString};
-    use crate::common::value::Val;
+    use crate::common::value::{CowVal, Val};
     use crate::ExecutionError::{IndexOutOfBounds, UnexpectedType};
-    use std::borrow::Cow;
 
     #[test]
     fn list_has_indexer() {
@@ -318,7 +341,7 @@ pub mod tests {
         let val: Box<dyn Val> = Box::new(val.clone());
         let list = DefaultList(vec![val]);
         let idx: CelInt = 0.into();
-        let expected = Cow::<dyn Val>::Owned(Box::new(Into::<CelString>::into("cel")));
+        let expected: CowVal<'_, '_> = CowVal::owned(Into::<CelString>::into("cel"));
         assert_eq!(Indexer::get(&list, &idx), Ok(expected));
     }
 

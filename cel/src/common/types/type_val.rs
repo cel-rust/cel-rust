@@ -1,6 +1,7 @@
 use crate::common::types::{Kind, Type};
-use crate::common::value::Val;
+use crate::common::value::{CowVal, StaticVal, Val};
 use crate::ExecutionError;
+use std::any::Any;
 use std::borrow::Cow;
 
 static TYPE_TYPE: Type = Type::simple_type(Kind::Type, "type");
@@ -59,14 +60,23 @@ impl Val for CelType {
             .is_some_and(|o| self.name == o.name)
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
         Box::new(self.clone())
+    }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
     }
 }
 
-fn type_of<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+impl StaticVal for CelType {}
+
+fn type_of<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     let name = args[0].as_ref().get_type().name().to_string();
-    Ok(Cow::<dyn Val>::Owned(Box::new(CelType::new(name))))
+    Ok(CowVal::owned(CelType::new(name)))
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
@@ -102,7 +112,7 @@ mod tests {
 
     #[test]
     fn type_of_returns_named_type() {
-        let args: Vec<Cow<dyn Val>> = vec![Cow::<dyn Val>::Owned(Box::new(CelInt::from(1)))];
+        let args: Vec<CowVal<'_, '_>> = vec![CowVal::owned(CelInt::from(1))];
         let out = type_of(args).unwrap();
         let t = out.as_ref().downcast_ref::<CelType>().unwrap();
         assert_eq!(t.name(), "int");
