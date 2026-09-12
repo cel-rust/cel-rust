@@ -48,6 +48,10 @@ name = "example-threads"
 path = "src/threads.rs"
 
 [[bin]]
+name = "example-var-resolver"
+path = "src/resolver.rs"
+
+[[bin]]
 name = "example-serde"
 path = "src/serde.rs"
 

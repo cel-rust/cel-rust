@@ -1,12 +1,11 @@
 use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelNull, CelString, CelUInt};
 #[cfg(feature = "chrono")]
 use crate::common::types::{CelDuration, CelTimestamp};
-use crate::common::value::Val;
+use crate::common::value::{CowVal, FromVal as DowncastFrom, Val};
 use crate::macros::{impl_conversions, impl_handler};
 use crate::objects::Opaque;
 use crate::resolvers::AllArguments;
 use crate::{ExecutionError, FunctionContext, Value};
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -51,8 +50,8 @@ pub(crate) trait FromVal: Sized {
     fn from_val(value: &dyn Val) -> Result<Self, ExecutionError>;
 }
 
-fn downcast_or_unexpected<'a, T: Val>(
-    value: &'a dyn Val,
+fn downcast_or_unexpected<'a, 'v, T: DowncastFrom<'a, 'v>>(
+    value: &'a (dyn Val + 'v),
     want: &str,
 ) -> Result<&'a T, ExecutionError> {
     value
@@ -173,14 +172,16 @@ impl From<Arc<Vec<Value>>> for Value {
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Arc<Vec<Value>> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+impl<'context, 'call> IntoResolveResult<'context, 'call> for Arc<Vec<Value>> {
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
         Value::List(self).into_resolve_result()
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Result<Arc<Vec<Value>>, ExecutionError> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+impl<'context, 'call> IntoResolveResult<'context, 'call>
+    for Result<Arc<Vec<Value>>, ExecutionError>
+{
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
         self?.into_resolve_result()
     }
 }
@@ -200,14 +201,16 @@ impl From<Arc<dyn Opaque>> for Value {
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Arc<dyn Opaque> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+impl<'context, 'call> IntoResolveResult<'context, 'call> for Arc<dyn Opaque> {
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
         Value::Opaque(self).into_resolve_result()
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Result<Arc<dyn Opaque>, ExecutionError> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+impl<'context, 'call> IntoResolveResult<'context, 'call>
+    for Result<Arc<dyn Opaque>, ExecutionError>
+{
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
         self?.into_resolve_result()
     }
 }
@@ -221,46 +224,48 @@ impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Arc<dyn Opaque> {
     }
 }
 
-/// A trait for types that can be converted into the `Cow<'context, dyn Val>` returned by a
-/// registered function. Every function that can be registered to the CEL context must return
-/// a value that implements this trait.
+/// A trait for types that can be converted into the [`CowVal`] returned by a registered
+/// function. Every function that can be registered to the CEL context must return a value that
+/// implements this trait.
 ///
 /// Most implementations (e.g. the CEL-primitive types, [`Value`] itself) produce an owned
 /// [`Val`], since they have no connection to the calling [`FunctionContext`]'s data. A function
 /// that wants to avoid cloning - for example one that returns one of its arguments, or `this`,
-/// unchanged - can instead return a [`Cow`] borrowed from the [`FunctionContext`] directly (see
-/// [`FunctionContext::this`] and [`FunctionContext::args`]).
-pub trait IntoResolveResult<'context> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError>;
+/// unchanged - can instead return a [`CowVal`] borrowed from the [`FunctionContext`] directly (see
+/// [`FunctionContext::this`] and [`FunctionContext::args`]). `'context` is that borrow, and
+/// `'call` bounds the data the borrowed values may themselves borrow.
+pub trait IntoResolveResult<'context, 'call> {
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError>;
 }
 
-impl<'context> IntoResolveResult<'context> for String {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
-        let val: Box<dyn Val> = Box::new(CelString::from(self));
-        Ok(Cow::Owned(val))
+impl<'context, 'call> IntoResolveResult<'context, 'call> for String {
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
+        Ok(CowVal::owned(CelString::from(self)))
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Value {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
-        Ok(Cow::Owned(self.try_into()?))
+impl<'context, 'call> IntoResolveResult<'context, 'call> for Value {
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
+        Ok(CowVal::Owned(self.try_into()?))
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Result<Value, ExecutionError> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+impl<'context, 'call> IntoResolveResult<'context, 'call> for Result<Value, ExecutionError> {
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
         self?.into_resolve_result()
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Cow<'context, dyn Val> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+impl<'context, 'call> IntoResolveResult<'context, 'call> for CowVal<'context, 'call> {
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
         Ok(self)
     }
 }
 
-impl<'context> IntoResolveResult<'context> for Result<Cow<'context, dyn Val>, ExecutionError> {
-    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+impl<'context, 'call> IntoResolveResult<'context, 'call>
+    for Result<CowVal<'context, 'call>, ExecutionError>
+{
+    fn into_resolve_result(self) -> Result<CowVal<'context, 'call>, ExecutionError> {
         self
     }
 }
@@ -441,9 +446,9 @@ impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Value {
 /// needs directly from the returned `Val` via [`FromVal`]. Calling this multiple
 /// times will increment the `arg_idx` which will return subsequent arguments
 /// every time.
-pub(crate) fn arg_val_from_context<'context>(
-    ctx: &mut FunctionContext<'context, '_>,
-) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+pub(crate) fn arg_val_from_context<'context, 'call>(
+    ctx: &mut FunctionContext<'context, 'call>,
+) -> Result<CowVal<'context, 'call>, ExecutionError> {
     let idx = ctx.arg_idx;
     ctx.arg_idx += 1;
     ctx.args
@@ -492,7 +497,7 @@ impl FunctionRegistry {
 pub type Function = Box<
     dyn for<'context, 'call> Fn(
             &mut FunctionContext<'context, 'call>,
-        ) -> Result<Cow<'context, dyn Val>, ExecutionError>
+        ) -> Result<CowVal<'context, 'call>, ExecutionError>
         + Send
         + Sync,
 >;

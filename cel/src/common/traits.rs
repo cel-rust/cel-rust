@@ -1,10 +1,7 @@
 use crate::common::types::CelInt;
-use crate::common::value::Val;
+use crate::common::value::{CowVal, Val};
 use crate::ExecutionError;
-use std::any::Any;
-use std::borrow::Cow;
 use std::cmp::Ordering;
-use std::fmt::Debug;
 
 pub type TraitSet = u16;
 
@@ -56,8 +53,14 @@ pub const SUBTRACTOR_TYPE: TraitSet = SIZER_TYPE << 1;
 /// FOLDABLE_TYPE types support comprehensions v2 macros which iterate over (key, value) pairs.
 pub const FOLDABLE_TYPE: TraitSet = SUBTRACTOR_TYPE << 1;
 
+// Operator traits produce values bounded by a caller-chosen `'v` that `Self`
+// outlives, so a borrowing operand yields a result borrowing the same data
+// rather than a `'static` copy.
+
 pub trait Adder {
-    fn add<'a>(&'a self, _rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+    fn add<'b, 'v>(&'b self, _rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v;
 }
 
 pub trait Comparer {
@@ -69,27 +72,37 @@ pub trait Container {
 }
 
 pub trait Divider {
-    fn div<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+    fn div<'b, 'v>(&'b self, _rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v;
 }
 
 pub trait Iterable {
-    fn iter<'a>(&'a self) -> Box<dyn Iterator<'a> + 'a>;
+    fn iter<'b, 'v>(&'b self) -> Box<dyn Iterator<'b, 'v> + 'b>
+    where
+        Self: 'v;
 }
 
-pub trait Iterator<'a> {
-    fn next(&mut self) -> Option<&'a dyn Val>;
+pub trait Iterator<'b, 'v> {
+    fn next(&mut self) -> Option<&'b (dyn Val + 'v)>;
 }
 
 pub trait Modder {
-    fn modulo<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+    fn modulo<'b, 'v>(&'b self, _rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v;
 }
 
 pub trait Multiplier {
-    fn mul<'a>(&self, _rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+    fn mul<'b, 'v>(&'b self, _rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v;
 }
 
 pub trait Negator {
-    fn negate(&self) -> Result<Box<dyn Val>, ExecutionError>;
+    fn negate<'v>(&self) -> Result<Box<dyn Val + 'v>, ExecutionError>
+    where
+        Self: 'v;
 }
 
 pub trait Sizer {
@@ -97,7 +110,9 @@ pub trait Sizer {
 }
 
 pub trait Subtractor {
-    fn sub<'a>(&'a self, _rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+    fn sub<'b, 'v>(&'b self, _rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v;
 }
 
 pub trait Zeroer {
@@ -105,28 +120,26 @@ pub trait Zeroer {
 }
 
 pub trait Indexer {
-    fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError>;
+    fn get<'b, 'v>(&'b self, _idx: &dyn Val) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v;
 
-    fn steal(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError>;
-}
-
-pub trait Lister: Debug + Any {
-    fn as_indexer(&self) -> &dyn Indexer;
+    fn steal<'v>(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val + 'v>, ExecutionError>
+    where
+        Self: 'v;
 }
 
 pub(crate) mod adapter {
-    use std::borrow::Cow;
+    use crate::{common::value::CowVal, ExecutionError};
 
-    use crate::{common::value::Val, ExecutionError};
-
-    pub fn sizer_size<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    pub fn sizer_size<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
         let target = &args[0];
         match target.as_sizer() {
             None => Err(ExecutionError::UnexpectedType {
                 got: target.get_type().name().to_owned(),
                 want: "missing trait Sizer".to_owned(),
             }),
-            Some(sizer) => Ok(Cow::<dyn Val>::Owned(Box::new(sizer.size()))),
+            Some(sizer) => Ok(CowVal::owned(sizer.size())),
         }
     }
 }

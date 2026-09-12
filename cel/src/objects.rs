@@ -1,13 +1,14 @@
-use crate::common::ast::{operators, EntryExpr, Expr};
+use crate::common::ast::{operators, ComprehensionExpr, EntryExpr, Expr};
 use crate::common::types::bool::Bool;
+use crate::common::types::optional::{unwrap_optional, Unwrapped};
 use crate::common::types::*;
-use crate::common::value::{Downcast, Val};
+use crate::common::value::{BuiltinRef, CowVal, FromVal, StaticVal, Val};
 use crate::context::Context;
 use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
 use std::any::Any;
-use std::borrow::{Borrow, Cow};
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -87,8 +88,8 @@ pub enum Key {
     String(Arc<String>),
 }
 
-impl From<CelMapKey> for Key {
-    fn from(value: CelMapKey) -> Self {
+impl From<CelMapKey<'_>> for Key {
+    fn from(value: CelMapKey<'_>) -> Self {
         match value {
             CelMapKey::Bool(b) => b.into_inner().into(),
             CelMapKey::Int(i) => i.into_inner().into(),
@@ -98,13 +99,13 @@ impl From<CelMapKey> for Key {
     }
 }
 
-impl From<Key> for CelMapKey {
+impl From<Key> for CelMapKey<'_> {
     fn from(key: Key) -> Self {
         match key {
             Key::Int(i) => CelMapKey::from(i),
             Key::Uint(u) => CelMapKey::from(u),
             Key::Bool(b) => CelMapKey::from(b),
-            Key::String(s) => CelMapKey::from(s.as_str()),
+            Key::String(s) => CelMapKey::from(Arc::unwrap_or_clone(s)),
         }
     }
 }
@@ -432,13 +433,22 @@ impl Val for OpaqueVal {
         }
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
         Box::new(Self {
             r#type: Type::new_opaque_type(self.val.runtime_type_name().to_owned()),
             val: self.val.clone(),
         })
     }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
+    }
 }
+
+impl StaticVal for OpaqueVal {}
 
 impl OpaqueVal {
     fn new(val: Arc<dyn Opaque>) -> Self {
@@ -544,7 +554,7 @@ pub enum Value {
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
     Opaque(Arc<dyn Opaque>),
     #[cfg(feature = "structs")]
-    Struct(Arc<CelStruct>),
+    Struct(Arc<CelStruct<'static>>),
     Null,
 }
 
@@ -860,13 +870,13 @@ fn no_value_repr(v: &dyn Val) -> ExecutionError {
 /// `Kind` without being the built-in value that carries it - a custom lazy list
 /// reports `Kind::List` but is not a [`CelList`]. Those reach `Value` as an
 /// error, not a panic.
-fn built_in<T: Val>(v: &dyn Val) -> Result<&T, ExecutionError> {
+fn built_in<'b, 'v, T: FromVal<'b, 'v>>(v: &'b (dyn Val + 'v)) -> Result<&'b T, ExecutionError> {
     v.downcast_ref::<T>().ok_or_else(|| no_value_repr(v))
 }
 
-impl TryFrom<&dyn Val> for Value {
+impl<'b, 'v> TryFrom<&'b (dyn Val + 'v)> for Value {
     type Error = ExecutionError;
-    fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
+    fn try_from(v: &'b (dyn Val + 'v)) -> Result<Self, Self::Error> {
         match v.get_type().kind() {
             Kind::Boolean => Ok(Value::Bool(*built_in::<CelBool>(v)?.inner())),
             Kind::Int => Ok(Value::Int(*built_in::<CelInt>(v)?.inner())),
@@ -917,14 +927,7 @@ impl TryFrom<&dyn Val> for Value {
                 #[cfg(feature = "structs")]
                 {
                     if let Some(v) = v.downcast_ref::<CelStruct>() {
-                        use crate::common::value::Downcast;
-
-                        return match v.clone_as_boxed().downcast::<CelStruct>() {
-                            Ok(v) => Ok(Value::Struct(Arc::new(*v))),
-                            Err(v) => Err(ExecutionError::InternalError(format!(
-                                "Not a Struct: `{v:?}`"
-                            ))),
-                        };
+                        return Ok(Value::Struct(Arc::new(v.to_static()?)));
                     }
                 }
                 if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
@@ -945,7 +948,7 @@ impl TryFrom<Value> for Box<dyn Val> {
             Value::Int(i) => Ok(Box::new(CelInt::from(i))),
             Value::UInt(u) => Ok(Box::new(CelUInt::from(u))),
             Value::Float(f) => Ok(Box::new(CelDouble::from(f))),
-            Value::String(s) => Ok(Box::new(CelString::from(s.as_str()))),
+            Value::String(s) => Ok(Box::new(CelString::from(Arc::unwrap_or_clone(s)))),
             Value::Null => Ok(Box::new(CelNull)),
             Value::Bytes(b) => Ok(Box::new(CelBytes::from(b.as_slice().to_vec()))),
             #[cfg(feature = "chrono")]
@@ -998,11 +1001,17 @@ impl Value {
         Self::resolve_val(expr, ctx)?.as_ref().try_into()
     }
 
+    /// Evaluates `expr` against `ctx`.
+    ///
+    /// The result borrows where it can: a literal borrows the AST (`'e`), a
+    /// variable borrows the context (`'e`), and anything carrying data the
+    /// context's resolver or values borrow is bounded by `'v`. Nothing is
+    /// copied unless an operation produces a new value.
     #[inline(always)]
-    pub fn resolve_val<'a>(
-        expr: &'a Expression,
-        ctx: &'a Context<'a>,
-    ) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    pub fn resolve_val<'e, 'p, 'v>(
+        expr: &'e Expression,
+        ctx: &'e Context<'p, 'v>,
+    ) -> Result<CowVal<'e, 'v>, ExecutionError> {
         match &expr.expr {
             Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
@@ -1020,18 +1029,14 @@ impl Value {
                         operators::LOGICAL_OR => {
                             let left = try_bool(Value::resolve_val(&call.args[0], ctx));
                             return if Ok(true) == left {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
+                                Ok(bool(true))
                             } else {
                                 let right_value = Value::resolve_val(&call.args[1], ctx)?;
                                 let right =
                                     right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
                                 match (left, right) {
-                                    (Ok(false), Some(right)) => {
-                                        Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(right))))
-                                    }
-                                    (Err(_), Some(true)) => {
-                                        Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
-                                    }
+                                    (Ok(false), Some(right)) => Ok(bool(right)),
+                                    (Err(_), Some(true)) => Ok(bool(true)),
                                     (left, _) => Err(boolean_operator_error(
                                         &call.func_name,
                                         left,
@@ -1043,18 +1048,14 @@ impl Value {
                         operators::LOGICAL_AND => {
                             let left = try_bool(Value::resolve_val(&call.args[0], ctx));
                             return if Ok(false) == left {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
+                                Ok(bool(false))
                             } else {
                                 let right_value = Value::resolve_val(&call.args[1], ctx)?;
                                 let right =
                                     right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
                                 match (left, right) {
-                                    (Ok(true), Some(right)) => {
-                                        Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(right))))
-                                    }
-                                    (Err(_), Some(false)) => {
-                                        Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
-                                    }
+                                    (Ok(true), Some(right)) => Ok(bool(right)),
+                                    (Err(_), Some(false)) => Ok(bool(false)),
                                     (left, _) => Err(boolean_operator_error(
                                         &call.func_name,
                                         left,
@@ -1066,32 +1067,26 @@ impl Value {
                         operators::EQUALS => {
                             return Ok(bool(
                                 Value::resolve_val(&call.args[0], ctx)?
-                                    .eq(&Value::resolve_val(&call.args[1], ctx)?),
+                                    == Value::resolve_val(&call.args[1], ctx)?,
                             ))
                         }
                         operators::NOT_EQUALS => {
                             return Ok(bool(
                                 Value::resolve_val(&call.args[0], ctx)?
-                                    .ne(&Value::resolve_val(&call.args[1], ctx)?),
+                                    != Value::resolve_val(&call.args[1], ctx)?,
                             ))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
                             let value = Value::resolve_val(&call.args[0], ctx)?;
 
-                            let value = if let Some(opt) = value.downcast_ref::<CelOptional>() {
-                                is_optional = true;
-                                match opt.inner() {
-                                    // todo try to keep this borrowed
-                                    Some(v) => Cow::Owned(v.clone_as_boxed()),
-                                    None => {
-                                        return Ok(Cow::<dyn Val>::Owned(Box::new(
-                                            CelOptional::none(),
-                                        )))
-                                    }
+                            let value = match unwrap_optional(value) {
+                                Unwrapped::NotOptional(value) => value,
+                                Unwrapped::Some(value) => {
+                                    is_optional = true;
+                                    value
                                 }
-                            } else {
-                                value
+                                Unwrapped::None => return Ok(CowVal::owned(CelOptional::none())),
                             };
 
                             let index = Self::resolve_val(&call.args[1], ctx)?;
@@ -1101,25 +1096,23 @@ impl Value {
                                 false,
                             );
                             let result = match value {
-                                Cow::Borrowed(val) => val
+                                CowVal::Borrowed(val) => val
                                     .as_indexer()
                                     .ok_or_else(|| overload_error.clone())?
                                     .get(index.as_ref())
                                     .map_err(|error| error.with_overload_context(overload_error)),
-                                Cow::Owned(val) => val
+                                CowVal::Owned(val) => val
                                     .into_indexer()
                                     .ok_or_else(|| overload_error.clone())?
                                     .steal(index.as_ref())
-                                    .map(Cow::Owned)
+                                    .map(CowVal::Owned)
                                     .map_err(|error| error.with_overload_context(overload_error)),
                             };
                             return if is_optional {
-                                Ok(match result {
-                                    Ok(val) => Cow::<dyn Val>::Owned(Box::new(CelOptional::from(
-                                        val.clone_as_boxed(),
-                                    ))),
-                                    Err(_) => Cow::<dyn Val>::Owned(Box::new(CelOptional::none())),
-                                })
+                                Ok(CowVal::owned(match result {
+                                    Ok(val) => CelOptional::of(val.into_owned()),
+                                    Err(_) => CelOptional::none(),
+                                }))
                             } else {
                                 result
                             };
@@ -1143,18 +1136,17 @@ impl Value {
                             // the operand is the target itself. A missing
                             // key/field maps to `Optional::none()` per
                             // cel-spec (mirrors OPT_INDEX semantics).
-                            let target: Option<&dyn Val> =
-                                if let Some(opt) = operand.downcast_ref::<CelOptional>() {
-                                    opt.option()
-                                } else {
-                                    Some(operand.as_ref())
-                                };
-                            let result = target
-                                .and_then(|v| v.as_indexer())
-                                .and_then(|i| i.get(field).ok())
-                                .map(|v| CelOptional::of(v.clone_as_boxed()))
-                                .unwrap_or_else(CelOptional::none);
-                            return Ok(Cow::<dyn Val>::Owned(Box::new(result)));
+                            let target = match unwrap_optional(operand) {
+                                Unwrapped::NotOptional(v) | Unwrapped::Some(v) => v,
+                                Unwrapped::None => return Ok(CowVal::owned(CelOptional::none())),
+                            };
+                            let result = match index_into(target, field, "_?._", |value| {
+                                ExecutionError::overload_for_values("_?._", [value, field], false)
+                            }) {
+                                Ok(v) => CelOptional::of(v.into_owned()),
+                                Err(_) => CelOptional::none(),
+                            };
+                            return Ok(CowVal::owned(result));
                         }
                         // END OF SPECIAL CASES
 
@@ -1162,9 +1154,8 @@ impl Value {
                         operators::ADD => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return Ok(Cow::Owned(
-                                lhs.as_ref()
-                                    .as_adder()
+                            return Ok(CowVal::Owned(
+                                lhs.as_adder()
                                     .ok_or_else(|| {
                                         ExecutionError::unsupported_binary_operator(
                                             "add",
@@ -1179,7 +1170,7 @@ impl Value {
                         operators::SUBSTRACT => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return Ok(Cow::Owned(
+                            return Ok(CowVal::Owned(
                                 lhs.as_subtractor()
                                     .ok_or_else(|| {
                                         ExecutionError::unsupported_binary_operator(
@@ -1195,7 +1186,7 @@ impl Value {
                         operators::DIVIDE => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return Ok(Cow::Owned(
+                            return Ok(CowVal::Owned(
                                 lhs.as_divider()
                                     .ok_or_else(|| {
                                         ExecutionError::unsupported_binary_operator(
@@ -1211,7 +1202,7 @@ impl Value {
                         operators::MULTIPLY => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return Ok(Cow::Owned(
+                            return Ok(CowVal::Owned(
                                 lhs.as_multiplier()
                                     .ok_or_else(|| {
                                         ExecutionError::unsupported_binary_operator(
@@ -1227,7 +1218,7 @@ impl Value {
                         operators::MODULO => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return Ok(Cow::Owned(
+                            return Ok(CowVal::Owned(
                                 lhs.as_modder()
                                     .ok_or_else(|| {
                                         ExecutionError::unsupported_binary_operator(
@@ -1251,13 +1242,10 @@ impl Value {
                         operators::LESS_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
-                                == Ordering::Greater
-                            {
-                                Ok(bool(false))
-                            } else {
-                                Ok(bool(true))
-                            };
+                            return Ok(bool(
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
+                                    != Ordering::Greater,
+                            ));
                         }
                         operators::GREATER => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
@@ -1270,13 +1258,10 @@ impl Value {
                         operators::GREATER_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
-                                == Ordering::Less
-                            {
-                                Ok(bool(false))
-                            } else {
-                                Ok(bool(true))
-                            };
+                            return Ok(bool(
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
+                                    != Ordering::Less,
+                            ));
                         }
                         operators::IN => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
@@ -1319,7 +1304,7 @@ impl Value {
                                 [val.as_ref()],
                                 false,
                             );
-                            return Ok(Cow::<dyn Val>::Owned(
+                            return Ok(CowVal::Owned(
                                 val.as_negator()
                                     .ok_or_else(|| overload_error.clone())?
                                     .negate()
@@ -1337,7 +1322,7 @@ impl Value {
                 match &call.target {
                     None => {
                         // TODO: Optimize for the 1 and 2 arg cases and avoid the Vec altogether
-                        let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
+                        let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
                             .args
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
@@ -1365,7 +1350,7 @@ impl Value {
                         (func)(&mut ctx)
                     }
                     Some(target) => {
-                        let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
+                        let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
                             .args
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
@@ -1431,9 +1416,12 @@ impl Value {
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                // borrows the field name from the AST
                 let key: CelString = select.field.as_str().into();
-                let overload_error =
-                    || ExecutionError::overload_for_values("_._", [left.as_ref(), &key], false);
+                let no_such_key = || ExecutionError::NoSuchKey(Arc::new(select.field.clone()));
+                let overload_error = |value: &dyn Val| {
+                    ExecutionError::overload_for_values("_._", [value, &key], false)
+                };
 
                 // Plain `.field` on an `Optional` propagates optional-ness
                 // per cel-spec — matches cel-go `applyQualifiers` at
@@ -1441,8 +1429,16 @@ impl Value {
                 // operand makes the whole qualifier chain optional. `has()`
                 // (test=true) on the same shape returns Bool(false) when the
                 // chain is empty.
-                if let Some(opt) = left.downcast_ref::<CelOptional>() {
+                let left = match unwrap_optional(left) {
+                    Unwrapped::NotOptional(left) => left,
                     // Optional::none() short-circuits — the chain stops.
+                    Unwrapped::None => {
+                        return if select.test {
+                            Ok(bool(false))
+                        } else {
+                            Ok(CowVal::owned(CelOptional::none()))
+                        }
+                    }
                     // Otherwise unwrap and access the field. A missing key on
                     // a real container maps to Optional::none(); a field
                     // access on a value that isn't a container at all
@@ -1451,119 +1447,88 @@ impl Value {
                     // conformance runner enables (see
                     // `interpreter/attributes.go:1382` and
                     // `conformance/conformance_test.go:87`).
-                    return match opt.option() {
-                        None => {
-                            if select.test {
-                                Ok(bool(false))
-                            } else {
-                                Ok(Cow::<dyn Val>::Owned(Box::new(CelOptional::none())))
+                    Unwrapped::Some(inner) => {
+                        return if select.test {
+                            let has = inner
+                                .as_indexer()
+                                .ok_or_else(no_such_key)?
+                                .get(&key)
+                                .is_ok();
+                            Ok(bool(has))
+                        } else {
+                            // a non-container operand is an error, a missing
+                            // key maps to `optional.none()`
+                            if inner.as_indexer().is_none() {
+                                return Err(no_such_key());
                             }
-                        }
-                        Some(inner) => {
-                            let indexer = inner.as_indexer().ok_or_else(|| {
-                                ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
-                            })?;
-                            if select.test {
-                                Ok(bool(indexer.get(&key).is_ok()))
-                            } else {
-                                let result = match indexer.get(&key) {
-                                    Ok(v) => CelOptional::of(v.clone_as_boxed()),
+                            Ok(CowVal::owned(
+                                match index_into(inner, &key, "_._", |_| no_such_key()) {
+                                    Ok(v) => CelOptional::of(v.into_owned()),
                                     Err(_) => CelOptional::none(),
-                                };
-                                Ok(Cow::<dyn Val>::Owned(Box::new(result)))
-                            }
-                        }
-                    };
-                }
+                                },
+                            ))
+                        };
+                    }
+                };
 
                 if select.test {
                     match left.get_type().kind() {
                         Kind::Map => Ok(bool(
                             left.as_container()
-                                .ok_or_else(|| {
-                                    ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
-                                })?
+                                .ok_or_else(no_such_key)?
                                 .contains(&key)?,
                         )),
                         #[cfg(feature = "structs")]
-                        Kind::Struct => {
-                            if let Some(indexer) = left.as_indexer() {
-                                Ok(bool(indexer.get(&key).is_ok()))
-                            } else {
-                                Ok(bool(false))
-                            }
-                        }
-                        _ => Ok(Cow::<dyn Val>::Owned(
+                        Kind::Struct => Ok(bool(
                             left.as_indexer()
-                                .ok_or_else(overload_error)?
-                                .get(&key)
-                                .map_err(|error| error.with_overload_context(overload_error()))?
-                                .into_owned(),
+                                .is_some_and(|indexer| indexer.get(&key).is_ok()),
                         )),
+                        _ => index_into(left, &key, "_._", overload_error),
                     }
                 } else {
-                    match left.get_type().kind() {
-                        Kind::Map => {
-                            // todo avoid cloning when not needed
-                            Ok(Cow::<dyn Val>::Owned(
-                                left.as_indexer()
-                                    .ok_or_else(|| {
-                                        ExecutionError::NoSuchKey(Arc::new(key.inner().to_string()))
-                                    })?
-                                    .get(&key)?
-                                    .into_owned(),
-                            ))
+                    let is_map = left.get_type().kind() == Kind::Map;
+                    index_into(left, &key, "_._", |value| {
+                        if is_map {
+                            no_such_key()
+                        } else {
+                            overload_error(value)
                         }
-                        _ => Ok(Cow::<dyn Val>::Owned(
-                            left.as_indexer()
-                                .ok_or_else(overload_error)?
-                                .get(&key)
-                                .map_err(|error| error.with_overload_context(overload_error()))?
-                                .into_owned(),
-                        )),
-                    }
+                    })
                 }
             }
             Expr::List(list_expr) => {
-                let list = list_expr
-                    .elements
-                    .iter()
-                    .enumerate()
-                    .map(|(idx, element)| {
-                        Value::resolve_val(element, ctx).map(|value| {
-                            if list_expr.optional_indices.contains(&idx) {
-                                if let Some(opt_val) = value.downcast_ref::<CelOptional>() {
-                                    opt_val.inner().map(|v| v.clone_as_boxed())
-                                } else {
-                                    Some(value.into_owned())
-                                }
-                            } else {
-                                Some(value.into_owned())
+                let mut list: Vec<Box<dyn Val + 'v>> = Vec::with_capacity(list_expr.elements.len());
+                for (idx, element) in list_expr.elements.iter().enumerate() {
+                    let value = Value::resolve_val(element, ctx)?;
+                    if list_expr.optional_indices.contains(&idx) {
+                        match unwrap_optional(value) {
+                            Unwrapped::NotOptional(v) | Unwrapped::Some(v) => {
+                                list.push(v.into_owned())
                             }
-                        })
-                    })
-                    .collect::<Result<Vec<_>, _>>()?
-                    .into_iter()
-                    .flatten()
-                    .collect::<Vec<_>>();
-                Ok(Cow::<dyn Val>::Owned(Box::new(CelList::from(list))))
+                            Unwrapped::None => {}
+                        }
+                    } else {
+                        list.push(value.into_owned());
+                    }
+                }
+                Ok(CowVal::owned(CelList::from(list)))
             }
             Expr::Map(map_expr) => {
-                let mut map = HashMap::with_capacity(map_expr.entries.len());
+                let mut map: HashMap<CelMapKey<'v>, Box<dyn Val + 'v>> =
+                    HashMap::with_capacity(map_expr.entries.len());
                 for entry in map_expr.entries.iter() {
                     let (k, v, is_optional) = match &entry.expr {
                         EntryExpr::StructField(_) => panic!("WAT?"),
                         EntryExpr::MapEntry(e) => (&e.key, &e.value, e.optional),
                     };
-                    let key: CelMapKey = Value::resolve_val(k, ctx)?.into_owned().try_into()?;
-                    // todo do not clone if not needed!
-                    let value = Value::resolve_val(v, ctx)?.into_owned();
+                    let key: CelMapKey<'v> = Value::resolve_val(k, ctx)?.try_into()?;
+                    let value = Value::resolve_val(v, ctx)?;
 
                     // An optional entry holding no value adds nothing, not even its key.
                     let value = if is_optional {
-                        match value.downcast_ref::<CelOptional>() {
-                            Some(opt_val) => opt_val.inner().map(|inner| inner.clone_as_boxed()),
-                            None => Some(value),
+                        match unwrap_optional(value) {
+                            Unwrapped::NotOptional(v) | Unwrapped::Some(v) => Some(v),
+                            Unwrapped::None => None,
                         }
                     } else {
                         Some(value)
@@ -1573,11 +1538,10 @@ impl Value {
                         if ctx.env().error_on_duplicate_map_keys() && map.contains_key(&key) {
                             return Err(ExecutionError::DuplicateKey(Key::from(key).into()));
                         }
-                        map.insert(key, value);
+                        map.insert(key, value.into_owned());
                     }
                 }
-                let map: Box<CelMap> = CelMap::from(map).into();
-                Ok(Cow::<dyn Val>::Owned(map))
+                Ok(CowVal::owned(CelMap::from(map)))
             }
             Expr::Comprehension(comprehension) => {
                 let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
@@ -1585,30 +1549,22 @@ impl Value {
 
                 // Mirror cel-go's optimization (see `folder.ResolveName` in
                 // `cel-go/interpreter/interpretable.go`): when the
-                // accumulator starts out as an empty list, swap it for a
-                // preallocated `MutableList` so the loop step
-                // (`@result + [expr]`) can grow a single shared buffer in
-                // place instead of paying O(n) clone-and-extend on every
-                // iteration. The ADD dispatch itself stays generic — it
-                // just calls `Adder::add` on whatever the accumulator
-                // resolves to, and `MutableList::add` mutates the shared
-                // `Arc<Mutex<Vec<_>>>` in place then returns
-                // `Cow::Borrowed(self)` (the "return the receiver" trick
-                // cel-go's `mutableList.Add` uses to keep the same pointer
-                // identity across iterations).
-                let accu_boxed: Box<dyn Val> = match accu_init.downcast_ref::<CelList>() {
-                    Some(list) if list.inner().is_empty() => {
-                        let size_hint = iter
-                            .as_sizer()
-                            .map(|s| *s.size().inner() as usize)
-                            .unwrap_or(0);
-                        Box::new(MutableList::with_capacity(size_hint))
+                // accumulator starts out as an empty list and the loop step
+                // only ever appends to it (`map` / `filter`), build the
+                // result in a single preallocated `MutableList` instead of
+                // paying O(n) clone-and-extend on every iteration
+                // (`@result + [expr]`).
+                if let Some(step) = AppendStep::of(comprehension) {
+                    if accu_init
+                        .downcast_ref::<CelList>()
+                        .is_some_and(|list| list.inner().is_empty())
+                    {
+                        return step.run(comprehension, &iter, ctx);
                     }
-                    _ => accu_init.clone_as_boxed(),
-                };
+                }
 
                 let mut ctx = ctx.new_inner_scope();
-                ctx.add_variable_as_val(&comprehension.accu_var, accu_boxed);
+                ctx.add_variable_as_val(&comprehension.accu_var, accu_init.into_owned());
 
                 let mut items = iter
                     .as_iterable()
@@ -1623,17 +1579,11 @@ impl Value {
                     }
                     ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
                     let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
-                    ctx.add_variable_as_val(&comprehension.accu_var, accu.clone_as_boxed());
+                    ctx.add_variable_as_val(&comprehension.accu_var, accu.into_owned());
                 }
-                // Freeze the mutable accumulator back into an immutable
-                // list before it leaves the accu scope (cel-go does the
-                // analogous conversion in `folder.evalResult`).
-                let result = Value::resolve_val(&comprehension.result, &ctx)?.into_owned();
-                let result: Box<dyn Val> = match result.downcast::<MutableList>() {
-                    Ok(mutable) => Box::new(mutable.to_immutable()),
-                    Err(result) => result,
-                };
-                Ok(Cow::<dyn Val>::Owned(result))
+                Ok(CowVal::Owned(
+                    Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
+                ))
             }
             Expr::Struct(strct) => {
                 let name = strct.type_name.clone();
@@ -1667,7 +1617,7 @@ impl Value {
                         }
                     }
                     let s = struct_def.new_struct(fields)?;
-                    Ok(Cow::<dyn Val>::Owned(Box::new(s)))
+                    Ok(CowVal::owned(s))
                 }
             }
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
@@ -1675,8 +1625,9 @@ impl Value {
     }
 }
 
-fn bool<'a>(boolean: bool) -> Cow<'a, dyn Val> {
-    Cow::<dyn Val>::Owned(Box::new(CelBool::from(boolean)))
+/// A boolean result, borrowed from a constant: no allocation.
+fn bool<'b, 'v>(boolean: bool) -> CowVal<'b, 'v> {
+    CowVal::Borrowed(if boolean { &Bool::TRUE } else { &Bool::FALSE })
 }
 
 fn compare_values(
@@ -1706,7 +1657,97 @@ fn boolean_operator_error(
     }
 }
 
-fn try_bool(val: Result<Cow<dyn Val>, ExecutionError>) -> Result<bool, ExecutionError> {
+/// The loop step of a `map` / `filter` comprehension: `@result + [expr]`,
+/// optionally guarded as `cond ? @result + [expr] : @result`, with `@result`
+/// as the comprehension's result.
+///
+/// Evaluating it generically clones the whole accumulator on every
+/// iteration; recognising the shape lets [`AppendStep::run`] append to a
+/// [`MutableList`] in place instead. `@result` cannot be written in CEL
+/// source, so nothing but the step itself can observe the accumulator.
+struct AppendStep<'e> {
+    /// The `cond` of a guarded step.
+    guard: Option<&'e Expression>,
+    /// The `[expr]` list appended on every iteration.
+    items: &'e Expression,
+}
+
+impl<'e> AppendStep<'e> {
+    fn of(comprehension: &'e ComprehensionExpr) -> Option<Self> {
+        let accu = comprehension.accu_var.as_str();
+        let is_accu = |e: &Expression| matches!(&e.expr, Expr::Ident(name) if name == accu);
+        let items_of = |e: &'e Expression| match &e.expr {
+            Expr::Call(call) if call.func_name == operators::ADD && call.target.is_none() => {
+                match call.args.as_slice() {
+                    [lhs, rhs] if is_accu(lhs) && matches!(rhs.expr, Expr::List(_)) => Some(rhs),
+                    _ => None,
+                }
+            }
+            _ => None,
+        };
+
+        if !is_accu(&comprehension.result)
+            || !matches!(comprehension.loop_cond.expr, Expr::Literal(_))
+        {
+            return None;
+        }
+        match &comprehension.loop_step.expr {
+            Expr::Call(call)
+                if call.func_name == operators::CONDITIONAL && call.target.is_none() =>
+            {
+                match call.args.as_slice() {
+                    [guard, step, otherwise] if is_accu(otherwise) => Some(AppendStep {
+                        guard: Some(guard),
+                        items: items_of(step)?,
+                    }),
+                    _ => None,
+                }
+            }
+            _ => Some(AppendStep {
+                guard: None,
+                items: items_of(&comprehension.loop_step)?,
+            }),
+        }
+    }
+
+    /// Runs the comprehension over `iter`, starting from an empty list.
+    fn run<'p, 'v>(
+        &self,
+        comprehension: &'e ComprehensionExpr,
+        iter: &CowVal<'e, 'v>,
+        ctx: &'e Context<'p, 'v>,
+    ) -> Result<CowVal<'e, 'v>, ExecutionError> {
+        let size_hint = iter
+            .as_sizer()
+            .map(|s| *s.size().inner() as usize)
+            .unwrap_or(0);
+        let mut accu = MutableList::with_capacity(size_hint);
+
+        let mut ctx = ctx.new_inner_scope();
+        let mut items = iter
+            .as_iterable()
+            .ok_or_else(|| ExecutionError::UnexpectedType {
+                got: iter.get_type().name().to_owned(),
+                want: "iterable".to_owned(),
+            })?
+            .iter();
+        while let Some(item) = items.next() {
+            if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
+                break;
+            }
+            ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
+            if let Some(guard) = self.guard {
+                if !try_bool(Value::resolve_val(guard, &ctx))? {
+                    continue;
+                }
+            }
+            accu.extend(Value::resolve_val(self.items, &ctx)?.as_ref())?;
+        }
+        Ok(CowVal::owned(accu.to_immutable()))
+    }
+}
+
+fn try_bool(val: Result<CowVal<'_, '_>, ExecutionError>) -> Result<bool, ExecutionError> {
     match val {
         Ok(val) => val
             .downcast_ref::<CelBool>()
@@ -1716,6 +1757,57 @@ fn try_bool(val: Result<Cow<dyn Val>, ExecutionError>) -> Result<bool, Execution
                 want: "bool".to_owned(),
             }),
         Err(err) => Result::Err(err),
+    }
+}
+
+/// Indexes `value` with `idx`: a borrowed container hands out a borrow of
+/// the element, an owned one moves the element out. `missing` is given `value`
+/// and returns the error when it cannot be indexed at all.
+///
+/// A lookup that fails for want of a matching overload (say, a list indexed
+/// with a string) reports `function` applied to the types of `value` and `idx`.
+/// That error is only built when there is one.
+///
+/// Only the built-in containers are known to be able to give up their
+/// elements; any other owned value is indexed in place and the element is
+/// copied out, so a `Val` need only implement [`Val::as_indexer`].
+fn index_into<'b, 'v>(
+    value: CowVal<'b, 'v>,
+    idx: &dyn Val,
+    function: &str,
+    missing: impl FnOnce(&dyn Val) -> ExecutionError,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let overload = |value_type: &Type| {
+        ExecutionError::no_such_overload(
+            function,
+            vec![
+                value_type.name().to_owned(),
+                idx.get_type().name().to_owned(),
+            ],
+        )
+    };
+    match value {
+        CowVal::Borrowed(v) => v
+            .as_indexer()
+            .ok_or_else(|| missing(v))?
+            .get(idx)
+            .map_err(|error| error.with_lazy_overload_context(|| overload(v.get_type()))),
+        CowVal::Owned(b) => {
+            let indexer = b.as_indexer().ok_or_else(|| missing(b.as_ref()))?;
+            if matches!(b.as_builtin(), BuiltinRef::Other) {
+                return indexer
+                    .get(idx)
+                    .map(|v| CowVal::Owned(v.into_owned()))
+                    .map_err(|error| error.with_lazy_overload_context(|| overload(b.get_type())));
+            }
+            // `b` is consumed below: keep what an error would need to say about it
+            let value_type = b.get_type().to_owned();
+            b.into_indexer()
+                .ok_or_else(|| overload(&value_type))?
+                .steal(idx)
+                .map(CowVal::Owned)
+                .map_err(|error| error.with_lazy_overload_context(|| overload(&value_type)))
+        }
     }
 }
 
@@ -1947,7 +2039,7 @@ fn checked_op(
 mod tests {
     use crate::common::traits::Sizer;
     use crate::common::types::{CelInt, Type, LIST_TYPE};
-    use crate::common::value::Val;
+    use crate::common::value::{StaticVal, Val};
     use crate::{objects::Key, Context, Env, ExecutionError, Program, ResolveResult, Value};
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -1993,7 +2085,7 @@ mod tests {
                 &LIST_TYPE
             }
 
-            fn clone_as_boxed(&self) -> Box<dyn Val> {
+            fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
                 self.0.fetch_add(1, Ordering::SeqCst);
                 Box::new(CountedVal(self.0.clone()))
             }
@@ -2084,6 +2176,79 @@ mod tests {
         let program =
             Program::compile("check(duration('5s'), timestamp('1970-01-01T00:00:00Z'))").unwrap();
         assert_eq!(program.execute(&ctx), Ok(true.into()));
+    }
+
+    /// `map` and `filter` (and a guarded `map`) are recognised as appending to
+    /// their accumulator; the other comprehension macros are not.
+    #[test]
+    fn test_append_step_is_recognised_for_map_and_filter_only() {
+        use super::AppendStep;
+        use crate::common::ast::Expr;
+        use crate::parser::Parser;
+
+        let recognised = |expr: &str| {
+            let ast = Parser::default().parse(expr).unwrap();
+            match &ast.expr {
+                Expr::Comprehension(c) => AppendStep::of(c).is_some(),
+                other => panic!("`{expr}` is not a comprehension: {other:?}"),
+            }
+        };
+
+        assert!(recognised("[1, 2, 3].map(x, x * 2)"));
+        assert!(recognised("[1, 2, 3].map(x, x > 1, x * 2)"));
+        assert!(recognised("[1, 2, 3].filter(x, x > 1)"));
+        assert!(!recognised("[1, 2, 3].all(x, x > 0)"));
+        assert!(!recognised("[1, 2, 3].exists(x, x > 2)"));
+        assert!(!recognised("[1, 2, 3].exists_one(x, x > 2)"));
+    }
+
+    /// Building the result in place must be indistinguishable from the generic
+    /// `@result + [expr]` evaluation, including for empty inputs, guards, maps
+    /// (which iterate their keys) and errors raised part-way through.
+    #[test]
+    fn test_map_and_filter_results() {
+        let context = Context::default();
+        let eval = |expr: &str| Program::compile(expr).unwrap().execute(&context);
+        let ints = |v: &[i64]| Value::List(Arc::new(v.iter().map(|i| Value::Int(*i)).collect()));
+
+        assert_eq!(eval("[1, 2, 3].map(x, x * 2)"), Ok(ints(&[2, 4, 6])));
+        assert_eq!(
+            eval("[1, 2, 3, 4].map(x, x % 2 == 0, x * 10)"),
+            Ok(ints(&[20, 40]))
+        );
+        assert_eq!(eval("[1, 2, 3, 4].filter(x, x > 2)"), Ok(ints(&[3, 4])));
+        assert_eq!(eval("[].map(x, x)"), Ok(ints(&[])));
+        assert_eq!(eval("[1, 2].filter(x, x > 5)"), Ok(ints(&[])));
+        // (a single entry: the order in which a map's keys are visited is unspecified)
+        assert_eq!(eval("{1: 'a'}.map(k, k + 1)"), Ok(ints(&[2])));
+        assert_eq!(
+            eval("[[1, 2], [3]].map(l, l.map(x, x + 1))"),
+            Ok(Value::List(Arc::new(vec![ints(&[2, 3]), ints(&[4])])))
+        );
+        // A step that is not a `bool` guard, or an expression that fails, is an error
+        // rather than a partial result.
+        assert!(eval("[1, 2].filter(x, x)").is_err());
+        assert!(eval("[1, 0].map(x, 1 / x)").is_err());
+    }
+
+    /// Selecting a field from something that has none reports the `_._` overload
+    /// and the runtime types involved, whether the operand is borrowed (a variable)
+    /// or owned (a literal, consumed by the lookup); a missing key on a real map
+    /// is still a `NoSuchKey`.
+    #[test]
+    fn test_select_errors_report_the_overload_and_types() {
+        let mut context = Context::default();
+        context.add_variable_from_value("borrowed", vec![1, 2]);
+        let eval = |expr: &str| Program::compile(expr).unwrap().execute(&context);
+        let overload = |types: [&str; 2]| {
+            ExecutionError::no_such_overload("_._", types.iter().map(|t| t.to_string()).collect())
+        };
+
+        assert_eq!(eval("borrowed.field"), Err(overload(["list", "string"])));
+        assert_eq!(eval("[1, 2].field"), Err(overload(["list", "string"])));
+        assert_eq!(eval("(1).field"), Err(overload(["int", "string"])));
+        assert_eq!(eval("{'a': 1}.b"), Err(ExecutionError::no_such_key("b")));
+        assert_eq!(eval("{'a': 1}.a"), Ok(Value::Int(1)));
     }
 
     #[test]
@@ -2930,13 +3095,12 @@ mod tests {
 
     #[cfg(feature = "structs")]
     mod structs {
-        use std::borrow::Cow;
         use std::sync::Arc;
 
         use crate::{
             common::{
                 types::{self, CelBool, CelInt, CelString, CelStruct},
-                value::Val,
+                value::{CowVal, Val},
             },
             env::StructDef,
             Context, Env, ExecutionError, Program, Value,
@@ -3053,14 +3217,8 @@ mod tests {
             );
 
             let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
-            my_struct.add_field_value(
-                "name".to_owned(),
-                Cow::<dyn Val>::Owned(Box::new(CelString::from("test"))),
-            );
-            my_struct.add_field_value(
-                "value".to_owned(),
-                Cow::<dyn Val>::Owned(Box::new(CelInt::from(42))),
-            );
+            my_struct.add_field_value("name".to_owned(), CowVal::owned(CelString::from("test")));
+            my_struct.add_field_value("value".to_owned(), CowVal::owned(CelInt::from(42)));
 
             let mut context = Context::with_env(Arc::new(env));
             context
@@ -3123,14 +3281,8 @@ mod tests {
             );
 
             let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
-            my_struct.add_field_value(
-                "name".to_owned(),
-                Cow::<dyn Val>::Owned(Box::new(CelString::from("test"))),
-            );
-            my_struct.add_field_value(
-                "value".to_owned(),
-                Cow::<dyn Val>::Owned(Box::new(CelInt::from(42))),
-            );
+            my_struct.add_field_value("name".to_owned(), CowVal::owned(CelString::from("test")));
+            my_struct.add_field_value("value".to_owned(), CowVal::owned(CelInt::from(42)));
 
             let mut context = Context::with_env(Arc::new(env));
             context
@@ -3161,10 +3313,19 @@ mod tests {
             other.downcast_ref::<Ip>().is_some_and(|o| o.1 == self.1)
         }
 
-        fn clone_as_boxed(&self) -> Box<dyn Val> {
+        fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+        where
+            Self: 'v,
+        {
             Box::new(Ip::new(&self.1))
         }
+
+        fn as_any(&self) -> Option<&dyn std::any::Any> {
+            Some(self)
+        }
     }
+
+    impl StaticVal for Ip {}
 
     /// A list whose contents are resolved on access rather than materialized,
     /// the shape `Context::add_variable_as_val` was made public for.
@@ -3186,12 +3347,15 @@ mod tests {
             Some(self)
         }
 
-        fn clone_as_boxed(&self) -> Box<dyn Val> {
+        fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+        where
+            Self: 'v,
+        {
             Box::new(LazyList(self.0.clone()))
         }
     }
 
-    fn context_with_custom_vals() -> Context<'static> {
+    fn context_with_custom_vals() -> Context<'static, 'static> {
         let mut context = Context::default();
         context.add_variable_as_val("ip", Box::new(Ip::new("1.2.3.4")));
         context.add_variable_as_val("lazy", Box::new(LazyList(vec![1, 2])));
