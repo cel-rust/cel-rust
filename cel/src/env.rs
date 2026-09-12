@@ -2,16 +2,13 @@ use crate::common::{
     decls::FunctionDecl,
     functions::Function,
     types::{self, Type},
-    value::Val,
+    value::CowVal,
 };
 #[cfg(feature = "structs")]
-use crate::{common::types::CelStruct, ExecutionError};
-use std::{
-    borrow::Cow,
-    collections::{
-        btree_map::Entry::{Occupied, Vacant},
-        BTreeMap,
-    },
+use crate::{common::types::CelStruct, common::value::Val, ExecutionError};
+use std::collections::{
+    btree_map::Entry::{Occupied, Vacant},
+    BTreeMap,
 };
 
 /// An environment for the CEL execution.
@@ -43,16 +40,14 @@ use std::{
 /// You can add custom function overloads to the environment.
 ///
 /// ```
-/// use cel::{Env, common::types, common::value::Val};
-/// use std::borrow::Cow;
+/// use cel::{Env, common::types, common::value::CowVal};
 ///
 /// let mut env = Env::stdlib();
 ///
 /// // Define a function that takes an integer and returns its square.
 /// env.add_overload("square", "int_square", vec![types::INT_TYPE], |args| {
-///     let val = args[0].downcast_ref::<cel::common::types::CelInt>().unwrap();
-///     let result: Box<dyn Val> = Box::new(cel::common::types::CelInt::from(val.inner() * val.inner()));
-///     Ok(Cow::Owned(result))
+///     let val = args[0].downcast_ref::<types::CelInt>().unwrap();
+///     Ok(CowVal::owned(types::CelInt::from(val.inner() * val.inner())))
 /// }).unwrap();
 /// ```
 #[derive(Default)]
@@ -118,7 +113,7 @@ impl Env {
     }
 
     /// Finds a global function overload that matches the given name and arguments.
-    pub fn find_overload(&self, name: &str, args: &[Cow<dyn Val>]) -> Option<Function> {
+    pub fn find_overload(&self, name: &str, args: &[CowVal<'_, '_>]) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(false, args),
@@ -163,7 +158,7 @@ impl Env {
     pub(crate) fn find_member_overload(
         &self,
         name: &str,
-        args: &[Cow<dyn Val>],
+        args: &[CowVal<'_, '_>],
     ) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
@@ -265,17 +260,17 @@ impl StructDef {
     /// - A field's type does not match the type in the definition.
     /// - An unknown field name is provided.
     #[cfg(feature = "structs")]
-    pub(crate) fn new_struct(
+    pub(crate) fn new_struct<'b, 'v>(
         &self,
-        fields: BTreeMap<String, std::borrow::Cow<dyn Val>>,
-    ) -> Result<CelStruct, ExecutionError> {
+        fields: BTreeMap<String, CowVal<'b, 'v>>,
+    ) -> Result<CelStruct<'v>, ExecutionError> {
         let mut s = CelStruct::new(self.name.clone());
         let mut fields = fields;
         for (field, default) in &self.defaults {
             if let Some(value) = fields.remove(field) {
                 s.add_field_value(field.clone(), value);
             } else {
-                s.add_field_value(field.clone(), Cow::Owned(default.clone_as_boxed()));
+                s.add_field_value(field.clone(), CowVal::Owned(default.clone_as_boxed()));
             }
         }
         for (field, value) in fields {

@@ -1,10 +1,9 @@
 use cel::common::types::CelBool;
-use cel::common::value::Val;
+use cel::common::value::{CowVal, Val};
 use cel::context::{Context, VariableResolver};
 use cel::parser::Parser;
 use cel::{Program, Value};
 use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
-use std::borrow::Cow;
 use std::collections::HashMap;
 
 const EXPRESSIONS: [(&str, &str); 34] = [
@@ -59,7 +58,7 @@ impl Default for Resolver {
 }
 
 impl VariableResolver for Resolver {
-    fn resolve(&self, expr: &str) -> Option<Cow<'_, dyn Val>> {
+    fn resolve<'b>(&'b self, expr: &str) -> Option<CowVal<'b, 'b>> {
         let v: &dyn Val = match expr {
             "fruit" => &self.truthy,
             "carrot" => &self.truthy,
@@ -67,7 +66,7 @@ impl VariableResolver for Resolver {
             "banana" => &self.falsy,
             _ => return None,
         };
-        Some(Cow::Borrowed(v))
+        Some(CowVal::Borrowed(v))
     }
 }
 
@@ -78,11 +77,11 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         execution_group.bench_function(BenchmarkId::from_parameter(name), |b| {
             let parser = Parser::default();
             let ast = parser.parse(expr).expect("Parsing failed");
+            let resolver = Resolver::default();
             let mut ctx = Context::default();
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             ctx.add_variable_from_value("apple", true);
             ctx.add_variable_from_value("a", 1);
-            let resolver = Resolver::default();
             ctx.set_variable_resolver(&resolver);
             b.iter(|| Value::resolve_val(&ast, &ctx).expect("Eval failed!"))
         });

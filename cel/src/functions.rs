@@ -1,9 +1,8 @@
-use crate::common::value::Val;
+use crate::common::value::CowVal;
 use crate::context::Context;
 use crate::magic::Arguments;
 use crate::resolvers::Resolver;
 use crate::{ExecutionError, Value};
-use std::borrow::Cow;
 use std::cmp::Ordering;
 
 type Result<T> = std::result::Result<T, ExecutionError>;
@@ -13,21 +12,27 @@ type Result<T> = std::result::Result<T, ExecutionError>;
 /// It contains references to the target object (if the function is called as
 /// a method), the program context ([`Context`]) which gives functions access
 /// to variables, and the arguments to the function call.
+///
+/// `'context` is the borrow of everything handed to the function for the
+/// duration of the call, and `'call` bounds the data the values themselves may
+/// borrow (a resolver's `&str`, a context variable). A function that returns
+/// one of its arguments, or `this`, borrowed can hand back a
+/// [`CowVal<'context, 'call>`](CowVal) without copying it.
 #[derive(Clone)]
 pub struct FunctionContext<'context, 'call: 'context> {
-    pub name: &'call str,
-    pub this: Option<Cow<'context, dyn Val>>,
-    pub ptx: &'context Context<'context>,
-    pub args: Vec<Cow<'context, dyn Val>>,
+    pub name: &'context str,
+    pub this: Option<CowVal<'context, 'call>>,
+    pub ptx: &'context Context<'context, 'call>,
+    pub args: Vec<CowVal<'context, 'call>>,
     pub arg_idx: usize,
 }
 
 impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     pub fn new(
-        name: &'call str,
-        this: Option<Cow<'context, dyn Val>>,
-        ptx: &'context Context<'context>,
-        args: Vec<Cow<'context, dyn Val>>,
+        name: &'context str,
+        this: Option<CowVal<'context, 'call>>,
+        ptx: &'context Context<'context, 'call>,
+        args: Vec<CowVal<'context, 'call>>,
     ) -> Self {
         Self {
             name,
