@@ -1,10 +1,9 @@
 use crate::common::types::CelType;
-use crate::common::value::Val;
+use crate::common::value::{CowVal, Val};
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
 use crate::{Env, ExecutionError};
-use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -33,21 +32,28 @@ use std::sync::Arc;
 ///                  ↑
 /// Only in scope for the duration of the map expression
 ///
-pub enum Context<'a> {
+/// # Lifetimes
+///
+/// `'v` bounds the data the context's values may borrow: the
+/// [`VariableResolver`] it references and any [`Val`] bound with
+/// [`add_variable_as_val`](Context::add_variable_as_val). Values resolved
+/// against the context borrow for at most `'v`. `'p` is the borrow of the
+/// parent context for a child scope; a root context does not use it.
+pub enum Context<'p, 'v> {
     Root {
         functions: FunctionRegistry,
-        variables: BTreeMap<String, Box<dyn Val>>,
-        resolver: Option<&'a dyn VariableResolver>,
+        variables: BTreeMap<String, Box<dyn Val + 'v>>,
+        resolver: Option<&'v dyn VariableResolver>,
         env: Arc<Env>,
     },
     Child {
-        parent: &'a Context<'a>,
-        variables: BTreeMap<String, Box<dyn Val>>,
-        resolver: Option<&'a dyn VariableResolver>,
+        parent: &'p Context<'p, 'v>,
+        variables: BTreeMap<String, Box<dyn Val + 'v>>,
+        resolver: Option<&'v dyn VariableResolver>,
     },
 }
 
-impl<'a> Context<'a> {
+impl<'p, 'v> Context<'p, 'v> {
     pub fn add_variable<S, V>(
         &mut self,
         name: S,
@@ -57,18 +63,9 @@ impl<'a> Context<'a> {
         S: Into<String>,
         V: TryIntoValue,
     {
-        match self {
-            Context::Root { variables, .. } => {
-                let value = value.try_into_value()?;
-                let value: Box<dyn Val> = value.try_into().unwrap();
-                variables.insert(name.into(), value);
-            }
-            Context::Child { variables, .. } => {
-                let value = value.try_into_value()?;
-                let value: Box<dyn Val> = value.try_into().unwrap();
-                variables.insert(name.into(), value);
-            }
-        }
+        let value = value.try_into_value()?;
+        let value: Box<dyn Val> = value.try_into().unwrap();
+        self.add_variable_as_val(name, value);
         Ok(())
     }
 
@@ -77,18 +74,9 @@ impl<'a> Context<'a> {
         S: Into<String>,
         V: Into<Value>,
     {
-        match self {
-            Context::Root { variables, .. } => {
-                let value = value.into();
-                let value: Box<dyn Val> = value.try_into().unwrap();
-                variables.insert(name.into(), value);
-            }
-            Context::Child { variables, .. } => {
-                let value = value.into();
-                let value: Box<dyn Val> = value.try_into().unwrap();
-                variables.insert(name.into(), value);
-            }
-        }
+        let value = value.into();
+        let value: Box<dyn Val> = value.try_into().unwrap();
+        self.add_variable_as_val(name, value);
     }
 
     /// Binds a variable to a custom [`Val`] implementation directly, without
@@ -110,6 +98,9 @@ impl<'a> Context<'a> {
     /// [`common::types`](crate::common::types) (e.g. `DefaultMap`, `Struct`)
     /// are the reference for what to implement.
     ///
+    /// The value may borrow data for `'v`, for example a
+    /// [`CelString`](crate::common::types::CelString) built from a `&'v str`.
+    ///
     /// ```ignore
     /// // `my_value` implements `Val` + `Indexer`, resolving fields on access.
     /// let mut ctx = Context::default();
@@ -118,7 +109,7 @@ impl<'a> Context<'a> {
     /// // `input.field` calls `Indexer::get` on `my_value` only when evaluated.
     /// let result = program.execute(&ctx)?;
     /// ```
-    pub fn add_variable_as_val<S>(&mut self, name: S, value: Box<dyn Val>)
+    pub fn add_variable_as_val<S>(&mut self, name: S, value: Box<dyn Val + 'v>)
     where
         S: Into<String>,
     {
@@ -132,7 +123,7 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn set_variable_resolver(&mut self, r: &'a dyn VariableResolver) {
+    pub fn set_variable_resolver(&mut self, r: &'v dyn VariableResolver) {
         match self {
             Context::Root { resolver, .. } => {
                 *resolver = Some(r);
@@ -143,7 +134,11 @@ impl<'a> Context<'a> {
         }
     }
 
-    pub fn get_variable<S>(&'a self, name: S) -> Option<Cow<'a, dyn Val>>
+    /// Looks a variable up: the resolver first, then this scope's variables,
+    /// then the parent scopes. The result borrows from the context where it
+    /// can and is bounded by `'v` where the resolver or a bound value
+    /// borrows data.
+    pub fn get_variable<'b, S>(&'b self, name: S) -> Option<CowVal<'b, 'v>>
     where
         S: AsRef<str>,
     {
@@ -153,32 +148,20 @@ impl<'a> Context<'a> {
                 variables,
                 parent,
                 resolver,
-            } => resolver
-                .and_then(|r| {
-                    r.resolve(name)
-                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
-                })
-                .or_else(|| {
-                    variables
-                        .get(name)
-                        .map(|b| Cow::<dyn Val>::Borrowed(b.as_ref()))
-                        .or_else(|| parent.get_variable(name))
-                }),
+            } => resolver.and_then(|r| r.resolve_val(name)).or_else(|| {
+                variables
+                    .get(name)
+                    .map(|b| CowVal::Borrowed(b.as_ref()))
+                    .or_else(|| parent.get_variable(name))
+            }),
             Context::Root {
                 variables,
                 resolver,
                 ..
             } => resolver
-                .and_then(|r| {
-                    r.resolve(name)
-                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
-                })
-                .or_else(|| {
-                    variables
-                        .get(name)
-                        .map(|v| Cow::<dyn Val>::Borrowed(v.as_ref()))
-                })
-                .or_else(|| CelType::for_ident(name).map(|t| Cow::<dyn Val>::Owned(Box::new(t)))),
+                .and_then(|r| r.resolve_val(name))
+                .or_else(|| variables.get(name).map(|v| CowVal::Borrowed(v.as_ref())))
+                .or_else(|| CelType::for_ident(name).map(CowVal::owned)),
         }
     }
 
@@ -214,7 +197,10 @@ impl<'a> Context<'a> {
         Value::resolve_all(exprs, self)
     }
 
-    pub fn new_inner_scope(&self) -> Context<'_> {
+    /// Creates a child scope that borrows this context as its parent. Values
+    /// bound in the child keep the parent's `'v`, so a value resolved in the
+    /// child scope can outlive the child.
+    pub fn new_inner_scope<'b>(&'b self) -> Context<'b, 'v> {
         Context::Child {
             parent: self,
             variables: Default::default(),
@@ -252,7 +238,7 @@ impl<'a> Context<'a> {
     }
 }
 
-impl Default for Context<'_> {
+impl Default for Context<'_, '_> {
     fn default() -> Self {
         Context::Root {
             env: Arc::new(Env::stdlib()),
@@ -266,6 +252,9 @@ impl Default for Context<'_> {
 /// VariableResolver implements a custom resolver for variables that is consulted before looking at
 /// variables added to the context. This allows dynamic variables, or avoiding HashMap lookup/creation.
 ///
+/// Implement [`resolve`](VariableResolver::resolve) to hand out owned
+/// [`Value`]s, or [`resolve_val`](VariableResolver::resolve_val) to hand out
+/// a [`Val`] that may borrow from the resolver, avoiding a copy.
 ///
 /// # Example
 /// ```
@@ -284,13 +273,56 @@ impl Default for Context<'_> {
 ///     }
 /// }
 /// ```
+///
+/// Borrowing instead of copying:
+/// ```
+/// use cel::common::types::CelString;
+/// use cel::common::value::CowVal;
+///
+/// struct Names<'a> {
+///     name: &'a str,
+/// }
+///
+/// impl cel::context::VariableResolver for Names<'_> {
+///     fn resolve_val<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+///         match variable {
+///             // `CelString::from(&str)` borrows: no copy of the bytes
+///             "name" => Some(CowVal::owned(CelString::from(self.name))),
+///             _ => None,
+///         }
+///     }
+/// }
+/// ```
 pub trait VariableResolver: Send + Sync {
-    fn resolve(&self, variable: &str) -> Option<Value>;
+    /// Resolves `variable` to an owned [`Value`].
+    ///
+    /// The default resolves nothing; implement this or
+    /// [`resolve_val`](VariableResolver::resolve_val).
+    fn resolve(&self, _variable: &str) -> Option<Value> {
+        None
+    }
+
+    /// Resolves `variable` to a [`Val`] that may borrow from `self`.
+    ///
+    /// The default converts the result of
+    /// [`resolve`](VariableResolver::resolve).
+    fn resolve_val<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+        self.resolve(variable).map(|v| {
+            CowVal::Owned(
+                v.try_into()
+                    .expect("a `Value` always converts to a `Box<dyn Val>`"),
+            )
+        })
+    }
 }
 
 impl<T: VariableResolver> VariableResolver for Box<T> {
     fn resolve(&self, variable: &str) -> Option<Value> {
         (**self).resolve(variable)
+    }
+
+    fn resolve_val<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+        (**self).resolve_val(variable)
     }
 }
 
@@ -298,16 +330,28 @@ impl<T: VariableResolver> VariableResolver for Arc<T> {
     fn resolve(&self, variable: &str) -> Option<Value> {
         (**self).resolve(variable)
     }
+
+    fn resolve_val<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+        (**self).resolve_val(variable)
+    }
 }
 
 impl<T: VariableResolver> VariableResolver for &T {
     fn resolve(&self, variable: &str) -> Option<Value> {
         (**self).resolve(variable)
     }
+
+    fn resolve_val<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+        (**self).resolve_val(variable)
+    }
 }
 
 #[cfg(test)]
 mod test {
+    use super::{Context, VariableResolver};
+    use crate::common::types::CelString;
+    use crate::common::value::CowVal;
+
     // A helper function that requires T to implement some traits
     fn assert_send<T: Send>() {}
 
@@ -315,5 +359,69 @@ mod test {
     fn test_context_is_send() {
         // This line will only compile if assertion passes
         assert_send::<super::Context>();
+    }
+
+    struct Borrowing<'a>(&'a str);
+
+    impl VariableResolver for Borrowing<'_> {
+        fn resolve_val<'b>(&'b self, variable: &str) -> Option<CowVal<'b, 'b>> {
+            (variable == "s").then(|| CowVal::owned(CelString::from(self.0)))
+        }
+    }
+
+    /// A borrowed string survives a whole evaluation without being copied,
+    /// through a conditional, a `string()` call, an optional, a list index,
+    /// a map field, and a comprehension.
+    #[test]
+    fn resolver_value_borrows_through_a_full_evaluation() {
+        use crate::parser::Parser;
+        use crate::Value;
+
+        let owned = String::from("cel-rust");
+        let resolver = Borrowing(owned.as_str());
+        let mut ctx = Context::default();
+        ctx.set_variable_resolver(&resolver);
+        for expr in [
+            "s",
+            "s == 'cel-rust' ? s : 'other'",
+            "string(s)",
+            "dyn(s)",
+            "optional.of(s).value()",
+            "optional.of(s).orValue('other')",
+            "[s][0]",
+            "{'k': s}.k",
+            "{'k': s}['k']",
+            "[s].map(x, x)[0]",
+            "[1].map(x, s)[0]",
+        ] {
+            let ast = Parser::default()
+                .enable_optional_syntax(true)
+                .parse(expr)
+                .unwrap();
+            let v = Value::resolve_val(&ast, &ctx).unwrap();
+            let s = v.downcast_ref::<CelString>().unwrap();
+            assert!(
+                std::ptr::eq(s.inner(), owned.as_str()),
+                "`{expr}` copied the string"
+            );
+        }
+    }
+
+    #[test]
+    fn resolver_value_borrows_through_the_context_and_a_child_scope() {
+        let owned = String::from("cel-rust");
+        let resolver = Borrowing(owned.as_str());
+        let mut ctx = Context::default();
+        ctx.set_variable_resolver(&resolver);
+        let inner = ctx.new_inner_scope();
+        let v = inner.get_variable("s").unwrap();
+        let s = v.downcast_ref::<CelString>().unwrap();
+        assert!(std::ptr::eq(s.inner(), owned.as_str()));
+        // the value outlives the child scope: it is bounded by `'v`, not by
+        // the scope borrow
+        let escaped: Box<dyn crate::common::value::Val + '_> = v.into_owned();
+        drop(inner);
+        let s = escaped.downcast_ref::<CelString>().unwrap();
+        assert!(std::ptr::eq(s.inner(), owned.as_str()));
     }
 }

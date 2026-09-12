@@ -1,9 +1,9 @@
 use crate::common::traits::Negator;
 use crate::common::traits::{self, Comparer};
 use crate::common::types::{CelDouble, CelString, CelUInt, Kind, Type};
-use crate::common::value::{Downcast, Val};
+use crate::common::value::{CowVal, StaticVal, Val};
 use crate::ExecutionError;
-use std::borrow::Cow;
+use std::any::Any;
 use std::cmp::Ordering;
 use std::ops::{Deref, Neg};
 
@@ -33,7 +33,10 @@ impl Val for Int {
         &super::INT_TYPE
     }
 
-    fn as_adder(&self) -> Option<&dyn traits::Adder> {
+    fn as_adder<'b, 'v>(&'b self) -> Option<&'b (dyn traits::Adder + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -41,23 +44,38 @@ impl Val for Int {
         Some(self)
     }
 
-    fn as_divider(&self) -> Option<&dyn traits::Divider> {
+    fn as_divider<'b, 'v>(&'b self) -> Option<&'b (dyn traits::Divider + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
-    fn as_modder(&self) -> Option<&dyn traits::Modder> {
+    fn as_modder<'b, 'v>(&'b self) -> Option<&'b (dyn traits::Modder + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
-    fn as_multiplier(&self) -> Option<&dyn traits::Multiplier> {
+    fn as_multiplier<'b, 'v>(&'b self) -> Option<&'b (dyn traits::Multiplier + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
-    fn as_negator(&self) -> Option<&dyn Negator> {
+    fn as_negator<'b, 'v>(&'b self) -> Option<&'b (dyn Negator + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
-    fn as_subtractor(&self) -> Option<&dyn traits::Subtractor> {
+    fn as_subtractor<'b, 'v>(&'b self) -> Option<&'b (dyn traits::Subtractor + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -71,21 +89,32 @@ impl Val for Int {
             .unwrap_or(false)
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(Int(self.0))
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
+        Box::new(*self)
+    }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
     }
 }
 
+impl StaticVal for Int {}
+
 impl traits::Adder for Int {
-    fn add<'a>(&'a self, other: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn add<'b, 'v>(&'b self, other: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(i) = other.downcast_ref::<Int>() {
             let t: Self = self
                 .0
                 .checked_add(i.0)
                 .ok_or_else(|| ExecutionError::Overflow("add", self.0.into(), i.0.into()))?
                 .into();
-            let b: Box<dyn Val> = Box::new(t);
-            Ok(Cow::Owned(b))
+            Ok(CowVal::owned(t))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
@@ -113,7 +142,10 @@ impl traits::Comparer for Int {
 }
 
 impl traits::Divider for Int {
-    fn div<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn div<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(i) = rhs.downcast_ref::<Int>() {
             if i.0 == 0 {
                 return Err(ExecutionError::DivisionByZero(self.0.into()));
@@ -123,8 +155,7 @@ impl traits::Divider for Int {
                 .checked_div(i.0)
                 .ok_or_else(|| ExecutionError::Overflow("div", self.0.into(), i.0.into()))?)
             .into();
-            let b: Box<dyn Val> = Box::new(t);
-            Ok(Cow::Owned(b))
+            Ok(CowVal::owned(t))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
@@ -132,7 +163,10 @@ impl traits::Divider for Int {
 }
 
 impl traits::Modder for Int {
-    fn modulo<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn modulo<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(i) = rhs.downcast_ref::<Int>() {
             if i.0 == 0 {
                 return Err(ExecutionError::RemainderByZero(self.0.into()));
@@ -142,8 +176,7 @@ impl traits::Modder for Int {
                 .checked_rem(i.0)
                 .ok_or_else(|| ExecutionError::Overflow("rem", self.0.into(), i.0.into()))?)
             .into();
-            let b: Box<dyn Val> = Box::new(t);
-            Ok(Cow::Owned(b))
+            Ok(CowVal::owned(t))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
@@ -151,15 +184,17 @@ impl traits::Modder for Int {
 }
 
 impl traits::Multiplier for Int {
-    fn mul<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn mul<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(i) = rhs.downcast_ref::<Int>() {
             let t: Self = (self
                 .0
                 .checked_mul(i.0)
                 .ok_or_else(|| ExecutionError::Overflow("mul", self.0.into(), i.0.into()))?)
             .into();
-            let b: Box<dyn Val> = Box::new(t);
-            Ok(Cow::Owned(b))
+            Ok(CowVal::owned(t))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
@@ -167,19 +202,25 @@ impl traits::Multiplier for Int {
 }
 
 impl Negator for Int {
-    fn negate(&self) -> Result<Box<dyn Val>, ExecutionError> {
+    fn negate<'v>(&self) -> Result<Box<dyn Val + 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         Ok(Box::new(Self::from(self.0.neg())))
     }
 }
 
 impl traits::Subtractor for Int {
-    fn sub<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn sub<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(i) = rhs.downcast_ref::<Int>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self::from(
+            Ok(CowVal::owned(Self::from(
                 self.0
                     .checked_sub(i.0)
                     .ok_or_else(|| ExecutionError::Overflow("sub", self.0.into(), i.0.into()))?,
-            ))))
+            )))
         } else {
             Err(ExecutionError::NoSuchOverload)
         }
@@ -204,10 +245,10 @@ impl From<i64> for Int {
     }
 }
 
-impl TryFrom<Box<dyn Val>> for i64 {
-    type Error = Box<dyn Val>;
+impl<'v> TryFrom<Box<dyn Val + 'v>> for i64 {
+    type Error = Box<dyn Val + 'v>;
 
-    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+    fn try_from(value: Box<dyn Val + 'v>) -> Result<Self, Self::Error> {
         if let Some(i) = value.downcast_ref::<Int>() {
             return Ok(i.0);
         }
@@ -215,10 +256,10 @@ impl TryFrom<Box<dyn Val>> for i64 {
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
-    type Error = &'a dyn Val;
+impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a i64 {
+    type Error = &'a (dyn Val + 'v);
 
-    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a (dyn Val + 'v)) -> Result<Self, Self::Error> {
         if let Some(i) = value.downcast_ref::<Int>() {
             return Ok(&i.0);
         }
@@ -226,63 +267,56 @@ impl<'a> TryFrom<&'a dyn Val> for &'a i64 {
     }
 }
 
-fn int<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let arg = args.remove(0).into_owned();
-    let ret: Result<Box<Int>, Box<dyn Val>> = match arg.get_type().kind() {
-        Kind::Int => arg.downcast::<Int>(),
-        Kind::UInt => match arg.downcast::<CelUInt>() {
-            Err(arg) => Err(arg),
-            Ok(arg) => match i64::try_from(*arg.inner()) {
-                Ok(value) => Ok(Box::new(Int::from(value))),
-                Err(_) => {
-                    return Err(ExecutionError::FunctionError {
-                        function: "int".to_owned(),
-                        message: "integer overflow".to_owned(),
-                    });
-                }
-            },
-        },
-        Kind::Double => match arg.downcast::<CelDouble>() {
-            Err(arg) => Err(arg),
-            Ok(arg) => {
-                let value = *arg.inner();
-                // Double to int conversions are limited to (minInt, maxInt) non-inclusive.
-                // 'i64::MAX as f64' rounds up to 2^63, and the largest double below that
-                // is 2^63 - 2^10, so the check also keeps 'value as i64' from saturating.
-                // 'i64::MIN as f64' is exactly -(2^63), so the exclusive lower bound
-                // rejects a double that i64 could actually hold. NaN, -infinity and
-                // infinity will also be rejected.
-                if !(value > (i64::MIN as f64) && value < (i64::MAX as f64)) {
-                    return Err(ExecutionError::FunctionError {
-                        function: "int".to_owned(),
-                        message: "integer overflow".to_owned(),
-                    });
-                }
-
-                Ok(Box::new(Int::from(value as i64)))
-            }
-        },
-        Kind::String => match arg.downcast::<CelString>() {
-            Err(arg) => Err(arg),
-            Ok(arg) => match arg.inner().parse::<i64>() {
-                Ok(arg) => Ok(Box::new(Int::from(arg))),
-                Err(e) => {
-                    return Err(ExecutionError::FunctionError {
-                        function: "int".to_owned(),
-                        message: format!("string parse error: {e}"),
-                    })
-                }
-            },
-        },
-        _ => Err(arg),
+fn int<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let arg = args.remove(0);
+    if arg.downcast_ref::<Int>().is_some() {
+        return Ok(arg);
+    }
+    let overflow = || ExecutionError::FunctionError {
+        function: "int".to_owned(),
+        message: "integer overflow".to_owned(),
     };
+    let converted: Option<i64> =
+        match arg.get_type().kind() {
+            Kind::UInt => match arg.downcast_ref::<CelUInt>() {
+                None => None,
+                Some(u) => Some(i64::try_from(*u.inner()).map_err(|_| overflow())?),
+            },
+            Kind::Double => match arg.downcast_ref::<CelDouble>() {
+                None => None,
+                Some(d) => {
+                    let value = *d.inner();
+                    // Double to int conversions are limited to (minInt, maxInt) non-inclusive.
+                    // 'i64::MAX as f64' rounds up to 2^63, and the largest double below that
+                    // is 2^63 - 2^10, so the check also keeps 'value as i64' from saturating.
+                    // 'i64::MIN as f64' is exactly -(2^63), so the exclusive lower bound
+                    // rejects a double that i64 could actually hold. NaN, -infinity and
+                    // infinity will also be rejected.
+                    if !(value > (i64::MIN as f64) && value < (i64::MAX as f64)) {
+                        return Err(overflow());
+                    }
+                    Some(value as i64)
+                }
+            },
+            Kind::String => {
+                match arg.downcast_ref::<CelString>() {
+                    None => None,
+                    Some(s) => Some(s.inner().parse::<i64>().map_err(|e| {
+                        ExecutionError::FunctionError {
+                            function: "int".to_owned(),
+                            message: format!("string parse error: {e}"),
+                        }
+                    })?),
+                }
+            }
+            _ => None,
+        };
 
-    match ret {
-        Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
-        Err(arg) => Err(ExecutionError::FunctionError {
+    match converted {
+        Some(value) => Ok(CowVal::owned(Int::from(value))),
+        None => Err(ExecutionError::FunctionError {
             function: "int".to_owned(),
-            message: format!("cannot convert {arg:?} to int"),
+            message: format!("cannot convert {:?} to int", arg.as_ref()),
         }),
     }
 }

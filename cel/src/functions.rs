@@ -1,9 +1,9 @@
+use crate::common::value::CowVal;
 use crate::context::Context;
 use crate::magic::{Arguments, This};
 use crate::objects::{KeyRef, OptionalValue, Value};
 use crate::resolvers::Resolver;
 use crate::ExecutionError;
-use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::convert::TryInto;
 use std::sync::Arc;
@@ -15,21 +15,24 @@ type Result<T> = std::result::Result<T, ExecutionError>;
 /// It contains references to the target object (if the function is called as
 /// a method), the program context ([`Context`]) which gives functions access
 /// to variables, and the arguments to the function call.
+///
+/// Everything in it is bounded by the `'context` borrow: values and the
+/// context are handed to the function for the duration of the call.
 #[derive(Clone)]
 pub struct FunctionContext<'context, 'call: 'context> {
     pub name: &'call str,
-    pub this: Option<Cow<'context, dyn Val>>,
-    pub ptx: &'context Context<'context>,
-    pub args: Vec<Cow<'context, dyn Val>>,
+    pub this: Option<CowVal<'context, 'context>>,
+    pub ptx: &'context Context<'context, 'context>,
+    pub args: Vec<CowVal<'context, 'context>>,
     pub arg_idx: usize,
 }
 
 impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     pub fn new(
         name: &'call str,
-        this: Option<Cow<'context, dyn Val>>,
-        ptx: &'context Context<'context>,
-        args: Vec<Cow<'context, dyn Val>>,
+        this: Option<CowVal<'context, 'context>>,
+        ptx: &'context Context<'context, 'context>,
+        args: Vec<CowVal<'context, 'context>>,
     ) -> Self {
         Self {
             name,
@@ -286,7 +289,6 @@ pub fn matches(
     }
 }
 
-use crate::common::value::Val;
 #[cfg(feature = "chrono")]
 pub use time::duration;
 

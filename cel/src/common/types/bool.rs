@@ -1,13 +1,17 @@
 use crate::common::traits::{Comparer, Negator, Zeroer};
 use crate::common::types::Type;
-use crate::common::value::Val;
+use crate::common::value::{StaticVal, Val};
 use crate::ExecutionError;
+use std::any::Any;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Bool(bool);
 
 impl Bool {
+    pub const TRUE: Bool = Bool(true);
+    pub const FALSE: Bool = Bool(false);
+
     pub fn negate(&self) -> Self {
         Self(!self.0)
     }
@@ -38,7 +42,10 @@ impl Val for Bool {
         Some(self)
     }
 
-    fn as_negator(&self) -> Option<&dyn Negator> {
+    fn as_negator<'b, 'v>(&'b self) -> Option<&'b (dyn Negator + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -50,10 +57,19 @@ impl Val for Bool {
         other.downcast_ref::<Self>().is_some_and(|a| self.0 == a.0)
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
         Box::new(*self)
     }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
+    }
 }
+
+impl StaticVal for Bool {}
 
 impl Comparer for Bool {
     fn compare(&self, rhs: &dyn Val) -> Result<std::cmp::Ordering, crate::ExecutionError> {
@@ -66,7 +82,10 @@ impl Comparer for Bool {
 }
 
 impl Negator for Bool {
-    fn negate(&self) -> Result<Box<dyn Val>, ExecutionError> {
+    fn negate<'v>(&self) -> Result<Box<dyn Val + 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         Ok(Box::new(self.negate()))
     }
 }
@@ -89,10 +108,10 @@ impl From<bool> for Bool {
     }
 }
 
-impl TryFrom<Box<dyn Val>> for bool {
-    type Error = Box<dyn Val>;
+impl<'v> TryFrom<Box<dyn Val + 'v>> for bool {
+    type Error = Box<dyn Val + 'v>;
 
-    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+    fn try_from(value: Box<dyn Val + 'v>) -> Result<Self, Self::Error> {
         if let Some(b) = value.downcast_ref::<Bool>() {
             return Ok(b.0);
         }
@@ -100,10 +119,10 @@ impl TryFrom<Box<dyn Val>> for bool {
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a bool {
-    type Error = &'a dyn Val;
+impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a bool {
+    type Error = &'a (dyn Val + 'v);
 
-    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a (dyn Val + 'v)) -> Result<Self, Self::Error> {
         if let Some(b) = value.downcast_ref::<Bool>() {
             return Ok(&b.0);
         }

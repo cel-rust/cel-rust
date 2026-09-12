@@ -1,8 +1,6 @@
-use std::borrow::Cow;
-
 use crate::common::functions::Function;
 use crate::common::types::Type;
-use crate::common::value::Val;
+use crate::common::value::{CowVal, Val};
 
 pub struct FunctionDecl {
     pub name: String,
@@ -17,7 +15,11 @@ impl FunctionDecl {
         }
     }
 
-    pub fn find_overload(&self, member_function: bool, args: &[Cow<dyn Val>]) -> Option<Function> {
+    pub fn find_overload(
+        &self,
+        member_function: bool,
+        args: &[CowVal<'_, '_>],
+    ) -> Option<Function> {
         for overload in &self.overloads {
             if overload.member_function == member_function
                 && args.len() == overload.arg_types.len()

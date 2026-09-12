@@ -2,27 +2,38 @@ use crate::common::traits::{self, Adder, Comparer, Sizer, Zeroer};
 use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelUInt, Kind, Type};
 #[cfg(feature = "chrono")]
 use crate::common::types::{CelDuration, CelTimestamp};
-use crate::common::value::{Downcast, Val};
+use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
 use crate::ExecutionError;
 use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::Deref;
 use std::string::String as StdString;
 
+/// A CEL string. Owns its bytes, or borrows them for `'a`.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct String(StdString);
+pub struct String<'a>(Cow<'a, str>);
 
-impl String {
+impl<'a> String<'a> {
+    /// The string, copied out if it was borrowed.
     pub fn into_inner(self) -> StdString {
-        self.0
+        self.0.into_owned()
     }
 
     pub fn inner(&self) -> &str {
         &self.0
     }
+
+    /// Copies the bytes out if they were borrowed, so the result owns them.
+    pub fn into_static(self) -> String<'static> {
+        String(Cow::Owned(self.0.into_owned()))
+    }
+
+    pub(crate) fn into_cow(self) -> Cow<'a, str> {
+        self.0
+    }
 }
 
-impl Deref for String {
+impl Deref for String<'_> {
     type Target = str;
 
     fn deref(&self) -> &Self::Target {
@@ -30,12 +41,15 @@ impl Deref for String {
     }
 }
 
-impl Val for String {
+impl<'a> Val for String<'a> {
     fn get_type(&self) -> &Type {
         &super::STRING_TYPE
     }
 
-    fn as_adder(&self) -> Option<&dyn Adder> {
+    fn as_adder<'b, 'v>(&'b self) -> Option<&'b (dyn Adder + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -53,22 +67,42 @@ impl Val for String {
 
     fn equals(&self, other: &dyn Val) -> bool {
         other
-            .downcast_ref::<Self>()
+            .downcast_ref::<String>()
             .is_some_and(|other| self.0 == other.0)
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(String(self.0.clone()))
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
+        Box::new(self.clone())
+    }
+
+    fn as_builtin<'b, 'v>(&'b self) -> BuiltinRef<'b, 'v>
+    where
+        Self: 'v,
+    {
+        BuiltinRef::String(self)
+    }
+
+    fn into_builtin<'v>(self: Box<Self>) -> Option<Builtin<'v>>
+    where
+        Self: 'v,
+    {
+        Some(Builtin::String(*self))
     }
 }
 
-impl Adder for String {
-    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+impl<'a> Adder for String<'a> {
+    fn add<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
+        if let Some(rhs) = rhs.downcast_ref::<String>() {
             let mut s = StdString::with_capacity(rhs.0.len() + self.0.len());
             s.push_str(&self.0);
             s.push_str(&rhs.0);
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self(s))))
+            Ok(CowVal::owned(String::from(s)))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "add",
@@ -79,9 +113,9 @@ impl Adder for String {
     }
 }
 
-impl Comparer for String {
+impl Comparer for String<'_> {
     fn compare(&self, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
-        if let Some(rhs) = rhs.downcast_ref::<Self>() {
+        if let Some(rhs) = rhs.downcast_ref::<String>() {
             Ok(self.0.cmp(&rhs.0))
         } else {
             Err(ExecutionError::NoSuchOverload)
@@ -89,47 +123,56 @@ impl Comparer for String {
     }
 }
 
-impl Sizer for String {
+impl Sizer for String<'_> {
     fn size(&self) -> CelInt {
         (self.inner().len() as i64).into()
     }
 }
 
-impl Zeroer for String {
+impl Zeroer for String<'_> {
     fn is_zero_value(&self) -> bool {
         self.inner().is_empty()
     }
 }
 
-impl From<StdString> for String {
+impl From<StdString> for String<'_> {
     fn from(v: StdString) -> Self {
-        Self(v)
+        Self(Cow::Owned(v))
     }
 }
 
-impl From<String> for StdString {
-    fn from(v: String) -> Self {
-        v.0
+impl From<String<'_>> for StdString {
+    fn from(v: String<'_>) -> Self {
+        v.into_inner()
     }
 }
 
-impl From<&str> for String {
-    fn from(value: &str) -> Self {
-        Self(StdString::from(value))
+/// Borrows the `str`: no copy is made.
+impl<'a> From<&'a str> for String<'a> {
+    fn from(value: &'a str) -> Self {
+        Self(Cow::Borrowed(value))
     }
 }
 
-impl TryFrom<Box<dyn Val>> for StdString {
-    type Error = Box<dyn Val>;
-
-    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
-        super::cast_boxed::<String>(value).map(|s| s.into_inner())
+impl<'a> From<Cow<'a, str>> for String<'a> {
+    fn from(value: Cow<'a, str>) -> Self {
+        Self(value)
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a str {
-    type Error = &'a dyn Val;
-    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+impl<'v> TryFrom<Box<dyn Val + 'v>> for StdString {
+    type Error = Box<dyn Val + 'v>;
+
+    fn try_from(value: Box<dyn Val + 'v>) -> Result<Self, Self::Error> {
+        take_string(CowVal::Owned(value))
+            .map(String::into_inner)
+            .map_err(|v| v.into_owned())
+    }
+}
+
+impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a str {
+    type Error = &'a (dyn Val + 'v);
+    fn try_from(value: &'a (dyn Val + 'v)) -> Result<Self, Self::Error> {
         if let Some(s) = value.downcast_ref::<String>() {
             return Ok(s.inner());
         }
@@ -137,98 +180,104 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
     }
 }
 
-fn string_contains<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let target = &args[0];
-    let arg = &args[1];
-    match target.downcast_ref::<String>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: target.get_type().name().to_string(),
-            want: super::STRING_TYPE.name().to_string(),
-        }),
-        Some(s) => match arg.downcast_ref::<String>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg.get_type().name().to_string(),
-                want: super::STRING_TYPE.name().to_string(),
-            }),
-            Some(needle) => Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(
-                s.contains(needle.inner()),
-            )))),
+/// Takes the string out of `arg`: a move for an owned box, a cheap clone of
+/// the `Cow` for a borrowed one. Hands `arg` back when it is not a string.
+pub(crate) fn take_string<'b, 'v>(arg: CowVal<'b, 'v>) -> Result<String<'v>, CowVal<'b, 'v>> {
+    match arg {
+        CowVal::Borrowed(v) => v
+            .downcast_ref::<String>()
+            .cloned()
+            .ok_or(CowVal::Borrowed(v)),
+        CowVal::Owned(b) => match super::into_builtin(b) {
+            Ok(Builtin::String(s)) => Ok(s),
+            Ok(other) => Err(CowVal::Owned(other.into_boxed())),
+            Err(b) => Err(CowVal::Owned(b)),
         },
     }
 }
 
-fn ends_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |target: &String, needle: &String| {
-            Ok(Box::new(CelBool::from(target.ends_with(needle.inner()))))
-        },
-    )
+fn unexpected_type(got: &dyn Val) -> ExecutionError {
+    ExecutionError::UnexpectedType {
+        got: got.get_type().name().to_string(),
+        want: super::STRING_TYPE.name().to_string(),
+    }
 }
 
-fn starts_with_string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |target: &String, needle: &String| {
-            Ok(Box::new(CelBool::from(target.starts_with(needle.inner()))))
-        },
-    )
+type StringBinaryFn = fn(&str, &str) -> Result<Box<dyn Val>, ExecutionError>;
+
+/// Applies `func` to two string arguments.
+fn string_binary_fn<'b, 'v>(
+    args: Vec<CowVal<'b, 'v>>,
+    func: StringBinaryFn,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let target = args[0].as_ref();
+    let arg = args[1].as_ref();
+    let target = target
+        .downcast_ref::<String>()
+        .ok_or_else(|| unexpected_type(target))?;
+    let arg = arg
+        .downcast_ref::<String>()
+        .ok_or_else(|| unexpected_type(arg))?;
+    Ok(CowVal::Owned(func(target.inner(), arg.inner())?))
+}
+
+fn string_contains<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    string_binary_fn(args, |s, needle| {
+        Ok(Box::new(CelBool::from(s.contains(needle))))
+    })
+}
+
+fn ends_with_string<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    string_binary_fn(args, |s, needle| {
+        Ok(Box::new(CelBool::from(s.ends_with(needle))))
+    })
+}
+
+fn starts_with_string<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    string_binary_fn(args, |s, needle| {
+        Ok(Box::new(CelBool::from(s.starts_with(needle))))
+    })
 }
 
 #[cfg(feature = "regex")]
-fn matches<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::binary_fn(
-        args,
-        super::STRING_TYPE,
-        super::STRING_TYPE,
-        |this: &String, regex: &String| match regex::Regex::new(regex.inner()) {
-            Ok(re) => Ok(Box::new(CelBool::from(re.is_match(this.inner())))),
-            Err(err) => Err(ExecutionError::FunctionError {
-                function: "matches".to_string(),
-                message: format!("'{}' not a valid regex:\n{err}", regex.inner()),
-            }),
-        },
-    )
+fn matches<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    string_binary_fn(args, |this, regex| match regex::Regex::new(regex) {
+        Ok(re) => Ok(Box::new(CelBool::from(re.is_match(this)))),
+        Err(err) => Err(ExecutionError::FunctionError {
+            function: "matches".to_string(),
+            message: format!("'{regex}' not a valid regex:\n{err}"),
+        }),
+    })
 }
 
-fn string<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let arg = args.remove(0).into_owned();
-    let ret: Result<Box<String>, Box<dyn Val>> = match arg.get_type().kind() {
-        Kind::String => arg.downcast::<String>(),
-        Kind::Int => arg
-            .downcast::<CelInt>()
-            .map(|arg| Box::new(String::from(arg.to_string()))),
-        Kind::UInt => arg
-            .downcast::<CelUInt>()
-            .map(|arg| Box::new(String::from(arg.to_string()))),
-        Kind::Double => arg
-            .downcast::<CelDouble>()
-            .map(|arg| Box::new(String::from(arg.to_string()))),
-        Kind::Bytes => arg.downcast::<CelBytes>().map(|arg| {
-            Box::new(String::from(
-                StdString::from_utf8_lossy(arg.inner()).as_ref(),
-            ))
-        }),
+fn string<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let arg = args.remove(0);
+    if arg.downcast_ref::<String>().is_some() {
+        // `string(s)` is the identity: keep the borrow.
+        return Ok(arg);
+    }
+    let converted: Option<StdString> = match arg.get_type().kind() {
+        Kind::Int => arg.downcast_ref::<CelInt>().map(|i| i.to_string()),
+        Kind::UInt => arg.downcast_ref::<CelUInt>().map(|u| u.to_string()),
+        Kind::Double => arg.downcast_ref::<CelDouble>().map(|d| d.to_string()),
+        Kind::Bytes => arg
+            .downcast_ref::<CelBytes>()
+            .map(|b| StdString::from_utf8_lossy(b.inner()).into_owned()),
         #[cfg(feature = "chrono")]
         Kind::Timestamp => arg
-            .downcast::<CelTimestamp>()
-            .map(|ts| Box::new(String::from(ts.inner().to_rfc3339()))),
+            .downcast_ref::<CelTimestamp>()
+            .map(|ts| ts.inner().to_rfc3339()),
         #[cfg(feature = "chrono")]
         Kind::Duration => arg
-            .downcast::<CelDuration>()
-            .map(|arg| Box::new(String::from(crate::duration::format_duration(arg.inner())))),
-        _ => Err(arg),
+            .downcast_ref::<CelDuration>()
+            .map(|d| crate::duration::format_duration(d.inner())),
+        _ => None,
     };
-    match ret {
-        Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
-        Err(arg) => Err(ExecutionError::FunctionError {
+    match converted {
+        Some(s) => Ok(CowVal::owned(String::from(s))),
+        None => Err(ExecutionError::FunctionError {
             function: "string".to_owned(),
-            message: format!("cannot convert {arg:?} to string"),
+            message: format!("cannot convert {:?} to string", arg.as_ref()),
         }),
     }
 }
@@ -327,7 +376,7 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 mod tests {
     use super::StdString;
     use super::String;
-    use crate::common::value::Val;
+    use crate::common::value::{CowVal, Val};
 
     #[test]
     fn test_try_into_string() {
@@ -339,5 +388,25 @@ mod tests {
     fn test_try_into_str() {
         let str: Box<dyn Val> = Box::new(String::from("cel-rust"));
         assert_eq!(Ok("cel-rust"), str.as_ref().try_into())
+    }
+
+    #[test]
+    fn from_str_borrows() {
+        let owned = StdString::from("cel-rust");
+        let s = String::from(owned.as_str());
+        assert!(std::ptr::eq(s.inner(), owned.as_str()));
+        let boxed: Box<dyn Val + '_> = s.clone_as_boxed();
+        let back = boxed.downcast_ref::<String>().unwrap();
+        assert!(std::ptr::eq(back.inner(), owned.as_str()));
+        assert_eq!(s.into_static().inner(), "cel-rust");
+    }
+
+    #[test]
+    fn string_of_string_is_identity() {
+        let owned = StdString::from("cel-rust");
+        let arg: CowVal<'_, '_> = CowVal::owned(String::from(owned.as_str()));
+        let out = super::string(vec![arg]).unwrap();
+        let s = out.downcast_ref::<String>().unwrap();
+        assert!(std::ptr::eq(s.inner(), owned.as_str()));
     }
 }

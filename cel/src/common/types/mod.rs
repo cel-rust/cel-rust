@@ -1,6 +1,6 @@
 use crate::common::traits;
+#[cfg(feature = "chrono")]
 use crate::ExecutionError;
-use std::any::Any;
 use std::borrow::Cow;
 
 pub(crate) mod bool;
@@ -23,7 +23,9 @@ pub(crate) mod type_val;
 pub(crate) mod uint;
 
 use crate::common::traits::TraitSet;
-use crate::common::value::Val;
+use crate::common::value::{Builtin, BuiltinRef, Val};
+#[cfg(feature = "chrono")]
+use crate::common::value::{CowVal, StaticVal};
 pub use bool::Bool as CelBool;
 pub use bytes::Bytes as CelBytes;
 pub use double::Double as CelDouble;
@@ -353,65 +355,73 @@ impl Type {
     }
 }
 
-/// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`
-/// Will return `Result::Ok` if the type check succeeded with the actual Box to the
-/// `Box<T>`. `Result::Err` with the `Box<dyn Val>` back to the caller should the type check
-/// fail.
-fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
-    if <dyn Any>::is::<T>(&*value) {
-        let temp_container = &mut Some(value);
-        // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
-        // that check for memory safety because we have implemented Any for all types; no other
-        // impls can exist as they would conflict with our impl.
-        let temp_container = unsafe { &mut *(temp_container as *mut _ as *mut Option<Box<T>>) };
-        return Ok(temp_container.take().unwrap());
+/// Moves a built-in value out of its box without copying it.
+///
+/// Hands the box back untouched when the value is not one of the built-in
+/// types that [`Val::into_builtin`] covers.
+pub(crate) fn into_builtin<'v>(value: Box<dyn Val + 'v>) -> Result<Builtin<'v>, Box<dyn Val + 'v>> {
+    if matches!(value.as_builtin(), BuiltinRef::Other) {
+        return Err(value);
     }
-    Err(value)
+    // `as_builtin` and `into_builtin` are implemented together on every
+    // built-in type, so a value that answered `as_builtin` answers here.
+    Ok(value
+        .into_builtin()
+        .expect("`as_builtin` and `into_builtin` must agree"))
 }
 
-type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
-type BinaryFn<A, B> = fn(&A, &B) -> Result<Box<dyn Val>, ExecutionError>;
+impl<'v> Builtin<'v> {
+    /// Boxes the value back up.
+    pub(crate) fn into_boxed(self) -> Box<dyn Val + 'v> {
+        match self {
+            Builtin::String(s) => Box::new(s),
+            Builtin::Bytes(b) => Box::new(b),
+            Builtin::List(l) => Box::new(l),
+            Builtin::Map(m) => Box::new(m),
+            Builtin::Optional(o) => Box::new(o),
+            #[cfg(feature = "structs")]
+            Builtin::Struct(s) => Box::new(s),
+        }
+    }
+}
 
-fn unary_fn<'a, A: Val>(
-    args: Vec<Cow<'a, dyn Val>>,
+#[cfg(feature = "chrono")]
+type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
+
+/// Applies `func` to the single `'static` argument of type `A`.
+#[cfg(feature = "chrono")]
+fn unary_fn<'b, 'v, A: StaticVal>(
+    args: Vec<CowVal<'b, 'v>>,
     type_a: Type,
     func: UnaryFn<A>,
-) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
     let arg = &args[0];
     match arg.downcast_ref::<A>() {
         None => Err(ExecutionError::UnexpectedType {
             got: arg.get_type().name().to_string(),
             want: type_a.name().to_string(),
         }),
-        Some(arg) => Ok(Cow::<dyn Val>::Owned(func(arg)?)),
+        Some(arg) => Ok(CowVal::Owned(func(arg)?)),
     }
 }
 
-fn binary_fn<'a, A: Val, B: Val>(
-    args: Vec<Cow<'a, dyn Val>>,
-    type_a: Type,
-    type_b: Type,
-    func: BinaryFn<A, B>,
-) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let arg1 = &args[0];
-    let arg2 = &args[1];
-    match arg1.downcast_ref::<A>() {
+/// Applies `func` to the single string argument.
+#[cfg(feature = "chrono")]
+fn string_fn<'b, 'v>(
+    args: Vec<CowVal<'b, 'v>>,
+    func: fn(&str) -> Result<Box<dyn Val>, ExecutionError>,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let arg = &args[0];
+    match arg.downcast_ref::<CelString>() {
         None => Err(ExecutionError::UnexpectedType {
-            got: arg1.get_type().name().to_string(),
-            want: type_a.name().to_string(),
+            got: arg.get_type().name().to_string(),
+            want: STRING_TYPE.name().to_string(),
         }),
-        Some(arg1) => match arg2.downcast_ref::<B>() {
-            None => Err(ExecutionError::UnexpectedType {
-                got: arg2.get_type().name().to_string(),
-                want: type_b.name().to_string(),
-            }),
-            Some(arg2) => Ok(Cow::<dyn Val>::Owned(func(arg1, arg2)?)),
-        },
+        Some(arg) => Ok(CowVal::Owned(func(arg.inner())?)),
     }
 }
 
-fn noop<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let ts = args.remove(0);
-    Ok(ts)
+#[cfg(feature = "chrono")]
+fn noop<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    Ok(args.remove(0))
 }
