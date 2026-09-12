@@ -31,6 +31,8 @@ pub use double::Double as CelDouble;
 pub use duration::Duration as CelDuration;
 pub use int::Int as CelInt;
 pub use list::DefaultList as CelList;
+#[doc(hidden)]
+pub use list::MutableList;
 pub use map::DefaultMap as CelMap;
 pub use map::Key as CelMapKey;
 pub use null::Null as CelNull;
