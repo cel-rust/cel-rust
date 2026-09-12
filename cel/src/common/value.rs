@@ -80,9 +80,54 @@ impl PartialEq for dyn Val {
     }
 }
 
+/// A `T: Val` that borrows data for `'a`, even though `T` itself carries
+/// no lifetime.
+///
+/// The value cannot outlive `'a`, and because of its `Drop` impl it
+/// cannot even be *dropped* after `'a` ends:
+///
+/// ```compile_fail,E0597
+/// use cel::common::types::CelString;
+/// use cel::common::value::BorrowedVal;
+///
+/// let bv: BorrowedVal<'_, CelString>;
+/// {
+///     let s = String::from("bar");
+///     bv = BorrowedVal::from(s.as_str());
+/// } // error[E0597]: `s` does not live long enough (bv dropped later)
+/// ```
 pub struct BorrowedVal<'a, T: Val> {
     val: Box<T>,
+    // Safety invariant: this field is load-bearing. `Box<T>` does not
+    // itself mention `'a`, so without this `PhantomData` the compiler
+    // would not bound `BorrowedVal<'a, T>` by `'a`. That bound is what
+    // keeps every borrow reachable through the value, including a
+    // lifetime-laundered interior `&'static` produced inside `T` (see
+    // `<BorrowedVal<'a, String> as From<&'a str>>` in
+    // `common::types::string.rs`), bounded at `<= 'a` and prevented from
+    // outliving the borrow this wrapper represents. Do not remove this
+    // field, and do not weaken its variance (e.g. to `PhantomData<fn()
+    // -> &'a ()>` for contravariance, or `PhantomData<*const &'a ()>`
+    // for invariance without a borrow) without re-auditing every unsafe
+    // `From` / constructor that produces a `BorrowedVal`.
+    //
+    // The `PhantomData` alone does not make drop-check require `'a` to
+    // be live when the `BorrowedVal` is dropped; the explicit `Drop`
+    // impl below does. Do not remove that impl either: without it a
+    // `BorrowedVal` can be dropped after its referent is freed, and the
+    // drop glue of `T` then runs over a dangling laundered reference.
     phantom: PhantomData<&'a ()>,
+}
+
+// This impl exists solely for drop-check. A type with a `Drop` impl is
+// considered to access every lifetime in its type when dropped, so the
+// borrow checker requires `'a` to be live at the drop of a
+// `BorrowedVal<'a, T>`. That guarantees the inner `Box<T>` (and any
+// laundered `&'a` it holds, see the Safety invariant on `phantom`) is
+// dropped before the referent it borrows. The `compile_fail` doctest on
+// `BorrowedVal` pins this behaviour.
+impl<'a, T: Val> Drop for BorrowedVal<'a, T> {
+    fn drop(&mut self) {}
 }
 
 impl<'a, T: Val> BorrowedVal<'a, T> {

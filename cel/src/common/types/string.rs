@@ -8,7 +8,27 @@ use std::ops::Deref;
 use std::string::String as StdString;
 
 #[derive(Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
-pub struct String(Cow<'static, str>);
+pub struct String(
+    // Safety invariant: the `'static` on this `Cow` may be a lie. The only
+    // constructor that stores the `Borrowed` variant is
+    // `<BorrowedVal<'a, String> as From<&'a str>>` in this file, which
+    // launders an `&'a str` to `&'static str` via `leak_ref`. Such a
+    // value is sound to read only while the enclosing
+    // `BorrowedVal<'a, String>` is alive, i.e. for `'a`.
+    //
+    // Consequently, no code may move or copy the `Borrowed` variant out
+    // of a `&String` into a value that is not itself bounded by `'a`.
+    // Every function that produces an owned `String`, `Box<dyn Val>`,
+    // `StdString`, or `Cow<'static, str>` from `&self` must go through
+    // `Cow::Owned` (see `Clone`, `Val::clone_as_boxed`, and
+    // `into_inner` in this file). Returning `&str` bounded by `&self`
+    // is fine. Adding a new such producer without re-auditing this
+    // invariant reintroduces a use-after-free reachable from safe code.
+    //
+    // Non-laundered values are always `Cow::Owned`; every other
+    // constructor in this file allocates.
+    Cow<'static, str>,
+);
 
 impl String {
     pub fn into_inner(self) -> StdString {
@@ -21,8 +41,8 @@ impl String {
 }
 
 impl Clone for String {
-    // SAFETY: this explicitly allocates a new `String` with the same contents as the original on the heap
-    // as we can't _ever_ reuse the `&'static str`, or the `Cow::Borrowed`.
+    // Upholds the Safety invariant on the field: the clone is always
+    // `Cow::Owned`, never a copy of a (possibly laundered) `Borrowed`.
     fn clone(&self) -> Self {
         Self(Cow::Owned(StdString::from(self.inner())))
     }
@@ -56,7 +76,11 @@ impl Val for String {
     }
 
     fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(String(self.0.clone()))
+        // Upholds the Safety invariant on the field: `Box<dyn Val>` is
+        // `'static`, so the boxed value must not carry a laundered
+        // `Borrowed`. `self.clone()` always produces `Cow::Owned`.
+        // `String(self.0.clone())` would copy the `Borrowed` pointer.
+        Box::new(self.clone())
     }
 }
 
@@ -125,9 +149,43 @@ impl<'a> TryFrom<&'a dyn Val> for &'a str {
 
 impl<'a> From<&'a str> for BorrowedVal<'a, String> {
     fn from(value: &'a str) -> Self {
-        // SAFETY: BorrowedVal is retying the `'a` lifetime from the `&'a str`
-        // now, the `String`'s borrowed `leaked' reference also need to _never_
-        // escape the `String` by other means neither!
+        // SAFETY:
+        // Operation: `super::leak_ref::<'static, str>(value)`, the sole
+        // unsafe call in this block. `BorrowedVal::new` is a safe fn.
+        // Contract: `leak_ref`'s five `# Safety` preconditions must hold
+        // for the caller-chosen lifetime, here `'static`. Because the
+        // chosen lifetime exceeds the real one, `leak_ref`'s docs require
+        // a named project-local invariant that bounds every use of the
+        // returned reference. That invariant is the Safety invariant on
+        // the `Cow<'static, str>` field of `String` in this file, plus
+        // the Safety invariant on `BorrowedVal::phantom` in
+        // `common::value.rs`.
+        // Evidence:
+        //   1–3. AXIOM (Rust Reference, reference validity): a live
+        //        `&'a str` is non-null, aligned, and covers `len` bytes
+        //        of initialized UTF-8 in one live allocation, with
+        //        correct length metadata. The raw pointer decayed from
+        //        `value` therefore satisfies (1), (2), and (3) for `'a`.
+        //   4–5. TYPE FACT: `value: &'a str`, so the allocation is live
+        //        and no `&mut` alias exists for all of `'a`. The leaked
+        //        reference is only ever read within `'a` because:
+        //        - INVARIANT (`BorrowedVal::phantom`): the returned
+        //          `BorrowedVal<'a, String>` is bounded by `'a`, and its
+        //          explicit `Drop` impl makes the borrow checker require
+        //          `'a` to be live through the drop as well, so the
+        //          `Box<String>` inside is dropped before `'a` ends.
+        //        - INVARIANT (`String` field): every path from `&String`
+        //          to an owned value goes through `Cow::Owned`, so the
+        //          laundered `Borrowed` cannot be copied into a value
+        //          that outlives the `BorrowedVal`. The only reads of
+        //          the pointer are through `&str`s bounded by a borrow
+        //          of the `BorrowedVal`, hence by `'a`.
+        //        Therefore (4) and (5) hold at every read of the leaked
+        //        reference, and no read or drop occurs after `'a`.
+        // Postcondition: the returned `BorrowedVal<'a, String>` behaves
+        // as a borrow of `value`; every `&str` reachable through it has
+        // lifetime `<= 'a`, and every owned value derived from it copies
+        // the bytes.
         unsafe {
             let leaked: &'static str = super::leak_ref(value);
             let val = String(Cow::Borrowed(leaked));
@@ -165,6 +223,23 @@ mod tests {
         assert_eq!(string.as_str(), r.inner());
         assert!(std::ptr::eq(string.as_str(), r.inner()));
         assert!(std::ptr::eq(string.as_str(), r.inner()));
+    }
+
+    /// Regression: `clone_as_boxed` (and therefore `Cow::<dyn Val>::
+    /// into_owned`) must copy the bytes out of a laundered `Borrowed`,
+    /// never the pointer. Run under Miri to catch a use-after-free.
+    #[test]
+    fn test_clone_as_boxed_outlives_borrow() {
+        let (boxed, owned): (Box<dyn Val>, Box<dyn Val>) = {
+            let string = StdString::from("cel-rust");
+            let val = BorrowedVal::from(string.as_str());
+            let cow: std::borrow::Cow<dyn Val> = std::borrow::Cow::Borrowed(val.inner());
+            (val.inner().clone_as_boxed(), cow.into_owned())
+        };
+        let boxed = boxed.downcast_ref::<String>().unwrap();
+        let owned = owned.downcast_ref::<String>().unwrap();
+        assert_eq!(boxed.inner(), "cel-rust");
+        assert_eq!(owned.inner(), "cel-rust");
     }
 
     #[test]

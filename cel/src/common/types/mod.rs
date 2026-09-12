@@ -233,22 +233,97 @@ impl<'a> Type<'a> {
     }
 }
 
+/// Extends the lifetime of a `*const T` into a caller-chosen `&'a T`.
+///
+/// Lifetime-laundry primitive: the caller picks `'a`, which may be much
+/// longer than any borrow the raw pointer was derived from (including
+/// `'static`). Use only when a documented project-local invariant bounds
+/// every read of the returned reference to the real liveness of the
+/// pointee; the caller's SAFETY comment must name that invariant. The
+/// only current user is `<BorrowedVal<'a, String> as From<&'a str>>` in
+/// `string.rs`, relying on the Safety invariant on `String`'s field and
+/// on `BorrowedVal::phantom`. Prefer safe borrow-based APIs whenever
+/// possible.
+///
+/// # Safety
+///
+/// The caller must ensure that, for the entire caller-chosen lifetime
+/// `'a`:
+///
+/// 1. `s` is non-null.
+/// 2. `s` is properly aligned for `T`.
+/// 3. `s` carries correct metadata for `T` (e.g. the length for `str`
+///    and slices), and the whole `size_of_val` byte range starting at
+///    `s` lies in one live allocation and holds a valid, initialized
+///    `T`.
+/// 4. The allocation backing `s` remains live: no deallocation,
+///    reallocation, or repurposing occurs.
+/// 5. No other access path mutates the pointee (except through
+///    `UnsafeCell` inside `T`), and no `&mut` reference to the pointee
+///    is alive.
+///
+/// The chosen `'a` is not tied to any source borrow by the compiler.
+/// Callers must audit every downstream use site, including drops, to
+/// confirm the returned reference is neither read nor dropped as part of
+/// a value after the duration for which conditions 1–5 hold.
+///
+/// If these preconditions hold, the returned `&'a T` is a valid shared
+/// reference to the pointee for all of `'a`.
 unsafe fn leak_ref<'a, T: ?Sized>(s: *const T) -> &'a T {
+    // SAFETY:
+    // Operation: creating a shared reference from a raw pointer via `&*s`.
+    // Contract (AXIOM: Rust Reference, reference validity and place
+    // expressions): `s` must be dereferenceable, i.e. non-null, aligned
+    // for `T`, with correct metadata and its full `size_of_val` range in
+    // one live allocation; the pointee must be a valid initialized `T`;
+    // and no conflicting `&mut` alias may exist for the reference's
+    // lifetime `'a`.
+    // Evidence: each of these obligations is exactly one of
+    // PRECONDITIONS 1–5 in this function's `# Safety` section, which the
+    // caller has discharged. Nothing in this body mutates state or runs
+    // intervening code that could invalidate them.
     &*s
 }
 
-/// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`
-/// Will return `Result::Ok` if the type check succeeded with the actual Box to the
-/// `Box<T>`. `Result::Err` with the `Box<dyn Val>` back to the caller should the type check
-/// fail.
+/// Try to cast a `Box<dyn Val>` to its concrete type `T: Val`.
+///
+/// Returns `Ok(Box<T>)` if the underlying concrete type is exactly `T`,
+/// otherwise returns `Err(Box<dyn Val>)` with the original box unchanged.
 fn cast_boxed<T: Val>(value: Box<dyn Val>) -> Result<Box<T>, Box<dyn Val>> {
     if <dyn Any>::is::<T>(&*value) {
-        let temp_container = &mut Some(value);
-        // SAFETY: just checked whether we are pointing to the correct type, and we can rely on
-        // that check for memory safety because we have implemented Any for all types; no other
-        // impls can exist as they would conflict with our impl.
-        let temp_container = unsafe { &mut *(temp_container as *mut _ as *mut Option<Box<T>>) };
-        return Ok(temp_container.take().unwrap());
+        // Mirror std's `Box<dyn Any>::downcast` pattern: consume the
+        // source `Box` via `Box::into_raw`, thin the resulting fat
+        // pointer to `*mut T`, and reconstitute a `Box<T>`.
+        let raw: *mut dyn Val = Box::into_raw(value);
+        // SAFETY:
+        // Operation: `Box::from_raw(raw as *mut T)`.
+        // Contract from `Box::from_raw` (AXIOM: std docs): the pointer
+        // must have been produced by a prior `Box::into_raw` for a value
+        // whose concrete type has the same layout and alignment as `T`,
+        // and be usable with the global allocator; the resulting `Box`
+        // takes exclusive ownership and will free the allocation with
+        // `T`'s layout on drop.
+        // Evidence:
+        //   - POSTCONDITION of `Box::into_raw(value)` (AXIOM: std docs):
+        //     `raw` points to the heap allocation that `value` owned,
+        //     ownership has been surrendered, and no other Box currently
+        //     owns the allocation.
+        //   - `T: Val` (TYPE FACT) and `Val: Any` (declared on the trait
+        //     in `common::value::Val`), so `<dyn Any>::is::<T>(&*value)`
+        //     called above compares `TypeId::of::<T>()` against the
+        //     concrete type behind the trait object. When it returns
+        //     true, AXIOM (std docs for `Any::is`) states that the
+        //     concrete type is exactly `T`.
+        //   - Therefore the heap allocation was constructed for `T` and
+        //     has `T`'s layout and alignment; `raw as *mut T` is a
+        //     non-null pointer to an aligned, initialized `T` in that
+        //     allocation.
+        //   - Between the type-id check and this `Box::from_raw`, no
+        //     code observes, aliases, or frees the allocation.
+        // Postcondition: the returned `Box<T>` is the unique owner of
+        // the heap allocation and will free it with `T`'s layout on
+        // drop.
+        return Ok(unsafe { Box::from_raw(raw as *mut T) });
     }
     Err(value)
 }
