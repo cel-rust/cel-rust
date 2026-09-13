@@ -1287,17 +1287,18 @@ impl Value {
                         operators::IN => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            let overload_error = ExecutionError::overload_for_values(
-                                &call.func_name,
-                                [lhs.as_ref(), rhs.as_ref()],
-                                false,
-                            );
-                            let container =
-                                rhs.as_container().ok_or_else(|| overload_error.clone())?;
+                            let overload_error = || {
+                                ExecutionError::overload_for_values(
+                                    &call.func_name,
+                                    [lhs.as_ref(), rhs.as_ref()],
+                                    false,
+                                )
+                            };
+                            let container = rhs.as_container().ok_or_else(overload_error)?;
                             return container
                                 .contains(lhs.as_ref())
                                 .map(bool)
-                                .map_err(|error| error.with_overload_context(overload_error));
+                                .map_err(|error| error.with_overload_context(overload_error()));
                         }
                         _ => (),
                     }
@@ -1407,23 +1408,22 @@ impl Value {
                                 {
                                     return op(args);
                                 }
-                                let overload_error = ExecutionError::overload_for_values(
-                                    &call.func_name,
-                                    args.iter().map(|arg| arg.as_ref()),
-                                    true,
-                                );
-                                let has_member_overload =
-                                    ctx.env().has_member_overload(&call.func_name);
-                                let target = args.remove(0);
                                 let func = match ctx.get_function(call.func_name.as_str()) {
                                     Some(func) => func,
-                                    None if has_member_overload => return Err(overload_error),
+                                    None if ctx.env().has_member_overload(&call.func_name) => {
+                                        return Err(ExecutionError::overload_for_values(
+                                            &call.func_name,
+                                            args.iter().map(|arg| arg.as_ref()),
+                                            true,
+                                        ));
+                                    }
                                     None => {
                                         return Err(ExecutionError::UndeclaredReference(
                                             call.func_name.clone().into(),
                                         ));
                                     }
                                 };
+                                let target = args.remove(0);
                                 (Some(target), func, args)
                             }
                             Some(func) => (None, func, args),
@@ -1442,7 +1442,7 @@ impl Value {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
                 let key: CelString = select.field.as_str().into();
                 let overload_error =
-                    ExecutionError::overload_for_values("_._", [left.as_ref(), &key], false);
+                    || ExecutionError::overload_for_values("_._", [left.as_ref(), &key], false);
 
                 // Plain `.field` on an `Optional` propagates optional-ness
                 // per cel-spec — matches cel-go `applyQualifiers` at
@@ -1504,9 +1504,9 @@ impl Value {
                         }
                         _ => Ok(Cow::<dyn Val>::Owned(
                             left.as_indexer()
-                                .ok_or_else(|| overload_error.clone())?
+                                .ok_or_else(overload_error)?
                                 .get(&key)
-                                .map_err(|error| error.with_overload_context(overload_error))?
+                                .map_err(|error| error.with_overload_context(overload_error()))?
                                 .into_owned(),
                         )),
                     }
@@ -1525,9 +1525,9 @@ impl Value {
                         }
                         _ => Ok(Cow::<dyn Val>::Owned(
                             left.as_indexer()
-                                .ok_or_else(|| overload_error.clone())?
+                                .ok_or_else(overload_error)?
                                 .get(&key)
-                                .map_err(|error| error.with_overload_context(overload_error))?
+                                .map_err(|error| error.with_overload_context(overload_error()))?
                                 .into_owned(),
                         )),
                     }
