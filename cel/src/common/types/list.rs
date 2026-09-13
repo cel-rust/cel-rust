@@ -6,6 +6,7 @@ use crate::ExecutionError;
 use std::any::Any;
 use std::borrow::Cow;
 use std::ops::Deref;
+use std::sync::{Arc, Mutex};
 
 #[derive(Debug, Default)]
 pub struct DefaultList(Vec<Box<dyn Val>>);
@@ -244,6 +245,114 @@ impl<'a> traits::Iterator<'a> for SliceIterator<'a> {
     }
 }
 
+/// A mutable list that shares its backing storage across clones.
+///
+/// `MutableList` is an internal helper used by the comprehension evaluator
+/// (see [`crate::objects::Value::resolve_val`]) to build up the accumulator
+/// of `map` / `filter` comprehensions in place, avoiding the quadratic
+/// clone-on-add cost that a normal [`DefaultList`] would incur when the
+/// comprehension expands to `@result = @result + [expr]` on every iteration.
+///
+/// Only the surface the comprehension actually invokes on the accumulator
+/// is implemented — `Val` + [`Adder`]. `DefaultList` stays a full-fledged
+/// value type (with `Container`/`Indexer`/`Iterable`/`Sizer`/`Zeroer`);
+/// `MutableList` never leaves this scope, so those trait impls would be
+/// dead code.
+///
+/// It is not exposed to user code and should never be produced by
+/// user-defined overloads or programs. When a comprehension completes, the
+/// evaluator converts the accumulator back to a [`DefaultList`] via
+/// [`MutableList::to_immutable`].
+#[derive(Debug, Default)]
+#[doc(hidden)]
+pub struct MutableList {
+    inner: Arc<Mutex<Vec<Box<dyn Val>>>>,
+}
+
+impl MutableList {
+    pub fn with_capacity(cap: usize) -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(Vec::with_capacity(cap))),
+        }
+    }
+
+    /// Converts the mutable list into an immutable [`DefaultList`], reusing
+    /// the backing storage if this handle is the only one still alive.
+    pub fn to_immutable(self) -> DefaultList {
+        match Arc::try_unwrap(self.inner) {
+            Ok(mutex) => DefaultList(mutex.into_inner().expect("mutable list mutex poisoned")),
+            Err(shared) => {
+                let guard = shared.lock().expect("mutable list mutex poisoned");
+                let mut out = Vec::with_capacity(guard.len());
+                for v in guard.iter() {
+                    out.push(v.clone_as_boxed());
+                }
+                DefaultList(out)
+            }
+        }
+    }
+
+    fn share(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+        }
+    }
+
+    #[cfg(test)]
+    fn len_for_test(&self) -> usize {
+        self.inner
+            .lock()
+            .expect("mutable list mutex poisoned")
+            .len()
+    }
+}
+
+// `MutableList` only implements the Val + trait surface the comprehension
+// evaluator actually invokes on the accumulator:
+//   * `get_type` / `clone_as_boxed` — mandatory on every `Val`, and
+//     `clone_as_boxed` fires on every loop iteration when the accumulator
+//     is re-stored in the child context (the `Arc` inside means it's a
+//     refcount bump, not a buffer copy).
+//   * `as_adder` — invoked by the ADD dispatch every time the loop step
+//     evaluates `@result + [expr]`.
+// The other trait accessors (`as_iterable`, `as_indexer`, `as_container`,
+// `as_sizer`, `as_zeroer`) never fire because the accumulator identifier
+// `@result` is not typeable in CEL source, so user expressions can never
+// call `size()`, iterate, index, or use `in` on it; and the accumulator
+// is always frozen to `DefaultList` before it leaves the comprehension
+// scope, so no user code ever sees a `MutableList` either. Same reasoning
+// leaves `equals` at the default `false` — no one compares mutable lists.
+impl Val for MutableList {
+    fn get_type(&self) -> &Type {
+        &types::LIST_TYPE
+    }
+
+    fn as_adder(&self) -> Option<&dyn Adder> {
+        Some(self)
+    }
+
+    fn clone_as_boxed(&self) -> Box<dyn Val> {
+        Box::new(self.share())
+    }
+}
+
+impl Adder for MutableList {
+    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+        let iter = rhs
+            .as_iterable()
+            .ok_or(ExecutionError::NoSuchOverload)?
+            .iter();
+        {
+            let mut inner = self.inner.lock().expect("mutable list mutex poisoned");
+            let mut items = iter;
+            while let Some(other) = items.next() {
+                inner.push(other.clone_as_boxed());
+            }
+        }
+        Ok(Cow::Borrowed(self as &dyn Val))
+    }
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "size",
@@ -350,5 +459,45 @@ pub mod tests {
         let list: &[Box<dyn Val>] = list.as_ref().try_into().unwrap();
         assert_eq!(list[0].downcast_ref::<CelString>().unwrap().inner(), "cel");
         assert_eq!(list[1].downcast_ref::<CelString>().unwrap().inner(), "rust");
+    }
+
+    use crate::common::traits::Adder;
+    use crate::common::types::list::MutableList;
+
+    fn box_val<V: Val>(v: V) -> Box<dyn Val> {
+        Box::new(v)
+    }
+
+    #[test]
+    fn mutable_list_add_extends_in_place_across_clones() {
+        let m = MutableList::with_capacity(4);
+        let clone_box = m.clone_as_boxed();
+        let clone = clone_box.downcast_ref::<MutableList>().unwrap();
+
+        m.add(&DefaultList::from(vec![box_val(CelInt::from(1i64))]))
+            .unwrap();
+        m.add(&DefaultList::from(vec![box_val(CelInt::from(2i64))]))
+            .unwrap();
+        clone
+            .add(&DefaultList::from(vec![box_val(CelInt::from(3i64))]))
+            .unwrap();
+
+        // Both handles observe the same growing buffer.
+        assert_eq!(m.len_for_test(), 3);
+        assert_eq!(clone.len_for_test(), 3);
+    }
+
+    #[test]
+    fn mutable_list_to_immutable_preserves_order() {
+        let m = MutableList::with_capacity(0);
+        for i in 0..5i64 {
+            let rhs = DefaultList::from(vec![box_val(CelInt::from(i))]);
+            m.add(&rhs).unwrap();
+        }
+        let imm = m.to_immutable();
+        assert_eq!(imm.inner().len(), 5);
+        for (i, v) in imm.inner().iter().enumerate() {
+            assert_eq!(*v.downcast_ref::<CelInt>().unwrap().inner(), i as i64);
+        }
     }
 }

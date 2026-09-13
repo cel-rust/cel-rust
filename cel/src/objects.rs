@@ -1,7 +1,7 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::common::types::bool::Bool;
 use crate::common::types::*;
-use crate::common::value::Val;
+use crate::common::value::{Downcast, Val};
 use crate::context::Context;
 use crate::ExecutionError::NoSuchOverload;
 use crate::{ExecutionError, Expression, FunctionContext};
@@ -1525,8 +1525,33 @@ impl Value {
             Expr::Comprehension(comprehension) => {
                 let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
                 let iter = Value::resolve_val(&comprehension.iter_range, ctx)?;
+
+                // Mirror cel-go's optimization (see `folder.ResolveName` in
+                // `cel-go/interpreter/interpretable.go`): when the
+                // accumulator starts out as an empty list, swap it for a
+                // preallocated `MutableList` so the loop step
+                // (`@result + [expr]`) can grow a single shared buffer in
+                // place instead of paying O(n) clone-and-extend on every
+                // iteration. The ADD dispatch itself stays generic — it
+                // just calls `Adder::add` on whatever the accumulator
+                // resolves to, and `MutableList::add` mutates the shared
+                // `Arc<Mutex<Vec<_>>>` in place then returns
+                // `Cow::Borrowed(self)` (the "return the receiver" trick
+                // cel-go's `mutableList.Add` uses to keep the same pointer
+                // identity across iterations).
+                let accu_boxed: Box<dyn Val> = match accu_init.downcast_ref::<CelList>() {
+                    Some(list) if list.inner().is_empty() => {
+                        let size_hint = iter
+                            .as_sizer()
+                            .map(|s| *s.size().inner() as usize)
+                            .unwrap_or(0);
+                        Box::new(MutableList::with_capacity(size_hint))
+                    }
+                    _ => accu_init.clone_as_boxed(),
+                };
+
                 let mut ctx = ctx.new_inner_scope();
-                ctx.add_variable_as_val(&comprehension.accu_var, accu_init.clone_as_boxed());
+                ctx.add_variable_as_val(&comprehension.accu_var, accu_boxed);
 
                 let mut items = iter
                     .as_iterable()
@@ -1540,9 +1565,15 @@ impl Value {
                     let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
                     ctx.add_variable_as_val(&comprehension.accu_var, accu.clone_as_boxed());
                 }
-                Ok(Cow::<dyn Val>::Owned(
-                    Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
-                ))
+                // Freeze the mutable accumulator back into an immutable
+                // list before it leaves the accu scope (cel-go does the
+                // analogous conversion in `folder.evalResult`).
+                let result = Value::resolve_val(&comprehension.result, &ctx)?.into_owned();
+                let result: Box<dyn Val> = match result.downcast::<MutableList>() {
+                    Ok(mutable) => Box::new(mutable.to_immutable()),
+                    Err(result) => result,
+                };
+                Ok(Cow::<dyn Val>::Owned(result))
             }
             Expr::Struct(strct) => {
                 let name = strct.type_name.clone();
