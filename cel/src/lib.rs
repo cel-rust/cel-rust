@@ -176,7 +176,7 @@ impl ExecutionError {
 #[derive(Debug)]
 pub struct Program {
     expression: Expression,
-    source_info: Arc<common::ast::SourceInfo>,
+    source_info: common::ast::SourceInfo,
 }
 
 impl Program {

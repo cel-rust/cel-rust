@@ -216,7 +216,7 @@ impl Parser {
     pub fn parse_with_source_info(
         mut self,
         source: &str,
-    ) -> Result<(IdedExpr, Arc<SourceInfo>), ParseErrors> {
+    ) -> Result<(IdedExpr, SourceInfo), ParseErrors> {
         let parse_errors = Rc::new(RefCell::new(Vec::<ParseError>::new()));
         let stream = InputStream::new(source);
         let mut lexer = gen::CELLexer::new(stream);
@@ -251,17 +251,19 @@ impl Parser {
             }),
         };
 
-        let info = self.helper.source_info;
-        let source_info = Arc::new(info);
+        let source_info = self.helper.source_info;
 
         let mut errors = parse_errors.take();
         errors.extend(self.errors);
         errors.sort_by_key(|a| a.pos);
 
         if errors.is_empty() {
-            r.map(|expr| (expr, source_info.clone()))
+            r.map(|expr| (expr, source_info))
                 .map_err(|e| ParseErrors { errors: vec![e] })
         } else {
+            // Every error carries the same source info, so it is shared here and
+            // nowhere else.
+            let source_info = Arc::new(source_info);
             Err(ParseErrors {
                 errors: errors
                     .into_iter()
