@@ -33,6 +33,12 @@ impl FunctionDecl {
         None
     }
 
+    pub(crate) fn has_overload(&self, member_function: bool) -> bool {
+        self.overloads
+            .iter()
+            .any(|overload| overload.member_function == member_function)
+    }
+
     pub(crate) fn add_overload(
         &mut self,
         id: String,
