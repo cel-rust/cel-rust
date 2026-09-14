@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.6](https://github.com/cel-rust/cel-rust/compare/v0.14.5...v0.14.6) - 2026-09-14
+
+### Added
+
+- *(parser)* expose SourceInfo on the success path ([#315](https://github.com/cel-rust/cel-rust/pull/315))
+
+### Other
+
+- *(map)* Added mutable `List` used in `map`
+
 ## [0.14.5](https://github.com/cel-rust/cel-rust/compare/v0.14.4...v0.14.5) - 2026-09-07
 
 ### Added
