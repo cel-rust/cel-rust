@@ -411,7 +411,6 @@ fields::map_fields::map_key_mixed_numbers_int_key
 fields::map_fields::map_key_mixed_numbers_uint_key
 fields::qualified_identifier_resolution::ident_with_longest_prefix_check
 fields::qualified_identifier_resolution::map_field_select
-fields::qualified_identifier_resolution::map_value_repeat_key
 fields::qualified_identifier_resolution::qualified_ident
 fields::qualified_identifier_resolution::qualified_identifier_resolution_unchecked
 fields::r#in::mixed_numbers_and_keys_absent

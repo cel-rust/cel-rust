@@ -950,7 +950,6 @@ mod qualified_identifier_resolution {
     }
 
     // Test: map_value_repeat_key
-    #[should_panic]
     #[test]
     fn map_value_repeat_key() {
         run_test(&dedent!(
