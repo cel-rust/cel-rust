@@ -1,0 +1,101 @@
+name: Spec conformance gap
+description: A CEL expression evaluates differently than the cel-spec / cel-go say it should.
+labels: ["conformance"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Spec compliance is this project's top priority, so mismatches with the
+        [CEL specification](https://github.com/google/cel-spec) get triaged first.
+
+        Before filing: this crate already tracks **1000+ known conformance gaps**
+        in [`conformance/src/bin/ignored.txt`](https://github.com/cel-rust/cel-rust/blob/master/conformance/src/bin/ignored.txt).
+        If your expression maps to one of the generated tests under
+        `conformance/tests/gen/` (e.g. `bindings_ext::bind::string_concat`), search
+        that file first — it may already be tracked, and a comment there or a 👍
+        is more useful than a duplicate issue.
+
+  - type: textarea
+    id: tldr
+    attributes:
+      label: TL;DR
+      description: One to three sentences, ~350 characters max. Assume a maintainer only reads this line.
+      placeholder: '`"1" + 1` should coerce and return `"11"` per cel-go, but cel-rust throws a NoSuchOverload error instead.'
+    validations:
+      required: true
+
+  - type: input
+    id: expression
+    attributes:
+      label: CEL expression
+      description: The exact expression that misbehaves.
+      placeholder: '"abc".startsWith("a") && resource.age > duration("24h")'
+    validations:
+      required: true
+
+  - type: textarea
+    id: bindings
+    attributes:
+      label: Variable bindings / context
+      description: Any variables the expression refers to, and how they were bound (`Context::add_variable`, a `VariableResolver`, etc).
+      placeholder: |
+        resource.age = duration("48h")
+    validations:
+      required: false
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: What the spec, cel-go, or another conformant implementation produces. Link the relevant part of cel-spec's `langdef.md` or a conformance `.textproto` test if you have one.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: What cel-rust produces — the returned `Value`, or the full `ExecutionError`/panic.
+      render: shell
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checked-ignored
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched `conformance/src/bin/ignored.txt` and this isn't already tracked there.
+          required: false
+        - label: This corresponds to a specific cel-spec conformance test (named below if so).
+          required: false
+
+  - type: input
+    id: conformance-test-name
+    attributes:
+      label: cel-spec conformance test name (if applicable)
+      placeholder: bindings_ext::bind::string_concat
+    validations:
+      required: false
+
+  - type: input
+    id: version
+    attributes:
+      label: cel-rust version
+      description: Crate version, or `git rev-parse HEAD` if built from source.
+      placeholder: "0.14.5"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Cargo features enabled
+      description: Default is `regex` + `chrono`. Feature-gated behavior (especially `parser_pratt`) can differ from the default ANTLR-based parser.
+      options:
+        - label: regex
+        - label: chrono
+        - label: structs
+        - label: json
+        - label: bytes
+        - label: parser_pratt (experimental hand-written parser)
