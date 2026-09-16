@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/cel-rust/cel-rust/blob/master/CONTRIBUTING.md
+    about: Read this before opening a feature request or sending a PR.
+  - name: CEL language question (not cel-rust specific)
+    url: https://github.com/google/cel-spec
+    about: For questions about the CEL language itself, rather than this implementation.
