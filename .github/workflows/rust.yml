@@ -33,6 +33,7 @@ jobs:
           cargo test -p cel --verbose --features regex
           cargo test -p cel --verbose --features chrono
           cargo test -p cel --verbose --features structs
+          cargo test -p cel --verbose --features parser_winnow
   conformance:
     name: Conformance
     runs-on: ubuntu-latest

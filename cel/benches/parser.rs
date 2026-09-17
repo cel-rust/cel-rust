@@ -175,6 +175,7 @@ fn bench_categories() -> Vec<BenchCategory> {
 fn new_antlr_parser() -> Parser {
     Parser::default()
         .enable_optional_syntax(true)
+        .enable_ident_escape_syntax(true)
         .max_recursion_depth(512)
 }
 
@@ -186,22 +187,33 @@ fn new_pratt_parser() -> cel::parser::PrattParser {
         .max_recursion_depth(512)
 }
 
+#[cfg(feature = "parser_winnow")]
+fn new_winnow_parser() -> cel::parser::WinnowParser {
+    cel::parser::WinnowParser::default()
+        .enable_optional_syntax(true)
+        .enable_ident_escape_syntax(true)
+        .max_recursion_depth(512)
+}
+
 #[derive(Debug)]
 #[non_exhaustive]
 enum BackendParser {
     #[allow(clippy::upper_case_acronyms)]
     ANTLR,
     Pratt,
+    Winnow,
 }
 
 pub fn benchmark_by_category(c: &mut Criterion) {
     let categories = bench_categories();
 
-    let backends = if cfg!(feature = "parser_pratt") {
-        vec![BackendParser::ANTLR, BackendParser::Pratt]
-    } else {
-        vec![BackendParser::ANTLR]
-    };
+    let mut backends = vec![BackendParser::ANTLR];
+    if cfg!(feature = "parser_pratt") {
+        backends.push(BackendParser::Pratt);
+    }
+    if cfg!(feature = "parser_winnow") {
+        backends.push(BackendParser::Winnow);
+    }
 
     for backend in backends {
         let mut group = c.benchmark_group(format!("by_category/{backend:?}"));
@@ -217,6 +229,11 @@ pub fn benchmark_by_category(c: &mut Criterion) {
                             #[cfg(feature = "parser_pratt")]
                             BackendParser::Pratt => {
                                 let parser = new_pratt_parser();
+                                parser.parse(black_box(&tc.input)).is_err()
+                            }
+                            #[cfg(feature = "parser_winnow")]
+                            BackendParser::Winnow => {
+                                let parser = new_winnow_parser();
                                 parser.parse(black_box(&tc.input)).is_err()
                             }
                             #[allow(unreachable_patterns)]
@@ -251,6 +268,16 @@ pub fn benchmark_by_category_comparison(c: &mut Criterion) {
             b.iter(|| {
                 for tc in &cat.cases {
                     let res = new_pratt_parser().parse(black_box(&tc.input));
+                    assert_eq!(res.is_err(), tc.expect_err, "Failed: {}", tc.input);
+                }
+            });
+        });
+
+        #[cfg(feature = "parser_winnow")]
+        group.bench_function("winnow", |b| {
+            b.iter(|| {
+                for tc in &cat.cases {
+                    let res = new_winnow_parser().parse(black_box(&tc.input));
                     assert_eq!(res.is_err(), tc.expect_err, "Failed: {}", tc.input);
                 }
             });
