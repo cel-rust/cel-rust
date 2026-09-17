@@ -1,13 +1,13 @@
 //! A CEL parser built on the [`winnow`] parser-combinator crate.
 //!
-//! The parser is split in two winnow passes:
-//!
-//! 1. a lexer over the source text ([`lex`]) that mirrors the lexer rules
-//!    of `CEL.g4` and produces a flat `Vec<Token>` of byte-span tokens, and
-//! 2. a recursive-descent parser over a [`TokenSlice`] of those tokens that
-//!    mirrors the grammar rules of `CEL.g4` one function per rule (`expr`,
-//!    `conditionalOr`, `conditionalAnd`, `relation`, `calc`, `unary`,
-//!    `member`, `primary`).
+//! The lexer ([`lex_token`]) is written with winnow combinators over a
+//! [`LocatingSlice`] of the source and mirrors the lexer rules of `CEL.g4`.
+//! The parser lexes on demand — one token of lookahead, cached in the
+//! [`Stateful`] state — and is a precedence-climbing recursive descent over
+//! the grammar rules of `CEL.g4`, with error recovery at list elements,
+//! map / struct entries, call arguments and the top level: a syntax error
+//! is recorded there and the parser re-synchronises on the next `,` `)`
+//! `]` `}`.
 //!
 //! It produces the very same [`IdedExpr`] tree — same shape, same node ids,
 //! same [`SourceInfo`] offsets — as the default ANTLR-generated parser in
@@ -15,12 +15,6 @@
 //! *messages* are this parser's own, but errors are reported at the same
 //! positions, and the `max_recursion_depth` / `error_recovery_limit` knobs
 //! follow the same semantics.
-//!
-//! Parser state (id counter, source info, options, collected errors) is
-//! threaded through the token stream with [`Stateful`]. Syntax errors are
-//! raised as [`ErrMode::Cut`] and caught at recovery points (list elements,
-//! map / struct entries, call arguments and the top level), where they are
-//! recorded and the parser re-synchronises on the next `,` `)` `]` `}`.
 
 use crate::common::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, LiteralValue,
@@ -32,9 +26,7 @@ use std::mem;
 use std::sync::Arc;
 use winnow::combinator::{alt, dispatch, fail, opt, peek, repeat, repeat_till};
 use winnow::error::{ErrMode, ModalResult, ParserError};
-use winnow::stream::{
-    AsChar, ContainsToken, LocatingSlice, Location, Stateful, Stream, TokenSlice,
-};
+use winnow::stream::{AsChar, LocatingSlice, Location, Stateful, Stream};
 use winnow::token::{any, none_of, one_of, rest, take_till, take_while};
 use winnow::Parser;
 
@@ -42,7 +34,7 @@ use winnow::Parser;
 // Tokens
 // ---------------------------------------------------------------------------
 
-/// The kinds of token produced by [`lex`], one per lexer rule of `CEL.g4`.
+/// The kinds of token produced by the lexer, one per lexer rule of `CEL.g4`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum TokenKind {
     // Literals
@@ -88,6 +80,8 @@ pub enum TokenKind {
     /// already reported it; the parser silently treats it as a placeholder
     /// expression so the same stretch isn't reported twice.
     Error,
+    /// End of input.
+    Eof,
 }
 
 impl TokenKind {
@@ -129,6 +123,7 @@ impl TokenKind {
             TokenKind::And => "'&&'",
             TokenKind::Or => "'||'",
             TokenKind::Error => "error",
+            TokenKind::Eof => "<EOF>",
         }
     }
 }
@@ -139,28 +134,6 @@ pub struct Token {
     pub kind: TokenKind,
     pub start: usize,
     pub end: usize,
-}
-
-// Lets a `TokenKind` be used as a winnow parser / token set over the token
-// stream (`literal(TokenKind::Comma)`, `one_of(TokenKind::Comma)`).
-impl PartialEq<TokenKind> for Token {
-    fn eq(&self, other: &TokenKind) -> bool {
-        self.kind == *other
-    }
-}
-
-impl ContainsToken<&Token> for TokenKind {
-    #[inline(always)]
-    fn contains_token(&self, token: &Token) -> bool {
-        token.kind == *self
-    }
-}
-
-impl<const N: usize> ContainsToken<&Token> for [TokenKind; N] {
-    #[inline]
-    fn contains_token(&self, token: &Token) -> bool {
-        self.contains(&token.kind)
-    }
 }
 
 // ---------------------------------------------------------------------------
@@ -198,61 +171,80 @@ pub struct LexError {
     pub message: &'static str,
 }
 
-/// Tokenize `source`. Whitespace and `//` comments are dropped. Every
-/// stretch that fails to lex yields both a [`LexError`] and a
-/// [`TokenKind::Error`] token spanning it, and lexing carries on.
+/// Tokenize all of `source` (the parser itself lexes on demand). Whitespace
+/// and `//` comments are dropped. Every stretch that fails to lex yields
+/// both a [`LexError`] and a [`TokenKind::Error`] token spanning it, and
+/// lexing carries on.
 pub fn lex(source: &str) -> (Vec<Token>, Vec<LexError>) {
     let mut input = LocatingSlice::new(source);
-    let mut tokens = Vec::with_capacity(source.len() / 4 + 4);
+    let mut tokens = Vec::new();
     let mut errors = Vec::new();
     loop {
-        // Whitespace and comments never fail; ignore the (unit) result.
-        let _ = trivia.parse_next(&mut input);
-        if input.is_empty() {
+        let (token, error) = lex_token(&mut input);
+        if token.kind == TokenKind::Eof {
             break;
         }
-        let start = Location::current_token_start(&input);
-        match token.parse_next(&mut input) {
-            Ok(kind) => {
-                let end = Location::current_token_start(&input);
-                tokens.push(Token { kind, start, end });
-            }
-            Err(err) => {
-                let message = err
-                    .into_inner()
-                    .map(|LexFailure(msg)| msg)
-                    .unwrap_or("unexpected character");
-                if Location::current_token_start(&input) == start {
-                    // Nothing consumed: skip the offending character so we
-                    // always make progress.
-                    let _ = any::<_, LexFailure>.parse_next(&mut input);
-                }
-                let end = Location::current_token_start(&input);
-                errors.push(LexError {
-                    offset: start,
-                    message,
-                });
-                tokens.push(Token {
-                    kind: TokenKind::Error,
-                    start,
-                    end,
-                });
-            }
+        if let Some(message) = error {
+            errors.push(LexError {
+                offset: token.start,
+                message,
+            });
         }
+        tokens.push(token);
     }
     (tokens, errors)
 }
 
+/// Skips trivia and lexes the next token. A stretch that fails to lex
+/// yields a [`TokenKind::Error`] token along with the message to report;
+/// the end of the input yields [`TokenKind::Eof`].
+fn lex_token(input: &mut LexInput<'_>) -> (Token, Option<&'static str>) {
+    // Whitespace and comments never fail; ignore the (unit) result.
+    let _ = trivia.parse_next(input);
+    let start = Location::current_token_start(input);
+    if input.is_empty() {
+        let eof = Token {
+            kind: TokenKind::Eof,
+            start,
+            end: start,
+        };
+        return (eof, None);
+    }
+    match token.parse_next(input) {
+        Ok(kind) => {
+            let end = Location::current_token_start(input);
+            (Token { kind, start, end }, None)
+        }
+        Err(err) => {
+            let message = err
+                .into_inner()
+                .map(|LexFailure(msg)| msg)
+                .unwrap_or("unexpected character");
+            if Location::current_token_start(input) == start {
+                // Nothing consumed: skip the offending character so we
+                // always make progress.
+                let _ = any::<_, LexFailure>.parse_next(input);
+            }
+            let end = Location::current_token_start(input);
+            let error = Token {
+                kind: TokenKind::Error,
+                start,
+                end,
+            };
+            (error, Some(message))
+        }
+    }
+}
+
 /// `WHITESPACE` and `COMMENT` — both on the hidden channel in the grammar.
 fn trivia(i: &mut LexInput<'_>) -> LexResult<()> {
-    repeat(
-        0..,
-        alt((
-            take_while(1.., [' ', '\t', '\r', '\n', '\u{0C}']).void(),
-            ("//", take_till(0.., '\n')).void(),
-        )),
-    )
-    .parse_next(i)
+    loop {
+        take_while(0.., [' ', '\t', '\r', '\n', '\u{0C}']).parse_next(i)?;
+        if opt("//").parse_next(i)?.is_none() {
+            return Ok(());
+        }
+        take_till(0.., '\n').parse_next(i)?;
+    }
 }
 
 fn token(i: &mut LexInput<'_>) -> LexResult<TokenKind> {
@@ -360,13 +352,11 @@ fn integral_suffix(i: &mut LexInput<'_>) -> LexResult<TokenKind> {
 /// `IDENTIFIER`, with the grammar keywords (`true`, `false`, `null`, `in`)
 /// split out. Reserved words (`as`, `while`, …) are plain identifiers here,
 /// exactly like in `CEL.g4`; the parser rejects them where the grammar does.
+///
+/// Only reached from [`token`], which has already checked the first
+/// character.
 fn ident_or_keyword(i: &mut LexInput<'_>) -> LexResult<TokenKind> {
-    let word = (
-        one_of(|c: char| c.is_ascii_alphabetic() || c == '_'),
-        take_while(0.., |c: char| c.is_ascii_alphanumeric() || c == '_'),
-    )
-        .take()
-        .parse_next(i)?;
+    let word = take_while(1.., |c: char| c.is_ascii_alphanumeric() || c == '_').parse_next(i)?;
     Ok(match word {
         "true" => TokenKind::True,
         "false" => TokenKind::False,
@@ -526,39 +516,36 @@ impl WinnowParser {
         self,
         source: &str,
     ) -> Result<(IdedExpr, SourceInfo), ParseErrors> {
-        let (tokens, lex_errors) = lex(source);
-
         let mut helper = ParserHelper::default();
         helper.source_info.source = source.to_string();
-        let mut state = State {
+        let state = State {
             source,
             options: self,
             helper,
             errors: Vec::new(),
+            peek: Token {
+                kind: TokenKind::Eof,
+                start: 0,
+                end: 0,
+            },
             depth: 0,
             recoveries: 0,
             aborted: false,
         };
-        for err in lex_errors {
-            state.push_error(err.offset, err.message.to_string());
-            if state.count_recovery().is_err() {
-                break;
-            }
-        }
-
         let mut input = Input {
-            input: TokenSlice::new(&tokens),
+            input: LocatingSlice::new(source),
             state,
         };
-        let expr = if input.state.aborted {
-            IdedExpr::default()
-        } else {
-            let expr = recover(&mut input, expr).unwrap_or_default();
-            if !input.state.aborted && !input.is_empty() {
-                let _ = recover_here(&mut input, "<EOF>");
+        input.state.peek = next_token(&mut input);
+
+        let expr = recover(&mut input, expr).unwrap_or_default();
+        if !input.state.aborted && peek_kind(&input) != TokenKind::Eof {
+            let _ = recover_here(&mut input, "<EOF>");
+            // Lex the rest so that every lexer error still gets reported.
+            while !input.state.aborted && peek_kind(&input) != TokenKind::Eof {
+                advance(&mut input);
             }
-            expr
-        };
+        }
 
         let State {
             mut errors, helper, ..
@@ -576,12 +563,14 @@ impl WinnowParser {
     }
 }
 
-/// Parser state, threaded through the token stream by [`Stateful`].
+/// Parser state, threaded through the source stream by [`Stateful`].
 struct State<'s> {
     source: &'s str,
     options: WinnowParser,
     helper: ParserHelper,
     errors: Vec<ParseError>,
+    /// The one token of lookahead: the next unconsumed token.
+    peek: Token,
     /// Number of `expr` rules currently being parsed.
     depth: u32,
     /// Number of errors recovered from so far.
@@ -593,6 +582,7 @@ struct State<'s> {
 impl fmt::Debug for State<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("State")
+            .field("peek", &self.peek)
             .field("depth", &self.depth)
             .field("recoveries", &self.recoveries)
             .field("errors", &self.errors)
@@ -622,26 +612,36 @@ impl<'s> State<'s> {
         self.push_error(tok.start, msg.into());
     }
 
-    /// Reports a `mismatched input … expecting …` syntax error at `tok`
-    /// (`None` is end of input) and counts the recovery. Errors at a lexer
-    /// [`TokenKind::Error`] token are not reported again: the lexer already
-    /// did.
-    fn recover_from(&mut self, tok: Option<Token>, expecting: &'static str) -> PResult<()> {
-        match tok {
-            Some(tok) if tok.kind == TokenKind::Error => {}
-            Some(tok) => {
-                let msg = mismatched(self.source, Some(tok), expecting);
-                self.push_error(tok.start, msg);
-            }
-            None => {
-                let msg = mismatched(self.source, None, expecting);
-                self.push_error(self.source.len(), msg);
-            }
+    /// Reports a lexer error. It counts as a recovery, like in the Pratt
+    /// parser, so garbage input can't run up an unbounded error list.
+    fn lex_error(&mut self, offset: usize, message: &'static str) {
+        if self.aborted {
+            return;
+        }
+        self.push_error(offset, message.to_string());
+        // The abort, if any, is recorded in `aborted`; the lexer itself
+        // can't unwind, the next rule will.
+        let _ = self.count_recovery();
+    }
+
+    /// Reports a `mismatched input … expecting …` syntax error at `tok` and
+    /// counts the recovery. Errors at a lexer [`TokenKind::Error`] token are
+    /// not reported again: the lexer already did.
+    fn recover_from(&mut self, tok: Token, expecting: &'static str) -> PResult<()> {
+        if self.aborted {
+            return Err(PErr::Abort);
+        }
+        if tok.kind != TokenKind::Error {
+            let msg = mismatched(self.source, tok, expecting);
+            self.push_error(tok.start, msg);
         }
         self.count_recovery()
     }
 
     fn count_recovery(&mut self) -> PResult<()> {
+        if self.aborted {
+            return Err(PErr::Abort);
+        }
         self.recoveries += 1;
         if self.recoveries > self.options.error_recovery_limit {
             Err(self.abort(format!(
@@ -655,7 +655,7 @@ impl<'s> State<'s> {
 
     /// Records `msg` and flags the parse as aborted; returns the error every
     /// rule must now unwind with.
-    fn abort(&mut self, msg: String) -> ErrMode<PErr> {
+    fn abort(&mut self, msg: String) -> PErr {
         self.aborted = true;
         self.errors.push(ParseError {
             source: None,
@@ -664,7 +664,7 @@ impl<'s> State<'s> {
             expr_id: 0,
             source_info: None,
         });
-        ErrMode::Cut(PErr::Abort)
+        PErr::Abort
     }
 
     /// Allocates the next id, spanning `tok` (with an inclusive end offset,
@@ -696,47 +696,31 @@ impl<'s> State<'s> {
     }
 }
 
-type Input<'a> = Stateful<TokenSlice<'a, Token>, State<'a>>;
+type Input<'s> = Stateful<LexInput<'s>, State<'s>>;
 
-/// The parser's winnow error type.
+/// The parser's error type.
 ///
-/// Deliberately allocation-free: every optional-token probe that misses
-/// (`opt(one_of(..))`) builds one of these, so the message is only
+/// Deliberately allocation-free: the message of a `Syntax` error is only
 /// rendered by the recovery point that ends up reporting it.
 #[derive(Debug)]
 enum PErr {
-    /// A `mismatched input … expecting …` syntax error at `tok` (`None` at
-    /// end of input), to be recorded by whichever recovery point catches it.
-    Syntax {
-        tok: Option<Token>,
-        expecting: &'static str,
-    },
+    /// A `mismatched input … expecting …` syntax error at `tok`, to be
+    /// recorded by whichever recovery point catches it.
+    Syntax { tok: Token, expecting: &'static str },
     /// A limit was exceeded and recorded; unwind without recording more.
     Abort,
 }
 
-impl<'a> ParserError<Input<'a>> for PErr {
-    type Inner = Self;
+type PResult<O> = Result<O, PErr>;
 
-    fn from_input(input: &Input<'a>) -> Self {
-        syntax_err(input, "expression")
-    }
-
-    fn into_inner(self) -> Result<Self::Inner, Self> {
-        Ok(self)
+fn quoted_text(source: &str, tok: Token) -> String {
+    match tok.kind {
+        TokenKind::Eof => "'<EOF>'".to_string(),
+        _ => format!("'{}'", &source[tok.start..tok.end]),
     }
 }
 
-type PResult<O> = ModalResult<O, PErr>;
-
-fn quoted_text(source: &str, tok: Option<Token>) -> String {
-    match tok {
-        None => "'<EOF>'".to_string(),
-        Some(tok) => format!("'{}'", &source[tok.start..tok.end]),
-    }
-}
-
-fn mismatched(source: &str, tok: Option<Token>, expecting: &str) -> String {
+fn mismatched(source: &str, tok: Token, expecting: &str) -> String {
     format!(
         "Syntax error: mismatched input {} expecting {expecting}",
         quoted_text(source, tok)
@@ -746,7 +730,7 @@ fn mismatched(source: &str, tok: Option<Token>, expecting: &str) -> String {
 /// A `mismatched input … expecting …` error at the current token.
 fn syntax_err(i: &Input<'_>, expecting: &'static str) -> PErr {
     PErr::Syntax {
-        tok: i.first().copied(),
+        tok: i.state.peek,
         expecting,
     }
 }
@@ -789,41 +773,63 @@ fn is_reserved_id(name: &str) -> bool {
 // Parser: token stream helpers and error recovery
 // ---------------------------------------------------------------------------
 
-fn peek_kind(i: &Input<'_>) -> Option<TokenKind> {
-    i.first().map(|t| t.kind)
+/// Lexes the next token off the source, reporting it if it is an error.
+fn next_token(i: &mut Input<'_>) -> Token {
+    let (token, error) = lex_token(&mut i.input);
+    if let Some(message) = error {
+        i.state.lex_error(token.start, message);
+    }
+    token
 }
 
-fn kind_at(i: &Input<'_>, n: usize) -> Option<TokenKind> {
-    i.get(n).map(|t| t.kind)
+/// Consumes the current token and lexes the next one.
+fn advance(i: &mut Input<'_>) -> Token {
+    let current = i.state.peek;
+    if current.kind != TokenKind::Eof {
+        i.state.peek = next_token(i);
+    }
+    current
 }
 
-/// Matches (and copies out) one token of the given kind.
-fn tok<'a>(kind: TokenKind) -> impl Parser<Input<'a>, Token, ErrMode<PErr>> {
-    one_of(kind).map(|t: &Token| *t)
+#[inline]
+fn peek_kind(i: &Input<'_>) -> TokenKind {
+    i.state.peek.kind
 }
 
 /// Consumes the next token if it is of the given kind.
 fn eat(i: &mut Input<'_>, kind: TokenKind) -> Option<Token> {
-    opt(tok(kind)).parse_next(i).ok().flatten()
+    if i.state.peek.kind == kind {
+        Some(advance(i))
+    } else {
+        None
+    }
 }
 
-/// Requires the next token to be of the given kind; a mismatch is a `Cut`
+/// Requires the next token to be of the given kind; a mismatch is an error
 /// that unwinds to the nearest recovery point.
 fn expect(i: &mut Input<'_>, kind: TokenKind) -> PResult<Token> {
-    eat(i, kind).ok_or_else(|| ErrMode::Cut(syntax_err(i, kind.as_str())))
+    if i.state.peek.kind == kind {
+        Ok(advance(i))
+    } else {
+        Err(syntax_err(i, kind.as_str()))
+    }
 }
 
 /// Tokens the parser re-synchronises on after an error.
 fn is_sync(kind: TokenKind) -> bool {
     matches!(
         kind,
-        TokenKind::Comma | TokenKind::RParen | TokenKind::RBracket | TokenKind::RBrace
+        TokenKind::Comma
+            | TokenKind::RParen
+            | TokenKind::RBracket
+            | TokenKind::RBrace
+            | TokenKind::Eof
     )
 }
 
 /// Records a syntax error at the current token, without unwinding.
 fn recover_here(i: &mut Input<'_>, expecting: &'static str) -> PResult<()> {
-    let tok = i.first().copied();
+    let tok = i.state.peek;
     i.state.recover_from(tok, expecting)
 }
 
@@ -836,14 +842,11 @@ fn expect_close(i: &mut Input<'_>, kind: TokenKind) -> PResult<()> {
         return Ok(());
     }
     recover_here(i, kind.as_str())?;
-    while let Some(k) = peek_kind(i) {
-        if is_sync(k) {
-            if k == kind {
-                i.next_token();
-            }
-            break;
-        }
-        i.next_token();
+    while !is_sync(peek_kind(i)) {
+        advance(i);
+    }
+    if peek_kind(i) == kind {
+        advance(i);
     }
     Ok(())
 }
@@ -851,24 +854,20 @@ fn expect_close(i: &mut Input<'_>, kind: TokenKind) -> PResult<()> {
 /// A recovery point: runs `parser`, and on a syntax error records it,
 /// skips ahead to the next delimiter (not consumed) and yields a default
 /// value so the enclosing rule can go on. Aborts are not recovered from.
-fn recover<'a, O: Default>(
-    i: &mut Input<'a>,
-    parser: impl FnOnce(&mut Input<'a>) -> PResult<O>,
+fn recover<'s, O: Default>(
+    i: &mut Input<'s>,
+    parser: impl FnOnce(&mut Input<'s>) -> PResult<O>,
 ) -> PResult<O> {
     match parser(i) {
         Ok(o) => Ok(o),
-        Err(ErrMode::Backtrack(PErr::Syntax { tok, expecting }))
-        | Err(ErrMode::Cut(PErr::Syntax { tok, expecting })) => {
+        Err(PErr::Syntax { tok, expecting }) => {
             i.state.recover_from(tok, expecting)?;
-            while let Some(k) = peek_kind(i) {
-                if is_sync(k) {
-                    break;
-                }
-                i.next_token();
+            while !is_sync(peek_kind(i)) {
+                advance(i);
             }
             Ok(O::default())
         }
-        Err(e) => Err(e),
+        Err(PErr::Abort) => Err(PErr::Abort),
     }
 }
 
@@ -925,9 +924,9 @@ fn call_or_macro(
 ///
 /// Also where nesting depth is enforced, as `expr` is the rule the ANTLR
 /// parser's recursion listener counts.
-fn expr<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
+fn expr(i: &mut Input<'_>) -> PResult<IdedExpr> {
     if i.state.aborted {
-        return Err(ErrMode::Cut(PErr::Abort));
+        return Err(PErr::Abort);
     }
     let max = i.state.options.max_recursion_depth;
     if i.state.depth > u32::from(max) {
@@ -941,13 +940,13 @@ fn expr<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
     result
 }
 
-fn conditional<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    let condition = conditional_or(i)?;
+fn conditional(i: &mut Input<'_>) -> PResult<IdedExpr> {
+    let condition = binary(i, PREC_OR)?;
     let Some(question) = eat(i, TokenKind::Question) else {
         return Ok(condition);
     };
     let op_id = i.state.next_id(&question);
-    let if_true = conditional_or(i)?;
+    let if_true = binary(i, PREC_OR)?;
     expect(i, TokenKind::Colon)?;
     let if_false = expr(i)?;
     Ok(call(
@@ -957,40 +956,71 @@ fn conditional<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
     ))
 }
 
-/// `conditionalOr : conditionalAnd ('||' conditionalAnd)*`
-fn conditional_or<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    logical_chain(i, TokenKind::Or, operators::LOGICAL_OR, conditional_and)
+// Binary operator precedence, from `conditionalOr` down to `calc`.
+const PREC_OR: u8 = 1;
+const PREC_AND: u8 = 2;
+const PREC_RELATION: u8 = 3;
+const PREC_ADDITIVE: u8 = 4;
+const PREC_MULTIPLICATIVE: u8 = 5;
+
+fn binary_op(kind: TokenKind) -> Option<(u8, &'static str)> {
+    Some(match kind {
+        TokenKind::Or => (PREC_OR, operators::LOGICAL_OR),
+        TokenKind::And => (PREC_AND, operators::LOGICAL_AND),
+        TokenKind::Less => (PREC_RELATION, operators::LESS),
+        TokenKind::LessEq => (PREC_RELATION, operators::LESS_EQUALS),
+        TokenKind::GreaterEq => (PREC_RELATION, operators::GREATER_EQUALS),
+        TokenKind::Greater => (PREC_RELATION, operators::GREATER),
+        TokenKind::EqEq => (PREC_RELATION, operators::EQUALS),
+        TokenKind::NotEq => (PREC_RELATION, operators::NOT_EQUALS),
+        TokenKind::In => (PREC_RELATION, operators::IN),
+        TokenKind::Plus => (PREC_ADDITIVE, operators::ADD),
+        TokenKind::Minus => (PREC_ADDITIVE, operators::SUBSTRACT),
+        TokenKind::Star => (PREC_MULTIPLICATIVE, operators::MULTIPLY),
+        TokenKind::Slash => (PREC_MULTIPLICATIVE, operators::DIVIDE),
+        TokenKind::Percent => (PREC_MULTIPLICATIVE, operators::MODULO),
+        _ => return None,
+    })
 }
 
-/// `conditionalAnd : relation ('&&' relation)*`
-fn conditional_and<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    logical_chain(i, TokenKind::And, operators::LOGICAL_AND, relation)
-}
-
-/// A run of the same logical operator, folded into a balanced tree. Each
-/// operator is numbered *after* its right operand, as the ANTLR visitor does.
-fn logical_chain<'a>(
-    i: &mut Input<'a>,
-    kind: TokenKind,
-    func: &str,
-    operand: fn(&mut Input<'a>) -> PResult<IdedExpr>,
-) -> PResult<IdedExpr> {
-    let first = operand(i)?;
-    let Some(mut op) = eat(i, kind) else {
-        return Ok(first);
-    };
-    let mut terms = vec![first];
-    let mut ops = Vec::new();
+/// `conditionalOr`, `conditionalAnd`, `relation` and `calc` in one
+/// precedence-climbing loop, producing the trees the rule cascade would:
+/// left-associative binary operators numbered between their operands, and
+/// `||` / `&&` runs folded into balanced trees with each operator numbered
+/// after its right operand.
+fn binary(i: &mut Input<'_>, min_prec: u8) -> PResult<IdedExpr> {
+    let mut lhs = unary(i)?;
     loop {
-        let next = operand(i)?;
-        ops.push(i.state.next_id(&op));
-        terms.push(next);
-        match eat(i, kind) {
-            Some(next_op) => op = next_op,
-            None => break,
+        let op = i.state.peek;
+        let Some((prec, func)) = binary_op(op.kind) else {
+            break;
+        };
+        if prec < min_prec {
+            break;
         }
+        advance(i);
+        if prec > PREC_AND {
+            let op_id = i.state.next_id(&op);
+            let rhs = binary(i, prec + 1)?;
+            lhs = call(op_id, func, vec![lhs, rhs]);
+            continue;
+        }
+        let rhs = binary(i, prec + 1)?;
+        let op_id = i.state.next_id(&op);
+        if peek_kind(i) != op.kind {
+            lhs = call(op_id, func, vec![lhs, rhs]);
+            continue;
+        }
+        let mut terms = vec![lhs, rhs];
+        let mut ops = vec![op_id];
+        while let Some(op) = eat(i, op.kind) {
+            let rhs = binary(i, prec + 1)?;
+            ops.push(i.state.next_id(&op));
+            terms.push(rhs);
+        }
+        lhs = balanced_tree(func, &mut terms, &ops, 0, ops.len() - 1);
     }
-    Ok(balanced_tree(func, &mut terms, &ops, 0, ops.len() - 1))
+    Ok(lhs)
 }
 
 fn balanced_tree(
@@ -1014,93 +1044,49 @@ fn balanced_tree(
     call(ops[mid], func, vec![left, right])
 }
 
-const RELATION_OPS: [(TokenKind, &str); 7] = [
-    (TokenKind::Less, operators::LESS),
-    (TokenKind::LessEq, operators::LESS_EQUALS),
-    (TokenKind::GreaterEq, operators::GREATER_EQUALS),
-    (TokenKind::Greater, operators::GREATER),
-    (TokenKind::EqEq, operators::EQUALS),
-    (TokenKind::NotEq, operators::NOT_EQUALS),
-    (TokenKind::In, operators::IN),
-];
-
-const ADDITIVE_OPS: [(TokenKind, &str); 2] = [
-    (TokenKind::Plus, operators::ADD),
-    (TokenKind::Minus, operators::SUBSTRACT),
-];
-
-const MULTIPLICATIVE_OPS: [(TokenKind, &str); 3] = [
-    (TokenKind::Star, operators::MULTIPLY),
-    (TokenKind::Slash, operators::DIVIDE),
-    (TokenKind::Percent, operators::MODULO),
-];
-
-/// `relation : calc | relation ('<'|'<='|'>='|'>'|'=='|'!='|'in') relation`
-fn relation<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    binary_chain(i, &RELATION_OPS, addition)
-}
-
-/// The `calc ('+'|'-') calc` alternatives of `calc`.
-fn addition<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    binary_chain(i, &ADDITIVE_OPS, multiplication)
-}
-
-/// The `calc ('*'|'/'|'%') calc` alternatives of `calc`.
-fn multiplication<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    binary_chain(i, &MULTIPLICATIVE_OPS, unary)
-}
-
-/// Left-associative binary operators of one precedence level.
-fn binary_chain<'a>(
-    i: &mut Input<'a>,
-    ops: &[(TokenKind, &'static str)],
-    operand: fn(&mut Input<'a>) -> PResult<IdedExpr>,
-) -> PResult<IdedExpr> {
-    let mut lhs = operand(i)?;
-    while let Some(op) = i.first().copied() {
-        let Some((_, func)) = ops.iter().find(|(kind, _)| *kind == op.kind) else {
-            break;
-        };
-        i.next_token();
-        let op_id = i.state.next_id(&op);
-        let rhs = operand(i)?;
-        lhs = call(op_id, func, vec![lhs, rhs]);
-    }
-    Ok(lhs)
-}
-
 /// `unary : member | '!'+ member | '-'+ member`
-fn unary<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    if let Some(first) = eat(i, TokenKind::Exclam) {
-        let mut count = 1;
-        while eat(i, TokenKind::Exclam).is_some() {
-            count += 1;
+fn unary(i: &mut Input<'_>) -> PResult<IdedExpr> {
+    match peek_kind(i) {
+        TokenKind::Exclam => {
+            let first = advance(i);
+            let mut count = 1;
+            while eat(i, TokenKind::Exclam).is_some() {
+                count += 1;
+            }
+            prefixed(i, first, count, operators::LOGICAL_NOT)
         }
-        return prefixed(i, first, count, operators::LOGICAL_NOT);
+        TokenKind::Minus => {
+            let first = advance(i);
+            let mut count = 1;
+            while eat(i, TokenKind::Minus).is_some() {
+                count += 1;
+            }
+            // A lone `-` right before a numeric literal is the literal's
+            // sign: the `literal` alternative wins over `Negate` in the
+            // grammar.
+            if count == 1 {
+                match peek_kind(i) {
+                    TokenKind::Int => {
+                        let literal = int_literal(i, true)?;
+                        return member_tail(i, literal);
+                    }
+                    TokenKind::Float => {
+                        let literal = double_literal(i, true)?;
+                        return member_tail(i, literal);
+                    }
+                    _ => {}
+                }
+            }
+            prefixed(i, first, count, operators::NEGATE)
+        }
+        _ => member(i),
     }
-    if peek_kind(i) == Some(TokenKind::Minus) {
-        let mut count = 1;
-        while kind_at(i, count) == Some(TokenKind::Minus) {
-            count += 1;
-        }
-        // A lone `-` right before a numeric literal is the literal's sign:
-        // the `literal` alternative wins over `Negate` in the grammar.
-        if count == 1 && matches!(kind_at(i, 1), Some(TokenKind::Int | TokenKind::Float)) {
-            return member(i);
-        }
-        let first = expect(i, TokenKind::Minus)?;
-        for _ in 1..count {
-            i.next_token();
-        }
-        return prefixed(i, first, count, operators::NEGATE);
-    }
-    member(i)
 }
 
 /// A run of `count` identical prefix operators. Even runs cancel out and
 /// get no id; an odd run is a single call, numbered from its first operator
 /// before the operand is parsed.
-fn prefixed<'a>(i: &mut Input<'a>, first: Token, count: usize, func: &str) -> PResult<IdedExpr> {
+fn prefixed(i: &mut Input<'_>, first: Token, count: usize, func: &str) -> PResult<IdedExpr> {
     if count % 2 == 0 {
         return member(i);
     }
@@ -1115,50 +1101,161 @@ fn prefixed<'a>(i: &mut Input<'a>, first: Token, count: usize, func: &str) -> PR
 ///        | member '.' IDENTIFIER '(' exprList? ')'
 ///        | member '[' '?'? expr ']'
 /// ```
-fn member<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    let mut lhs = primary(i)?;
+fn member(i: &mut Input<'_>) -> PResult<IdedExpr> {
+    if matches!(peek_kind(i), TokenKind::Dot | TokenKind::Ident) {
+        return dotted(i);
+    }
+    let lhs = primary(i)?;
+    member_tail(i, lhs)
+}
+
+/// The `'.'? IDENTIFIER …` alternatives of `primary`, together with the
+/// `member '.' IDENTIFIER` selects that may follow: an identifier, a global
+/// call, a select chain, or — when a `{` follows the dotted name — a
+/// message literal. The name parts are held back until that is known,
+/// because a message name gets no ids of its own, and with one token of
+/// lookahead the `{` is only seen once the whole name has been lexed.
+fn dotted(i: &mut Input<'_>) -> PResult<IdedExpr> {
+    let leading_dot = eat(i, TokenKind::Dot).is_some();
+    let head = expect(i, TokenKind::Ident)?;
+    if peek_kind(i) == TokenKind::LParen {
+        let raw = i.state.text(&head);
+        if is_reserved_id(raw) {
+            i.state
+                .report_at(&head, format!("reserved identifier: {raw}"));
+        }
+        let name = qualified(leading_dot, raw);
+        let open = advance(i);
+        let op_id = i.state.next_id(&open);
+        let args = arguments(i)?;
+        let lhs = call_or_macro(i, op_id, name, None, args);
+        return member_tail(i, lhs);
+    }
+    // `('.' IDENTIFIER)*` seen so far, as (dot, identifier) token pairs.
+    let mut parts: Vec<(Token, Token)> = Vec::new();
     loop {
-        if let Some(dot) = eat(i, TokenKind::Dot) {
-            let optional = eat(i, TokenKind::Question);
-            match peek_kind(i) {
-                Some(TokenKind::Ident) => {
-                    let ident = expect(i, TokenKind::Ident)?;
-                    if optional.is_none() && peek_kind(i) == Some(TokenKind::LParen) {
-                        let open = expect(i, TokenKind::LParen)?;
-                        let op_id = i.state.next_id(&open);
-                        let args = arguments(i)?;
-                        let func_name = i.state.text(&ident).to_string();
-                        lhs = call_or_macro(i, op_id, func_name, Some(lhs), args);
-                    } else {
-                        let field = i.state.text(&ident).to_string();
-                        lhs = select(i, lhs, dot, optional, field);
-                    }
+        match peek_kind(i) {
+            TokenKind::Dot => {
+                let dot = advance(i);
+                if peek_kind(i) != TokenKind::Ident {
+                    let lhs = select_chain(i, leading_dot, head, &parts);
+                    let lhs = after_dot(i, lhs, dot)?;
+                    return member_tail(i, lhs);
                 }
-                Some(TokenKind::EscIdent) => {
-                    let ident = expect(i, TokenKind::EscIdent)?;
-                    let field = escaped_ident(i, &ident, &dot);
-                    lhs = select(i, lhs, dot, optional, field);
+                let ident = advance(i);
+                if peek_kind(i) == TokenKind::LParen {
+                    let target = select_chain(i, leading_dot, head, &parts);
+                    let lhs = member_call(i, target, ident)?;
+                    return member_tail(i, lhs);
                 }
-                _ => return Err(ErrMode::Cut(syntax_err(i, "identifier"))),
+                parts.push((dot, ident));
             }
-        } else if let Some(open) = eat(i, TokenKind::LBracket) {
-            let op_id = i.state.next_id(&open);
-            let optional = eat(i, TokenKind::Question);
-            let index = expr(i)?;
-            expect_close(i, TokenKind::RBracket)?;
-            let func = match optional {
-                Some(_) if i.state.options.enable_optional_syntax => operators::OPT_INDEX,
-                Some(_) => {
-                    i.state.report_at(&open, "unsupported syntax '[?'");
-                    operators::INDEX
+            TokenKind::LBrace => {
+                let mut type_name = qualified(leading_dot, i.state.text(&head));
+                for (_, ident) in &parts {
+                    type_name.push('.');
+                    type_name.push_str(i.state.text(ident));
                 }
-                None => operators::INDEX,
-            };
-            lhs = call(op_id, func, vec![lhs, index]);
-        } else {
-            return Ok(lhs);
+                let lhs = message(i, type_name)?;
+                return member_tail(i, lhs);
+            }
+            _ => {
+                let lhs = select_chain(i, leading_dot, head, &parts);
+                return member_tail(i, lhs);
+            }
         }
     }
+}
+
+fn qualified(leading_dot: bool, name: &str) -> String {
+    if leading_dot {
+        format!(".{name}")
+    } else {
+        name.to_string()
+    }
+}
+
+/// Numbers and builds the identifier and selects held back by [`dotted`].
+fn select_chain(
+    i: &mut Input<'_>,
+    leading_dot: bool,
+    head: Token,
+    parts: &[(Token, Token)],
+) -> IdedExpr {
+    let raw = i.state.text(&head);
+    let name = qualified(leading_dot, raw);
+    if is_reserved_id(raw) {
+        i.state
+            .report_at(&head, format!("reserved identifier: {name}"));
+    }
+    let mut lhs = i.state.next_expr(&head, Expr::Ident(name));
+    for (dot, ident) in parts {
+        let field = i.state.text(ident).to_string();
+        lhs = plain_select(i, lhs, *dot, field);
+    }
+    lhs
+}
+
+/// The `'.'` and `'['` alternatives of `member`, applied to `lhs` for as
+/// long as they follow.
+fn member_tail(i: &mut Input<'_>, mut lhs: IdedExpr) -> PResult<IdedExpr> {
+    loop {
+        match peek_kind(i) {
+            TokenKind::Dot => {
+                let dot = advance(i);
+                lhs = after_dot(i, lhs, dot)?;
+            }
+            TokenKind::LBracket => {
+                let open = advance(i);
+                let op_id = i.state.next_id(&open);
+                let optional = eat(i, TokenKind::Question);
+                let index = expr(i)?;
+                expect_close(i, TokenKind::RBracket)?;
+                let func = match optional {
+                    Some(_) if i.state.options.enable_optional_syntax => operators::OPT_INDEX,
+                    Some(_) => {
+                        i.state.report_at(&open, "unsupported syntax '[?'");
+                        operators::INDEX
+                    }
+                    None => operators::INDEX,
+                };
+                lhs = call(op_id, func, vec![lhs, index]);
+            }
+            _ => return Ok(lhs),
+        }
+    }
+}
+
+/// What may follow a `member '.'`: `'?'? escapeIdent` or
+/// `IDENTIFIER '(' exprList? ')'`.
+fn after_dot(i: &mut Input<'_>, lhs: IdedExpr, dot: Token) -> PResult<IdedExpr> {
+    let optional = eat(i, TokenKind::Question);
+    match peek_kind(i) {
+        TokenKind::Ident => {
+            let ident = advance(i);
+            if optional.is_none() && peek_kind(i) == TokenKind::LParen {
+                member_call(i, lhs, ident)
+            } else {
+                let field = i.state.text(&ident).to_string();
+                Ok(select(i, lhs, dot, optional, field))
+            }
+        }
+        TokenKind::EscIdent => {
+            let ident = advance(i);
+            let field = escaped_ident(i, &ident, &dot);
+            Ok(select(i, lhs, dot, optional, field))
+        }
+        _ => Err(syntax_err(i, "identifier")),
+    }
+}
+
+/// `'(' exprList? ')'` after `member '.' IDENTIFIER`.
+fn member_call(i: &mut Input<'_>, target: IdedExpr, ident: Token) -> PResult<IdedExpr> {
+    let open = expect(i, TokenKind::LParen)?;
+    let op_id = i.state.next_id(&open);
+    let args = arguments(i)?;
+    let func_name = i.state.text(&ident).to_string();
+    Ok(call_or_macro(i, op_id, func_name, Some(target), args))
 }
 
 fn select(
@@ -1207,15 +1304,15 @@ fn escaped_ident(i: &mut Input<'_>, ident: &Token, at: &Token) -> String {
 
 /// `'(' exprList? ')'` with the `(` already consumed —
 /// `exprList : expr (',' expr)*`, no trailing comma.
-fn arguments<'a>(i: &mut Input<'a>) -> PResult<Vec<IdedExpr>> {
+fn arguments(i: &mut Input<'_>) -> PResult<Vec<IdedExpr>> {
     let mut args = Vec::new();
-    if !matches!(peek_kind(i), Some(TokenKind::RParen) | None) {
+    if !matches!(peek_kind(i), TokenKind::RParen | TokenKind::Eof) {
         loop {
             args.push(recover(i, expr)?);
             if eat(i, TokenKind::Comma).is_none() {
                 break;
             }
-            if peek_kind(i) == Some(TokenKind::RParen) {
+            if peek_kind(i) == TokenKind::RParen {
                 recover_here(i, "expression")?;
                 break;
             }
@@ -1226,35 +1323,31 @@ fn arguments<'a>(i: &mut Input<'a>) -> PResult<Vec<IdedExpr>> {
 }
 
 /// ```text
-/// primary : '.'? IDENTIFIER
-///         | '.'? IDENTIFIER '(' exprList? ')'
-///         | '(' expr ')'
+/// primary : '(' expr ')'
 ///         | '[' listInit? ','? ']'
 ///         | '{' mapInitializerList? ','? '}'
-///         | '.'? IDENTIFIER ('.' IDENTIFIER)* '{' fieldInitializerList? ','? '}'
 ///         | literal
 /// ```
-fn primary<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    let Some(tok) = i.first().copied() else {
-        return Err(ErrMode::Cut(syntax_err(i, "expression")));
-    };
+/// plus the `'.'? IDENTIFIER …` alternatives, which live in [`dotted`].
+fn primary(i: &mut Input<'_>) -> PResult<IdedExpr> {
+    let tok = i.state.peek;
     match tok.kind {
         TokenKind::LParen => {
-            i.next_token();
+            advance(i);
             let nested = expr(i)?;
             expect_close(i, TokenKind::RParen)?;
             Ok(nested)
         }
         TokenKind::LBracket => list(i),
         TokenKind::LBrace => map(i),
-        TokenKind::Dot | TokenKind::Ident => ident_call_or_message(i),
+        TokenKind::Dot | TokenKind::Ident => dotted(i),
         TokenKind::Minus => {
             // `literal : '-'? NUM_INT | '-'? NUM_FLOAT | …`
-            i.next_token();
+            advance(i);
             match peek_kind(i) {
-                Some(TokenKind::Int) => int_literal(i, true),
-                Some(TokenKind::Float) => double_literal(i, true),
-                _ => Err(ErrMode::Cut(syntax_err(i, "numeric literal"))),
+                TokenKind::Int => int_literal(i, true),
+                TokenKind::Float => double_literal(i, true),
+                _ => Err(syntax_err(i, "numeric literal")),
             }
         }
         TokenKind::Int => int_literal(i, false),
@@ -1263,29 +1356,29 @@ fn primary<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
         TokenKind::String => string_literal(i),
         TokenKind::Bytes => bytes_literal(i),
         TokenKind::True => {
-            i.next_token();
+            advance(i);
             Ok(i.state
                 .next_expr(&tok, Expr::Literal(LiteralValue::Boolean(true.into()))))
         }
         TokenKind::False => {
-            i.next_token();
+            advance(i);
             Ok(i.state
                 .next_expr(&tok, Expr::Literal(LiteralValue::Boolean(false.into()))))
         }
         TokenKind::Null => {
-            i.next_token();
+            advance(i);
             Ok(i.state.next_expr(&tok, Expr::Literal(LiteralValue::Null)))
         }
         TokenKind::Error => {
             // Already reported by the lexer; stand in for the expression.
-            i.next_token();
+            advance(i);
             Ok(IdedExpr::default())
         }
-        _ => Err(ErrMode::Cut(syntax_err(i, "expression"))),
+        _ => Err(syntax_err(i, "expression")),
     }
 }
 
-fn int_literal<'a>(i: &mut Input<'a>, negative: bool) -> PResult<IdedExpr> {
+fn int_literal(i: &mut Input<'_>, negative: bool) -> PResult<IdedExpr> {
     let tok = expect(i, TokenKind::Int)?;
     let text = i.state.text(&tok);
     let (radix, digits) = match text.strip_prefix("0x") {
@@ -1308,7 +1401,7 @@ fn int_literal<'a>(i: &mut Input<'a>, negative: bool) -> PResult<IdedExpr> {
     })
 }
 
-fn uint_literal<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
+fn uint_literal(i: &mut Input<'_>) -> PResult<IdedExpr> {
     let tok = expect(i, TokenKind::Uint)?;
     let text = i.state.text(&tok);
     let digits = &text[..text.len() - 1]; // strip the `u` / `U`
@@ -1327,7 +1420,7 @@ fn uint_literal<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
     })
 }
 
-fn double_literal<'a>(i: &mut Input<'a>, negative: bool) -> PResult<IdedExpr> {
+fn double_literal(i: &mut Input<'_>, negative: bool) -> PResult<IdedExpr> {
     let tok = expect(i, TokenKind::Float)?;
     Ok(match i.state.text(&tok).parse::<f64>() {
         Ok(v) if v.is_finite() => {
@@ -1342,7 +1435,7 @@ fn double_literal<'a>(i: &mut Input<'a>, negative: bool) -> PResult<IdedExpr> {
     })
 }
 
-fn string_literal<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
+fn string_literal(i: &mut Input<'_>) -> PResult<IdedExpr> {
     let tok = expect(i, TokenKind::String)?;
     Ok(match parse::parse_string(i.state.text(&tok)) {
         Ok(s) => i
@@ -1356,7 +1449,7 @@ fn string_literal<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
     })
 }
 
-fn bytes_literal<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
+fn bytes_literal(i: &mut Input<'_>) -> PResult<IdedExpr> {
     let tok = expect(i, TokenKind::Bytes)?;
     Ok(match parse::parse_bytes(i.state.text(&tok)) {
         Ok(bytes) => i
@@ -1372,14 +1465,14 @@ fn bytes_literal<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
 
 /// `'[' listInit? ','? ']'` — `listInit : optExpr (',' optExpr)*`,
 /// `optExpr : '?'? expr`. Note `[,]` is a (valid) empty list.
-fn list<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
+fn list(i: &mut Input<'_>) -> PResult<IdedExpr> {
     let open = expect(i, TokenKind::LBracket)?;
     let list_id = i.state.next_id(&open);
     let mut elements = Vec::new();
     let mut optional_indices = Vec::new();
     if matches!(
         peek_kind(i),
-        Some(TokenKind::RBracket | TokenKind::Comma) | None
+        TokenKind::RBracket | TokenKind::Comma | TokenKind::Eof
     ) {
         let _ = eat(i, TokenKind::Comma);
     } else {
@@ -1394,7 +1487,7 @@ fn list<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
                 None => {}
             }
             elements.push(element);
-            if eat(i, TokenKind::Comma).is_none() || peek_kind(i) == Some(TokenKind::RBracket) {
+            if eat(i, TokenKind::Comma).is_none() || peek_kind(i) == TokenKind::RBracket {
                 break;
             }
         }
@@ -1408,7 +1501,7 @@ fn list<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
 
 /// `'{' mapInitializerList? ','? '}'` —
 /// `mapInitializerList : optExpr ':' expr (',' optExpr ':' expr)*`
-fn map<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
+fn map(i: &mut Input<'_>) -> PResult<IdedExpr> {
     let open = expect(i, TokenKind::LBrace)?;
     let map_id = i.state.next_id(&open);
     let entries = entries(i, TokenKind::RBrace, map_entry)?;
@@ -1421,33 +1514,33 @@ fn map<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
 
 /// The comma-separated entry list of map and message literals, up to (not
 /// including) `close`. A trailing comma is allowed, and `{,}` is empty.
-fn entries<'a>(
-    i: &mut Input<'a>,
+fn entries<'s>(
+    i: &mut Input<'s>,
     close: TokenKind,
-    entry: fn(&mut Input<'a>) -> PResult<IdedEntryExpr>,
+    entry: fn(&mut Input<'s>) -> PResult<IdedEntryExpr>,
 ) -> PResult<Vec<IdedEntryExpr>> {
     let mut entries = Vec::new();
     match peek_kind(i) {
-        Some(k) if k == close => return Ok(entries),
-        Some(TokenKind::Comma) => {
-            let _ = eat(i, TokenKind::Comma);
+        TokenKind::Comma => {
+            advance(i);
             return Ok(entries);
         }
-        None => return Ok(entries),
-        Some(_) => {}
+        TokenKind::Eof => return Ok(entries),
+        k if k == close => return Ok(entries),
+        _ => {}
     }
     loop {
         if let Some(e) = recover(i, |i| entry(i).map(Some))? {
             entries.push(e);
         }
-        if eat(i, TokenKind::Comma).is_none() || peek_kind(i) == Some(close) {
+        if eat(i, TokenKind::Comma).is_none() || peek_kind(i) == close {
             break;
         }
     }
     Ok(entries)
 }
 
-fn map_entry<'a>(i: &mut Input<'a>) -> PResult<IdedEntryExpr> {
+fn map_entry(i: &mut Input<'_>) -> PResult<IdedEntryExpr> {
     let optional = eat(i, TokenKind::Question);
     // The ANTLR visitor numbers an entry (from its `:`) before visiting the
     // key: reserve the id now, attach the span once the colon is reached.
@@ -1474,66 +1567,10 @@ fn map_entry<'a>(i: &mut Input<'a>) -> PResult<IdedEntryExpr> {
     })
 }
 
-/// The `'.'? IDENTIFIER …` alternatives of `primary`: an identifier, a
-/// global call, or a message literal.
-fn ident_call_or_message<'a>(i: &mut Input<'a>) -> PResult<IdedExpr> {
-    let leading_dot = eat(i, TokenKind::Dot).is_some();
-    if peek_kind(i) != Some(TokenKind::Ident) {
-        return Err(ErrMode::Cut(syntax_err(i, "identifier")));
-    }
-    if message_ahead(i) {
-        return message(i, leading_dot);
-    }
-    let ident = expect(i, TokenKind::Ident)?;
-    let raw = i.state.text(&ident);
-    let reserved = is_reserved_id(raw);
-    let name = if leading_dot {
-        format!(".{raw}")
-    } else {
-        raw.to_string()
-    };
-    if let Some(open) = eat(i, TokenKind::LParen) {
-        if reserved {
-            i.state
-                .report_at(&ident, format!("reserved identifier: {raw}"));
-        }
-        let op_id = i.state.next_id(&open);
-        let args = arguments(i)?;
-        Ok(call_or_macro(i, op_id, name, None, args))
-    } else {
-        if reserved {
-            i.state
-                .report_at(&ident, format!("reserved identifier: {name}"));
-        }
-        Ok(i.state.next_expr(&ident, Expr::Ident(name)))
-    }
-}
-
-/// Looks past `IDENTIFIER ('.' IDENTIFIER)*` for the `{` that makes this a
-/// message literal (the lookahead ANTLR's prediction performs).
-fn message_ahead(i: &Input<'_>) -> bool {
-    let mut n = 1;
-    while kind_at(i, n) == Some(TokenKind::Dot) && kind_at(i, n + 1) == Some(TokenKind::Ident) {
-        n += 2;
-    }
-    kind_at(i, n) == Some(TokenKind::LBrace)
-}
-
-/// `'.'? IDENTIFIER ('.' IDENTIFIER)* '{' fieldInitializerList? ','? '}'` —
+/// `'{' fieldInitializerList? ','? '}'` of a message literal, `type_name`
+/// being its `'.'? IDENTIFIER ('.' IDENTIFIER)*` —
 /// `fieldInitializerList : optField ':' expr (',' optField ':' expr)*`
-fn message<'a>(i: &mut Input<'a>, leading_dot: bool) -> PResult<IdedExpr> {
-    let mut type_name = String::new();
-    if leading_dot {
-        type_name.push('.');
-    }
-    loop {
-        let ident = expect(i, TokenKind::Ident)?;
-        type_name.push_str(i.state.text(&ident));
-        if eat(i, TokenKind::Dot).is_none() {
-            break;
-        }
-        type_name.push('.');
-    }
+fn message(i: &mut Input<'_>, type_name: String) -> PResult<IdedExpr> {
     let open = expect(i, TokenKind::LBrace)?;
     let struct_id = i.state.next_id(&open);
     let entries = entries(i, TokenKind::RBrace, message_field)?;
@@ -1545,11 +1582,11 @@ fn message<'a>(i: &mut Input<'a>, leading_dot: bool) -> PResult<IdedExpr> {
 }
 
 /// `optField ':' expr` — `optField : '?'? escapeIdent`
-fn message_field<'a>(i: &mut Input<'a>) -> PResult<IdedEntryExpr> {
+fn message_field(i: &mut Input<'_>) -> PResult<IdedEntryExpr> {
     let optional = eat(i, TokenKind::Question);
     let name = match peek_kind(i) {
-        Some(kind @ (TokenKind::Ident | TokenKind::EscIdent)) => expect(i, kind)?,
-        _ => return Err(ErrMode::Cut(syntax_err(i, "identifier"))),
+        TokenKind::Ident | TokenKind::EscIdent => advance(i),
+        _ => return Err(syntax_err(i, "identifier")),
     };
     let colon = expect(i, TokenKind::Colon)?;
     let entry_id = i.state.next_id(&colon);
@@ -1924,6 +1961,15 @@ mod tests {
             ".a.b{c: d}",
             "Foo{a: Bar{b: 1}}",
             "SomeMessage{foo: 5, bar: \"xyz\"}",
+            "a.b.c{}.d",
+            "Foo{}.bar[0]",
+            // Reserved words are only rejected as identifiers and function
+            // names, not as message names or fields.
+            "while{}",
+            ".while{}",
+            "a.while{}",
+            "a.b.while()",
+            "a.while.b",
             // Macros
             "has(m.f)",
             "has(a.b.c)",
@@ -2069,6 +2115,16 @@ mod tests {
                 "position of the first error for `{source}`\n  antlr: {expected}\n  winnow: {actual}"
             );
         }
+    }
+
+    #[test]
+    fn reports_lexer_errors_after_the_expression() {
+        // The lexer runs on demand, so the source past a complete expression
+        // is only tokenized when the parser gets there — which the top level
+        // makes sure of, so that every lexer error is reported.
+        let err = Parser::new().parse("a @ b @ c").expect_err("should fail");
+        let positions: Vec<_> = err.errors.iter().map(|e| e.pos).collect();
+        assert_eq!(positions, vec![(1, 3), (1, 7)], "{err}");
     }
 
     // -----------------------------------------------------------------
