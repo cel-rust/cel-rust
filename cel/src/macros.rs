@@ -1,34 +1,12 @@
 #[macro_export]
 macro_rules! impl_conversions {
-    // Capture pairs separated by commas, where each pair is separated by =>
-    ($($target_type:ty => $value_variant:path),* $(,)?) => {
+    // Capture triples separated by commas: the Rust type a function signature can
+    // use, the `Value` variant it corresponds to at the library boundary, and the
+    // concrete `Val` implementation that backs it internally. The latter lets both
+    // argument extraction and return-value construction go straight to/from the
+    // `Val`, without materializing an intermediate `Value`.
+    ($($target_type:ty => $value_variant:path as $cel_type:ty),* $(,)?) => {
         $(
-            impl FromValue for $target_type {
-                fn from_value(expr: &Value) -> Result<Self, ExecutionError> {
-                    if let $value_variant(v) = expr {
-                        Ok(v.clone())
-                    } else {
-                        Err(ExecutionError::UnexpectedType {
-                            got: format!("{:?}", expr),
-                            want: stringify!($target_type).to_string(),
-                        })
-                    }
-                }
-            }
-
-            impl FromValue for Option<$target_type> {
-                fn from_value(expr: &Value) -> Result<Self, ExecutionError> {
-                    match expr {
-                        Value::Null => Ok(None),
-                        $value_variant(v) => Ok(Some(v.clone())),
-                        _ => Err(ExecutionError::UnexpectedType {
-                            got: format!("{:?}", expr),
-                            want: stringify!($target_type).to_string(),
-                        }),
-                    }
-                }
-            }
-
             impl From<$target_type> for Value {
                 fn from(value: $target_type) -> Self {
                     $value_variant(value)
@@ -37,13 +15,14 @@ macro_rules! impl_conversions {
 
             impl<'context> $crate::magic::IntoResolveResult<'context> for $target_type {
                 fn into_resolve_result(self) -> Result<std::borrow::Cow<'context, dyn $crate::common::value::Val>, ExecutionError> {
-                    $crate::magic::IntoResolveResult::into_resolve_result($value_variant(self))
+                    let val: Box<dyn $crate::common::value::Val> = Box::new(<$cel_type>::from(self));
+                    Ok(std::borrow::Cow::Owned(val))
                 }
             }
 
             impl<'context> $crate::magic::IntoResolveResult<'context> for Result<$target_type, ExecutionError> {
                 fn into_resolve_result(self) -> Result<std::borrow::Cow<'context, dyn $crate::common::value::Val>, ExecutionError> {
-                    $crate::magic::IntoResolveResult::into_resolve_result(self.map($value_variant)?)
+                    $crate::magic::IntoResolveResult::into_resolve_result(self?)
                 }
             }
 
@@ -52,7 +31,8 @@ macro_rules! impl_conversions {
                 where
                     Self: Sized,
                 {
-                    arg_value_from_context(ctx).and_then(|v| FromValue::from_value(&v))
+                    $crate::magic::arg_val_from_context(ctx)
+                        .and_then(|v| $crate::magic::FromVal::from_val(v.as_ref()))
                 }
             }
         )*

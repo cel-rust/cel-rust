@@ -1918,6 +1918,78 @@ mod tests {
         assert_eq!(clones.load(Ordering::SeqCst), 0);
     }
 
+    /// All the CEL-primitive argument types a registered function can declare must
+    /// still extract correctly now that they're pulled straight from the `Val`
+    /// instead of via an intermediate `Value`, including through the `This`
+    /// extractor and its `Option<T>` (i.e. "or null") form.
+    #[test]
+    fn test_typed_args_still_extract_correctly() {
+        use crate::extractors::This;
+        use crate::objects::Opaque;
+
+        fn check(
+            a: i64,
+            b: u64,
+            c: f64,
+            d: bool,
+            e: Arc<String>,
+            f: Arc<Vec<u8>>,
+            g: Arc<Vec<Value>>,
+        ) -> bool {
+            a == 1
+                && b == 2
+                && c == 3.5
+                && d
+                && e.as_str() == "hi"
+                && f.as_slice() == b"by"
+                && g.len() == 2
+        }
+
+        fn this_is_null(This(v): This<Option<i64>>) -> bool {
+            v.is_none()
+        }
+
+        #[derive(Debug, Eq, PartialEq)]
+        struct Blob(i64);
+
+        impl Opaque for Blob {
+            fn runtime_type_name(&self) -> &str {
+                "blob"
+            }
+        }
+
+        fn opaque_len(o: Arc<dyn Opaque>) -> i64 {
+            o.downcast_ref::<Blob>().map(|b| b.0).unwrap_or(-1)
+        }
+
+        let mut ctx = Context::default();
+        ctx.add_function("check", check);
+        ctx.add_function("thisIsNull", this_is_null);
+        ctx.add_function("opaqueLen", opaque_len);
+        ctx.add_variable_from_value("blob", Value::Opaque(Arc::new(Blob(42))));
+
+        let program = Program::compile(
+            "check(1, 2u, 3.5, true, 'hi', b'by', [1, 2]) && null.thisIsNull() && opaqueLen(blob) == 42",
+        )
+        .unwrap();
+        assert_eq!(program.execute(&ctx), Ok(true.into()));
+    }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn test_chrono_args_still_extract_correctly() {
+        fn check(d: chrono::Duration, t: chrono::DateTime<chrono::FixedOffset>) -> bool {
+            d == chrono::Duration::seconds(5) && t.timestamp() == 0
+        }
+
+        let mut ctx = Context::default();
+        ctx.add_function("check", check);
+
+        let program =
+            Program::compile("check(duration('5s'), timestamp('1970-01-01T00:00:00Z'))").unwrap();
+        assert_eq!(program.execute(&ctx), Ok(true.into()));
+    }
+
     #[test]
     fn test_heterogeneous_compare() {
         let context = Context::default();
