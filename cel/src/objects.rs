@@ -59,9 +59,6 @@ impl PartialOrd for Map {
 }
 
 impl Map {
-    pub(crate) fn contains_key(&self, key: &(dyn AsKeyRef + '_)) -> bool {
-        self.map.contains_key(key)
-    }
     /// Returns a reference to the value corresponding to the key. Implicitly converts between int
     /// and uint keys.
     pub fn get(&self, key: &(dyn AsKeyRef + '_)) -> Option<&Value> {
