@@ -1327,8 +1327,7 @@ impl Value {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
                         })?;
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
-                        let v = (func)(&mut ctx)?;
-                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+                        (func)(&mut ctx)
                     }
                     Some(target) => {
                         let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
@@ -1369,9 +1368,7 @@ impl Value {
                             Some(func) => (None, func, args),
                         };
                         let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
-                        // todo fix this to _not_ use `Value`
-                        let v = (func)(&mut ctx)?;
-                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+                        (func)(&mut ctx)
                     }
                 }
             }
@@ -1881,6 +1878,44 @@ mod tests {
         let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
+    }
+
+    /// A registered [`crate::magic::Function`] that hands back one of its arguments
+    /// unchanged must be able to do so without cloning it - i.e. it can return the
+    /// `Cow::Borrowed` it was handed as-is, rather than being forced through `Value`.
+    #[test]
+    fn test_function_can_return_borrowed_val() {
+        use crate::magic::Function;
+        use crate::FunctionContext;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        #[derive(Debug)]
+        struct CountedVal(Arc<AtomicUsize>);
+
+        impl Val for CountedVal {
+            fn get_type(&self) -> &Type {
+                &LIST_TYPE
+            }
+
+            fn clone_as_boxed(&self) -> Box<dyn Val> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Box::new(CountedVal(self.0.clone()))
+            }
+        }
+
+        let clones = Arc::new(AtomicUsize::new(0));
+        let mut ctx = Context::default();
+        ctx.add_variable_as_val("counted", Box::new(CountedVal(clones.clone())));
+
+        let echo: Function = Box::new(|ftx: &mut FunctionContext| Ok(ftx.args[0].clone()));
+        ctx.add_function("echo", echo);
+
+        let program = Program::compile("echo(counted)").unwrap();
+        // `Value` has no representation for `CountedVal`, so the final conversion at
+        // the library boundary errors out - only the clone count matters here.
+        let _ = program.execute(&ctx);
+
+        assert_eq!(clones.load(Ordering::SeqCst), 0);
     }
 
     #[test]

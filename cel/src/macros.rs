@@ -35,15 +35,15 @@ macro_rules! impl_conversions {
                 }
             }
 
-            impl $crate::magic::IntoResolveResult for $target_type {
-                fn into_resolve_result(self) -> ResolveResult {
-                    Ok($value_variant(self))
+            impl<'context> $crate::magic::IntoResolveResult<'context> for $target_type {
+                fn into_resolve_result(self) -> Result<std::borrow::Cow<'context, dyn $crate::common::value::Val>, ExecutionError> {
+                    $crate::magic::IntoResolveResult::into_resolve_result($value_variant(self))
                 }
             }
 
-            impl $crate::magic::IntoResolveResult for Result<$target_type, ExecutionError> {
-                fn into_resolve_result(self) -> ResolveResult {
-                    self.map($value_variant)
+            impl<'context> $crate::magic::IntoResolveResult<'context> for Result<$target_type, ExecutionError> {
+                fn into_resolve_result(self) -> Result<std::borrow::Cow<'context, dyn $crate::common::value::Val>, ExecutionError> {
+                    $crate::magic::IntoResolveResult::into_resolve_result(self.map($value_variant)?)
                 }
             }
 
@@ -67,7 +67,7 @@ macro_rules! impl_handler {
             where
                 F: Fn($($t,)*) -> R + Send + Sync + 'static,
                 $($t: for<'a, 'context, 'call> $crate::FromContext<'a, 'context, 'call>,)*
-                R: IntoResolveResult,
+                R: for<'context> IntoResolveResult<'context>,
             {
                 fn into_function(self) -> Function {
                     Box::new(move |_ftx| {
@@ -83,7 +83,7 @@ macro_rules! impl_handler {
             where
                 F: Fn(&FunctionContext, $($t,)*) -> R + Send + Sync + 'static,
                 $($t: for<'a, 'context, 'call> $crate::FromContext<'a, 'context, 'call>,)*
-                R: IntoResolveResult,
+                R: for<'context> IntoResolveResult<'context>,
             {
                 fn into_function(self) -> Function {
                     Box::new(move |_ftx| {

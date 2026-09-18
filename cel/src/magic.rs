@@ -1,7 +1,9 @@
+use crate::common::value::Val;
 use crate::macros::{impl_conversions, impl_handler};
 use crate::objects::Opaque;
 use crate::resolvers::{AllArguments, Argument};
-use crate::{ExecutionError, FunctionContext, ResolveResult, Value};
+use crate::{ExecutionError, FunctionContext, Value};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -59,20 +61,45 @@ impl FromValue for Value {
     }
 }
 
-/// A trait for types that can be converted into a [`ResolveResult`]. Every function that can
-/// be registered to the CEL context must return a value that implements this trait.
-pub trait IntoResolveResult {
-    fn into_resolve_result(self) -> ResolveResult;
+/// A trait for types that can be converted into the `Cow<'context, dyn Val>` returned by a
+/// registered function. Every function that can be registered to the CEL context must return
+/// a value that implements this trait.
+///
+/// Most implementations (e.g. the CEL-primitive types, [`Value`] itself) produce an owned
+/// [`Val`], since they have no connection to the calling [`FunctionContext`]'s data. A function
+/// that wants to avoid cloning - for example one that returns one of its arguments, or `this`,
+/// unchanged - can instead return a [`Cow`] borrowed from the [`FunctionContext`] directly (see
+/// [`FunctionContext::this`] and [`FunctionContext::args`]).
+pub trait IntoResolveResult<'context> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError>;
 }
 
-impl IntoResolveResult for String {
-    fn into_resolve_result(self) -> ResolveResult {
-        Ok(Value::String(Arc::new(self)))
+impl<'context> IntoResolveResult<'context> for String {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        Value::String(Arc::new(self)).into_resolve_result()
     }
 }
 
-impl IntoResolveResult for Result<Value, ExecutionError> {
-    fn into_resolve_result(self) -> ResolveResult {
+impl<'context> IntoResolveResult<'context> for Value {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        Ok(Cow::Owned(self.try_into()?))
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Result<Value, ExecutionError> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        self?.into_resolve_result()
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Cow<'context, dyn Val> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        Ok(self)
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Result<Cow<'context, dyn Val>, ExecutionError> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
         self
     }
 }
@@ -298,7 +325,13 @@ impl FunctionRegistry {
     }
 }
 
-pub type Function = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + Sync>;
+pub type Function = Box<
+    dyn for<'context, 'call> Fn(
+            &mut FunctionContext<'context, 'call>,
+        ) -> Result<Cow<'context, dyn Val>, ExecutionError>
+        + Send
+        + Sync,
+>;
 
 pub trait IntoFunction<T> {
     fn into_function(self) -> Function;
