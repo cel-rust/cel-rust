@@ -26,6 +26,20 @@ impl<'a> Bytes<'a> {
     pub fn into_static(self) -> Bytes<'static> {
         Bytes(Cow::Owned(self.0.into_owned()))
     }
+
+    /// The bytes, with the lifetime of the borrow itself, if they are borrowed
+    /// rather than owned.
+    ///
+    /// Unlike [`inner`](Bytes::inner), whose result is bounded by the borrow
+    /// of `self`, this lets a slice of the bytes outlive the `Bytes` that
+    /// handed it out: a value read out of a borrowed container can be
+    /// re-borrowed, without a copy, for as long as the container's own data.
+    pub fn as_borrowed(&self) -> Option<&'a [u8]> {
+        match &self.0 {
+            Cow::Borrowed(b) => Some(b),
+            Cow::Owned(_) => None,
+        }
+    }
 }
 
 impl Deref for Bytes<'_> {
@@ -244,6 +258,19 @@ mod tests {
     use super::Bytes;
     use crate::common::types::CelString;
     use crate::common::value::CowVal;
+
+    #[test]
+    fn as_borrowed_outlives_the_bytes() {
+        let owned = vec![1u8, 2, 3, 4];
+        let tail = {
+            let b = Bytes::from(owned.as_slice());
+            // `b` is dropped at the end of this block; the slice is not tied to it
+            b.as_borrowed().map(|b| &b[1..])
+        };
+        assert_eq!(tail, Some(&[2u8, 3, 4][..]));
+        assert!(std::ptr::eq(tail.unwrap().as_ptr(), owned[1..].as_ptr()));
+        assert_eq!(Bytes::from(vec![1u8]).as_borrowed(), None);
+    }
 
     #[test]
     fn bytes_of_borrowed_string_keeps_the_borrow() {
