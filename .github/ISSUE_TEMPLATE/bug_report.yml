@@ -1,6 +1,6 @@
 name: Bug report
 description: Something in the crate itself is broken — a panic, an incorrect Rust API, a build failure, etc.
-labels: ["bug"]
+labels: ["bug", "triage/needed"]
 body:
   - type: markdown
     attributes:

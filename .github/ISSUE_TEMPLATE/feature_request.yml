@@ -1,6 +1,6 @@
 name: Feature request
 description: A missing CEL function/macro/extension, or a new cel-rust API.
-labels: ["enhancement"]
+labels: ["enhancement", "triage/needed"]
 body:
   - type: markdown
     attributes:
