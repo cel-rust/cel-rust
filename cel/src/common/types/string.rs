@@ -29,6 +29,20 @@ impl<'a> String<'a> {
         String(Cow::Owned(self.0.into_owned()))
     }
 
+    /// The bytes, with the lifetime of the borrow itself, if they are borrowed
+    /// rather than owned.
+    ///
+    /// Unlike [`inner`](String::inner), whose result is bounded by the borrow
+    /// of `self`, this lets a slice of the bytes outlive the `String` that
+    /// handed it out: a value read out of a borrowed container can be
+    /// re-borrowed, without a copy, for as long as the container's own data.
+    pub fn as_borrowed(&self) -> Option<&'a str> {
+        match &self.0 {
+            Cow::Borrowed(s) => Some(s),
+            Cow::Owned(_) => None,
+        }
+    }
+
     pub(crate) fn into_cow(self) -> Cow<'a, str> {
         self.0
     }
@@ -387,6 +401,22 @@ mod tests {
     use super::StdString;
     use super::String;
     use crate::common::value::{CowVal, Val};
+
+    #[test]
+    fn as_borrowed_outlives_the_string() {
+        let owned = StdString::from("/v1/users");
+        let stripped = {
+            let s = String::from(owned.as_str());
+            // `s` is dropped at the end of this block; the slice is not tied to it
+            s.as_borrowed().and_then(|s| s.strip_prefix("/v1"))
+        };
+        assert_eq!(stripped, Some("/users"));
+        assert!(std::ptr::eq(
+            stripped.unwrap().as_ptr(),
+            owned[3..].as_ptr()
+        ));
+        assert_eq!(String::from(StdString::from("owned")).as_borrowed(), None);
+    }
 
     #[test]
     fn test_try_into_string() {
