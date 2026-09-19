@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0](https://github.com/cel-rust/cel-rust/compare/v0.14.5...v0.15.0) - 2026-09-19
+
+### Added
+
+- *(val)* [**breaking**] `VariableResolver` uses `Cow<dyn Val>`
+- *(val)* `Context::add_function` supports `Val`
+- *(Val)* [**breaking**] Deleted all previously unused `Value` based fns
+- *(parser)* expose SourceInfo on the success path ([#315](https://github.com/cel-rust/cel-rust/pull/315))
+
+### Other
+
+- *(val)* `FunctionContext` uses `Val`
+- *(pratt)* Added test coverage for unescaping
+- *(map)* Added mutable `List` used in `map`
+
 ## [0.14.5](https://github.com/cel-rust/cel-rust/compare/v0.14.4...v0.14.5) - 2026-09-07
 
 ### Added
