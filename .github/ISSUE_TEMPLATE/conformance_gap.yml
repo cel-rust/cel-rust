@@ -1,6 +1,6 @@
 name: Spec conformance gap
 description: A CEL expression evaluates differently than the cel-spec / cel-go say it should.
-labels: ["conformance"]
+labels: ["conformance", "triage/needed"]
 body:
   - type: markdown
     attributes:
