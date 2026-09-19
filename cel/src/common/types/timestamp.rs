@@ -1,10 +1,10 @@
 use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
-use crate::common::types::{CelDuration, CelInt, CelString, Type};
-use crate::common::value::Val;
+use crate::common::types::{CelDuration, CelInt, Type};
+use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use chrono::{Datelike, Days, Months};
 use chrono::{TimeZone, Timelike};
-use std::borrow::Cow;
+use std::any::Any;
 use std::cmp::Ordering;
 use std::ops::{Add, Sub};
 use std::sync::LazyLock;
@@ -27,7 +27,10 @@ impl Val for Timestamp {
         &super::TIMESTAMP_TYPE
     }
 
-    fn as_adder(&self) -> Option<&dyn Adder> {
+    fn as_adder<'b, 'v>(&'b self) -> Option<&'b (dyn Adder + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -35,7 +38,10 @@ impl Val for Timestamp {
         Some(self)
     }
 
-    fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+    fn as_subtractor<'b, 'v>(&'b self) -> Option<&'b (dyn Subtractor + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -49,10 +55,19 @@ impl Val for Timestamp {
             .is_some_and(|other| self.0 == other.0)
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
         Box::new(Timestamp(self.0))
     }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
+    }
 }
+
+impl StaticVal for Timestamp {}
 
 /// Timestamp values are limited to the range of values which can be serialized as a string:
 /// `["0001-01-01T00:00:00Z", "9999-12-31T23:59:59.999999999Z"]`. Since the max is a smaller
@@ -82,7 +97,10 @@ static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock
 });
 
 impl Adder for Timestamp {
-    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn add<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
             let result = self.0.add(*rhs.inner());
             if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
@@ -92,7 +110,7 @@ impl Adder for Timestamp {
                     (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
                 ));
             }
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self(result))))
+            Ok(CowVal::owned(Self(result)))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "add",
@@ -114,7 +132,10 @@ impl Comparer for Timestamp {
 }
 
 impl Subtractor for Timestamp {
-    fn sub<'a>(&'a self, rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn sub<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
             let result = self.0.sub(*rhs.inner());
             if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
@@ -124,11 +145,11 @@ impl Subtractor for Timestamp {
                     (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
                 ));
             }
-            Ok(Cow::<dyn Val>::Owned(Box::new(Self(result))))
+            Ok(CowVal::owned(Self(result)))
         } else if let Some(rhs) = rhs.downcast_ref::<Self>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(CelDuration::from(
+            Ok(CowVal::owned(CelDuration::from(
                 self.0.signed_duration_since(rhs.inner()),
-            ))))
+            )))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "sub",
@@ -157,10 +178,10 @@ impl From<Timestamp> for chrono::DateTime<chrono::FixedOffset> {
     }
 }
 
-impl TryFrom<Box<dyn Val>> for chrono::DateTime<chrono::FixedOffset> {
-    type Error = Box<dyn Val>;
+impl<'v> TryFrom<Box<dyn Val + 'v>> for chrono::DateTime<chrono::FixedOffset> {
+    type Error = Box<dyn Val + 'v>;
 
-    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+    fn try_from(value: Box<dyn Val + 'v>) -> Result<Self, Self::Error> {
         if let Some(ts) = value.downcast_ref::<Timestamp>() {
             return Ok(ts.0);
         }
@@ -168,10 +189,10 @@ impl TryFrom<Box<dyn Val>> for chrono::DateTime<chrono::FixedOffset> {
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a chrono::DateTime<chrono::FixedOffset> {
-    type Error = &'a dyn Val;
+impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a chrono::DateTime<chrono::FixedOffset> {
+    type Error = &'a (dyn Val + 'v);
 
-    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+    fn try_from(value: &'a (dyn Val + 'v)) -> Result<Self, Self::Error> {
         if let Some(ts) = value.downcast_ref::<Timestamp>() {
             return Ok(&ts.0);
         }
@@ -179,7 +200,7 @@ impl<'a> TryFrom<&'a dyn Val> for &'a chrono::DateTime<chrono::FixedOffset> {
     }
 }
 
-fn millis<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn millis<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(
             ts.inner().timestamp_subsec_millis() as i64
@@ -187,25 +208,25 @@ fn millis<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Execution
     })
 }
 
-fn seconds<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn seconds<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(ts.inner().second() as i64)))
     })
 }
 
-fn minutes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn minutes<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(ts.inner().minute() as i64)))
     })
 }
 
-fn hours<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn hours<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(ts.inner().hour() as i64)))
     })
 }
 
-fn day_of_week<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn day_of_week<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(
             ts.inner().weekday().num_days_from_sunday() as i64,
@@ -213,19 +234,19 @@ fn day_of_week<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Exec
     })
 }
 
-fn date<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn date<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(ts.inner().day() as i64)))
     })
 }
 
-fn day_of_month<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn day_of_month<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(ts.inner().day0() as i64)))
     })
 }
 
-fn day_of_year<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn day_of_year<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         let year = ts
             .inner()
@@ -239,22 +260,22 @@ fn day_of_year<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, Exec
     })
 }
 
-fn month<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn month<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(ts.inner().month0() as i64)))
     })
 }
 
-fn full_year<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+fn full_year<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
         Ok(Box::new(CelInt::from(ts.inner().year() as i64)))
     })
 }
 
-fn timestamp<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::STRING_TYPE, |value: &CelString| {
+fn timestamp<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    super::string_fn(args, |value: &str| {
         Ok(Box::new(Timestamp::from(
-            chrono::DateTime::parse_from_rfc3339(value.inner())
+            chrono::DateTime::parse_from_rfc3339(value)
                 .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
         )))
     })
