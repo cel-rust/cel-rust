@@ -59,9 +59,6 @@ impl PartialOrd for Map {
 }
 
 impl Map {
-    pub(crate) fn contains_key(&self, key: &(dyn AsKeyRef + '_)) -> bool {
-        self.map.contains_key(key)
-    }
     /// Returns a reference to the value corresponding to the key. Implicitly converts between int
     /// and uint keys.
     pub fn get(&self, key: &(dyn AsKeyRef + '_)) -> Option<&Value> {
@@ -1330,8 +1327,7 @@ impl Value {
                             ExecutionError::UndeclaredReference(call.func_name.clone().into())
                         })?;
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
-                        let v = (func)(&mut ctx)?;
-                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+                        (func)(&mut ctx)
                     }
                     Some(target) => {
                         let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
@@ -1372,9 +1368,7 @@ impl Value {
                             Some(func) => (None, func, args),
                         };
                         let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
-                        // todo fix this to _not_ use `Value`
-                        let v = (func)(&mut ctx)?;
-                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+                        (func)(&mut ctx)
                     }
                 }
             }
@@ -1884,6 +1878,116 @@ mod tests {
         let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
+    }
+
+    /// A registered [`crate::magic::Function`] that hands back one of its arguments
+    /// unchanged must be able to do so without cloning it - i.e. it can return the
+    /// `Cow::Borrowed` it was handed as-is, rather than being forced through `Value`.
+    #[test]
+    fn test_function_can_return_borrowed_val() {
+        use crate::magic::Function;
+        use crate::FunctionContext;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        #[derive(Debug)]
+        struct CountedVal(Arc<AtomicUsize>);
+
+        impl Val for CountedVal {
+            fn get_type(&self) -> &Type {
+                &LIST_TYPE
+            }
+
+            fn clone_as_boxed(&self) -> Box<dyn Val> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Box::new(CountedVal(self.0.clone()))
+            }
+        }
+
+        let clones = Arc::new(AtomicUsize::new(0));
+        let mut ctx = Context::default();
+        ctx.add_variable_as_val("counted", Box::new(CountedVal(clones.clone())));
+
+        let echo: Function = Box::new(|ftx: &mut FunctionContext| Ok(ftx.args[0].clone()));
+        ctx.add_function("echo", echo);
+
+        let program = Program::compile("echo(counted)").unwrap();
+        // `Value` has no representation for `CountedVal`, so the final conversion at
+        // the library boundary errors out - only the clone count matters here.
+        let _ = program.execute(&ctx);
+
+        assert_eq!(clones.load(Ordering::SeqCst), 0);
+    }
+
+    /// All the CEL-primitive argument types a registered function can declare must
+    /// still extract correctly now that they're pulled straight from the `Val`
+    /// instead of via an intermediate `Value`, including through the `This`
+    /// extractor and its `Option<T>` (i.e. "or null") form.
+    #[test]
+    fn test_typed_args_still_extract_correctly() {
+        use crate::extractors::This;
+        use crate::objects::Opaque;
+
+        fn check(
+            a: i64,
+            b: u64,
+            c: f64,
+            d: bool,
+            e: Arc<String>,
+            f: Arc<Vec<u8>>,
+            g: Arc<Vec<Value>>,
+        ) -> bool {
+            a == 1
+                && b == 2
+                && c == 3.5
+                && d
+                && e.as_str() == "hi"
+                && f.as_slice() == b"by"
+                && g.len() == 2
+        }
+
+        fn this_is_null(This(v): This<Option<i64>>) -> bool {
+            v.is_none()
+        }
+
+        #[derive(Debug, Eq, PartialEq)]
+        struct Blob(i64);
+
+        impl Opaque for Blob {
+            fn runtime_type_name(&self) -> &str {
+                "blob"
+            }
+        }
+
+        fn opaque_len(o: Arc<dyn Opaque>) -> i64 {
+            o.downcast_ref::<Blob>().map(|b| b.0).unwrap_or(-1)
+        }
+
+        let mut ctx = Context::default();
+        ctx.add_function("check", check);
+        ctx.add_function("thisIsNull", this_is_null);
+        ctx.add_function("opaqueLen", opaque_len);
+        ctx.add_variable_from_value("blob", Value::Opaque(Arc::new(Blob(42))));
+
+        let program = Program::compile(
+            "check(1, 2u, 3.5, true, 'hi', b'by', [1, 2]) && null.thisIsNull() && opaqueLen(blob) == 42",
+        )
+        .unwrap();
+        assert_eq!(program.execute(&ctx), Ok(true.into()));
+    }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn test_chrono_args_still_extract_correctly() {
+        fn check(d: chrono::Duration, t: chrono::DateTime<chrono::FixedOffset>) -> bool {
+            d == chrono::Duration::seconds(5) && t.timestamp() == 0
+        }
+
+        let mut ctx = Context::default();
+        ctx.add_function("check", check);
+
+        let program =
+            Program::compile("check(duration('5s'), timestamp('1970-01-01T00:00:00Z'))").unwrap();
+        assert_eq!(program.execute(&ctx), Ok(true.into()));
     }
 
     #[test]
