@@ -24,6 +24,10 @@ impl Timestamp {
 
 impl Val for Timestamp {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::TIMESTAMP_TYPE
     }
 
@@ -179,180 +183,96 @@ impl<'a> TryFrom<&'a dyn Val> for &'a chrono::DateTime<chrono::FixedOffset> {
     }
 }
 
-fn millis<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(
-            ts.inner().timestamp_subsec_millis() as i64
-        )))
-    })
+fn millis<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(
+        this.inner().timestamp_subsec_millis() as i64,
+    )))
 }
 
-fn seconds<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(ts.inner().second() as i64)))
-    })
+fn seconds<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(this.inner().second() as i64)))
 }
 
-fn minutes<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(ts.inner().minute() as i64)))
-    })
+fn minutes<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(this.inner().minute() as i64)))
 }
 
-fn hours<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(ts.inner().hour() as i64)))
-    })
+fn hours<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(this.inner().hour() as i64)))
 }
 
-fn day_of_week<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(
-            ts.inner().weekday().num_days_from_sunday() as i64,
-        )))
-    })
+fn day_of_week<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(
+        this.inner().weekday().num_days_from_sunday() as i64,
+    )))
 }
 
-fn date<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(ts.inner().day() as i64)))
-    })
+fn date<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(this.inner().day() as i64)))
 }
 
-fn day_of_month<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(ts.inner().day0() as i64)))
-    })
+fn day_of_month<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(this.inner().day0() as i64)))
 }
 
-fn day_of_year<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        let year = ts
-            .inner()
-            .checked_sub_days(Days::new(ts.inner().day0() as u64))
-            .unwrap()
-            .checked_sub_months(Months::new(ts.inner().month0()))
-            .unwrap();
-        Ok(Box::new(CelInt::from(
-            ts.inner().signed_duration_since(year).num_days(),
-        )))
-    })
+fn day_of_year<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    let year = this
+        .inner()
+        .checked_sub_days(Days::new(this.inner().day0() as u64))
+        .unwrap()
+        .checked_sub_months(Months::new(this.inner().month0()))
+        .unwrap();
+    Ok(Cow::Owned(CelInt::from(
+        this.inner().signed_duration_since(year).num_days(),
+    )))
 }
 
-fn month<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(ts.inner().month0() as i64)))
-    })
+fn month<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(this.inner().month0() as i64)))
 }
 
-fn full_year<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::TIMESTAMP_TYPE, |ts: &Timestamp| {
-        Ok(Box::new(CelInt::from(ts.inner().year() as i64)))
-    })
+fn full_year<'a>(this: Cow<'a, Timestamp>) -> Result<Cow<'a, CelInt>, ExecutionError> {
+    Ok(Cow::Owned(CelInt::from(this.inner().year() as i64)))
 }
 
-fn timestamp<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    super::unary_fn(args, super::STRING_TYPE, |value: &CelString| {
-        Ok(Box::new(Timestamp::from(
-            chrono::DateTime::parse_from_rfc3339(value.inner())
-                .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
-        )))
-    })
+fn timestamp_from_string<'a>(
+    this: Cow<'a, CelString>,
+) -> Result<Cow<'a, Timestamp>, ExecutionError> {
+    Ok(Cow::Owned(Timestamp::from(
+        chrono::DateTime::parse_from_rfc3339(this.inner())
+            .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
+    )))
+}
+
+fn timestamp_from_timestamp<'a>(
+    this: Cow<'a, Timestamp>,
+) -> Result<Cow<'a, Timestamp>, ExecutionError> {
+    Ok(this)
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "timestamp",
-        "string_to_timestamp",
-        vec![super::STRING_TYPE],
-        timestamp,
-    )
-    .expect("Must be unique");
-    env.add_overload(
-        "timestamp",
-        "timestamp_to_timestamp",
-        vec![super::TIMESTAMP_TYPE],
-        super::noop,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getFullYear",
-        "timestamp_to_year",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        full_year,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getMonth",
-        "timestamp_to_month",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        month,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getDayOfYear",
-        "timestamp_to_day_of_year",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        day_of_year,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getDayOfMonth",
-        "timestamp_to_day_of_month",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        day_of_month,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getDate",
-        "timestamp_to_day_of_month_1_based",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        date,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getDayOfWeek",
-        "timestamp_to_day_of_week",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        day_of_week,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getHours",
-        "timestamp_to_hours",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        hours,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getMinutes",
-        "timestamp_to_minutes",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        minutes,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getSeconds",
-        "timestamp_to_seconds",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        seconds,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getMilliseconds",
-        "timestamp_to_millis",
-        super::TIMESTAMP_TYPE,
-        Vec::default(),
-        millis,
-    )
-    .expect("Must be unique");
+    crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Timestamp,
+        name = "timestamp", id = "string_to_timestamp");
+    crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
+        name = "timestamp", id = "timestamp_to_timestamp");
+    crate::add_member_overload!(env, fn full_year: (Timestamp) -> CelInt,
+        name = "getFullYear", id = "timestamp_to_year");
+    crate::add_member_overload!(env, fn month: (Timestamp) -> CelInt,
+        name = "getMonth", id = "timestamp_to_month");
+    crate::add_member_overload!(env, fn day_of_year: (Timestamp) -> CelInt,
+        name = "getDayOfYear", id = "timestamp_to_day_of_year");
+    crate::add_member_overload!(env, fn day_of_month: (Timestamp) -> CelInt,
+        name = "getDayOfMonth", id = "timestamp_to_day_of_month");
+    crate::add_member_overload!(env, fn date: (Timestamp) -> CelInt,
+        name = "getDate", id = "timestamp_to_day_of_month_1_based");
+    crate::add_member_overload!(env, fn day_of_week: (Timestamp) -> CelInt,
+        name = "getDayOfWeek", id = "timestamp_to_day_of_week");
+    crate::add_member_overload!(env, fn hours: (Timestamp) -> CelInt,
+        name = "getHours", id = "timestamp_to_hours");
+    crate::add_member_overload!(env, fn minutes: (Timestamp) -> CelInt,
+        name = "getMinutes", id = "timestamp_to_minutes");
+    crate::add_member_overload!(env, fn seconds: (Timestamp) -> CelInt,
+        name = "getSeconds", id = "timestamp_to_seconds");
+    crate::add_member_overload!(env, fn millis: (Timestamp) -> CelInt,
+        name = "getMilliseconds", id = "timestamp_to_millis");
 }
