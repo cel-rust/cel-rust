@@ -85,7 +85,7 @@ impl Adder for DefaultList {
     fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         let mut rhs = rhs
             .as_iterable()
-            .ok_or(ExecutionError::NoSuchOverload)?
+            .ok_or_else(|| ExecutionError::unsupported_binary_operator("add", self, rhs))?
             .iter();
         let mut list = self.clone();
         while let Some(other) = rhs.next() {
@@ -112,7 +112,7 @@ impl Indexer for DefaultList {
             Kind::Int => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .expect("int kind must contain CelInt")
                     .inner();
                 Ok(Cow::Borrowed(
                     self.0
@@ -124,7 +124,7 @@ impl Indexer for DefaultList {
             Kind::UInt => {
                 let idx: u64 = *idx
                     .downcast_ref::<CelUInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .expect("uint kind must contain CelUInt")
                     .inner();
                 Ok(Cow::Borrowed(
                     self.0
@@ -150,7 +150,7 @@ impl Indexer for DefaultList {
             Kind::Int => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .expect("int kind must contain CelInt")
                     .inner();
                 if idx < 0 || idx as usize >= list.0.len() {
                     return Err(ExecutionError::IndexOutOfBounds(idx.into()));
@@ -160,7 +160,7 @@ impl Indexer for DefaultList {
             Kind::UInt => {
                 let idx: u64 = *idx
                     .downcast_ref::<CelUInt>()
-                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .expect("uint kind must contain CelUInt")
                     .inner();
                 if idx as usize >= list.0.len() {
                     return Err(ExecutionError::IndexOutOfBounds(idx.into()));

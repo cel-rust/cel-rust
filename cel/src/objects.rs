@@ -3,7 +3,6 @@ use crate::common::types::bool::Bool;
 use crate::common::types::*;
 use crate::common::value::{Downcast, Val};
 use crate::context::Context;
-use crate::ExecutionError::NoSuchOverload;
 use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -1023,9 +1022,9 @@ impl Value {
                             return if Ok(true) == left {
                                 Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
                             } else {
-                                let right = Value::resolve_val(&call.args[1], ctx)?
-                                    .downcast_ref::<CelBool>()
-                                    .map(|b| *b.inner());
+                                let right_value = Value::resolve_val(&call.args[1], ctx)?;
+                                let right =
+                                    right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
                                 match (left, right) {
                                     (Ok(false), Some(right)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(right))))
@@ -1033,7 +1032,11 @@ impl Value {
                                     (Err(_), Some(true)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(true))))
                                     }
-                                    (left, _) => Err(left.err().unwrap_or(NoSuchOverload)),
+                                    (left, _) => Err(boolean_operator_error(
+                                        &call.func_name,
+                                        left,
+                                        right_value.as_ref(),
+                                    )),
                                 }
                             };
                         }
@@ -1042,9 +1045,9 @@ impl Value {
                             return if Ok(false) == left {
                                 Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
                             } else {
-                                let right = Value::resolve_val(&call.args[1], ctx)?
-                                    .downcast_ref::<CelBool>()
-                                    .map(|b| *b.inner());
+                                let right_value = Value::resolve_val(&call.args[1], ctx)?;
+                                let right =
+                                    right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
                                 match (left, right) {
                                     (Ok(true), Some(right)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(right))))
@@ -1052,7 +1055,11 @@ impl Value {
                                     (Err(_), Some(false)) => {
                                         Ok(Cow::<dyn Val>::Owned(Box::new(CelBool::from(false))))
                                     }
-                                    (left, _) => Err(left.err().unwrap_or(NoSuchOverload)),
+                                    (left, _) => Err(boolean_operator_error(
+                                        &call.func_name,
+                                        left,
+                                        right_value.as_ref(),
+                                    )),
                                 }
                             };
                         }
@@ -1087,16 +1094,24 @@ impl Value {
                                 value
                             };
 
+                            let index = Self::resolve_val(&call.args[1], ctx)?;
+                            let overload_error = ExecutionError::overload_for_values(
+                                &call.func_name,
+                                [value.as_ref(), index.as_ref()],
+                                false,
+                            );
                             let result = match value {
                                 Cow::Borrowed(val) => val
                                     .as_indexer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .get(Self::resolve_val(&call.args[1], ctx)?.as_ref()),
+                                    .ok_or_else(|| overload_error.clone())?
+                                    .get(index.as_ref())
+                                    .map_err(|error| error.with_overload_context(overload_error)),
                                 Cow::Owned(val) => val
                                     .into_indexer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .steal(Self::resolve_val(&call.args[1], ctx)?.as_ref())
-                                    .map(Cow::Owned),
+                                    .ok_or_else(|| overload_error.clone())?
+                                    .steal(index.as_ref())
+                                    .map(Cow::Owned)
+                                    .map_err(|error| error.with_overload_context(overload_error)),
                             };
                             return if is_optional {
                                 Ok(match result {
@@ -1151,10 +1166,10 @@ impl Value {
                                 lhs.as_ref()
                                     .as_adder()
                                     .ok_or_else(|| {
-                                        ExecutionError::UnsupportedBinaryOperator(
+                                        ExecutionError::unsupported_binary_operator(
                                             "add",
-                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            lhs.as_ref(),
+                                            rhs.as_ref(),
                                         )
                                     })?
                                     .add(rhs.as_ref())?
@@ -1167,10 +1182,10 @@ impl Value {
                             return Ok(Cow::Owned(
                                 lhs.as_subtractor()
                                     .ok_or_else(|| {
-                                        ExecutionError::UnsupportedBinaryOperator(
+                                        ExecutionError::unsupported_binary_operator(
                                             "sub",
-                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            lhs.as_ref(),
+                                            rhs.as_ref(),
                                         )
                                     })?
                                     .sub(rhs.as_ref())?
@@ -1183,10 +1198,10 @@ impl Value {
                             return Ok(Cow::Owned(
                                 lhs.as_divider()
                                     .ok_or_else(|| {
-                                        ExecutionError::UnsupportedBinaryOperator(
+                                        ExecutionError::unsupported_binary_operator(
                                             "div",
-                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            lhs.as_ref(),
+                                            rhs.as_ref(),
                                         )
                                     })?
                                     .div(rhs.as_ref())?
@@ -1199,10 +1214,10 @@ impl Value {
                             return Ok(Cow::Owned(
                                 lhs.as_multiplier()
                                     .ok_or_else(|| {
-                                        ExecutionError::UnsupportedBinaryOperator(
+                                        ExecutionError::unsupported_binary_operator(
                                             "mul",
-                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            lhs.as_ref(),
+                                            rhs.as_ref(),
                                         )
                                     })?
                                     .mul(rhs.as_ref())?
@@ -1215,10 +1230,10 @@ impl Value {
                             return Ok(Cow::Owned(
                                 lhs.as_modder()
                                     .ok_or_else(|| {
-                                        ExecutionError::UnsupportedBinaryOperator(
+                                        ExecutionError::unsupported_binary_operator(
                                             "rem",
-                                            lhs.as_ref().try_into().unwrap_or(Value::Null),
-                                            rhs.as_ref().try_into().unwrap_or(Value::Null),
+                                            lhs.as_ref(),
+                                            rhs.as_ref(),
                                         )
                                     })?
                                     .modulo(rhs.as_ref())?
@@ -1229,19 +1244,14 @@ impl Value {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(bool(
-                                lhs.as_comparer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .compare(rhs.as_ref())?
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     == Ordering::Less,
                             ));
                         }
                         operators::LESS_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if lhs
-                                .as_comparer()
-                                .ok_or(ExecutionError::NoSuchOverload)?
-                                .compare(rhs.as_ref())?
+                            return if compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                 == Ordering::Greater
                             {
                                 Ok(bool(false))
@@ -1253,19 +1263,14 @@ impl Value {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
                             return Ok(bool(
-                                lhs.as_comparer()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .compare(rhs.as_ref())?
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     == Ordering::Greater,
                             ));
                         }
                         operators::GREATER_EQUALS => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if lhs
-                                .as_comparer()
-                                .ok_or(ExecutionError::NoSuchOverload)?
-                                .compare(rhs.as_ref())?
+                            return if compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                 == Ordering::Less
                             {
                                 Ok(bool(false))
@@ -1276,11 +1281,18 @@ impl Value {
                         operators::IN => {
                             let lhs = Value::resolve_val(&call.args[0], ctx)?;
                             let rhs = Value::resolve_val(&call.args[1], ctx)?;
-                            return if let Some(container) = rhs.as_container() {
-                                Ok(bool(container.contains(lhs.as_ref())?))
-                            } else {
-                                Err(ExecutionError::NoSuchOverload)
+                            let overload_error = || {
+                                ExecutionError::overload_for_values(
+                                    &call.func_name,
+                                    [lhs.as_ref(), rhs.as_ref()],
+                                    false,
+                                )
                             };
+                            let container = rhs.as_container().ok_or_else(overload_error)?;
+                            return container
+                                .contains(lhs.as_ref())
+                                .map(bool)
+                                .map_err(|error| error.with_overload_context(overload_error()));
                         }
                         _ => (),
                     }
@@ -1289,18 +1301,29 @@ impl Value {
                     match call.func_name.as_str() {
                         operators::LOGICAL_NOT => {
                             let expr = Value::resolve_val(&call.args[0], ctx)?;
+                            let overload_error = ExecutionError::overload_for_values(
+                                &call.func_name,
+                                [expr.as_ref()],
+                                false,
+                            );
                             return expr
                                 .downcast_ref::<CelBool>()
                                 .map(Bool::negate)
-                                .ok_or(ExecutionError::NoSuchOverload)
+                                .ok_or(overload_error)
                                 .map(|b| bool(b.into_inner()));
                         }
                         operators::NEGATE => {
                             let val = Value::resolve_val(&call.args[0], ctx)?;
+                            let overload_error = ExecutionError::overload_for_values(
+                                &call.func_name,
+                                [val.as_ref()],
+                                false,
+                            );
                             return Ok(Cow::<dyn Val>::Owned(
                                 val.as_negator()
-                                    .ok_or(ExecutionError::NoSuchOverload)?
-                                    .negate()?,
+                                    .ok_or_else(|| overload_error.clone())?
+                                    .negate()
+                                    .map_err(|error| error.with_overload_context(overload_error))?,
                             ));
                         }
                         operators::NOT_STRICTLY_FALSE => {
@@ -1323,9 +1346,21 @@ impl Value {
                         if let Some(op) = ctx.env().find_overload(&call.func_name, &args) {
                             return op(args);
                         }
-                        let func = ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
-                            ExecutionError::UndeclaredReference(call.func_name.clone().into())
-                        })?;
+                        let func = match ctx.get_function(call.func_name.as_str()) {
+                            Some(func) => func,
+                            None if ctx.env().has_overload(&call.func_name) => {
+                                return Err(ExecutionError::overload_for_values(
+                                    &call.func_name,
+                                    args.iter().map(|arg| arg.as_ref()),
+                                    false,
+                                ));
+                            }
+                            None => {
+                                return Err(ExecutionError::UndeclaredReference(
+                                    call.func_name.clone().into(),
+                                ));
+                            }
+                        };
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
                         (func)(&mut ctx)
                     }
@@ -1342,7 +1377,17 @@ impl Value {
                                 if let Some(op) = ctx.env().find_overload(&qualified_name, &args) {
                                     return op(args);
                                 }
-                                ctx.get_function(&qualified_name)
+                                match ctx.get_function(&qualified_name) {
+                                    Some(func) => Some(func),
+                                    None if ctx.env().has_overload(&qualified_name) => {
+                                        return Err(ExecutionError::overload_for_values(
+                                            &qualified_name,
+                                            args.iter().map(|arg| arg.as_ref()),
+                                            false,
+                                        ));
+                                    }
+                                    None => None,
+                                }
                             }
                             _ => None,
                         };
@@ -1356,13 +1401,22 @@ impl Value {
                                 {
                                     return op(args);
                                 }
-                                let target = args.remove(0);
-                                let func =
-                                    ctx.get_function(call.func_name.as_str()).ok_or_else(|| {
-                                        ExecutionError::UndeclaredReference(
+                                let func = match ctx.get_function(call.func_name.as_str()) {
+                                    Some(func) => func,
+                                    None if ctx.env().has_member_overload(&call.func_name) => {
+                                        return Err(ExecutionError::overload_for_values(
+                                            &call.func_name,
+                                            args.iter().map(|arg| arg.as_ref()),
+                                            true,
+                                        ));
+                                    }
+                                    None => {
+                                        return Err(ExecutionError::UndeclaredReference(
                                             call.func_name.clone().into(),
-                                        )
-                                    })?;
+                                        ));
+                                    }
+                                };
+                                let target = args.remove(0);
                                 (Some(target), func, args)
                             }
                             Some(func) => (None, func, args),
@@ -1378,6 +1432,8 @@ impl Value {
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
                 let key: CelString = select.field.as_str().into();
+                let overload_error =
+                    || ExecutionError::overload_for_values("_._", [left.as_ref(), &key], false);
 
                 // Plain `.field` on an `Optional` propagates optional-ness
                 // per cel-spec — matches cel-go `applyQualifiers` at
@@ -1439,8 +1495,9 @@ impl Value {
                         }
                         _ => Ok(Cow::<dyn Val>::Owned(
                             left.as_indexer()
-                                .ok_or_else(|| ExecutionError::NoSuchOverload)?
-                                .get(&key)?
+                                .ok_or_else(overload_error)?
+                                .get(&key)
+                                .map_err(|error| error.with_overload_context(overload_error()))?
                                 .into_owned(),
                         )),
                     }
@@ -1459,8 +1516,9 @@ impl Value {
                         }
                         _ => Ok(Cow::<dyn Val>::Owned(
                             left.as_indexer()
-                                .ok_or_else(|| ExecutionError::NoSuchOverload)?
-                                .get(&key)?
+                                .ok_or_else(overload_error)?
+                                .get(&key)
+                                .map_err(|error| error.with_overload_context(overload_error()))?
                                 .into_owned(),
                         )),
                     }
@@ -1549,7 +1607,10 @@ impl Value {
 
                 let mut items = iter
                     .as_iterable()
-                    .ok_or(ExecutionError::NoSuchOverload)?
+                    .ok_or_else(|| ExecutionError::UnexpectedType {
+                        got: iter.get_type().name().to_owned(),
+                        want: "iterable".to_owned(),
+                    })?
                     .iter();
                 while let Some(item) = items.next() {
                     if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
@@ -1613,12 +1674,42 @@ fn bool<'a>(boolean: bool) -> Cow<'a, dyn Val> {
     Cow::<dyn Val>::Owned(Box::new(CelBool::from(boolean)))
 }
 
+fn compare_values(
+    operator: &str,
+    lhs: &dyn Val,
+    rhs: &dyn Val,
+) -> Result<Ordering, ExecutionError> {
+    let context = ExecutionError::overload_for_values(operator, [lhs, rhs], false);
+    lhs.as_comparer()
+        .ok_or_else(|| context.clone())
+        .and_then(|comparer| comparer.compare(rhs))
+        .map_err(|error| error.with_overload_context(context))
+}
+
+fn boolean_operator_error(
+    operator: &str,
+    left: Result<bool, ExecutionError>,
+    right: &dyn Val,
+) -> ExecutionError {
+    let right_type = right.get_type().name().to_owned();
+    match left {
+        Err(ExecutionError::UnexpectedType { got, want }) if want == "bool" => {
+            ExecutionError::no_such_overload(operator, vec![got, right_type])
+        }
+        Err(error) => error,
+        Ok(_) => ExecutionError::no_such_overload(operator, vec!["bool".to_owned(), right_type]),
+    }
+}
+
 fn try_bool(val: Result<Cow<dyn Val>, ExecutionError>) -> Result<bool, ExecutionError> {
     match val {
         Ok(val) => val
             .downcast_ref::<CelBool>()
             .map(|b| *b.inner())
-            .ok_or(ExecutionError::NoSuchOverload),
+            .ok_or_else(|| ExecutionError::UnexpectedType {
+                got: val.get_type().name().to_owned(),
+                want: "bool".to_owned(),
+            }),
         Err(err) => Result::Err(err),
     }
 }
