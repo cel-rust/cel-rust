@@ -8,6 +8,7 @@ axum = ["dep:axum", "dep:tokio", "dep:thiserror"]
 json = ["dep:serde_json", "cel/json"]
 chrono = ["dep:chrono", "cel/chrono"]
 anyhow = ["dep:anyhow"]
+structs = ["cel/structs"]
 
 [dependencies]
 cel = { path = "../cel", default-features = false }
@@ -69,3 +70,8 @@ required-features = ["json"]
 name = "example-anyhow"
 path = "src/anyhow.rs"
 required-features = ["anyhow"]
+
+[[bin]]
+name = "example-no-copy"
+path = "src/zero_copy.rs"
+required-features = ["structs"]
