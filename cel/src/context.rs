@@ -215,11 +215,10 @@ impl<'p, 'v> Context<'p, 'v> {
     where
         F: IntoFunction<T> + 'static + Send + Sync,
     {
-        let env = self.env();
-        if env.has_overload(name) || env.has_member_overload(name) {
-            return Err(DeclarationError::overload_conflict(name));
-        }
-        if let Context::Root { functions, .. } = self {
+        if let Context::Root { functions, env, .. } = self {
+            if env.has_overload(name) || env.has_member_overload(name) {
+                return Err(DeclarationError::overload_conflict(name));
+            }
             functions.add(name, value);
         };
         Ok(())
@@ -620,16 +619,12 @@ mod test {
         assert_eq!(context.add_function("other", |a: i64| a), Ok(()));
     }
 
-    /// A child scope answers to the `Env` of the context it derives from.
     #[test]
-    fn add_function_on_a_child_scope_checks_the_env_of_its_parent() {
-        use crate::{Context, DeclarationError};
+    fn add_function_on_a_child_is_a_silent_noop_ignores_dups() {
+        use crate::Context;
 
         let context = Context::default();
         let mut child = context.new_inner_scope();
-        assert_eq!(
-            child.add_function("size", |a: i64| a),
-            Err(DeclarationError::overload_conflict("size")),
-        );
+        assert_eq!(child.add_function("size", |a: i64| a), Ok(()),);
     }
 }
