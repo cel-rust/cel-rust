@@ -1,0 +1,22 @@
+# cargo-mutants configuration. See https://mutants.rs/.
+#
+# Without this, cargo-mutants scopes each mutant's test run to the single
+# package containing the mutated file, and builds with default Cargo
+# features only. That misses most of this workspace's actual coverage:
+#
+# - The `cel` crate's default features are `["regex", "chrono"]`; the
+#   `parser_pratt`, `structs`, and `json` features are off by default, so
+#   code behind them (notably the whole hand-written parser in
+#   `cel/src/parser/pratt_parser.rs`) was never compiled into the mutated
+#   build, and every mutation in it was trivially "missed".
+# - Most of the interpreter's behavior is actually exercised by the
+#   `conformance` crate's cel-spec conformance tests, not by `cel`'s own
+#   unit tests. Per-package test scoping never ran them.
+
+all_features = true
+test_workspace = true
+
+# `cel/src/parser/gen/**` is generated from CEL.g4 by ANTLR; mutating and
+# "testing" generated code is not useful signal. `fuzz/` contains fuzz
+# targets, not unit-testable logic.
+exclude_globs = ["cel/src/parser/gen/**", "fuzz/**"]

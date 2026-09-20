@@ -2328,6 +2328,158 @@ mod tests {
         enable_optional_syntax: bool,
     }
 
+    // -----------------------------------------------------------------
+    // `unescape` / `unescape_bytes` — these are private, and this module
+    // (behind `parser_pratt`) is the *only* place that can reach them.
+    // The default parser is the ANTLR-generated one, so nothing in the
+    // rest of the crate or in the conformance suite ever calls these,
+    // no matter how thoroughly those are tested. This file has to carry
+    // its own complete coverage.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn unescape_bytes_recognizes_every_prefix_combination() {
+        // b / B: strip the one prefix byte, no raw handling.
+        assert_eq!(unescape_bytes("b'AB'").unwrap(), b"AB".to_vec());
+        assert_eq!(unescape_bytes("B'AB'").unwrap(), b"AB".to_vec());
+        // rb / RB / rB / Rb: raw + bytes — escapes are NOT processed, so
+        // the embedded `\B` survives literally.
+        assert_eq!(unescape_bytes("rb'A\\B'").unwrap(), b"A\\B".to_vec());
+        assert_eq!(unescape_bytes("RB'A\\B'").unwrap(), b"A\\B".to_vec());
+        assert_eq!(unescape_bytes("rB'A\\B'").unwrap(), b"A\\B".to_vec());
+        assert_eq!(unescape_bytes("Rb'A\\B'").unwrap(), b"A\\B".to_vec());
+        // br / BR / bR / Br: same raw+bytes result, but note this is
+        // reached via the *first* `starts_with('b'/'B')` branch — the
+        // dedicated "br" branch further down is unreachable dead code,
+        // since any string starting with "br"/"BR"/"bR"/"Br" already
+        // starts with a single 'b'/'B', so the first `if` always wins.
+        // No test can "cover" that branch; it's a cleanup candidate, not
+        // a coverage gap.
+        assert_eq!(unescape_bytes("br'A\\B'").unwrap(), b"A\\B".to_vec());
+        assert_eq!(unescape_bytes("BR'A\\B'").unwrap(), b"A\\B".to_vec());
+    }
+
+    #[test]
+    fn unescape_length_boundaries() {
+        assert!(unescape("", false).is_err(), "empty input");
+        assert!(
+            unescape("x", false).is_err(),
+            "one character can't be a quoted string"
+        );
+        // Exactly 2 chars (an empty quoted string) is the boundary: it
+        // must NOT hit the `len < 2` guard.
+        assert_eq!(unescape("\"\"", false).unwrap(), Vec::<u8>::new());
+        // Same boundary again, but checked after stripping a raw prefix.
+        assert!(
+            unescape("r\"", false).is_err(),
+            "raw prefix leaves a 1-char body"
+        );
+        assert_eq!(unescape("r\"\"", false).unwrap(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn unescape_rejects_mismatched_or_non_quote_delimiters() {
+        assert!(unescape("xx", false).is_err(), "not quoted at all");
+        assert!(unescape("\"x'", false).is_err(), "mismatched quote kinds");
+    }
+
+    #[test]
+    fn unescape_raw_strings_keep_backslashes_literal() {
+        // `is_raw` must short-circuit the escape loop even when the body
+        // contains a backslash that would otherwise look like an escape.
+        assert_eq!(unescape("r\"a\\nb\"", false).unwrap(), b"a\\nb".to_vec());
+        assert_eq!(unescape("R\"a\\nb\"", false).unwrap(), b"a\\nb".to_vec());
+        // The non-raw counterpart really does process the same escape;
+        // the two are only meaningful side by side.
+        assert_eq!(unescape("\"a\\nb\"", false).unwrap(), b"a\nb".to_vec());
+    }
+
+    #[test]
+    fn unescape_triple_quoted_strings() {
+        assert_eq!(unescape("'''abc'''", false).unwrap(), b"abc".to_vec());
+        assert_eq!(unescape("\"\"\"abc\"\"\"", false).unwrap(), b"abc".to_vec());
+        // Starts triple-quoted but doesn't end that way.
+        assert!(unescape("'''abc\"\"\"", false).is_err());
+        assert!(unescape("\"\"\"abc'''", false).is_err());
+    }
+
+    #[test]
+    fn unescape_plain_quoted_strings_of_every_relevant_length() {
+        // len < 6: the "else" branch outside the triple-quote check.
+        assert_eq!(unescape("\"abc\"", false).unwrap(), b"abc".to_vec());
+        // len >= 6 but not actually triple-quoted: the "else" branch
+        // *inside* the triple-quote check — a distinct code path from
+        // the one above, with its own slice arithmetic.
+        assert_eq!(unescape("\"abcd\"", false).unwrap(), b"abcd".to_vec());
+    }
+
+    #[test]
+    fn unescape_named_escapes() {
+        assert_eq!(unescape("\"\\a\"", false).unwrap(), vec![0x07]);
+        assert_eq!(unescape("\"\\b\"", false).unwrap(), vec![0x08]);
+        assert_eq!(unescape("\"\\f\"", false).unwrap(), vec![0x0C]);
+        assert_eq!(unescape("\"\\n\"", false).unwrap(), b"\n".to_vec());
+        assert_eq!(unescape("\"\\r\"", false).unwrap(), b"\r".to_vec());
+        assert_eq!(unescape("\"\\t\"", false).unwrap(), b"\t".to_vec());
+        assert_eq!(unescape("\"\\v\"", false).unwrap(), vec![0x0B]);
+        assert_eq!(unescape("\"\\\\\"", false).unwrap(), b"\\".to_vec());
+        assert_eq!(unescape("\"\\'\"", false).unwrap(), b"'".to_vec());
+        assert_eq!(unescape("\"\\\"\"", false).unwrap(), b"\"".to_vec());
+        assert_eq!(unescape("\"\\`\"", false).unwrap(), b"`".to_vec());
+        assert_eq!(unescape("\"\\?\"", false).unwrap(), b"?".to_vec());
+    }
+
+    #[test]
+    fn unescape_unknown_escape_is_an_error() {
+        assert!(unescape("\"\\z\"", false).is_err());
+    }
+
+    #[test]
+    fn unescape_trailing_backslash_is_an_error() {
+        assert!(unescape("\"a\\\"", false).is_err());
+    }
+
+    #[test]
+    fn unescape_hex_escape() {
+        assert_eq!(unescape("\"\\x41\"", false).unwrap(), b"A".to_vec());
+        assert_eq!(unescape("\"\\X41\"", false).unwrap(), b"A".to_vec());
+    }
+
+    #[test]
+    fn unescape_unicode_escapes_and_their_bytes_restriction() {
+        assert_eq!(unescape("\"\\u0041\"", false).unwrap(), b"A".to_vec());
+        assert_eq!(unescape("\"\\U00000041\"", false).unwrap(), b"A".to_vec());
+        // \u / \U are only meaningful for strings: a bytes literal has no
+        // notion of a Unicode scalar value to encode.
+        assert!(unescape("'\\u0041'", true).is_err());
+        assert!(unescape("'\\U00000041'", true).is_err());
+    }
+
+    #[test]
+    fn unescape_hex_is_a_codepoint_in_strings_but_a_raw_byte_in_bytes_literals() {
+        // 0xFF isn't ASCII: as a Unicode codepoint it's 'ÿ' (2 UTF-8
+        // bytes); as a raw byte it's just the single byte 0xFF. These
+        // must go through different code paths depending on `is_bytes`,
+        // for both the lowercase and uppercase escape letter.
+        assert_eq!(unescape("\"\\xFF\"", false).unwrap(), vec![0xC3, 0xBF]);
+        assert_eq!(unescape("'\\xFF'", true).unwrap(), vec![0xFF]);
+        assert_eq!(unescape("'\\XFF'", true).unwrap(), vec![0xFF]);
+    }
+
+    #[test]
+    fn unescape_octal_escape() {
+        // \061 == '1' (0*64 + 6*8 + 1 = 49). Leading digit '0' matters:
+        // its char code (48) divides evenly by itself, which would
+        // coincidentally match `(c - '0')` for a leading '1' and hide a
+        // `-` -> `/` mutation in the first digit's conversion.
+        assert_eq!(unescape("\"\\061\"", false).unwrap(), b"1".to_vec());
+        // A digit outside 0..=7 in either continuation position is
+        // invalid, even though it's a valid decimal digit.
+        assert!(unescape("\"\\189\"", false).is_err());
+        // Too few digits to complete the 3-digit sequence.
+        assert!(unescape("\"\\1\"", false).is_err());
+    }
+
     #[test]
     fn test_bad_input() {
         let expressions = [

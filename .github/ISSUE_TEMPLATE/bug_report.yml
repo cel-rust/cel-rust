@@ -1,0 +1,99 @@
+name: Bug report
+description: Something in the crate itself is broken — a panic, an incorrect Rust API, a build failure, etc.
+labels: ["bug", "triage/needed"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For a CEL *expression* that evaluates to the wrong value (as opposed to a
+        panic, a broken Rust API, or a build issue), please use the
+        **Spec conformance gap** template instead — it captures what's needed to
+        triage against cel-spec much more directly.
+
+  - type: textarea
+    id: tldr
+    attributes:
+      label: TL;DR
+      description: One to three sentences, ~350 characters max. Assume a maintainer only reads this line.
+      placeholder: Calling `Context::add_variable` with a `HashMap<String, i64>` panics with an index-out-of-bounds panic inside `objects.rs`.
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened
+      description: A clear description of the bug.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Minimal reproduction
+      description: The smallest Rust snippet (or CEL expression + how it's evaluated) that reproduces it.
+      render: rust
+      placeholder: |
+        use cel::{Context, Program};
+
+        let program = Program::compile("...").unwrap();
+        let mut context = Context::default();
+        // ...
+        program.execute(&context).unwrap();
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Paste the panic message / backtrace / compiler error / wrong output.
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: cel-rust version
+      description: Crate version, or `git rev-parse HEAD` if built from source.
+      placeholder: "0.14.5"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: features
+    attributes:
+      label: Cargo features enabled
+      description: Default is `regex` + `chrono`.
+      options:
+        - label: regex
+        - label: chrono
+        - label: structs
+        - label: json
+        - label: bytes
+        - label: parser_pratt (experimental hand-written parser)
+
+  - type: input
+    id: rust-version
+    attributes:
+      label: Rust version
+      description: Output of `rustc --version`. MSRV is 1.86.0.
+      placeholder: "rustc 1.86.0 (...)"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / platform
+      placeholder: "Linux x86_64, macOS arm64, wasm32-unknown-unknown, ..."
+    validations:
+      required: false

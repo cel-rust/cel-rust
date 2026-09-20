@@ -5,6 +5,7 @@ use crate::Value;
 use crate::{common::traits, ExecutionError};
 use std::borrow::Cow;
 use std::ops::Deref;
+use std::sync::Arc;
 use traits::{Adder, Comparer};
 
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -107,6 +108,15 @@ impl From<Vec<u8>> for Bytes {
 impl From<Bytes> for Vec<u8> {
     fn from(value: Bytes) -> Self {
         value.0
+    }
+}
+
+impl From<Arc<Vec<u8>>> for Bytes {
+    fn from(v: Arc<Vec<u8>>) -> Self {
+        match Arc::try_unwrap(v) {
+            Ok(b) => Bytes(b),
+            Err(v) => Bytes((*v).clone()),
+        }
     }
 }
 

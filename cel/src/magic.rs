@@ -1,25 +1,28 @@
+use crate::common::types::{CelBool, CelBytes, CelDouble, CelInt, CelNull, CelString, CelUInt};
+#[cfg(feature = "chrono")]
+use crate::common::types::{CelDuration, CelTimestamp};
+use crate::common::value::Val;
 use crate::macros::{impl_conversions, impl_handler};
 use crate::objects::Opaque;
-use crate::resolvers::{AllArguments, Argument};
-use crate::{ExecutionError, FunctionContext, ResolveResult, Value};
+use crate::resolvers::AllArguments;
+use crate::{ExecutionError, FunctionContext, Value};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 impl_conversions!(
-    i64 => Value::Int,
-    u64 => Value::UInt,
-    f64 => Value::Float,
-    Arc<String> => Value::String,
-    Arc<Vec<u8>> => Value::Bytes,
-    bool => Value::Bool,
-    Arc<Vec<Value>> => Value::List,
-    Arc<dyn Opaque> => Value::Opaque
+    i64 => Value::Int as CelInt,
+    u64 => Value::UInt as CelUInt,
+    f64 => Value::Float as CelDouble,
+    Arc<String> => Value::String as CelString,
+    Arc<Vec<u8>> => Value::Bytes as CelBytes,
+    bool => Value::Bool as CelBool,
 );
 
 #[cfg(feature = "chrono")]
 impl_conversions!(
-    chrono::Duration => Value::Duration,
-    chrono::DateTime<chrono::FixedOffset> => Value::Timestamp,
+    chrono::Duration => Value::Duration as CelDuration,
+    chrono::DateTime<chrono::FixedOffset> => Value::Timestamp as CelTimestamp,
 );
 
 impl From<i32> for Value {
@@ -40,39 +43,224 @@ impl From<f32> for Value {
     }
 }
 
-/// Describes any type that can be converted from a [`Value`] into itself.
-/// This is commonly used to convert from [`Value`] into primitive types,
-/// e.g. from `Value::Bool(true) -> true`. This trait is auto-implemented
-/// for many CEL-primitive types.
-trait FromValue {
-    fn from_value(value: &Value) -> Result<Self, ExecutionError>
-    where
-        Self: Sized;
+/// Describes a type that can be extracted directly from a `&dyn Val`, without
+/// materializing an intermediate [`Value`]. This is commonly used to convert a
+/// resolved argument into a primitive type, e.g. `CelInt -> i64`. This trait is
+/// auto-implemented for many CEL-primitive types.
+pub(crate) trait FromVal: Sized {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError>;
 }
 
-impl FromValue for Value {
-    fn from_value(value: &Value) -> Result<Self, ExecutionError>
+fn downcast_or_unexpected<'a, T: Val>(
+    value: &'a dyn Val,
+    want: &str,
+) -> Result<&'a T, ExecutionError> {
+    value
+        .downcast_ref::<T>()
+        .ok_or_else(|| ExecutionError::UnexpectedType {
+            got: format!("{value:?}"),
+            want: want.to_string(),
+        })
+}
+
+impl FromVal for Value {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        value.try_into()
+    }
+}
+
+impl FromVal for i64 {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(*downcast_or_unexpected::<CelInt>(value, "i64")?.inner())
+    }
+}
+
+impl FromVal for u64 {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(*downcast_or_unexpected::<CelUInt>(value, "u64")?.inner())
+    }
+}
+
+impl FromVal for f64 {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(*downcast_or_unexpected::<CelDouble>(value, "f64")?.inner())
+    }
+}
+
+impl FromVal for bool {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(*downcast_or_unexpected::<CelBool>(value, "bool")?.inner())
+    }
+}
+
+impl FromVal for Arc<String> {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(Arc::new(
+            downcast_or_unexpected::<CelString>(value, "Arc<String>")?
+                .inner()
+                .to_string(),
+        ))
+    }
+}
+
+impl FromVal for Arc<Vec<u8>> {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(Arc::new(
+            downcast_or_unexpected::<CelBytes>(value, "Arc<Vec<u8>>")?
+                .inner()
+                .to_vec(),
+        ))
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl FromVal for chrono::Duration {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(*downcast_or_unexpected::<CelDuration>(value, "chrono::Duration")?.inner())
+    }
+}
+
+#[cfg(feature = "chrono")]
+impl FromVal for chrono::DateTime<chrono::FixedOffset> {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        Ok(
+            *downcast_or_unexpected::<CelTimestamp>(
+                value,
+                "chrono::DateTime<chrono::FixedOffset>",
+            )?
+            .inner(),
+        )
+    }
+}
+
+impl FromVal for Arc<Vec<Value>> {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        match Value::from_val(value)? {
+            Value::List(list) => Ok(list),
+            _ => Err(ExecutionError::UnexpectedType {
+                got: format!("{value:?}"),
+                want: "Arc<Vec<Value>>".to_string(),
+            }),
+        }
+    }
+}
+
+impl FromVal for Arc<dyn Opaque> {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        match Value::from_val(value)? {
+            Value::Opaque(opaque) => Ok(opaque),
+            _ => Err(ExecutionError::UnexpectedType {
+                got: format!("{value:?}"),
+                want: "Arc<dyn Opaque>".to_string(),
+            }),
+        }
+    }
+}
+
+impl<T: FromVal> FromVal for Option<T> {
+    fn from_val(value: &dyn Val) -> Result<Self, ExecutionError> {
+        if value.downcast_ref::<CelNull>().is_some() {
+            Ok(None)
+        } else {
+            T::from_val(value).map(Some)
+        }
+    }
+}
+
+impl From<Arc<Vec<Value>>> for Value {
+    fn from(value: Arc<Vec<Value>>) -> Self {
+        Value::List(value)
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Arc<Vec<Value>> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        Value::List(self).into_resolve_result()
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Result<Arc<Vec<Value>>, ExecutionError> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        self?.into_resolve_result()
+    }
+}
+
+impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Arc<Vec<Value>> {
+    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
     where
         Self: Sized,
     {
-        Ok(value.clone())
+        arg_val_from_context(ctx).and_then(|v| FromVal::from_val(v.as_ref()))
     }
 }
 
-/// A trait for types that can be converted into a [`ResolveResult`]. Every function that can
-/// be registered to the CEL context must return a value that implements this trait.
-pub trait IntoResolveResult {
-    fn into_resolve_result(self) -> ResolveResult;
-}
-
-impl IntoResolveResult for String {
-    fn into_resolve_result(self) -> ResolveResult {
-        Ok(Value::String(Arc::new(self)))
+impl From<Arc<dyn Opaque>> for Value {
+    fn from(value: Arc<dyn Opaque>) -> Self {
+        Value::Opaque(value)
     }
 }
 
-impl IntoResolveResult for Result<Value, ExecutionError> {
-    fn into_resolve_result(self) -> ResolveResult {
+impl<'context> IntoResolveResult<'context> for Arc<dyn Opaque> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        Value::Opaque(self).into_resolve_result()
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Result<Arc<dyn Opaque>, ExecutionError> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        self?.into_resolve_result()
+    }
+}
+
+impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Arc<dyn Opaque> {
+    fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
+    where
+        Self: Sized,
+    {
+        arg_val_from_context(ctx).and_then(|v| FromVal::from_val(v.as_ref()))
+    }
+}
+
+/// A trait for types that can be converted into the `Cow<'context, dyn Val>` returned by a
+/// registered function. Every function that can be registered to the CEL context must return
+/// a value that implements this trait.
+///
+/// Most implementations (e.g. the CEL-primitive types, [`Value`] itself) produce an owned
+/// [`Val`], since they have no connection to the calling [`FunctionContext`]'s data. A function
+/// that wants to avoid cloning - for example one that returns one of its arguments, or `this`,
+/// unchanged - can instead return a [`Cow`] borrowed from the [`FunctionContext`] directly (see
+/// [`FunctionContext::this`] and [`FunctionContext::args`]).
+pub trait IntoResolveResult<'context> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError>;
+}
+
+impl<'context> IntoResolveResult<'context> for String {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        let val: Box<dyn Val> = Box::new(CelString::from(self));
+        Ok(Cow::Owned(val))
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Value {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        Ok(Cow::Owned(self.try_into()?))
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Result<Value, ExecutionError> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        self?.into_resolve_result()
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Cow<'context, dyn Val> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
+        Ok(self)
+    }
+}
+
+impl<'context> IntoResolveResult<'context> for Result<Cow<'context, dyn Val>, ExecutionError> {
+    fn into_resolve_result(self) -> Result<Cow<'context, dyn Val>, ExecutionError> {
         self
     }
 }
@@ -121,7 +309,7 @@ pub(crate) trait FromContext<'a, 'context, 'call> {
 ///
 /// # Type of `This`
 /// This also accepts a type `T` which determines the specific type
-/// that's extracted. Any type that supports [`FromValue`] can be used.
+/// that's extracted. Any type that supports [`FromVal`] can be used.
 /// In the previous example, the method `startsWith` is only ever called
 /// on a string, so we can use `This<Rc<String>>` to extract the string
 /// automatically prior to our method actually being called.
@@ -142,18 +330,18 @@ pub struct This<T>(pub T);
 
 impl<'a, 'context, 'call, T> FromContext<'a, 'context, 'call> for This<T>
 where
-    T: FromValue,
+    T: FromVal,
 {
     fn from_context(ctx: &'a mut FunctionContext<'context, 'call>) -> Result<Self, ExecutionError>
     where
         Self: Sized,
     {
         if let Some(ref this) = ctx.this {
-            Ok(This(T::from_value(&this.as_ref().try_into()?)?))
+            Ok(This(T::from_val(this.as_ref())?))
         } else {
-            let arg = arg_value_from_context(ctx)
+            let arg = arg_val_from_context(ctx)
                 .map_err(|_| ExecutionError::missing_argument_or_target())?;
-            Ok(This(T::from_value(&arg)?))
+            Ok(This(T::from_val(arg.as_ref())?))
         }
     }
 }
@@ -244,21 +432,24 @@ impl<'a, 'context, 'call> FromContext<'a, 'context, 'call> for Value {
     where
         Self: Sized,
     {
-        arg_value_from_context(ctx)
+        arg_val_from_context(ctx).and_then(|v| FromVal::from_val(v.as_ref()))
     }
 }
 
-/// Returns the next argument specified by the context's `arg_idx` field as after resolving
-/// it. Calling this multiple times will increment the `arg_idx` which will return subsequent
-/// arguments every time.
-///
-/// Calling this function when there are no more arguments will result in a panic. Since this
-/// function is only ever called within the context of a controlled macro that calls it once
-/// for each argument, this should never happen.
-fn arg_value_from_context(ctx: &mut FunctionContext) -> Result<Value, ExecutionError> {
+/// Returns the next argument specified by the context's `arg_idx` field, without
+/// resolving it into a [`Value`] - the caller extracts whatever concrete type it
+/// needs directly from the returned `Val` via [`FromVal`]. Calling this multiple
+/// times will increment the `arg_idx` which will return subsequent arguments
+/// every time.
+pub(crate) fn arg_val_from_context<'context>(
+    ctx: &mut FunctionContext<'context, '_>,
+) -> Result<Cow<'context, dyn Val>, ExecutionError> {
     let idx = ctx.arg_idx;
     ctx.arg_idx += 1;
-    ctx.resolve(Argument(idx))
+    ctx.args
+        .get(idx)
+        .cloned()
+        .ok_or_else(|| ExecutionError::invalid_argument_count(idx + 1, ctx.args.len()))
 }
 
 pub struct WithFunctionContext;
@@ -298,7 +489,13 @@ impl FunctionRegistry {
     }
 }
 
-pub type Function = Box<dyn Fn(&mut FunctionContext) -> ResolveResult + Send + Sync>;
+pub type Function = Box<
+    dyn for<'context, 'call> Fn(
+            &mut FunctionContext<'context, 'call>,
+        ) -> Result<Cow<'context, dyn Val>, ExecutionError>
+        + Send
+        + Sync,
+>;
 
 pub trait IntoFunction<T> {
     fn into_function(self) -> Function;

@@ -153,26 +153,18 @@ impl<'a> Context<'a> {
                 variables,
                 parent,
                 resolver,
-            } => resolver
-                .and_then(|r| {
-                    r.resolve(name)
-                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
-                })
-                .or_else(|| {
-                    variables
-                        .get(name)
-                        .map(|b| Cow::<dyn Val>::Borrowed(b.as_ref()))
-                        .or_else(|| parent.get_variable(name))
-                }),
+            } => resolver.and_then(|r| r.resolve(name)).or_else(|| {
+                variables
+                    .get(name)
+                    .map(|b| Cow::<dyn Val>::Borrowed(b.as_ref()))
+                    .or_else(|| parent.get_variable(name))
+            }),
             Context::Root {
                 variables,
                 resolver,
                 ..
             } => resolver
-                .and_then(|r| {
-                    r.resolve(name)
-                        .map(|v| Cow::<dyn Val>::Owned(v.try_into().unwrap()))
-                })
+                .and_then(|r| r.resolve(name))
                 .or_else(|| {
                     variables
                         .get(name)
@@ -266,42 +258,55 @@ impl Default for Context<'_> {
 /// VariableResolver implements a custom resolver for variables that is consulted before looking at
 /// variables added to the context. This allows dynamic variables, or avoiding HashMap lookup/creation.
 ///
+/// Unlike [`add_variable`](Context::add_variable) and
+/// [`add_variable_from_value`](Context::add_variable_from_value), which convert their input once
+/// at bind time, `resolve` runs on *every* lookup of the variable - including every reference to
+/// it inside a loop or comprehension. It returns a [`Cow<dyn Val>`](Val) directly (see
+/// [`add_variable_as_val`](Context::add_variable_as_val)) rather than a [`Value`], so a resolver
+/// backed by something already `Val`-shaped (or by a lazy/recursive object best wrapped directly,
+/// per `add_variable_as_val`'s doc) never has to round-trip through `Value` on the hot path - and
+/// one that already owns persistent `Val` data (e.g. a table of pre-built values) can hand back a
+/// `Cow::Borrowed` into `self` instead of cloning on every lookup.
 ///
 /// # Example
 /// ```
+/// use cel::common::value::Val;
+/// use std::borrow::Cow;
+///
 /// struct ValueContext {
 ///     request: cel::Value,
 ///     response: cel::Value,
 /// }
 ///
 /// impl cel::context::VariableResolver for ValueContext {
-///     fn resolve(&self, variable: &str) -> Option<cel::Value> {
-///         match variable {
-///             "request" => Some(self.request.clone()),
-///             "response" => Some(self.response.clone()),
-///             _ => None,
-///         }
+///     fn resolve(&self, variable: &str) -> Option<Cow<'_, dyn Val>> {
+///         let value = match variable {
+///             "request" => self.request.clone(),
+///             "response" => self.response.clone(),
+///             _ => return None,
+///         };
+///         value.try_into().ok().map(Cow::Owned)
 ///     }
 /// }
 /// ```
 pub trait VariableResolver: Send + Sync {
-    fn resolve(&self, variable: &str) -> Option<Value>;
+    fn resolve(&self, variable: &str) -> Option<Cow<'_, dyn Val>>;
 }
 
 impl<T: VariableResolver> VariableResolver for Box<T> {
-    fn resolve(&self, variable: &str) -> Option<Value> {
+    fn resolve(&self, variable: &str) -> Option<Cow<'_, dyn Val>> {
         (**self).resolve(variable)
     }
 }
 
 impl<T: VariableResolver> VariableResolver for Arc<T> {
-    fn resolve(&self, variable: &str) -> Option<Value> {
+    fn resolve(&self, variable: &str) -> Option<Cow<'_, dyn Val>> {
         (**self).resolve(variable)
     }
 }
 
 impl<T: VariableResolver> VariableResolver for &T {
-    fn resolve(&self, variable: &str) -> Option<Value> {
+    fn resolve(&self, variable: &str) -> Option<Cow<'_, dyn Val>> {
         (**self).resolve(variable)
     }
 }
@@ -315,5 +320,106 @@ mod test {
     fn test_context_is_send() {
         // This line will only compile if assertion passes
         assert_send::<super::Context>();
+    }
+
+    /// A [`VariableResolver`] can hand back a lazy, `Indexer`-backed [`Val`] directly -
+    /// something with no [`Value`] representation at all - rather than being forced to
+    /// produce one. Field access on it should still call straight into `Indexer::get`.
+    #[test]
+    fn test_variable_resolver_returns_val_directly() {
+        use crate::common::traits::Indexer;
+        use crate::common::types::{CelInt, Type, DYN_TYPE};
+        use crate::common::value::Val;
+        use crate::{Context, ExecutionError, Program, Value};
+        use std::borrow::Cow;
+
+        #[derive(Debug)]
+        struct Lazy;
+
+        impl Val for Lazy {
+            fn get_type(&self) -> &Type {
+                &DYN_TYPE
+            }
+
+            fn as_indexer(&self) -> Option<&dyn Indexer> {
+                Some(self)
+            }
+
+            fn clone_as_boxed(&self) -> Box<dyn Val> {
+                Box::new(Lazy)
+            }
+        }
+
+        impl Indexer for Lazy {
+            fn get<'a>(&'a self, _idx: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+                let val: Box<dyn Val> = Box::new(CelInt::from(42));
+                Ok(Cow::Owned(val))
+            }
+
+            fn steal(self: Box<Self>, _idx: &dyn Val) -> Result<Box<dyn Val>, ExecutionError> {
+                Ok(Box::new(CelInt::from(42)))
+            }
+        }
+
+        struct LazyResolver;
+
+        impl super::VariableResolver for LazyResolver {
+            fn resolve(&self, variable: &str) -> Option<Cow<'_, dyn Val>> {
+                let val: Box<dyn Val> = Box::new(Lazy);
+                (variable == "input").then(|| Cow::Owned(val))
+            }
+        }
+
+        let mut ctx = Context::default();
+        ctx.set_variable_resolver(&LazyResolver);
+        let program = Program::compile("input.anything").unwrap();
+        assert_eq!(program.execute(&ctx), Ok(Value::Int(42)));
+    }
+
+    /// A [`VariableResolver`] that already owns persistent `Val` data (e.g. a table of
+    /// pre-built values) can hand back a `Cow::Borrowed` into itself instead of cloning
+    /// on every lookup - including every reference to the same variable within one
+    /// expression.
+    #[test]
+    fn test_variable_resolver_can_borrow() {
+        use crate::common::types::{Type, DYN_TYPE};
+        use crate::common::value::Val;
+        use crate::{Context, Program};
+        use std::borrow::Cow;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+
+        #[derive(Debug)]
+        struct CountedVal(Arc<AtomicUsize>);
+
+        impl Val for CountedVal {
+            fn get_type(&self) -> &Type {
+                &DYN_TYPE
+            }
+
+            fn clone_as_boxed(&self) -> Box<dyn Val> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Box::new(CountedVal(self.0.clone()))
+            }
+        }
+
+        struct BorrowResolver(Box<dyn Val>);
+
+        impl super::VariableResolver for BorrowResolver {
+            fn resolve(&self, variable: &str) -> Option<Cow<'_, dyn Val>> {
+                (variable == "counted").then(|| Cow::Borrowed(self.0.as_ref()))
+            }
+        }
+
+        let clones = Arc::new(AtomicUsize::new(0));
+        let resolver = BorrowResolver(Box::new(CountedVal(clones.clone())));
+        let mut ctx = Context::default();
+        ctx.set_variable_resolver(&resolver);
+
+        // Referenced twice - a per-lookup clone would show up as 2, not 0.
+        let program = Program::compile("counted == counted").unwrap();
+        program.execute(&ctx).unwrap();
+
+        assert_eq!(clones.load(Ordering::SeqCst), 0);
     }
 }

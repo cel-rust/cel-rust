@@ -1,7 +1,10 @@
+use cel::common::types::CelBool;
+use cel::common::value::Val;
 use cel::context::{Context, VariableResolver};
 use cel::parser::Parser;
 use cel::{Program, Value};
 use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 const EXPRESSIONS: [(&str, &str); 34] = [
@@ -41,19 +44,30 @@ const EXPRESSIONS: [(&str, &str); 34] = [
     ("stress", "true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true && true"),
 ];
 
-struct Resolver;
+struct Resolver {
+    truthy: CelBool,
+    falsy: CelBool,
+}
+
+impl Default for Resolver {
+    fn default() -> Self {
+        Resolver {
+            truthy: CelBool::from(true),
+            falsy: CelBool::from(false),
+        }
+    }
+}
 
 impl VariableResolver for Resolver {
-    fn resolve(&self, expr: &str) -> Option<Value> {
-        const V: Value = Value::Bool(false);
-        const NOT_V: Value = Value::Bool(true);
-        match expr {
-            "fruit" => Some(NOT_V),
-            "carrot" => Some(NOT_V),
-            "orange" => Some(NOT_V),
-            "banana" => Some(V),
-            _ => None,
-        }
+    fn resolve(&self, expr: &str) -> Option<Cow<'_, dyn Val>> {
+        let v: &dyn Val = match expr {
+            "fruit" => &self.truthy,
+            "carrot" => &self.truthy,
+            "orange" => &self.truthy,
+            "banana" => &self.falsy,
+            _ => return None,
+        };
+        Some(Cow::Borrowed(v))
     }
 }
 
@@ -68,7 +82,8 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             ctx.add_variable_from_value("apple", true);
             ctx.add_variable_from_value("a", 1);
-            ctx.set_variable_resolver(&Resolver);
+            let resolver = Resolver::default();
+            ctx.set_variable_resolver(&resolver);
             b.iter(|| Value::resolve_val(&ast, &ctx).expect("Eval failed!"))
         });
     }

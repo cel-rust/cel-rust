@@ -1,7 +1,7 @@
 use crate::common::ast::{operators, EntryExpr, Expr};
 use crate::common::types::bool::Bool;
 use crate::common::types::*;
-use crate::common::value::Val;
+use crate::common::value::{Downcast, Val};
 use crate::context::Context;
 use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
@@ -58,9 +58,6 @@ impl PartialOrd for Map {
 }
 
 impl Map {
-    pub(crate) fn contains_key(&self, key: &(dyn AsKeyRef + '_)) -> bool {
-        self.map.contains_key(key)
-    }
     /// Returns a reference to the value corresponding to the key. Implicitly converts between int
     /// and uint keys.
     pub fn get(&self, key: &(dyn AsKeyRef + '_)) -> Option<&Value> {
@@ -849,70 +846,72 @@ impl From<Value> for ResolveResult {
     }
 }
 
+/// The error returned when a `dyn Val` has no `Value` representation.
+fn no_value_repr(v: &dyn Val) -> ExecutionError {
+    ExecutionError::UnexpectedType {
+        got: v.get_type().name().to_string(),
+        want: "a type representable as `Value`".to_string(),
+    }
+}
+
+/// Downcasts a `dyn Val` to the built-in type its [`Kind`] implies.
+///
+/// `Val` is public and not sealed, so a foreign implementation may report a
+/// `Kind` without being the built-in value that carries it - a custom lazy list
+/// reports `Kind::List` but is not a [`CelList`]. Those reach `Value` as an
+/// error, not a panic.
+fn built_in<T: Val>(v: &dyn Val) -> Result<&T, ExecutionError> {
+    v.downcast_ref::<T>().ok_or_else(|| no_value_repr(v))
+}
+
 impl TryFrom<&dyn Val> for Value {
     type Error = ExecutionError;
     fn try_from(v: &dyn Val) -> Result<Self, Self::Error> {
         match v.get_type().kind() {
-            Kind::Boolean => Ok(Value::Bool(*v.downcast_ref::<CelBool>().unwrap().inner())),
-            Kind::Int => Ok(Value::Int(*v.downcast_ref::<CelInt>().unwrap().inner())),
-            Kind::UInt => Ok(Value::UInt(*v.downcast_ref::<CelUInt>().unwrap().inner())),
-            Kind::Double => Ok(Value::Float(
-                *v.downcast_ref::<CelDouble>().unwrap().inner(),
-            )),
+            Kind::Boolean => Ok(Value::Bool(*built_in::<CelBool>(v)?.inner())),
+            Kind::Int => Ok(Value::Int(*built_in::<CelInt>(v)?.inner())),
+            Kind::UInt => Ok(Value::UInt(*built_in::<CelUInt>(v)?.inner())),
+            Kind::Double => Ok(Value::Float(*built_in::<CelDouble>(v)?.inner())),
             Kind::String => Ok(Value::String(Arc::new(
-                v.downcast_ref::<CelString>().unwrap().inner().to_string(),
+                built_in::<CelString>(v)?.inner().to_string(),
             ))),
             Kind::NullType => Ok(Value::Null),
             Kind::Bytes => Ok(Value::Bytes(Arc::new(
-                v.downcast_ref::<CelBytes>().unwrap().inner().to_vec(),
+                built_in::<CelBytes>(v)?.inner().to_vec(),
             ))),
             #[cfg(feature = "chrono")]
-            Kind::Duration => Ok(Value::Duration(
-                *v.downcast_ref::<CelDuration>().unwrap().inner(),
-            )),
+            Kind::Duration => Ok(Value::Duration(*built_in::<CelDuration>(v)?.inner())),
             #[cfg(feature = "chrono")]
-            Kind::Timestamp => {
-                let ts = v.downcast_ref::<CelTimestamp>().unwrap().inner();
-                Ok(Value::Timestamp(*ts))
-            }
+            Kind::Timestamp => Ok(Value::Timestamp(*built_in::<CelTimestamp>(v)?.inner())),
             Kind::List => {
-                let list = v.downcast_ref::<CelList>().unwrap().inner();
-                Ok(Value::List(Arc::new(
-                    list.iter()
-                        .map(|i| i.as_ref().try_into().expect("Not a Value list item"))
-                        .collect(),
-                )))
+                let list = built_in::<CelList>(v)?.inner();
+                let items = list
+                    .iter()
+                    .map(|i| Value::try_from(i.as_ref()))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(Value::List(Arc::new(items)))
             }
             Kind::Map => {
-                let map = v.downcast_ref::<CelMap>().unwrap().inner();
+                let map = built_in::<CelMap>(v)?.inner();
+                let entries = map
+                    .iter()
+                    .map(|(k, v)| Ok((Key::from(k.clone()), Value::try_from(v.as_ref())?)))
+                    .collect::<Result<HashMap<_, _>, ExecutionError>>()?;
                 Ok(Value::Map(Map {
-                    map: Arc::new(
-                        map.iter()
-                            .map(|(k, v)| {
-                                (
-                                    Key::from(k.clone()),
-                                    Value::try_from(v.as_ref()).expect("Not a Value map value"),
-                                )
-                            })
-                            .collect(),
-                    ),
+                    map: Arc::new(entries),
                 }))
             }
             Kind::Type => Ok(Value::String(Arc::new(
-                v.downcast_ref::<CelType>().unwrap().name().to_string(),
+                built_in::<CelType>(v)?.name().to_string(),
             ))),
             Kind::Opaque => Ok(Value::Opaque(match v.downcast_ref::<CelOptional>() {
-                None => v.downcast_ref::<OpaqueVal>().unwrap().clone_inner(),
-                Some(opt) => {
-                    let opt: Option<Result<Value, _>> = opt.option().map(|v| v.try_into());
-                    match opt {
-                        None => Arc::new(OptionalValue::none()),
-                        Some(t) => match t {
-                            Ok(v) => Arc::new(OptionalValue::of(v)),
-                            Err(_) => Arc::new(OptionalValue::none()),
-                        },
-                    }
-                }
+                None => built_in::<OpaqueVal>(v)?.clone_inner(),
+                // A present optional whose value has no `Value` representation is
+                // an error, not an absent one.
+                Some(opt) => match opt.option() {
+                    None => Arc::new(OptionalValue::none()),
+                    Some(v) => Arc::new(OptionalValue::of(Value::try_from(v)?)),
+                },
             })),
             _ => {
                 #[cfg(feature = "structs")]
@@ -931,12 +930,7 @@ impl TryFrom<&dyn Val> for Value {
                 if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
                     Ok(Value::Opaque(opaque.val.clone()))
                 } else {
-                    Err(ExecutionError::UnexpectedType {
-                        got: v.get_type().name().to_string(),
-                        want:
-                            "(BOOL|INT|UINT|DOUBLE|STRING|NULL|BYTES|TIMESTAMP|DURATION|LIST|MAP)"
-                                .to_string(),
-                    })
+                    Err(no_value_repr(v))
                 }
             }
         }
@@ -1368,8 +1362,7 @@ impl Value {
                             }
                         };
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
-                        let v = (func)(&mut ctx)?;
-                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+                        (func)(&mut ctx)
                     }
                     Some(target) => {
                         let args: Result<Vec<Cow<dyn Val>>, ExecutionError> = call
@@ -1429,9 +1422,7 @@ impl Value {
                             Some(func) => (None, func, args),
                         };
                         let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
-                        // todo fix this to _not_ use `Value`
-                        let v = (func)(&mut ctx)?;
-                        Ok(Cow::<dyn Val>::Owned(TryInto::<Box<dyn Val>>::try_into(v)?))
+                        (func)(&mut ctx)
                     }
                 }
             }
@@ -1586,8 +1577,33 @@ impl Value {
             Expr::Comprehension(comprehension) => {
                 let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
                 let iter = Value::resolve_val(&comprehension.iter_range, ctx)?;
+
+                // Mirror cel-go's optimization (see `folder.ResolveName` in
+                // `cel-go/interpreter/interpretable.go`): when the
+                // accumulator starts out as an empty list, swap it for a
+                // preallocated `MutableList` so the loop step
+                // (`@result + [expr]`) can grow a single shared buffer in
+                // place instead of paying O(n) clone-and-extend on every
+                // iteration. The ADD dispatch itself stays generic — it
+                // just calls `Adder::add` on whatever the accumulator
+                // resolves to, and `MutableList::add` mutates the shared
+                // `Arc<Mutex<Vec<_>>>` in place then returns
+                // `Cow::Borrowed(self)` (the "return the receiver" trick
+                // cel-go's `mutableList.Add` uses to keep the same pointer
+                // identity across iterations).
+                let accu_boxed: Box<dyn Val> = match accu_init.downcast_ref::<CelList>() {
+                    Some(list) if list.inner().is_empty() => {
+                        let size_hint = iter
+                            .as_sizer()
+                            .map(|s| *s.size().inner() as usize)
+                            .unwrap_or(0);
+                        Box::new(MutableList::with_capacity(size_hint))
+                    }
+                    _ => accu_init.clone_as_boxed(),
+                };
+
                 let mut ctx = ctx.new_inner_scope();
-                ctx.add_variable_as_val(&comprehension.accu_var, accu_init.clone_as_boxed());
+                ctx.add_variable_as_val(&comprehension.accu_var, accu_boxed);
 
                 let mut items = iter
                     .as_iterable()
@@ -1604,9 +1620,15 @@ impl Value {
                     let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
                     ctx.add_variable_as_val(&comprehension.accu_var, accu.clone_as_boxed());
                 }
-                Ok(Cow::<dyn Val>::Owned(
-                    Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
-                ))
+                // Freeze the mutable accumulator back into an immutable
+                // list before it leaves the accu scope (cel-go does the
+                // analogous conversion in `folder.evalResult`).
+                let result = Value::resolve_val(&comprehension.result, &ctx)?.into_owned();
+                let result: Box<dyn Val> = match result.downcast::<MutableList>() {
+                    Ok(mutable) => Box::new(mutable.to_immutable()),
+                    Err(result) => result,
+                };
+                Ok(Cow::<dyn Val>::Owned(result))
             }
             Expr::Struct(strct) => {
                 let name = strct.type_name.clone();
@@ -1918,7 +1940,10 @@ fn checked_op(
 
 #[cfg(test)]
 mod tests {
-    use crate::{objects::Key, Context, ExecutionError, Program, Value};
+    use crate::common::traits::Sizer;
+    use crate::common::types::{CelInt, Type, LIST_TYPE};
+    use crate::common::value::Val;
+    use crate::{objects::Key, Context, ExecutionError, Program, ResolveResult, Value};
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -1944,6 +1969,116 @@ mod tests {
         let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
+    }
+
+    /// A registered [`crate::magic::Function`] that hands back one of its arguments
+    /// unchanged must be able to do so without cloning it - i.e. it can return the
+    /// `Cow::Borrowed` it was handed as-is, rather than being forced through `Value`.
+    #[test]
+    fn test_function_can_return_borrowed_val() {
+        use crate::magic::Function;
+        use crate::FunctionContext;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        #[derive(Debug)]
+        struct CountedVal(Arc<AtomicUsize>);
+
+        impl Val for CountedVal {
+            fn get_type(&self) -> &Type {
+                &LIST_TYPE
+            }
+
+            fn clone_as_boxed(&self) -> Box<dyn Val> {
+                self.0.fetch_add(1, Ordering::SeqCst);
+                Box::new(CountedVal(self.0.clone()))
+            }
+        }
+
+        let clones = Arc::new(AtomicUsize::new(0));
+        let mut ctx = Context::default();
+        ctx.add_variable_as_val("counted", Box::new(CountedVal(clones.clone())));
+
+        let echo: Function = Box::new(|ftx: &mut FunctionContext| Ok(ftx.args[0].clone()));
+        ctx.add_function("echo", echo);
+
+        let program = Program::compile("echo(counted)").unwrap();
+        // `Value` has no representation for `CountedVal`, so the final conversion at
+        // the library boundary errors out - only the clone count matters here.
+        let _ = program.execute(&ctx);
+
+        assert_eq!(clones.load(Ordering::SeqCst), 0);
+    }
+
+    /// All the CEL-primitive argument types a registered function can declare must
+    /// still extract correctly now that they're pulled straight from the `Val`
+    /// instead of via an intermediate `Value`, including through the `This`
+    /// extractor and its `Option<T>` (i.e. "or null") form.
+    #[test]
+    fn test_typed_args_still_extract_correctly() {
+        use crate::extractors::This;
+        use crate::objects::Opaque;
+
+        fn check(
+            a: i64,
+            b: u64,
+            c: f64,
+            d: bool,
+            e: Arc<String>,
+            f: Arc<Vec<u8>>,
+            g: Arc<Vec<Value>>,
+        ) -> bool {
+            a == 1
+                && b == 2
+                && c == 3.5
+                && d
+                && e.as_str() == "hi"
+                && f.as_slice() == b"by"
+                && g.len() == 2
+        }
+
+        fn this_is_null(This(v): This<Option<i64>>) -> bool {
+            v.is_none()
+        }
+
+        #[derive(Debug, Eq, PartialEq)]
+        struct Blob(i64);
+
+        impl Opaque for Blob {
+            fn runtime_type_name(&self) -> &str {
+                "blob"
+            }
+        }
+
+        fn opaque_len(o: Arc<dyn Opaque>) -> i64 {
+            o.downcast_ref::<Blob>().map(|b| b.0).unwrap_or(-1)
+        }
+
+        let mut ctx = Context::default();
+        ctx.add_function("check", check);
+        ctx.add_function("thisIsNull", this_is_null);
+        ctx.add_function("opaqueLen", opaque_len);
+        ctx.add_variable_from_value("blob", Value::Opaque(Arc::new(Blob(42))));
+
+        let program = Program::compile(
+            "check(1, 2u, 3.5, true, 'hi', b'by', [1, 2]) && null.thisIsNull() && opaqueLen(blob) == 42",
+        )
+        .unwrap();
+        assert_eq!(program.execute(&ctx), Ok(true.into()));
+    }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn test_chrono_args_still_extract_correctly() {
+        fn check(d: chrono::Duration, t: chrono::DateTime<chrono::FixedOffset>) -> bool {
+            d == chrono::Duration::seconds(5) && t.timestamp() == 0
+        }
+
+        let mut ctx = Context::default();
+        ctx.add_function("check", check);
+
+        let program =
+            Program::compile("check(duration('5s'), timestamp('1970-01-01T00:00:00Z'))").unwrap();
+        assert_eq!(program.execute(&ctx), Ok(true.into()));
     }
 
     #[test]
@@ -2954,5 +3089,100 @@ mod tests {
             let result = program.execute(&context).unwrap();
             assert_eq!(result, Value::String(Arc::new("test 42".to_owned())));
         }
+    }
+    /// A custom type on the `dyn Val` path, as `Type::new_opaque_type` invites.
+    #[derive(Debug)]
+    struct Ip(Type, String);
+
+    impl Ip {
+        fn new(addr: &str) -> Self {
+            Ip(Type::new_opaque_type("net.IP"), addr.to_owned())
+        }
+    }
+
+    impl Val for Ip {
+        fn get_type(&self) -> &Type {
+            &self.0
+        }
+
+        fn equals(&self, other: &dyn Val) -> bool {
+            other.downcast_ref::<Ip>().is_some_and(|o| o.1 == self.1)
+        }
+
+        fn clone_as_boxed(&self) -> Box<dyn Val> {
+            Box::new(Ip::new(&self.1))
+        }
+    }
+
+    /// A list whose contents are resolved on access rather than materialized,
+    /// the shape `Context::add_variable_as_val` was made public for.
+    #[derive(Debug)]
+    struct LazyList(Vec<i64>);
+
+    impl Sizer for LazyList {
+        fn size(&self) -> CelInt {
+            CelInt::from(self.0.len() as i64)
+        }
+    }
+
+    impl Val for LazyList {
+        fn get_type(&self) -> &Type {
+            &LIST_TYPE
+        }
+
+        fn as_sizer(&self) -> Option<&dyn Sizer> {
+            Some(self)
+        }
+
+        fn clone_as_boxed(&self) -> Box<dyn Val> {
+            Box::new(LazyList(self.0.clone()))
+        }
+    }
+
+    fn context_with_custom_vals() -> Context<'static> {
+        let mut context = Context::default();
+        context.add_variable_as_val("ip", Box::new(Ip::new("1.2.3.4")));
+        context.add_variable_as_val("lazy", Box::new(LazyList(vec![1, 2])));
+        context
+    }
+
+    fn execute(expr: &str) -> ResolveResult {
+        Program::compile(expr)
+            .unwrap()
+            .execute(&context_with_custom_vals())
+    }
+
+    /// A `Val` a caller implemented has no `Value` representation. Reaching the
+    /// result of `Program::execute` it must be reported through the `Result`
+    /// that call already returns.
+    #[test]
+    fn custom_val_as_result_is_an_error() {
+        for expr in [
+            "ip",
+            "[ip]",
+            "[[ip]]",
+            "{'k': ip}",
+            "lazy",
+            "optional.of(ip)",
+        ] {
+            assert!(
+                matches!(execute(expr), Err(ExecutionError::UnexpectedType { .. })),
+                "`{expr}` should report an unexpected type, got {:?}",
+                execute(expr)
+            );
+        }
+    }
+
+    /// ... while the same values stay usable within an expression, which is the
+    /// whole point of implementing `Val`.
+    #[test]
+    fn custom_val_within_an_expression_still_evaluates() {
+        assert_eq!(execute("ip == ip"), Ok(Value::Bool(true)));
+        assert_eq!(execute("size(lazy)"), Ok(Value::Int(2)));
+        assert_eq!(execute("optional.of(ip).hasValue()"), Ok(Value::Bool(true)));
+        assert_eq!(
+            execute("optional.of(ip).value() == ip"),
+            Ok(Value::Bool(true))
+        );
     }
 }

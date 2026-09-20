@@ -346,7 +346,6 @@ mod int {
     }
 
     // Test: uint_range
-    #[should_panic]
     #[test]
     fn uint_range() {
         run_test(&dedent!(
@@ -439,7 +438,6 @@ mod int {
     }
 
     // Test: double_int_max_range
-    #[should_panic]
     #[test]
     fn double_int_max_range() {
         run_test(&dedent!(
@@ -454,7 +452,6 @@ mod int {
     }
 
     // Test: double_int_min_range
-    #[should_panic]
     #[test]
     fn double_int_min_range() {
         run_test(&dedent!(
@@ -469,7 +466,6 @@ mod int {
     }
 
     // Test: double_range
-    #[should_panic]
     #[test]
     fn double_range() {
         run_test(&dedent!(
@@ -962,7 +958,6 @@ mod uint {
     }
 
     // Test: int_neg
-    #[should_panic]
     #[test]
     fn int_neg() {
         run_test(&dedent!(
@@ -1033,7 +1028,6 @@ mod uint {
     }
 
     // Test: double_uint_max_range
-    #[should_panic]
     #[test]
     fn double_uint_max_range() {
         run_test(&dedent!(
@@ -1048,7 +1042,6 @@ mod uint {
     }
 
     // Test: double_range_beyond_uint
-    #[should_panic]
     #[test]
     fn double_range_beyond_uint() {
         run_test(&dedent!(

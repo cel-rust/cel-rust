@@ -126,15 +126,8 @@ conversions::bool::string_true_pascalcase
 conversions::bool::string_true_uppercase
 conversions::identity::bool
 conversions::identity::timestamp
-conversions::int::double_int_max_range
-conversions::int::double_int_min_range
-conversions::int::double_range
 conversions::int::timestamp
-conversions::int::uint_range
 conversions::string::bytes_invalid
-conversions::uint::double_range_beyond_uint
-conversions::uint::double_uint_max_range
-conversions::uint::int_neg
 dynamic::any::field_assign_proto2
 dynamic::any::field_assign_proto3
 dynamic::any::field_read_proto2

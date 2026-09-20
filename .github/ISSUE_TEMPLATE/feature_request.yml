@@ -1,0 +1,75 @@
+name: Feature request
+description: A missing CEL function/macro/extension, or a new cel-rust API.
+labels: ["enhancement", "triage/needed"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Per [CONTRIBUTING.md](https://github.com/cel-rust/cel-rust/blob/master/CONTRIBUTING.md),
+        please open this **before** starting a PR. The project is moving quickly
+        toward full CEL spec compliance, and your idea might overlap with work
+        already in progress, or be affected by an upcoming refactor.
+
+  - type: textarea
+    id: tldr
+    attributes:
+      label: TL;DR
+      description: One to three sentences, ~350 characters max. Assume a maintainer only reads this line.
+      placeholder: Add support for the math_ext extension's math.least/math.greatest functions, used to clamp values without a macro.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: What kind of feature is this?
+      options:
+        - Core cel-spec function/macro/operator
+        - An optional cel-spec extension library (bindings_ext, block_ext, encoders_ext, math_ext, ...)
+        - cel-rust-specific Rust API (e.g. a new way to bind variables/functions, a new `Val` helper)
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What's missing
+      description: What can't you do today, and what would this let you do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / use case
+      description: Why do you need this? A real use case is far more persuasive than "it would be nice to have".
+    validations:
+      required: true
+
+  - type: textarea
+    id: spec-reference
+    attributes:
+      label: Spec reference
+      description: If this is part of cel-spec or one of its extension libraries, link the relevant section of `langdef.md` or the extension's proto/doc.
+    validations:
+      required: false
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed approach (optional)
+      description: If you have an idea for the API or implementation shape, sketch it here. Not required.
+      render: rust
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: confirm
+    attributes:
+      label: Confirmation
+      options:
+        - label: I searched existing issues and this isn't a duplicate.
+          required: true
+        - label: I understand new features are discussed here first, and a PR without a prior issue may be asked to wait.
+          required: true

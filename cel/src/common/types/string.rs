@@ -8,6 +8,7 @@ use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::ops::Deref;
 use std::string::String as StdString;
+use std::sync::Arc;
 
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct String(StdString);
@@ -116,6 +117,15 @@ impl From<String> for StdString {
 impl From<&str> for String {
     fn from(value: &str) -> Self {
         Self(StdString::from(value))
+    }
+}
+
+impl From<Arc<StdString>> for String {
+    fn from(v: Arc<StdString>) -> Self {
+        match Arc::try_unwrap(v) {
+            Ok(s) => Self(s),
+            Err(v) => Self((*v).clone()),
+        }
     }
 }
 
