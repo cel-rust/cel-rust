@@ -204,39 +204,39 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a chrono::DateTime<chrono::FixedO
     }
 }
 
-fn millis<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_milliseconds<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(
         this.inner().timestamp_subsec_millis() as i64,
     )))
 }
 
-fn seconds<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_seconds<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().second() as i64)))
 }
 
-fn minutes<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_minutes<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().minute() as i64)))
 }
 
-fn hours<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_hours<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().hour() as i64)))
 }
 
-fn day_of_week<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_day_of_week<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(
         this.inner().weekday().num_days_from_sunday() as i64,
     )))
 }
 
-fn date<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_date<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().day() as i64)))
 }
 
-fn day_of_month<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_day_of_month<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().day0() as i64)))
 }
 
-fn day_of_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_day_of_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     let year = this
         .inner()
         .checked_sub_days(Days::new(this.inner().day0() as u64))
@@ -248,11 +248,11 @@ fn day_of_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionErro
     )))
 }
 
-fn month<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_month<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().month0() as i64)))
 }
 
-fn full_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_full_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(CowVal::owned(CelInt::from(this.inner().year() as i64)))
 }
 
@@ -272,24 +272,24 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         name = "timestamp", id = "string_to_timestamp");
     crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
         name = "timestamp", id = "timestamp_to_timestamp");
-    crate::add_member_overload!(env, fn full_year: (Timestamp) -> CelInt,
-        name = "getFullYear", id = "timestamp_to_year");
-    crate::add_member_overload!(env, fn month: (Timestamp) -> CelInt,
-        name = "getMonth", id = "timestamp_to_month");
-    crate::add_member_overload!(env, fn day_of_year: (Timestamp) -> CelInt,
-        name = "getDayOfYear", id = "timestamp_to_day_of_year");
-    crate::add_member_overload!(env, fn day_of_month: (Timestamp) -> CelInt,
-        name = "getDayOfMonth", id = "timestamp_to_day_of_month");
-    crate::add_member_overload!(env, fn date: (Timestamp) -> CelInt,
-        name = "getDate", id = "timestamp_to_day_of_month_1_based");
-    crate::add_member_overload!(env, fn day_of_week: (Timestamp) -> CelInt,
-        name = "getDayOfWeek", id = "timestamp_to_day_of_week");
-    crate::add_member_overload!(env, fn hours: (Timestamp) -> CelInt,
-        name = "getHours", id = "timestamp_to_hours");
-    crate::add_member_overload!(env, fn minutes: (Timestamp) -> CelInt,
-        name = "getMinutes", id = "timestamp_to_minutes");
-    crate::add_member_overload!(env, fn seconds: (Timestamp) -> CelInt,
-        name = "getSeconds", id = "timestamp_to_seconds");
-    crate::add_member_overload!(env, fn millis: (Timestamp) -> CelInt,
-        name = "getMilliseconds", id = "timestamp_to_millis");
+    crate::add_member_overload!(env, fn get_full_year: (Timestamp) -> CelInt,
+        id = "timestamp_to_year");
+    crate::add_member_overload!(env, fn get_month: (Timestamp) -> CelInt,
+        id = "timestamp_to_month");
+    crate::add_member_overload!(env, fn get_day_of_year: (Timestamp) -> CelInt,
+        id = "timestamp_to_day_of_year");
+    crate::add_member_overload!(env, fn get_day_of_month: (Timestamp) -> CelInt,
+        id = "timestamp_to_day_of_month");
+    crate::add_member_overload!(env, fn get_date: (Timestamp) -> CelInt,
+        id = "timestamp_to_day_of_month_1_based");
+    crate::add_member_overload!(env, fn get_day_of_week: (Timestamp) -> CelInt,
+        id = "timestamp_to_day_of_week");
+    crate::add_member_overload!(env, fn get_hours: (Timestamp) -> CelInt,
+        id = "timestamp_to_hours");
+    crate::add_member_overload!(env, fn get_minutes: (Timestamp) -> CelInt,
+        id = "timestamp_to_minutes");
+    crate::add_member_overload!(env, fn get_seconds: (Timestamp) -> CelInt,
+        id = "timestamp_to_seconds");
+    crate::add_member_overload!(env, fn get_milliseconds: (Timestamp) -> CelInt,
+        id = "timestamp_to_millis");
 }

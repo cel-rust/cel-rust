@@ -321,14 +321,11 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     }
 
     crate::add_member_overload!(env, fn contains: (String, String) -> CelBool);
-    crate::add_member_overload!(env, fn ends_with: (String, String) -> CelBool,
-        name = "endsWith");
-    crate::add_overload!(env, fn size: (String) -> CelInt,
-        name = "size", id = "size_string");
+    crate::add_member_overload!(env, fn ends_with: (String, String) -> CelBool);
+    crate::add_overload!(env, fn size: (String) -> CelInt, id = "size_string");
     crate::add_member_overload!(env, fn size: (String) -> CelInt,
         id = "string_size");
-    crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool,
-        name = "startsWith");
+    crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool);
     #[cfg(feature = "regex")]
     crate::add_member_overload!(env, fn matches: (String, String) -> CelBool);
 }
