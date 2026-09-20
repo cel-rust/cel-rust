@@ -9,16 +9,16 @@ fn main() {
     let mut context = Context::default();
 
     // Add functions using closures
-    context.add_function("add", |a: i64, b: i64| a + b);
+    context.add_function("add", |a: i64, b: i64| a + b).unwrap();
 
     // Add methods to a string type
-    context.add_function("isEmpty", is_empty);
+    context.add_function("isEmpty", is_empty).unwrap();
 
     // Use the function context to return error messages
-    context.add_function("fail", fail);
+    context.add_function("fail", fail).unwrap();
 
     // See all the different value types you can accept in your functions
-    context.add_function("primitives", primitives);
+    context.add_function("primitives", primitives).unwrap();
 
     // Run the program
     let result = program.execute(&context);

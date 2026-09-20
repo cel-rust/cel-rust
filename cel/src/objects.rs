@@ -2096,7 +2096,7 @@ mod tests {
         ctx.add_variable_as_val("counted", Box::new(CountedVal(clones.clone())));
 
         let echo: Function = Box::new(|ftx: &mut FunctionContext| Ok(ftx.args[0].clone()));
-        ctx.add_function("echo", echo);
+        ctx.add_function("echo", echo).unwrap();
 
         let program = Program::compile("echo(counted)").unwrap();
         // `Value` has no representation for `CountedVal`, so the final conversion at
@@ -2151,9 +2151,9 @@ mod tests {
         }
 
         let mut ctx = Context::default();
-        ctx.add_function("check", check);
-        ctx.add_function("thisIsNull", this_is_null);
-        ctx.add_function("opaqueLen", opaque_len);
+        ctx.add_function("check", check).unwrap();
+        ctx.add_function("thisIsNull", this_is_null).unwrap();
+        ctx.add_function("opaqueLen", opaque_len).unwrap();
         ctx.add_variable_from_value("blob", Value::Opaque(Arc::new(Blob(42))));
 
         let program = Program::compile(
@@ -2171,7 +2171,7 @@ mod tests {
         }
 
         let mut ctx = Context::default();
-        ctx.add_function("check", check);
+        ctx.add_function("check", check).unwrap();
 
         let program =
             Program::compile("check(duration('5s'), timestamp('1970-01-01T00:00:00Z'))").unwrap();
@@ -2615,7 +2615,7 @@ mod tests {
 
             let mut ctx = Context::default();
             ctx.add_variable_from_value("mine", Value::Opaque(value.clone()));
-            ctx.add_function("myFn", my_fn);
+            ctx.add_function("myFn", my_fn).unwrap();
             let prog = Program::compile("mine.myFn()").unwrap();
             assert_eq!(
                 Ok(Value::String(Arc::new("value".into()))),

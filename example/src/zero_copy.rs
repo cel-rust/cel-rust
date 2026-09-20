@@ -168,8 +168,12 @@ fn main() {
     // The request must outlive the context: the struct bound below borrows from it.
     let mut context = Context::default();
     context.add_variable_as_val("request", Box::new(request_struct(&request)));
-    context.add_function("stripVersion", Box::new(strip_version) as RawFunction);
-    context.add_function("header", Box::new(header) as RawFunction);
+    context
+        .add_function("stripVersion", Box::new(strip_version) as RawFunction)
+        .unwrap();
+    context
+        .add_function("header", Box::new(header) as RawFunction)
+        .unwrap();
 
     // Rolled out manually rather than via `Program`/`execute`, so the result stays
     // a `CowVal` all the way out - the same thing the functions above return -
@@ -205,7 +209,9 @@ fn main() {
     };
     let mut other = Context::default();
     other.add_variable_as_val("request", Box::new(request_struct(&unversioned)));
-    other.add_function("stripVersion", Box::new(strip_version) as RawFunction);
+    other
+        .add_function("stripVersion", Box::new(strip_version) as RawFunction)
+        .unwrap();
     let ast = Parser::default().parse("request.stripVersion()").unwrap();
     let result = Value::resolve_val(&ast, &other).unwrap();
     let path = result.downcast_ref::<CelString>().unwrap().as_borrowed();

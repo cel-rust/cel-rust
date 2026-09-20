@@ -299,6 +299,32 @@ impl ExecutionError {
     }
 }
 
+/// An error declaring something in an [`Env`] or a [`Context`].
+///
+/// Declarations are made once the program is parsed and before it is evaluated,
+/// which is what sets this apart from an [`ExecutionError`], raised while a
+/// program runs.
+#[derive(Error, Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum DeclarationError {
+    /// A function could not be added to a [`Context`] because its name is already
+    /// declared as an overload in the [`Env`].
+    ///
+    /// When a call is resolved, overloads take precedence over the functions
+    /// added to a [`Context`]: a function sharing a name with an overload would
+    /// be shadowed for every call that overload accepts.
+    #[error("Cannot add function '{function}': an overload with that name is already declared")]
+    OverloadConflict { function: String },
+}
+
+impl DeclarationError {
+    pub fn overload_conflict(function: &str) -> Self {
+        DeclarationError::OverloadConflict {
+            function: function.to_string(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Program {
     expression: Expression,
