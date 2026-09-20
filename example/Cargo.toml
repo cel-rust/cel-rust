@@ -52,6 +52,10 @@ name = "example-interrupt"
 path = "src/interrupt.rs"
 
 [[bin]]
+name = "example-budget"
+path = "src/budget.rs"
+
+[[bin]]
 name = "example-serde"
 path = "src/serde.rs"
 
