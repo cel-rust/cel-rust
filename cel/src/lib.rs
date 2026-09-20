@@ -315,12 +315,27 @@ pub enum DeclarationError {
     /// be shadowed for every call that overload accepts.
     #[error("Cannot add function '{function}': an overload with that name is already declared")]
     OverloadConflict { function: String },
+    /// An overload could not be declared for a function because one with the same
+    /// id, or with the same signature, is already declared.
+    ///
+    /// An id is unique across all the overloads of a function, member functions
+    /// included. A signature is the argument types, together with whether the
+    /// overload is a member function.
+    #[error("Cannot declare overload '{id}' of '{function}': one with the same id or signature is already declared")]
+    DuplicateOverload { function: String, id: String },
 }
 
 impl DeclarationError {
     pub fn overload_conflict(function: &str) -> Self {
         DeclarationError::OverloadConflict {
             function: function.to_string(),
+        }
+    }
+
+    pub fn duplicate_overload(function: &str, id: &str) -> Self {
+        DeclarationError::DuplicateOverload {
+            function: function.to_string(),
+            id: id.to_string(),
         }
     }
 }
