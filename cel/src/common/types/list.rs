@@ -112,7 +112,9 @@ impl Indexer for DefaultList {
             Kind::Int => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
-                    .expect("int kind must contain CelInt")
+                    .ok_or_else(|| {
+                        ExecutionError::overload_for_values("_[_]", [self as &dyn Val, idx], false)
+                    })?
                     .inner();
                 Ok(Cow::Borrowed(
                     self.0
@@ -124,7 +126,9 @@ impl Indexer for DefaultList {
             Kind::UInt => {
                 let idx: u64 = *idx
                     .downcast_ref::<CelUInt>()
-                    .expect("uint kind must contain CelUInt")
+                    .ok_or_else(|| {
+                        ExecutionError::overload_for_values("_[_]", [self as &dyn Val, idx], false)
+                    })?
                     .inner();
                 Ok(Cow::Borrowed(
                     self.0
@@ -150,7 +154,13 @@ impl Indexer for DefaultList {
             Kind::Int => {
                 let idx: i64 = *idx
                     .downcast_ref::<CelInt>()
-                    .expect("int kind must contain CelInt")
+                    .ok_or_else(|| {
+                        ExecutionError::overload_for_values(
+                            "_[_]",
+                            [list.as_ref() as &dyn Val, idx],
+                            false,
+                        )
+                    })?
                     .inner();
                 if idx < 0 || idx as usize >= list.0.len() {
                     return Err(ExecutionError::IndexOutOfBounds(idx.into()));
@@ -160,7 +170,13 @@ impl Indexer for DefaultList {
             Kind::UInt => {
                 let idx: u64 = *idx
                     .downcast_ref::<CelUInt>()
-                    .expect("uint kind must contain CelUInt")
+                    .ok_or_else(|| {
+                        ExecutionError::overload_for_values(
+                            "_[_]",
+                            [list.as_ref() as &dyn Val, idx],
+                            false,
+                        )
+                    })?
                     .inner();
                 if idx as usize >= list.0.len() {
                     return Err(ExecutionError::IndexOutOfBounds(idx.into()));
@@ -340,7 +356,7 @@ impl Adder for MutableList {
     fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
         let iter = rhs
             .as_iterable()
-            .ok_or(ExecutionError::NoSuchOverload)?
+            .ok_or_else(|| ExecutionError::unsupported_binary_operator("add", self, rhs))?
             .iter();
         {
             let mut inner = self.inner.lock().expect("mutable list mutex poisoned");
@@ -375,8 +391,9 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 pub mod tests {
     use crate::common::traits::Indexer;
     use crate::common::types::list::DefaultList;
-    use crate::common::types::{CelInt, CelString};
+    use crate::common::types::{self, CelInt, CelString, Type};
     use crate::common::value::Val;
+    use crate::ExecutionError;
     use crate::ExecutionError::{IndexOutOfBounds, UnexpectedType};
     use std::borrow::Cow;
 
@@ -429,6 +446,33 @@ pub mod tests {
         let idx: CelInt = 0.into();
         let expected = Cow::<dyn Val>::Owned(Box::new(Into::<CelString>::into("cel")));
         assert_eq!(Indexer::get(&list, &idx), Ok(expected));
+    }
+
+    #[test]
+    fn numeric_kind_without_numeric_value_returns_overload_error() {
+        #[derive(Debug, Clone)]
+        struct NumericKindOnly(&'static Type);
+
+        impl Val for NumericKindOnly {
+            fn get_type(&self) -> &Type {
+                self.0
+            }
+
+            fn clone_as_boxed(&self) -> Box<dyn Val> {
+                Box::new(self.clone())
+            }
+        }
+
+        for ty in [&types::INT_TYPE, &types::UINT_TYPE] {
+            let idx = NumericKindOnly(ty);
+            let list = DefaultList::default();
+            let expected = ExecutionError::no_such_overload(
+                "_[_]",
+                vec!["list".to_owned(), ty.name().to_owned()],
+            );
+            assert_eq!(Indexer::get(&list, &idx).err(), Some(expected.clone()));
+            assert_eq!(Indexer::steal(Box::new(list), &idx).err(), Some(expected));
+        }
     }
 
     #[test]
