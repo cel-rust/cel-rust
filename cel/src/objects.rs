@@ -1570,7 +1570,7 @@ impl Value {
                     };
 
                     if let Some(value) = value {
-                        if map.contains_key(&key) {
+                        if ctx.env().error_on_duplicate_map_keys() && map.contains_key(&key) {
                             return Err(ExecutionError::DuplicateKey(Key::from(key).into()));
                         }
                         map.insert(key, value);
@@ -1948,7 +1948,7 @@ mod tests {
     use crate::common::traits::Sizer;
     use crate::common::types::{CelInt, Type, LIST_TYPE};
     use crate::common::value::Val;
-    use crate::{objects::Key, Context, ExecutionError, Program, ResolveResult, Value};
+    use crate::{objects::Key, Context, Env, ExecutionError, Program, ResolveResult, Value};
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -2109,6 +2109,17 @@ mod tests {
 
         let program = Program::compile("{1: 'a', 2: 'b', 'c': 3}").unwrap();
         assert!(program.execute(&context).is_ok());
+    }
+
+    #[test]
+    fn test_map_repeated_key_opt_out() {
+        let mut env = Env::stdlib();
+        env.set_error_on_duplicate_map_keys(false);
+        let context = Context::with_env(Arc::new(env));
+
+        // With the check off the last entry wins, as it did before and as cel-go does.
+        let program = Program::compile("{'a': 1, 'a': 2}['a'] == 2").unwrap();
+        assert_eq!(program.execute(&context).unwrap(), true.into());
     }
 
     #[test]
