@@ -55,11 +55,22 @@ use std::{
 ///     Ok(Cow::Owned(result))
 /// }).unwrap();
 /// ```
-#[derive(Default)]
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
     #[cfg(feature = "structs")]
     structs: BTreeMap<String, StructDef>,
+    error_on_duplicate_map_keys: bool,
+}
+
+impl Default for Env {
+    fn default() -> Self {
+        Env {
+            functions: BTreeMap::new(),
+            #[cfg(feature = "structs")]
+            structs: BTreeMap::new(),
+            error_on_duplicate_map_keys: true,
+        }
+    }
 }
 
 impl Env {
@@ -193,6 +204,33 @@ impl Env {
     #[cfg(feature = "structs")]
     pub(crate) fn find_struct(&self, name: &str) -> Option<&StructDef> {
         self.structs.get(name)
+    }
+
+    /// Sets whether a map literal that repeats a key is an error.
+    ///
+    /// On by default, as the spec requires. Turning it off keeps the last entry
+    /// instead, so `{'a': 1, 'a': 2}` evaluates to `{'a': 2}`, which is what
+    /// cel-go does. Mirrors cel-java's `CelOptions.errorOnDuplicateMapKeys`,
+    /// where the shipped default (`CelOptions.DEFAULT`) also errors.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Program, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.set_error_on_duplicate_map_keys(false);
+    /// let context = Context::with_env(Arc::new(env));
+    ///
+    /// let program = Program::compile("{'a': 1, 'a': 2}['a']").unwrap();
+    /// let value: Value = program.execute(&context).unwrap();
+    /// assert_eq!(value, 2.into());
+    /// ```
+    pub fn set_error_on_duplicate_map_keys(&mut self, value: bool) {
+        self.error_on_duplicate_map_keys = value;
+    }
+
+    pub(crate) fn error_on_duplicate_map_keys(&self) -> bool {
+        self.error_on_duplicate_map_keys
     }
 }
 
