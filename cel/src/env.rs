@@ -4,6 +4,7 @@ use crate::common::{
     types::{self, Type},
     value::Val,
 };
+use crate::runtime::RuntimeOptions;
 #[cfg(feature = "structs")]
 use crate::{common::types::CelStruct, ExecutionError};
 use std::{
@@ -57,6 +58,7 @@ use std::{
 /// ```
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
+    options: RuntimeOptions,
     #[cfg(feature = "structs")]
     structs: BTreeMap<String, StructDef>,
     error_on_duplicate_map_keys: bool,
@@ -192,6 +194,25 @@ impl Env {
         self.functions
             .get(name)
             .is_some_and(|function| function.has_overload(true))
+    }
+
+    /// The runtime policy applied to every evaluation under this environment.
+    pub fn options(&self) -> &RuntimeOptions {
+        &self.options
+    }
+
+    /// Replaces the runtime policy applied to every evaluation under this environment.
+    ///
+    /// # Example
+    /// ```
+    /// use cel::{Env, RuntimeOptions};
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.set_options(RuntimeOptions::default().with_max_iterations(10_000));
+    /// assert_eq!(env.options().max_iterations(), 10_000);
+    /// ```
+    pub fn set_options(&mut self, options: RuntimeOptions) {
+        self.options = options;
     }
 
     /// Adds a custom struct definition to the environment.
