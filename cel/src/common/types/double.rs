@@ -260,6 +260,8 @@ fn double<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Execu
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::DOUBLE_TYPE)
+        .expect("Must be unique");
     env.add_overload(
         "double",
         "double_to_double",

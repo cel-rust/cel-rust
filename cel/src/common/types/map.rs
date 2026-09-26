@@ -439,6 +439,8 @@ impl<'b, 'v: 'w, 'w> traits::Iterator<'b, 'w> for MapKeyIterator<'b, 'v> {
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::MAP_TYPE)
+        .expect("Must be unique");
     env.add_overload(
         "size",
         "size_map",

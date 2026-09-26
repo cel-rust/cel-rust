@@ -282,6 +282,7 @@ fn timestamp<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Execut
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(super::TIMESTAMP_TYPE).expect("Must be unique");
     env.add_overload(
         "timestamp",
         "string_to_timestamp",

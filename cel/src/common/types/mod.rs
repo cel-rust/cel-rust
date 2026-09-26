@@ -12,7 +12,7 @@ pub(crate) mod r#dyn;
 pub(crate) mod int;
 pub(crate) mod list;
 pub(crate) mod map;
-mod null;
+pub(crate) mod null;
 pub(crate) mod optional;
 pub(crate) mod string;
 #[cfg(feature = "structs")]

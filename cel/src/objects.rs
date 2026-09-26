@@ -1391,7 +1391,10 @@ impl Value {
             // a variable shadows a type of the same name
             Expr::Ident(name) => Ok(ctx
                 .get_variable(name)
-                .or_else(|| CelType::for_ident(name).map(CowVal::owned))
+                .or_else(|| {
+                    let t = ctx.env().types().find_type(name)?;
+                    Some(CowVal::owned(CelType::from(t)))
+                })
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
@@ -2633,6 +2636,80 @@ mod tests {
             "not_a_type",
             ExecutionError::UndeclaredReference(Arc::new("not_a_type".to_string())),
         );
+    }
+
+    mod registered_types {
+        use crate::common::types::{CelType, Kind, Type};
+        use crate::common::value::{StaticVal, Val};
+        use crate::{Context, Env, ExecutionError, Program, Value};
+        use std::any::Any;
+        use std::sync::Arc;
+
+        static IP_TYPE: Type = Type::simple_type(Kind::Opaque, "Ip");
+
+        #[derive(Debug)]
+        struct Ip(u32);
+
+        impl Val for Ip {
+            fn get_type(&self) -> &Type {
+                &IP_TYPE
+            }
+            fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                Box::new(Ip(self.0))
+            }
+            fn as_any(&self) -> Option<&dyn Any> {
+                Some(self)
+            }
+        }
+        impl StaticVal for Ip {}
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        #[test]
+        fn a_registered_type_resolves_as_a_type_value() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::simple_type(Kind::Opaque, "Ip")).unwrap();
+            let mut context = Context::with_env(Arc::new(env));
+            context.add_variable_as_val("ip", Box::new(Ip(0x7f000001)));
+            assert_eq!(execute(&context, "type(ip) == Ip"), Ok(Value::Bool(true)));
+            assert_eq!(execute(&context, "type(1) == Ip"), Ok(Value::Bool(false)));
+        }
+
+        #[test]
+        fn an_unregistered_type_is_an_undeclared_reference() {
+            let mut context = Context::default();
+            context.add_variable_as_val("ip", Box::new(Ip(0x7f000001)));
+            assert_eq!(
+                execute(&context, "type(ip) == Ip"),
+                Err(ExecutionError::UndeclaredReference(Arc::new(
+                    "Ip".to_string()
+                )))
+            );
+        }
+
+        /// Evaluates `expr` to a type value, and returns its name.
+        fn type_name(context: &Context, expr: &str) -> Result<String, ExecutionError> {
+            let ast = crate::parser::Parser::default().parse(expr).unwrap();
+            let value = Value::resolve_val(&ast, context)?;
+            Ok(value.downcast_ref::<CelType>().unwrap().name().to_owned())
+        }
+
+        /// Types are known once a library registered them, the core types
+        /// included.
+        #[test]
+        fn types_come_with_the_standard_library() {
+            for name in ["int", "optional_type"] {
+                assert_eq!(
+                    type_name(&Context::empty(), name),
+                    Err(ExecutionError::UndeclaredReference(Arc::new(
+                        name.to_string()
+                    )))
+                );
+                assert_eq!(type_name(&Context::default(), name), Ok(name.to_owned()));
+            }
+        }
     }
 
     mod qualified_functions {

@@ -27,25 +27,14 @@ impl CelType {
     pub fn name(&self) -> &str {
         &self.name
     }
+}
 
-    /// Resolves a bare identifier such as `bool` or `null_type` to its
-    /// corresponding type value, per the cel-spec `type_denotation` set.
-    pub fn for_ident(name: &str) -> Option<CelType> {
-        matches!(
-            name,
-            "bool"
-                | "bytes"
-                | "double"
-                | "int"
-                | "list"
-                | "map"
-                | "null_type"
-                | "optional_type"
-                | "string"
-                | "type"
-                | "uint"
-        )
-        .then(|| CelType::new(name))
+/// The type value of `t`, sharing its name when it is `'static`.
+impl From<&Type> for CelType {
+    fn from(t: &Type) -> Self {
+        Self {
+            name: t.runtime_type_name.clone(),
+        }
     }
 }
 
@@ -80,6 +69,8 @@ fn type_of<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Executio
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::TYPE_TYPE)
+        .expect("Must be unique");
     env.add_overload(
         "type",
         "type_of",
@@ -119,10 +110,9 @@ mod tests {
     }
 
     #[test]
-    fn for_ident_recognizes_known_names() {
-        assert!(CelType::for_ident("bool").is_some());
-        assert!(CelType::for_ident("null_type").is_some());
-        assert!(CelType::for_ident("type").is_some());
-        assert!(CelType::for_ident("something_else").is_none());
+    fn from_type_shares_a_static_name() {
+        let t = CelType::from(&crate::common::types::INT_TYPE);
+        assert!(matches!(t.name, Cow::Borrowed("int")));
+        assert!(t.equals(&CelType::new("int")));
     }
 }

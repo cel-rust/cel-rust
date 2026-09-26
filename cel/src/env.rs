@@ -4,6 +4,7 @@ use crate::common::{
     types::{self, Type},
     value::CowVal,
 };
+use crate::registry::TypeRegistry;
 use crate::DeclarationError;
 #[cfg(feature = "structs")]
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError};
@@ -53,6 +54,7 @@ use std::collections::{
 /// ```
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
+    types: TypeRegistry,
     #[cfg(feature = "structs")]
     structs: BTreeMap<String, StructDef>,
     error_on_duplicate_map_keys: bool,
@@ -62,6 +64,7 @@ impl Default for Env {
     fn default() -> Self {
         Env {
             functions: BTreeMap::new(),
+            types: TypeRegistry::default(),
             #[cfg(feature = "structs")]
             structs: BTreeMap::new(),
             error_on_duplicate_map_keys: true,
@@ -76,12 +79,14 @@ impl Env {
     /// CEL specification.
     pub fn stdlib() -> Env {
         let mut env = Env::default();
+        types::bool::stdlib(&mut env);
         types::bytes::stdlib(&mut env);
         types::double::stdlib(&mut env);
         types::r#dyn::stdlib(&mut env);
         types::int::stdlib(&mut env);
         types::list::stdlib(&mut env);
         types::map::stdlib(&mut env);
+        types::null::stdlib(&mut env);
         types::optional::stdlib(&mut env);
         types::string::stdlib(&mut env);
         types::type_val::stdlib(&mut env);
@@ -196,6 +201,41 @@ impl Env {
         self.functions
             .get(name)
             .is_some_and(|function| function.has_overload(true))
+    }
+
+    /// Registers a type with the environment, so that expressions can refer
+    /// to it by name.
+    ///
+    /// The name resolves to the type value, unless a variable of the same name
+    /// shadows it. Values need not be registered to be evaluated: registering
+    /// their type is what lets an expression name it.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Program, Value};
+    /// use cel::common::types::Type;
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_type(Type::new_opaque_type("Ip")).unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    ///
+    /// let program = Program::compile("type(Ip) == type").unwrap();
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::TypeConflict`] if another type is
+    /// already registered under that name, and with
+    /// [`DeclarationError::InvalidTypeName`] if the name is not an identifier,
+    /// or several separated by dots. Registering an equal type again is fine.
+    pub fn add_type(&mut self, t: Type) -> Result<(), DeclarationError> {
+        self.types.register(t)
+    }
+
+    /// The types registered with the environment.
+    pub fn types(&self) -> &TypeRegistry {
+        &self.types
     }
 
     /// Adds a custom struct definition to the environment.
@@ -364,6 +404,43 @@ mod tests {
     #[test]
     fn test_env_default() {
         let _: Arc<dyn Send + Sync> = Arc::new(Env::default());
+    }
+
+    #[test]
+    fn the_standard_library_registers_its_types() {
+        let names = [
+            "bool",
+            "bytes",
+            "double",
+            "int",
+            "list",
+            "map",
+            "null_type",
+            "optional_type",
+            "string",
+            "type",
+            "uint",
+            #[cfg(feature = "chrono")]
+            "google.protobuf.Duration",
+            #[cfg(feature = "chrono")]
+            "google.protobuf.Timestamp",
+        ];
+        let stdlib = Env::stdlib();
+        let default = Env::default();
+        for name in names {
+            assert_eq!(stdlib.types().find_type(name).map(Type::name), Some(name));
+            assert!(default.types().find_type(name).is_none(), "{name}");
+        }
+    }
+
+    #[test]
+    fn add_type_rejects_another_type_of_a_registered_name() {
+        let mut env = Env::stdlib();
+        assert_eq!(
+            env.add_type(Type::new_opaque_type("optional_type")),
+            Err(DeclarationError::type_conflict("optional_type"))
+        );
+        assert_eq!(env.add_type(types::OPTIONAL_TYPE), Ok(()));
     }
 
     fn noop<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, crate::ExecutionError> {

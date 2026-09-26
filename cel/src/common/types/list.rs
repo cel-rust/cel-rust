@@ -321,6 +321,8 @@ impl<'v> MutableList<'v> {
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::LIST_TYPE)
+        .expect("Must be unique");
     env.add_overload(
         "size",
         "size_list",

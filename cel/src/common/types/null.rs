@@ -38,3 +38,8 @@ impl Zeroer for Null {
         true
     }
 }
+
+pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::NULL_TYPE)
+        .expect("Must be unique");
+}
