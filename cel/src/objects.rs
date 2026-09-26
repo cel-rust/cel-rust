@@ -1319,7 +1319,18 @@ impl Value {
                         _ => (),
                     }
                 }
-                match &call.target {
+                // As in cel-go, a call whose target spells a qualified name
+                // that, with the function's, names a function is a global call
+                // to that function: `optional.of(x)` calls `optional.of`.
+                let qualified_name = call
+                    .target
+                    .as_deref()
+                    .and_then(|target| qualified_function_name(ctx, target, &call.func_name));
+                let (target, func_name) = match &qualified_name {
+                    Some(name) => (None, name.as_str()),
+                    None => (call.target.as_deref(), call.func_name.as_str()),
+                };
+                match target {
                     None => {
                         // TODO: Optimize for the 1 and 2 arg cases and avoid the Vec altogether
                         let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
@@ -1328,24 +1339,26 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let args = args?;
-                        if let Some(op) = ctx.env().find_overload(&call.func_name, &args) {
+                        if let Some(op) = ctx.env().find_overload(func_name, &args) {
                             return op(args);
                         }
-                        let func = match ctx.get_function(call.func_name.as_str()) {
+                        let func = match ctx.get_function(func_name) {
                             Some(func) => func,
-                            None if ctx.env().has_overload(&call.func_name) => {
+                            None if ctx.env().has_overload(func_name) => {
                                 return Err(ExecutionError::overload_for_values(
-                                    &call.func_name,
+                                    func_name,
                                     args.iter().map(|arg| arg.as_ref()),
                                     false,
                                 ));
                             }
                             None => {
                                 return Err(ExecutionError::UndeclaredReference(
-                                    call.func_name.clone().into(),
+                                    func_name.to_owned().into(),
                                 ));
                             }
                         };
+                        // the context borrows its name for as long as the result:
+                        // a qualified function is told its unqualified name
                         let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
                         (func)(&mut ctx)
                     }
@@ -1355,66 +1368,30 @@ impl Value {
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
-                        let args = args?;
-                        let qualified_func = match target.expr.qualified_name_segments() {
-                            Some(segments) => {
-                                let mut qualified_name = String::with_capacity(
-                                    segments.iter().map(|s| s.len() + 1).sum::<usize>()
-                                        + call.func_name.len(),
-                                );
-                                for segment in segments {
-                                    qualified_name.push_str(segment);
-                                    qualified_name.push('.');
-                                }
-                                qualified_name.push_str(&call.func_name);
-                                if let Some(op) = ctx.env().find_overload(&qualified_name, &args) {
-                                    return op(args);
-                                }
-                                match ctx.get_function(&qualified_name) {
-                                    Some(func) => Some(func),
-                                    None if ctx.env().has_overload(&qualified_name) => {
-                                        return Err(ExecutionError::overload_for_values(
-                                            &qualified_name,
-                                            args.iter().map(|arg| arg.as_ref()),
-                                            false,
-                                        ));
-                                    }
-                                    None => None,
-                                }
+                        let mut args = args?;
+                        let target = Value::resolve_val(target, ctx)?;
+                        args.insert(0, target);
+                        if let Some(op) = ctx.env().find_member_overload(func_name, &args) {
+                            return op(args);
+                        }
+                        let func = match ctx.get_function(func_name) {
+                            Some(func) => func,
+                            None if ctx.env().has_member_overload(func_name) => {
+                                return Err(ExecutionError::overload_for_values(
+                                    func_name,
+                                    args.iter().map(|arg| arg.as_ref()),
+                                    true,
+                                ));
                             }
-                            None => None,
-                        };
-                        let (target, func, args) = match qualified_func {
                             None => {
-                                let target = Value::resolve_val(target, ctx)?;
-                                let mut args = args;
-                                args.insert(0, target);
-                                if let Some(op) =
-                                    ctx.env().find_member_overload(&call.func_name, &args)
-                                {
-                                    return op(args);
-                                }
-                                let func = match ctx.get_function(call.func_name.as_str()) {
-                                    Some(func) => func,
-                                    None if ctx.env().has_member_overload(&call.func_name) => {
-                                        return Err(ExecutionError::overload_for_values(
-                                            &call.func_name,
-                                            args.iter().map(|arg| arg.as_ref()),
-                                            true,
-                                        ));
-                                    }
-                                    None => {
-                                        return Err(ExecutionError::UndeclaredReference(
-                                            call.func_name.clone().into(),
-                                        ));
-                                    }
-                                };
-                                let target = args.remove(0);
-                                (Some(target), func, args)
+                                return Err(ExecutionError::UndeclaredReference(
+                                    func_name.to_owned().into(),
+                                ));
                             }
-                            Some(func) => (None, func, args),
                         };
-                        let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
+                        let target = args.remove(0);
+                        let mut ctx =
+                            FunctionContext::new(&call.func_name, Some(target), ctx, args);
                         (func)(&mut ctx)
                     }
                 }
@@ -1690,6 +1667,23 @@ fn try_bool(val: Result<CowVal<'_, '_>, ExecutionError>) -> Result<bool, Executi
             }),
         Err(err) => Result::Err(err),
     }
+}
+
+/// The name of the function a call on `target` names when `target` spells a
+/// qualified name: `a.b.f()` calls the function `a.b.f`, if there is one,
+/// rather than `f` on `a.b`. Mirrors cel-go's `resolveFunction`, deciding on
+/// the name alone.
+fn qualified_function_name(ctx: &Context, target: &Expression, func_name: &str) -> Option<String> {
+    let segments = target.expr.qualified_name_segments()?;
+    let mut name = String::with_capacity(
+        segments.iter().map(|s| s.len() + 1).sum::<usize>() + func_name.len(),
+    );
+    for segment in segments {
+        name.push_str(segment);
+        name.push('.');
+    }
+    name.push_str(func_name);
+    (ctx.env().has_overload(&name) || ctx.get_function(&name).is_some()).then_some(name)
 }
 
 /// Selects `field` on `left`, the already resolved operand of a select:
