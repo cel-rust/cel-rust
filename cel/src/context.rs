@@ -1,4 +1,3 @@
-use crate::common::types::CelType;
 use crate::common::value::{CowVal, Val};
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
@@ -160,8 +159,7 @@ impl<'p, 'v> Context<'p, 'v> {
                 ..
             } => resolver
                 .and_then(|r| r.resolve(name))
-                .or_else(|| variables.get(name).map(|v| CowVal::Borrowed(v.as_ref())))
-                .or_else(|| CelType::for_ident(name).map(CowVal::owned)),
+                .or_else(|| variables.get(name).map(|v| CowVal::Borrowed(v.as_ref()))),
         }
     }
 
@@ -626,5 +624,13 @@ mod test {
         let context = Context::default();
         let mut child = context.new_inner_scope();
         assert_eq!(child.add_function("size", |a: i64| a), Ok(()),);
+    }
+
+    /// Type names are resolved by the interpreter, not looked up as variables.
+    #[test]
+    fn a_type_name_is_not_a_variable() {
+        let context = Context::default();
+        assert!(context.get_variable("int").is_none());
+        assert!(context.new_inner_scope().get_variable("int").is_none());
     }
 }
