@@ -7,7 +7,7 @@ use crate::common::{
 use crate::registry::TypeRegistry;
 use crate::DeclarationError;
 #[cfg(feature = "structs")]
-use crate::{common::types::CelStruct, common::value::Val, ExecutionError};
+use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
     BTreeMap,
@@ -33,7 +33,7 @@ use std::collections::{
 ///     StructDef::new("cel.MyStruct".to_owned())
 ///         .add_field("some_field".to_owned(), types::STRING_TYPE)
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
-/// );
+/// ).unwrap();
 /// }
 /// ```
 ///
@@ -55,8 +55,6 @@ use std::collections::{
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
     types: TypeRegistry,
-    #[cfg(feature = "structs")]
-    structs: BTreeMap<String, StructDef>,
     error_on_duplicate_map_keys: bool,
 }
 
@@ -65,8 +63,6 @@ impl Default for Env {
         Env {
             functions: BTreeMap::new(),
             types: TypeRegistry::default(),
-            #[cfg(feature = "structs")]
-            structs: BTreeMap::new(),
             error_on_duplicate_map_keys: true,
         }
     }
@@ -238,16 +234,21 @@ impl Env {
         &self.types
     }
 
-    /// Adds a custom struct definition to the environment.
+    /// Adds a struct type to the environment, so that struct literals can
+    /// construct it, e.g. `cel.MyStruct{some_field: 'value'}`.
+    ///
+    /// Its type is registered too, as [`add_type`](Self::add_type) does, so
+    /// that expressions can name it: `type(x) == cel.MyStruct`.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::TypeConflict`] if a struct type, or
+    /// another type, is already registered under that name, and with
+    /// [`DeclarationError::InvalidTypeName`] if the name is not an identifier,
+    /// or several separated by dots.
     #[cfg(feature = "structs")]
-    pub fn add_struct(&mut self, def: StructDef) {
-        self.structs.insert(def.name.clone(), def);
-    }
-
-    /// Finds a struct definition by name.
-    #[cfg(feature = "structs")]
-    pub(crate) fn find_struct(&self, name: &str) -> Option<&StructDef> {
-        self.structs.get(name)
+    pub fn add_struct(&mut self, s: impl StructType + 'static) -> Result<(), DeclarationError> {
+        self.types.register_struct(Box::new(s))
     }
 
     /// Sets whether a map literal that repeats a key is an error.
@@ -294,11 +295,11 @@ impl Env {
 ///     StructDef::new("MyStruct".to_owned())
 ///         .add_field("some_field".to_owned(), types::STRING_TYPE)
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
-/// );
+/// ).unwrap();
 /// ```
 #[cfg(feature = "structs")]
 pub struct StructDef {
-    name: String,
+    r#type: Type,
     fields: BTreeMap<String, Type>,
     defaults: BTreeMap<String, Box<dyn Val>>,
 }
@@ -311,7 +312,7 @@ impl StructDef {
     /// referenced in CEL expressions (e.g., `cel.MyStruct`).
     pub fn new(name: String) -> Self {
         Self {
-            name,
+            r#type: Type::new_struct(name),
             fields: Default::default(),
             defaults: Default::default(),
         }
@@ -358,12 +359,12 @@ impl StructDef {
     /// - A field is missing and has no default value.
     /// - A field's type does not match the type in the definition.
     /// - An unknown field name is provided.
-    #[cfg(feature = "structs")]
-    pub(crate) fn new_struct<'b, 'v>(
+    fn new_struct<'b, 'v>(
         &self,
         fields: BTreeMap<String, CowVal<'b, 'v>>,
     ) -> Result<CelStruct<'v>, ExecutionError> {
-        let mut s = CelStruct::new(self.name.clone());
+        let name = self.r#type.name();
+        let mut s = CelStruct::new(name.to_owned());
         let mut fields = fields;
         for (field, default) in &self.defaults {
             if let Some(value) = fields.remove(field) {
@@ -378,20 +379,33 @@ impl StructDef {
                     if t != value.get_type() {
                         return Err(ExecutionError::UnexpectedType {
                             got: value.get_type().name().to_owned(),
-                            want: format!("{} for field {field} in {}", t.name(), self.name),
+                            want: format!("{} for field {field} in {name}", t.name()),
                         });
                     }
                     s.add_field_value(field, value);
                 }
                 None => {
                     return Err(ExecutionError::NoSuchKey(std::sync::Arc::new(format!(
-                        "field `{field}` on struct `{}`",
-                        self.name
+                        "field `{field}` on struct `{name}`"
                     ))))
                 }
             }
         }
         Ok(s)
+    }
+}
+
+#[cfg(feature = "structs")]
+impl StructType for StructDef {
+    fn get_type(&self) -> &Type {
+        &self.r#type
+    }
+
+    fn new_value<'b, 'v>(
+        &self,
+        fields: BTreeMap<String, CowVal<'b, 'v>>,
+    ) -> Result<Box<dyn Val + 'v>, ExecutionError> {
+        Ok(Box::new(self.new_struct(fields)?))
     }
 }
 

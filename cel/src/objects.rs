@@ -1516,13 +1516,12 @@ impl Value {
                 }
                 #[cfg(feature = "structs")]
                 {
-                    let struct_def =
-                        ctx.env()
-                            .find_struct(&name)
-                            .ok_or(ExecutionError::UnexpectedType {
-                                got: name.to_owned(),
-                                want: "known struct".to_owned(),
-                            })?;
+                    let struct_type = ctx.env().types().find_struct(&name).ok_or(
+                        ExecutionError::UnexpectedType {
+                            got: name.to_owned(),
+                            want: "known struct".to_owned(),
+                        },
+                    )?;
                     let mut fields = std::collections::BTreeMap::new();
                     for entry in &strct.entries {
                         match &entry.expr {
@@ -1537,8 +1536,7 @@ impl Value {
                             }
                         }
                     }
-                    let s = struct_def.new_struct(fields)?;
-                    Ok(CowVal::owned(s))
+                    Ok(CowVal::Owned(struct_type.new_value(fields)?))
                 }
             }
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
@@ -3531,7 +3529,8 @@ mod tests {
         #[test]
         fn test_empty_struct() {
             let mut env = Env::stdlib();
-            env.add_struct(StructDef::new(String::from("cel.MyStruct")));
+            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+                .unwrap();
             let program = Program::compile("cel.MyStruct {}").unwrap();
             let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
             match value {
@@ -3547,7 +3546,8 @@ mod tests {
                 StructDef::new(String::from("cel.Problem"))
                     .add_field(String::from("solved"), types::BOOL_TYPE)
                     .add_field(String::from("answer"), types::INT_TYPE),
-            );
+            )
+            .unwrap();
             let program =
                 Program::compile("cel.Problem { solved: 0 != null, answer: 21 * 2 }").unwrap();
             let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
@@ -3579,7 +3579,8 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { some: 'value' }.some").unwrap();
             let value = program.execute(&Context::with_env(env.into())).unwrap();
             assert_eq!(value, Value::String(Arc::new("value".to_owned())));
@@ -3591,7 +3592,8 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { not_here: 'value' }").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
             assert_eq!(
@@ -3609,7 +3611,8 @@ mod tests {
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
                     .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { some: 'value' }.here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
             assert_eq!(result, Ok(Value::String(Arc::new(String::from("yes")))));
@@ -3622,7 +3625,8 @@ mod tests {
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
                     .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
-            );
+            )
+            .unwrap();
             let program =
                 Program::compile("cel.MyStruct { some: 'value', here: 'totally' }.here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
@@ -3636,7 +3640,8 @@ mod tests {
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("name".into(), types::STRING_TYPE)
                     .add_field("value".into(), types::INT_TYPE),
-            );
+            )
+            .unwrap();
 
             let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
             my_struct.add_field_value("name".to_owned(), CowVal::owned(CelString::from("test")));
@@ -3671,7 +3676,8 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { some: 'value' }.not_here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
             assert_eq!(
@@ -3694,13 +3700,107 @@ mod tests {
         }
 
         #[test]
+        fn a_struct_name_is_its_type() {
+            let mut env = Env::stdlib();
+            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+                .unwrap();
+            let context = Context::with_env(Arc::new(env));
+            let program =
+                Program::compile("type(cel.MyStruct{}) == cel.MyStruct && type(1) != cel.MyStruct")
+                    .unwrap();
+            assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+        }
+
+        #[test]
+        fn a_struct_can_only_be_added_once() {
+            let mut env = Env::stdlib();
+            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+                .unwrap();
+            assert_eq!(
+                env.add_struct(StructDef::new(String::from("cel.MyStruct"))),
+                Err(crate::DeclarationError::type_conflict("cel.MyStruct"))
+            );
+        }
+
+        /// Any [`StructType`](crate::StructType) can be constructed by a
+        /// struct literal, whatever value it makes.
+        #[test]
+        fn a_custom_struct_type_is_constructed() {
+            use crate::common::types::Type;
+            use crate::common::value::StaticVal;
+            use crate::StructType;
+            use std::any::Any;
+            use std::collections::BTreeMap;
+
+            static POINT_TYPE: Type = Type::new_struct_type("geo.Point");
+
+            #[derive(Debug, PartialEq)]
+            struct Point(i64, i64);
+
+            impl Val for Point {
+                fn get_type(&self) -> &Type {
+                    &POINT_TYPE
+                }
+                fn equals(&self, other: &dyn Val) -> bool {
+                    other.downcast_ref::<Point>() == Some(self)
+                }
+                fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                    Box::new(Point(self.0, self.1))
+                }
+                fn as_any(&self) -> Option<&dyn Any> {
+                    Some(self)
+                }
+            }
+            impl StaticVal for Point {}
+
+            struct PointType;
+
+            impl StructType for PointType {
+                fn get_type(&self) -> &Type {
+                    &POINT_TYPE
+                }
+                fn new_value<'b, 'v>(
+                    &self,
+                    fields: BTreeMap<String, CowVal<'b, 'v>>,
+                ) -> Result<Box<dyn Val + 'v>, ExecutionError> {
+                    let coordinate = |name: &str| {
+                        fields
+                            .get(name)
+                            .and_then(|v| v.downcast_ref::<CelInt>())
+                            .map(|i| *i.inner())
+                            .unwrap_or_default()
+                    };
+                    Ok(Box::new(Point(coordinate("x"), coordinate("y"))))
+                }
+            }
+
+            let mut env = Env::stdlib();
+            env.add_struct(PointType).unwrap();
+            let context = Context::with_env(Arc::new(env));
+            let ast = crate::parser::Parser::default()
+                .parse("geo.Point{x: 1, y: 2}")
+                .unwrap();
+            let value = Value::resolve_val(&ast, &context).unwrap();
+            assert_eq!(value.downcast_ref::<Point>(), Some(&Point(1, 2)));
+
+            let program = Program::compile(
+                "geo.Point{x: 1, y: 2} == geo.Point{y: 2, x: 1} \
+                 && geo.Point{x: 1} != geo.Point{} \
+                 && type(geo.Point{}) == geo.Point",
+            )
+            .unwrap();
+            assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+        }
+
+        #[test]
         fn add_struct_variable_to_context() {
             let mut env = Env::stdlib();
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("name".into(), types::STRING_TYPE)
                     .add_field("value".into(), types::INT_TYPE),
-            );
+            )
+            .unwrap();
 
             let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
             my_struct.add_field_value("name".to_owned(), CowVal::owned(CelString::from("test")));
