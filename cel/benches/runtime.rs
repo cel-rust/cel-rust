@@ -1,10 +1,11 @@
-use cel::common::types::CelBool;
+use cel::common::types::{CelBool, CelString, STRING_TYPE};
 use cel::common::value::{CowVal, Val};
 use cel::context::{Context, VariableResolver};
 use cel::parser::Parser;
-use cel::{Program, Value};
+use cel::{Env, ExecutionError, Program, Value};
 use criterion::{black_box, criterion_group, BenchmarkId, Criterion};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 const EXPRESSIONS: [(&str, &str); 34] = [
     ("ternary_1", "(false || true) ? 1 : 2"),
@@ -114,10 +115,43 @@ pub fn map_macro_benchmark(c: &mut Criterion) {
     group.finish();
 }
 
+fn starts_with_slash<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let path = args[0]
+        .downcast_ref::<CelString>()
+        .expect("a string target");
+    Ok(CowVal::owned(CelBool::from(path.inner().starts_with('/'))))
+}
+
+/// A member overload called on a variable: the call's target is an
+/// identifier, so its name, with the function's, could be a qualified
+/// function name, e.g. `optional.none()`.
+pub fn member_overload_benchmark(c: &mut Criterion) {
+    let mut group = c.benchmark_group("execute");
+    group.bench_function("member_overload", |b| {
+        let mut env = Env::stdlib();
+        env.add_member_overload(
+            "startsWithSlash",
+            "string_starts_with_slash",
+            STRING_TYPE,
+            vec![],
+            starts_with_slash,
+        )
+        .expect("Must be unique");
+        let parser = Parser::default();
+        let ast = parser
+            .parse("path.startsWithSlash()")
+            .expect("Parsing failed");
+        let mut ctx = Context::with_env(Arc::new(env));
+        ctx.add_variable_as_val("path", Box::new(CelString::from("/some/path")));
+        b.iter(|| Value::resolve_val(&ast, &ctx).expect("Eval failed!"))
+    });
+    group.finish();
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default();
-    targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark
+    targets = criterion_benchmark, criterion_benchmark_parsing, map_macro_benchmark, member_overload_benchmark
 }
 
 #[cfg(feature = "dhat-heap")]
