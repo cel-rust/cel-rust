@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0](https://github.com/cel-rust/cel-rust/compare/v0.14.5...v0.15.0) - 2026-09-26
+
+### Added
+
+- *(Val)* Added `as_borrowed` to String & Bytes
+- *(val)* [**breaking**] `VariableResolver` uses `Cow<dyn Val>`
+- *(val)* `Context::add_function` supports `Val`
+- *(Val)* [**breaking**] Deleted all previously unused `Value` based fns
+- *(parser)* expose SourceInfo on the success path ([#315](https://github.com/cel-rust/cel-rust/pull/315))
+
+### Fixed
+
+- *(map)* [**breaking**] reject a map literal that repeats a key ([#302](https://github.com/cel-rust/cel-rust/pull/302))
+- *(errors)* report missing overload context ([#313](https://github.com/cel-rust/cel-rust/pull/313))
+
+### Other
+
+- Err on possible conflict when using `Context::add_function` ([#353](https://github.com/cel-rust/cel-rust/pull/353))
+- *(no-copy)* [**breaking**] Added `CowVal` to trace both lifetimes vorrow and value
+- *(val)* `FunctionContext` uses `Val`
+- *(pratt)* Added test coverage for unescaping
+- *(map)* Added mutable `List` used in `map`
+
 ## [0.14.5](https://github.com/cel-rust/cel-rust/compare/v0.14.4...v0.14.5) - 2026-09-07
 
 ### Added
