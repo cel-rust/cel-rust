@@ -9,19 +9,33 @@
 //! when it is called, strips the version prefix off the `&str`, and returns a
 //! `CelString` over the remaining slice - the same bytes, not a copy of them.
 //!
-//! That works because a registered function is handed `CowVal<'context, 'call>`s:
-//! `'context` is the borrow of the call itself and `'call` bounds the data the
-//! values borrow (here, the request). A function may return anything bounded by
-//! those, so a `CelString<'call>` over a sub-slice of the request's path is fine,
-//! and the interpreter can hand it to the caller with the same bound.
+//! That works because the values a function deals in carry two lifetimes:
+//! `CowVal<'context, 'call>`, where `'context` is the borrow of the call itself and
+//! `'call` bounds the data the values borrow (here, the request). A function may
+//! return anything bounded by those, so a `CelString<'call>` over a sub-slice of
+//! the request's path is fine, and the interpreter can hand it to the caller with
+//! the same bound.
+//!
+//! The two functions here show the two ways to register one, and why both exist:
+//!
+//! * `stripVersion` goes through [`cel::add_member_overload!`]. It is a plain typed
+//!   fn - `fn(&CelStruct<'v>) -> Result<CelString<'v>, _>` - and the macro generates
+//!   the downcast of the receiver and the wrapping of the result. It stays zero-copy
+//!   because `'v` bounds the request's data rather than the borrow of the receiver.
+//! * `header` is a raw [`RawFunction`]. It hands back a `CowVal::Borrowed` of a value
+//!   the request's header map *already holds*, which the macro cannot express: the
+//!   macro passes arguments by reference, borrowed from the wrapper's own argument
+//!   vector, so nothing reached through them lives long enough to be returned as a
+//!   borrow. Written by hand, it reads `ftx.this` at `'context` and can.
 //!
 //! Run with `cargo run -p example --bin example-no-copy --features structs`.
 use cel::common::ast::{Expr, LiteralValue};
-use cel::common::types::{CelMap, CelMapKey, CelString, CelStruct};
+use cel::common::types::{CelMap, CelMapKey, CelString, CelStruct, Type};
 use cel::common::value::{CowVal, Val};
 use cel::parser::Parser;
-use cel::{Context, ExecutionError, FunctionContext, Value};
+use cel::{Context, Env, ExecutionError, FunctionContext, Value};
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Plain application data - nothing CEL-aware about it. This is what a request
 /// handler already has lying around before it wants to evaluate a policy against it.
@@ -66,10 +80,10 @@ fn request_struct(req: &HttpRequest) -> CelStruct<'_> {
 const REQUEST_TYPE: &str = "HttpRequest";
 
 /// The raw shape a registered function actually has (`Context::add_function`'s
-/// typed closures are sugar that builds this same type). Reaching for it directly,
-/// instead of a plain `fn(...) -> R` closure, is what lets a function hand back a
-/// [`CowVal`] tied to the call's own [`FunctionContext`] lifetimes, instead of being
-/// limited to an owned value.
+/// typed closures, and the overload macros, are sugar that builds this same type).
+/// Reaching for it directly is what lets a function hand back a [`CowVal`] tied to
+/// the call's own [`FunctionContext`] lifetimes - including a `CowVal::Borrowed` of
+/// a value that already exists - instead of being limited to a value it owns.
 type RawFunction = Box<
     dyn for<'context, 'call> Fn(
             &mut FunctionContext<'context, 'call>,
@@ -80,8 +94,9 @@ type RawFunction = Box<
 
 /// Extracts `this` as the request struct, requiring it to already be a borrow (e.g.
 /// `request` resolved as a plain identifier) rather than a freshly computed value.
-/// Only a borrow can be handed on for `'context`, which is what lets the functions
-/// below return slices of the request's own fields instead of copies.
+/// Only a borrow can be handed on for `'context`, which is what lets [`header`]
+/// return a borrow of a value the request already holds. A macro-registered fn like
+/// [`strip_version`] needs none of this - it is handed the receiver already downcast.
 fn this_request<'context, 'call>(
     ftx: &FunctionContext<'context, 'call>,
 ) -> Result<&'context CelStruct<'call>, ExecutionError> {
@@ -98,25 +113,28 @@ fn this_request<'context, 'call>(
 
 /// `request.stripVersion()` - the request's path without its `/v1` or `/v2` prefix.
 ///
+/// Registered with [`cel::add_member_overload!`], so this is a plain typed fn: the
+/// receiver arrives already downcast, and the macro wraps the `CelString` into the
+/// `CowVal` the interpreter wants.
+///
 /// The path is read from the struct's field at call time, and the result is a
 /// `CelString` over the tail of *that same `&str`*: `path.strip_prefix(..)` only
 /// moves the start pointer. The bytes are never copied. The one allocation left is
-/// the `Box` around the 24-byte `CelString` itself, which is what makes it an
-/// owned `CowVal` (a `CowVal::Borrowed` needs a value that already exists to point
-/// at, and this one is computed here).
+/// the `Box` the macro puts around the 24-byte `CelString` itself.
 ///
-/// [`CelString::as_borrowed`] is what makes this possible: it hands back the
-/// field's `&'call str` itself, where `inner()` would only give a `&str` tied to
-/// this call, too short-lived to return.
-fn strip_version<'context, 'call>(
-    ftx: &mut FunctionContext<'context, 'call>,
-) -> Result<CowVal<'context, 'call>, ExecutionError> {
-    let request = this_request(ftx)?;
-    let path: &'call str = request
+/// The `'v` is what keeps this zero-copy through a by-reference receiver.
+/// [`CelString::as_borrowed`] hands back the field's own `&'v str` - the lifetime
+/// of *the data the struct borrows*, not of the borrow of the struct - so the
+/// result outlives the call even though `this` does not. `inner()` would only give
+/// a `&str` tied to this call, too short-lived to return.
+fn strip_version<'v>(this: &CelStruct<'v>) -> Result<CelString<'v>, ExecutionError> {
+    let path: &'v str = this
         .field_value("path")
         .and_then(|path| path.downcast_ref::<CelString>())
         .and_then(CelString::as_borrowed)
-        .ok_or_else(|| ftx.error("`path` must be a borrowed string"))?;
+        .ok_or_else(|| {
+            ExecutionError::function_error("stripVersion", "`path` must be a borrowed string")
+        })?;
 
     let stripped = VERSION_PREFIXES
         .iter()
@@ -126,12 +144,32 @@ fn strip_version<'context, 'call>(
                 .filter(|rest| rest.is_empty() || rest.starts_with('/'))
         })
         .unwrap_or(path);
-    Ok(CowVal::owned(CelString::from(stripped)))
+    Ok(CelString::from(stripped))
+}
+
+/// The `Env` both contexts below share: `stripVersion` is declared on it as a
+/// member overload of the request's struct type.
+///
+/// `receiver = ...` is needed because the macro otherwise derives the receiver's
+/// CEL type from `<CelStruct as Val>::cel_type()`, and a struct is named by its
+/// own type, so there is no static answer to give.
+fn env() -> Arc<Env> {
+    let mut env = Env::default();
+    cel::add_member_overload!(env, fn strip_version: (CelStruct) -> Result<CelString>,
+        receiver = Type::new_struct_type(REQUEST_TYPE), name = "stripVersion");
+    Arc::new(env)
 }
 
 /// `request.header(name)` - looks a header up case-insensitively and hands back a
 /// borrow of the value already stored in the request's `headers` map, rather than
 /// allocating a fresh string for it.
+///
+/// This is the case the overload macros cannot cover, and why it stays a
+/// [`RawFunction`]: the result is a `CowVal::Borrowed` pointing at a value inside
+/// the receiver, which needs the receiver at `'context`. A macro-generated wrapper
+/// owns its argument vector and lends the receiver out for less than that, so the
+/// best it could do is re-wrap the header's `&str` in a fresh `CelString` - no bytes
+/// copied, but an allocation this avoids entirely.
 fn header<'context, 'call>(
     ftx: &mut FunctionContext<'context, 'call>,
 ) -> Result<CowVal<'context, 'call>, ExecutionError> {
@@ -166,11 +204,11 @@ fn main() {
     };
 
     // The request must outlive the context: the struct bound below borrows from it.
-    let mut context = Context::default();
+    // `stripVersion` comes from the `Env`; `header` is registered here because it
+    // hands back a borrow of a value the request already holds, which the overload
+    // macros cannot express (see its doc comment).
+    let mut context = Context::with_env(env());
     context.add_variable_as_val("request", Box::new(request_struct(&request)));
-    context
-        .add_function("stripVersion", Box::new(strip_version) as RawFunction)
-        .unwrap();
     context
         .add_function("header", Box::new(header) as RawFunction)
         .unwrap();
@@ -207,11 +245,8 @@ fn main() {
         path: "/v10/users".to_string(),
         headers: vec![],
     };
-    let mut other = Context::default();
+    let mut other = Context::with_env(env());
     other.add_variable_as_val("request", Box::new(request_struct(&unversioned)));
-    other
-        .add_function("stripVersion", Box::new(strip_version) as RawFunction)
-        .unwrap();
     let ast = Parser::default().parse("request.stripVersion()").unwrap();
     let result = Value::resolve_val(&ast, &other).unwrap();
     let path = result.downcast_ref::<CelString>().unwrap().as_borrowed();

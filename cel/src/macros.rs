@@ -103,16 +103,47 @@ pub fn to_camel_case(snake: &str) -> String {
     out
 }
 
+/// How a registered fn hands its result back, and the conversion into a
+/// [`CowVal`](crate::common::value::CowVal). Not for direct use.
+///
+/// The `$ret` the caller wrote in the macro is used as the type annotation on
+/// the call's result, so a fn whose return type does not match is a compile
+/// error at the registration site rather than a surprise at runtime.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __overload_result {
+    // `-> T`: an owned value, boxed into the `CowVal`.
+    (owned, $ret:ty, $call:expr) => {{
+        let __v: $ret = $call;
+        ::std::result::Result::Ok($crate::common::value::CowVal::owned(__v))
+    }};
+    // `-> &T`: kept as a borrow. The reference has to outlive the call, so it
+    // cannot point into the arguments - those are owned by the wrapper.
+    (borrowed, $ret:ty, $call:expr) => {{
+        let __v: &$ret = $call;
+        ::std::result::Result::Ok($crate::common::value::CowVal::Borrowed(__v))
+    }};
+    // `-> Result<T>`: as `owned`, short-circuiting on the error.
+    (try_owned, $ret:ty, $call:expr) => {{
+        let __v: $ret = $call?;
+        ::std::result::Result::Ok($crate::common::value::CowVal::owned(__v))
+    }};
+    // `-> Result<&T>`: as `borrowed`, short-circuiting on the error.
+    (try_borrowed, $ret:ty, $call:expr) => {{
+        let __v: &$ret = $call?;
+        ::std::result::Result::Ok($crate::common::value::CowVal::Borrowed(__v))
+    }};
+}
+
 /// Register a member-function overload on an `Env` from a typed Rust `fn`
-/// item, generating the arg-downcast wrapper at expansion time.
+/// item, generating the arg-downcast and result-wrapping at expansion time.
 ///
 /// The syntax carries the CEL name (defaults to the Rust fn ident converted
 /// from `snake_case` to `camelCase`, so `fn ends_with` becomes `endsWith`),
 /// the overload id (defaults to `"{receiver}.{name}({rest_arg_types})"`,
 /// matching cel-cpp's `MakeOverloadSignature` format), the receiver +
 /// argument types (Rust types that implement
-/// [`Val`](crate::common::value::Val)), and the CEL type of the
-/// result.
+/// [`Val`](crate::common::value::Val)), and how the fn returns its result.
 ///
 /// # Shape
 ///
@@ -125,45 +156,126 @@ pub fn to_camel_case(snake: &str) -> String {
 /// );
 /// ```
 ///
-/// The referenced fn must have the signature
-/// `for<'b, 'v> fn(&Receiver[, &Arg]*) -> Result<CowVal<'b, 'v>, ExecutionError>`.
-/// It receives its arguments by reference, downcast from the call's
-/// [`CowVal`](crate::common::value::CowVal)s, and so cannot return a value
-/// borrowing from them; register a plain
-/// [`Function`](crate::common::functions::Function) by hand for that.
+/// The fn takes its receiver and arguments **by reference**, downcast from the
+/// call's [`CowVal`](crate::common::value::CowVal)s, and `<Ret>` says how it
+/// hands the result back - one of four shapes:
+///
+/// | `<Ret>` | fn returns | wrapped as |
+/// |---|---|---|
+/// | `T` | `T` | `CowVal::owned` |
+/// | `&T` | `&T` | `CowVal::Borrowed` |
+/// | `Result<T>` | `Result<T, ExecutionError>` | `CowVal::owned` |
+/// | `Result<&T>` | `Result<&T, ExecutionError>` | `CowVal::Borrowed` |
+///
+/// `Result<T, ExecutionError>` may also be spelled out in full. `<Ret>` is
+/// applied as the type annotation on the call, so a fn whose return type does
+/// not match is a compile error here.
+///
+/// Because the arguments are owned by the generated wrapper, a `&T` result
+/// cannot borrow *from them* - the borrow has to outlive the call. Returning a
+/// value that borrows from an argument needs a plain
+/// [`Function`](crate::common::functions::Function), written by hand.
 ///
 /// # Example
 ///
 /// ```ignore
-/// fn matches<'b, 'v>(
-///     this: &CelString<'_>,
-///     re: &CelString<'_>,
-/// ) -> Result<CowVal<'b, 'v>, ExecutionError> { … }
+/// fn matches(this: &CelString<'_>, re: &CelString<'_>) -> Result<CelBool, ExecutionError> { … }
 ///
-/// add_member_overload!(env, fn matches: (String, String) -> CelBool);
+/// add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>);
 /// // → registers CEL name "matches", overload id "string.matches(string)".
 /// ```
 ///
 /// # Optional overrides
 ///
-/// Both `name` and `id` may be given as trailing key-value args, in either
+/// `name`, `id` and `receiver` may be given as trailing key-value args, in any
 /// order. When only `name` is overridden the default id is built from the
 /// resolved name, so `name = "endsWith"` yields id `"string.endsWith(string)"`.
 ///
 /// ```ignore
-/// add_member_overload!(env, fn regex_matches: (String, String) -> CelBool,
+/// add_member_overload!(env, fn regex_matches: (String, String) -> Result<CelBool>,
 ///     name = "matches", id = "matches_regex");
+/// ```
+///
+/// `receiver = <Type expr>` supplies the receiver's CEL type instead of taking
+/// it from `<Receiver as Val>::cel_type()`. It is what makes a receiver whose
+/// runtime type is *per-instance* registrable at all - a
+/// [`CelStruct`](crate::common::types::CelStruct) is named by its own struct
+/// type, so it has no static `cel_type()` and the default would panic. The
+/// override is resolved before the id default, so the id still reads
+/// `"{receiver}.{name}({rest})"`:
+///
+/// ```ignore
+/// // `fn strip_version(this: &CelStruct<'v>) -> Result<CelString<'v>, _>`
+/// add_member_overload!(env, fn strip_version: (CelStruct) -> Result<CelString>,
+///     receiver = Type::new_struct_type("HttpRequest"), name = "stripVersion");
+/// // → CEL name "stripVersion", overload id "HttpRequest.stripVersion()".
+/// ```
+///
+/// A fn whose return type is not the declared `<Ret>` does not compile:
+///
+/// ```compile_fail
+/// use cel::common::types::{CelInt, CelString};
+/// use cel::Env;
+///
+/// fn len(this: &CelString<'_>) -> CelInt {
+///     CelInt::from(this.inner().len() as i64)
+/// }
+///
+/// let mut env = Env::default();
+/// // `len` returns a `CelInt`, not a `CelString`.
+/// cel::add_member_overload!(env, fn len: (CelString) -> CelString);
 /// ```
 #[macro_export]
 macro_rules! add_member_overload {
+    // The four result shapes, most specific first: `$ret:ty` would otherwise
+    // swallow `&T` and `Result<T>` whole. `Result`'s error type is always
+    // `ExecutionError`, so spelling it out is optional.
+    (
+        $env:expr,
+        fn $fn:ident : ( $this:ty $(, $other:ty )* $(,)? ) -> Result<&$ret:ty $(, $err:ty)?>
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_member_overload!(
+            try_borrowed, $env, fn $fn: ($this $(, $other)*) -> $ret $(, $key = $val)*)
+    };
+    (
+        $env:expr,
+        fn $fn:ident : ( $this:ty $(, $other:ty )* $(,)? ) -> Result<$ret:ty $(, $err:ty)?>
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_member_overload!(
+            try_owned, $env, fn $fn: ($this $(, $other)*) -> $ret $(, $key = $val)*)
+    };
+    (
+        $env:expr,
+        fn $fn:ident : ( $this:ty $(, $other:ty )* $(,)? ) -> &$ret:ty
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_member_overload!(
+            borrowed, $env, fn $fn: ($this $(, $other)*) -> $ret $(, $key = $val)*)
+    };
     (
         $env:expr,
         fn $fn:ident : ( $this:ty $(, $other:ty )* $(,)? ) -> $ret:ty
-        $(, $key:ident = $val:literal )*
-        $(,)?
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_member_overload!(
+            owned, $env, fn $fn: ($this $(, $other)*) -> $ret $(, $key = $val)*)
+    };
+}
+
+/// The body behind [`add_member_overload!`], with the result shape resolved to
+/// one of [`__overload_result!`]'s tags. Not for direct use.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __add_member_overload {
+    (
+        $shape:ident, $env:expr,
+        fn $fn:ident : ( $this:ty $(, $other:ty )* ) -> $ret:ty
+        $(, $key:ident = $val:expr )*
     ) => {{
-        // The wrapper: downcasts each `CowVal` to its declared Rust type and
-        // hands the references to the target fn.
+        // The wrapper: downcasts each `CowVal` to its declared Rust type,
+        // hands the references to the target fn, and wraps what comes back.
         fn __wrapper<'b, 'v>(
             args: ::std::vec::Vec<$crate::common::value::CowVal<'b, 'v>>,
         ) -> ::std::result::Result<
@@ -176,21 +288,20 @@ macro_rules! add_member_overload {
                 [::std::stringify!($this) $(, ::std::stringify!($other))*].len();
             let __actual = args.len();
             let mut __at = 0usize;
-            let __result: $crate::common::value::CowVal<'b, 'v> = $fn(
+            $crate::__overload_result!($shape, $ret, $fn(
                 $crate::__member_overload_extract!(args, __at, $this, __ARITY, __actual)
                 $(, $crate::__member_overload_extract!(args, __at, $other, __ARITY, __actual) )*
-            )?;
-            // The declared return type is what the overload is registered as
-            // answering to; a mismatch is a bug in the fn, not in the call.
-            ::std::debug_assert_eq!(
-                __result.get_type(),
-                <$ret as $crate::common::value::Val>::cel_type(),
-                "`{}` returned a {}",
-                ::std::stringify!($fn),
-                __result.get_type().name(),
-            );
-            ::std::result::Result::Ok(__result)
+            ))
         }
+
+        // The receiver's CEL type. `receiver = ...` overrides it, and the
+        // default is only evaluated when it does not: a receiver whose type is
+        // per-instance has no static `cel_type()` to fall back on.
+        let __receiver: ::std::option::Option<$crate::common::types::Type> =
+            ::std::option::Option::None;
+        $( $crate::__overload_receiver_override!(__receiver, $key = $val); )*
+        let __receiver: $crate::common::types::Type = __receiver
+            .unwrap_or_else(|| <$this as $crate::common::value::Val>::cel_type().to_owned());
 
         // CEL name defaults to the fn ident. `name = "..."` overrides apply
         // first so the id default sees the resolved name (matching cel-cpp).
@@ -205,7 +316,7 @@ macro_rules! add_member_overload {
         ];
         let __id: ::std::string::String = ::std::format!(
             "{}.{}({})",
-            <$this as $crate::common::value::Val>::cel_type().name(),
+            __receiver.name(),
             __name,
             __rest_types.join(","),
         );
@@ -214,7 +325,7 @@ macro_rules! add_member_overload {
         $env.add_member_overload(
             &__name,
             &__id,
-            <$this as $crate::common::value::Val>::cel_type().to_owned(),
+            __receiver,
             ::std::vec![
                 $( <$other as $crate::common::value::Val>::cel_type().to_owned() ),*
             ],
@@ -254,30 +365,46 @@ macro_rules! __member_overload_extract {
     }};
 }
 
-/// Internal helper: applies only `name = "..."` overrides (silently ignoring
-/// any `id = ...`) so name resolution happens before id defaulting.
+/// Internal helper: applies only `name = "..."` overrides (ignoring the other
+/// keys) so name resolution happens before id defaulting.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __overload_name_override {
-    ($bind:ident, name = $val:literal) => {
+    ($bind:ident, name = $val:expr) => {
         let $bind: ::std::string::String = ::std::string::String::from($val);
     };
-    ($bind:ident, id = $val:literal) => {};
+    ($bind:ident, id = $val:expr) => {};
+    ($bind:ident, receiver = $val:expr) => {};
 }
 
-/// Internal helper: applies only `id = "..."` overrides (silently ignoring
-/// any `name = ...`).
+/// Internal helper: applies only `id = "..."` overrides (ignoring the others).
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __overload_id_override {
-    ($bind:ident, id = $val:literal) => {
+    ($bind:ident, id = $val:expr) => {
         let $bind: ::std::string::String = ::std::string::String::from($val);
     };
-    ($bind:ident, name = $val:literal) => {};
+    ($bind:ident, name = $val:expr) => {};
+    ($bind:ident, receiver = $val:expr) => {};
+}
+
+/// Internal helper: applies only `receiver = ...` overrides (ignoring the
+/// others), so the receiver type is resolved before the id default uses its
+/// name.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __overload_receiver_override {
+    ($bind:ident, receiver = $val:expr) => {
+        let $bind: ::std::option::Option<$crate::common::types::Type> =
+            ::std::option::Option::Some($val);
+    };
+    ($bind:ident, name = $val:expr) => {};
+    ($bind:ident, id = $val:expr) => {};
 }
 
 /// Register a global (non-member) function overload on an `Env` from a typed
-/// Rust `fn` item, generating the arg-downcast wrapper at expansion time.
+/// Rust `fn` item, generating the arg-downcast and result-wrapping at
+/// expansion time.
 ///
 /// Mirrors [`add_member_overload!`] but delegates to `Env::add_overload` and
 /// treats every parameter as a regular arg (no `this`-receiver split).
@@ -293,12 +420,9 @@ macro_rules! __overload_id_override {
 /// );
 /// ```
 ///
-/// The referenced fn must have the signature
-/// `for<'b, 'v> fn(&Arg*) -> Result<CowVal<'b, 'v>, ExecutionError>`. As with
-/// [`add_member_overload!`], the arguments arrive by reference, so the result
-/// cannot borrow from them.
-///
 /// Zero-argument overloads are supported: use `()` for the parameter list.
+/// `<Ret>` takes the same four shapes as [`add_member_overload!`]'s, with the
+/// same caveat on `&T` results.
 ///
 /// # Default naming
 ///
@@ -315,12 +439,47 @@ macro_rules! __overload_id_override {
 /// key-value args, in either order.
 #[macro_export]
 macro_rules! add_overload {
-    // Non-empty arg list.
+    // The four result shapes, most specific first - see `add_member_overload!`.
     (
         $env:expr,
-        fn $fn:ident : ( $first:ty $(, $rest:ty )* $(,)? ) -> $ret:ty
-        $(, $key:ident = $val:literal )*
-        $(,)?
+        fn $fn:ident : ( $($arg:ty),* $(,)? ) -> Result<&$ret:ty $(, $err:ty)?>
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_overload!(try_borrowed, $env, fn $fn: ($($arg),*) -> $ret $(, $key = $val)*)
+    };
+    (
+        $env:expr,
+        fn $fn:ident : ( $($arg:ty),* $(,)? ) -> Result<$ret:ty $(, $err:ty)?>
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_overload!(try_owned, $env, fn $fn: ($($arg),*) -> $ret $(, $key = $val)*)
+    };
+    (
+        $env:expr,
+        fn $fn:ident : ( $($arg:ty),* $(,)? ) -> &$ret:ty
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_overload!(borrowed, $env, fn $fn: ($($arg),*) -> $ret $(, $key = $val)*)
+    };
+    (
+        $env:expr,
+        fn $fn:ident : ( $($arg:ty),* $(,)? ) -> $ret:ty
+        $(, $key:ident = $val:expr )* $(,)?
+    ) => {
+        $crate::__add_overload!(owned, $env, fn $fn: ($($arg),*) -> $ret $(, $key = $val)*)
+    };
+}
+
+/// The body behind [`add_overload!`], with the result shape resolved to one of
+/// [`__overload_result!`]'s tags. Handles the zero-argument case too. Not for
+/// direct use.
+#[doc(hidden)]
+#[macro_export]
+macro_rules! __add_overload {
+    (
+        $shape:ident, $env:expr,
+        fn $fn:ident : ( $($arg:ty),* ) -> $ret:ty
+        $(, $key:ident = $val:expr )*
     ) => {{
         fn __wrapper<'b, 'v>(
             args: ::std::vec::Vec<$crate::common::value::CowVal<'b, 'v>>,
@@ -328,22 +487,19 @@ macro_rules! add_overload {
             $crate::common::value::CowVal<'b, 'v>,
             $crate::ExecutionError,
         > {
-            const __ARITY: usize =
-                [::std::stringify!($first) $(, ::std::stringify!($rest))*].len();
+            // Spelled out via a slice so that a zero-arg overload, where there
+            // is no element to infer from, still has an element type.
+            const __ARITY: usize = {
+                const __ARGS: &[&str] = &[$(::std::stringify!($arg)),*];
+                __ARGS.len()
+            };
+            let _ = &args;
             let __actual = args.len();
             let mut __at = 0usize;
-            let __result: $crate::common::value::CowVal<'b, 'v> = $fn(
-                $crate::__member_overload_extract!(args, __at, $first, __ARITY, __actual)
-                $(, $crate::__member_overload_extract!(args, __at, $rest, __ARITY, __actual) )*
-            )?;
-            ::std::debug_assert_eq!(
-                __result.get_type(),
-                <$ret as $crate::common::value::Val>::cel_type(),
-                "`{}` returned a {}",
-                ::std::stringify!($fn),
-                __result.get_type().name(),
-            );
-            ::std::result::Result::Ok(__result)
+            let _ = &mut __at;
+            $crate::__overload_result!($shape, $ret, $fn(
+                $( $crate::__member_overload_extract!(args, __at, $arg, __ARITY, __actual) ),*
+            ))
         }
 
         let __name: ::std::string::String =
@@ -352,8 +508,7 @@ macro_rules! add_overload {
 
         // Id default: `name(arg_types_comma_separated)` — cel-cpp format.
         let __arg_types: ::std::vec::Vec<&str> = ::std::vec![
-            <$first as $crate::common::value::Val>::cel_type().name()
-            $(, <$rest as $crate::common::value::Val>::cel_type().name() )*
+            $( <$arg as $crate::common::value::Val>::cel_type().name() ),*
         ];
         let __id: ::std::string::String =
             ::std::format!("{}({})", __name, __arg_types.join(","));
@@ -363,48 +518,11 @@ macro_rules! add_overload {
             &__name,
             &__id,
             ::std::vec![
-                <$first as $crate::common::value::Val>::cel_type().to_owned()
-                $(, <$rest as $crate::common::value::Val>::cel_type().to_owned() )*
+                $( <$arg as $crate::common::value::Val>::cel_type().to_owned() ),*
             ],
             __wrapper,
         )
         .expect("Must be unique id");
-    }};
-
-    // Zero-argument overload.
-    (
-        $env:expr,
-        fn $fn:ident : ( ) -> $ret:ty
-        $(, $key:ident = $val:literal )*
-        $(,)?
-    ) => {{
-        fn __wrapper<'b, 'v>(
-            _args: ::std::vec::Vec<$crate::common::value::CowVal<'b, 'v>>,
-        ) -> ::std::result::Result<
-            $crate::common::value::CowVal<'b, 'v>,
-            $crate::ExecutionError,
-        > {
-            let __result: $crate::common::value::CowVal<'b, 'v> = $fn()?;
-            ::std::debug_assert_eq!(
-                __result.get_type(),
-                <$ret as $crate::common::value::Val>::cel_type(),
-                "`{}` returned a {}",
-                ::std::stringify!($fn),
-                __result.get_type().name(),
-            );
-            ::std::result::Result::Ok(__result)
-        }
-
-        let __name: ::std::string::String =
-            $crate::to_camel_case(::std::stringify!($fn));
-        $( $crate::__overload_name_override!(__name, $key = $val); )*
-
-        // Zero-arg id default: `name()` — cel-cpp format.
-        let __id: ::std::string::String = ::std::format!("{}()", __name);
-        $( $crate::__overload_id_override!(__id, $key = $val); )*
-
-        $env.add_overload(&__name, &__id, ::std::vec::Vec::new(), __wrapper)
-            .expect("Must be unique id");
     }};
 }
 
@@ -430,30 +548,33 @@ mod tests {
 
     // --- Fixture fns used across the tests below. -----------------------
 
-    fn ping<'b, 'v>(_x: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-        Ok(CowVal::owned(CelInt::from(0)))
+    fn ping(_x: &CelString<'_>) -> CelInt {
+        CelInt::from(0)
     }
-    fn ping2<'b, 'v>(
-        _a: &CelString<'_>,
-        _b: &CelString<'_>,
-    ) -> Result<CowVal<'b, 'v>, ExecutionError> {
-        Ok(CowVal::owned(CelInt::from(0)))
+    fn ping2(_a: &CelString<'_>, _b: &CelString<'_>) -> CelInt {
+        CelInt::from(0)
     }
-    fn ping2_bool<'b, 'v>(
-        _a: &CelString<'_>,
-        _b: &CelString<'_>,
-    ) -> Result<CowVal<'b, 'v>, ExecutionError> {
-        Ok(CowVal::owned(CelBool::from(false)))
+    fn ping2_bool(_a: &CelString<'_>, _b: &CelString<'_>) -> CelBool {
+        CelBool::from(false)
     }
     // Named to exercise snake_case -> camelCase conversion of the CEL name.
-    fn ends_with<'b, 'v>(
-        _a: &CelString<'_>,
-        _b: &CelString<'_>,
-    ) -> Result<CowVal<'b, 'v>, ExecutionError> {
-        Ok(CowVal::owned(CelBool::from(false)))
+    fn ends_with(_a: &CelString<'_>, _b: &CelString<'_>) -> CelBool {
+        CelBool::from(false)
     }
-    fn ping0<'b, 'v>() -> Result<CowVal<'b, 'v>, ExecutionError> {
-        Ok(CowVal::owned(CelInt::from(0)))
+    fn ping0() -> CelInt {
+        CelInt::from(0)
+    }
+
+    // --- the other three result shapes ---------------------------------
+
+    fn fallible(_x: &CelString<'_>) -> Result<CelInt, ExecutionError> {
+        Ok(CelInt::from(0))
+    }
+    fn borrows(_x: &CelString<'_>) -> &'static CelBool {
+        &CelBool::TRUE
+    }
+    fn fallible_borrows(_x: &CelString<'_>) -> Result<&'static CelBool, ExecutionError> {
+        Ok(&CelBool::TRUE)
     }
 
     /// A raw [`Function`](crate::common::functions::Function) used as the
@@ -611,6 +732,167 @@ mod tests {
         crate::add_overload!(env, fn ping: (CelString) -> CelInt, id = "explicit");
         assert!(env
             .add_overload("ping", "explicit", vec![types::STRING_TYPE], noop)
+            .is_err());
+    }
+
+    // --- the four result shapes ---------------------------------------
+    //
+    // Each registers through a different `__overload_result!` arm; calling the
+    // wrapper back checks the value actually made it into the `CowVal`.
+
+    fn call(env: &Env, name: &str) -> CowVal<'static, 'static> {
+        let wrapper = env.find_overload(name, &[string_arg()]).unwrap();
+        wrapper(vec![string_arg()]).unwrap()
+    }
+
+    #[test]
+    fn a_plain_value_is_wrapped_as_owned() {
+        let mut env = Env::default();
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt);
+        let out = call(&env, "ping");
+        assert!(out.is_owned());
+        assert_eq!(out.downcast_ref::<CelInt>(), Some(&CelInt::from(0)));
+    }
+
+    #[test]
+    fn a_result_value_is_wrapped_as_owned() {
+        let mut env = Env::default();
+        crate::add_overload!(env, fn fallible: (CelString) -> Result<CelInt>);
+        let out = call(&env, "fallible");
+        assert!(out.is_owned());
+        assert_eq!(out.downcast_ref::<CelInt>(), Some(&CelInt::from(0)));
+    }
+
+    /// `Result<T, ExecutionError>` may also be spelled out in full.
+    #[test]
+    fn a_result_shape_accepts_an_explicit_error_type() {
+        let mut env = Env::default();
+        crate::add_overload!(env, fn fallible: (CelString) -> Result<CelInt, ExecutionError>);
+        assert_eq!(
+            call(&env, "fallible").downcast_ref::<CelInt>(),
+            Some(&CelInt::from(0))
+        );
+    }
+
+    #[test]
+    fn a_reference_is_kept_as_a_borrow() {
+        let mut env = Env::default();
+        crate::add_overload!(env, fn borrows: (CelString) -> &CelBool);
+        let out = call(&env, "borrows");
+        assert!(out.is_borrowed(), "a `&T` result should not be boxed");
+        assert_eq!(out.downcast_ref::<CelBool>(), Some(&CelBool::TRUE));
+    }
+
+    #[test]
+    fn a_result_reference_is_kept_as_a_borrow() {
+        let mut env = Env::default();
+        crate::add_overload!(env, fn fallible_borrows: (CelString) -> Result<&CelBool>);
+        let out = call(&env, "fallibleBorrows");
+        assert!(out.is_borrowed(), "a `&T` result should not be boxed");
+        assert_eq!(out.downcast_ref::<CelBool>(), Some(&CelBool::TRUE));
+    }
+
+    /// The error from a failing fn reaches the caller unchanged.
+    #[test]
+    fn a_result_shape_propagates_the_error() {
+        fn boom(_x: &CelString<'_>) -> Result<CelInt, ExecutionError> {
+            Err(ExecutionError::function_error("boom", "nope"))
+        }
+        let mut env = Env::default();
+        crate::add_overload!(env, fn boom: (CelString) -> Result<CelInt>);
+        let wrapper = env.find_overload("boom", &[string_arg()]).unwrap();
+        assert_eq!(
+            wrapper(vec![string_arg()]).err(),
+            Some(ExecutionError::function_error("boom", "nope")),
+        );
+    }
+
+    // --- receiver override --------------------------------------------
+
+    /// The override, not `<Receiver as Val>::cel_type()`, supplies the receiver
+    /// type - and the id default is built from it. Registration only: the Rust
+    /// receiver stays `CelString`, and the CEL type is an opaque one, so the
+    /// test needs no `structs` feature.
+    #[test]
+    fn a_receiver_override_supplies_the_type_and_drives_the_id() {
+        use crate::common::types::Type;
+
+        let mut env = Env::default();
+        crate::add_member_overload!(env, fn ping: (CelString) -> CelInt,
+            receiver = Type::new_opaque_type("HttpRequest"));
+        // Default id reads from the overridden receiver, not from `string`.
+        assert!(env
+            .add_member_overload(
+                "ping",
+                "HttpRequest.ping()",
+                Type::new_opaque_type("HttpRequest"),
+                vec![],
+                noop,
+            )
+            .is_err());
+        // ... and the un-overridden id is therefore free.
+        assert!(env
+            .add_member_overload("ping", "string.ping()", types::STRING_TYPE, vec![], noop)
+            .is_ok());
+    }
+
+    /// The override is independent of `id`: an explicit id still wins.
+    #[test]
+    fn a_receiver_override_composes_with_an_explicit_id() {
+        use crate::common::types::Type;
+
+        let mut env = Env::default();
+        crate::add_member_overload!(env, fn ping: (CelString) -> CelInt,
+            receiver = Type::new_opaque_type("Req"), id = "explicit");
+        assert!(env
+            .add_member_overload(
+                "ping",
+                "explicit",
+                Type::new_opaque_type("Req"),
+                vec![],
+                noop
+            )
+            .is_err());
+    }
+
+    /// The motivating case: a `CelStruct` receiver is named by its own struct
+    /// type, so without the override the default is reached and panics rather
+    /// than inventing a type.
+    #[test]
+    #[cfg(feature = "structs")]
+    #[should_panic(expected = "no static `Val::cel_type()`")]
+    fn a_struct_receiver_without_the_override_panics() {
+        use crate::common::types::CelStruct;
+
+        fn on_struct(_this: &CelStruct<'_>) -> CelInt {
+            CelInt::from(0)
+        }
+
+        let mut env = Env::default();
+        crate::add_member_overload!(env, fn on_struct: (CelStruct) -> CelInt);
+    }
+
+    /// ... and with it, the same fn registers fine.
+    #[test]
+    #[cfg(feature = "structs")]
+    fn a_struct_receiver_registers_with_the_override() {
+        use crate::common::types::{CelStruct, Type};
+
+        fn on_struct(_this: &CelStruct<'_>) -> CelInt {
+            CelInt::from(0)
+        }
+
+        let mut env = Env::default();
+        crate::add_member_overload!(env, fn on_struct: (CelStruct) -> CelInt,
+            receiver = Type::new_struct_type("HttpRequest"), name = "onStruct");
+        assert!(env
+            .add_member_overload(
+                "onStruct",
+                "HttpRequest.onStruct()",
+                Type::new_struct_type("HttpRequest"),
+                vec![],
+                noop,
+            )
             .is_err());
     }
 
