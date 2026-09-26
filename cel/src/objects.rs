@@ -1411,8 +1411,10 @@ impl Value {
                     }
                 }
             }
+            // a variable shadows a type of the same name
             Expr::Ident(name) => Ok(ctx
                 .get_variable(name)
+                .or_else(|| CelType::for_ident(name).map(CowVal::owned))
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
@@ -2553,6 +2555,50 @@ mod tests {
         let result = p.execute(&ctx);
 
         assert!(result.is_err(), "Should error on missing map key");
+    }
+
+    /// The built-in type names are identifiers resolving to type values.
+    #[test]
+    fn type_names_resolve_as_type_values() {
+        let context = Context::default();
+        for expr in [
+            "type(true) == bool",
+            "type(b'') == bytes",
+            "type(1.0) == double",
+            "type(1) == int",
+            "type([]) == list",
+            "type({}) == map",
+            "type(null) == null_type",
+            "type(optional.none()) == optional_type",
+            "type('') == string",
+            "type(int) == type",
+            "type(1u) == uint",
+        ] {
+            let program = Program::compile(expr).unwrap();
+            assert_eq!(program.execute(&context), Ok(Value::Bool(true)), "{expr}");
+        }
+    }
+
+    /// A variable shadows a type of the same name, whether bound on the
+    /// context or by a comprehension in a child scope.
+    #[test]
+    fn a_variable_shadows_a_type_name() {
+        let mut context = Context::default();
+        context.add_variable_from_value("int", 42);
+        let program = Program::compile("int").unwrap();
+        assert_eq!(program.execute(&context), Ok(Value::Int(42)));
+
+        let context = Context::default();
+        let program = Program::compile("[1].map(int, int + 1)").unwrap();
+        assert_eq!(program.execute(&context), Ok(vec![2].into()));
+    }
+
+    #[test]
+    fn an_unknown_identifier_is_an_undeclared_reference() {
+        test_execution_error(
+            "not_a_type",
+            ExecutionError::UndeclaredReference(Arc::new("not_a_type".to_string())),
+        );
     }
 
     mod opaque {
