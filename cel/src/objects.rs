@@ -362,7 +362,9 @@ where
 /// ```rust
 /// use std::fmt::{Debug, Formatter, Result as FmtResult};
 /// use std::sync::Arc;
+/// use cel::common::types::Type;
 /// use cel::objects::{Opaque, Value};
+/// use cel::{Context, Env, Program};
 ///
 /// #[derive(Eq, PartialEq)]
 /// struct MyId(u64);
@@ -379,6 +381,15 @@ where
 /// let a = Value::Opaque(Arc::new(MyId(7)));
 /// let b = Value::Opaque(Arc::new(MyId(7)));
 /// assert_eq!(a, b);
+///
+/// // Registering its type lets expressions name it.
+/// let mut env = Env::stdlib();
+/// env.add_type(Type::new_opaque_type("example.MyId")).unwrap();
+/// let mut context = Context::with_env(Arc::new(env));
+/// context.add_variable_from_value("id", a);
+///
+/// let program = Program::compile("type(id) == example.MyId").unwrap();
+/// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
 /// ```
 pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
     /// Returns a stable, fully-qualified type name for this value's runtime type.
