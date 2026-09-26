@@ -36,7 +36,8 @@ pub trait StructType: Send + Sync {
 /// the environment's libraries register their types, e.g. the standard
 /// library registers `int` and `optional_type`.
 ///
-/// A struct type registered with [`StructType`] can also be constructed.
+/// A struct type, registered as a `StructType` with the `structs` feature,
+/// can also be constructed.
 #[derive(Default)]
 pub struct TypeRegistry {
     types: BTreeMap<String, Type>,
