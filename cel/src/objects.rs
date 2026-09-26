@@ -1347,25 +1347,16 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let mut args = args?;
-                        // The call is tried as a method call first. Only when
-                        // that fails does a target spelling a qualified name
-                        // that, with the function's, names a function make
-                        // this a call to that function: `optional.of(x)` calls
-                        // `optional.of`. cel-go favors the function, but
-                        // resolves it once, when planning.
-                        let target = match Value::resolve_val(target_expr, ctx) {
-                            Ok(target) => target,
-                            Err(error) => {
-                                return match qualified_function_name(
-                                    ctx,
-                                    target_expr,
-                                    &call.func_name,
-                                ) {
-                                    Some(name) => call_function(ctx, &name, &call.func_name, args),
-                                    None => Err(error),
-                                };
-                            }
-                        };
+                        // As in cel-go, a call whose target spells a qualified
+                        // name that, with the function's, names a function is
+                        // a call to that function: `optional.of(x)` calls
+                        // `optional.of`.
+                        if let Some(name) =
+                            qualified_function_name(ctx, target_expr, &call.func_name)
+                        {
+                            return call_function(ctx, &name, &call.func_name, args);
+                        }
+                        let target = Value::resolve_val(target_expr, ctx)?;
                         args.insert(0, target);
                         if let Some(op) = ctx.env().find_member_overload(&call.func_name, &args) {
                             return op(args);
@@ -1373,12 +1364,6 @@ impl Value {
                         let func = match ctx.get_function(&call.func_name) {
                             Some(func) => func,
                             None => {
-                                if let Some(name) =
-                                    qualified_function_name(ctx, target_expr, &call.func_name)
-                                {
-                                    args.remove(0);
-                                    return call_function(ctx, &name, &call.func_name, args);
-                                }
                                 return Err(if ctx.env().has_member_overload(&call.func_name) {
                                     ExecutionError::overload_for_values(
                                         &call.func_name,
@@ -1723,8 +1708,12 @@ fn call_function<'e, 'p, 'v>(
 /// The name of the function a call on `target` names when `target` spells a
 /// qualified name: `a.b.f()` calls the function `a.b.f`, if there is one,
 /// rather than `f` on `a.b`. Mirrors cel-go's `resolveFunction`, deciding on
-/// the name alone.
+/// the name alone, but on every evaluation: a target whose first segment is
+/// no function's namespace, as most are, is told apart without allocating.
 fn qualified_function_name(ctx: &Context, target: &Expression, func_name: &str) -> Option<String> {
+    if !ctx.has_function_namespace(target.expr.qualified_name_root()?) {
+        return None;
+    }
     let segments = target.expr.qualified_name_segments()?;
     let mut name = String::with_capacity(
         segments.iter().map(|s| s.len() + 1).sum::<usize>() + func_name.len(),
@@ -2942,11 +2931,10 @@ mod tests {
             assert!(error.to_string().contains("a.b.f"), "{error}");
         }
 
-        /// The qualified name is only a fallback: a method that applies to
-        /// the target is called first. cel-go resolves the qualified function
-        /// first instead, once at planning; that awaits our own planning phase.
+        /// As in cel-go, the qualified function is called rather than a
+        /// method that applies to the target.
         #[test]
-        fn a_method_is_tried_before_a_qualified_function() {
+        fn a_qualified_function_is_called_before_a_method() {
             fn forty_two<'b, 'v>(_: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
                 Ok(CowVal::owned(CelInt::from(42)))
             }
@@ -2955,7 +2943,33 @@ mod tests {
                 .unwrap();
             let mut context = Context::with_env(Arc::new(env));
             context.add_variable_from_value("m", vec![1, 2]);
-            assert_eq!(execute(&context, "m.size()"), Ok(Value::Int(2)));
+            assert_eq!(execute(&context, "m.size()"), Ok(Value::Int(42)));
+        }
+
+        /// A namespace of functions is no function: a call with no function
+        /// of its qualified name is a method call.
+        #[test]
+        fn a_method_is_called_on_a_variable_named_as_a_namespace() {
+            let mut context = Context::default();
+            context.add_variable_from_value("optional", vec![1, 2]);
+            assert_eq!(execute(&context, "optional.size()"), Ok(Value::Int(2)));
+            assert_eq!(
+                execute(&context, "optional.of(1).hasValue()"),
+                Ok(Value::Bool(true))
+            );
+        }
+
+        /// A comprehension's scope finds the namespaces of its root context.
+        #[test]
+        fn a_qualified_function_is_called_in_a_child_scope() {
+            let context = context_with_overload("a.f");
+            assert_eq!(execute(&context, "[1].map(x, a.f(x))"), Ok(vec![2].into()));
+            let mut context = Context::default();
+            context.add_function("a.b.f", |i: i64| i + 1).unwrap();
+            assert_eq!(
+                execute(&context, "[1].map(x, a.b.f(x))"),
+                Ok(vec![2].into())
+            );
         }
 
         #[test]

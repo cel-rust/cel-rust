@@ -10,7 +10,7 @@ use crate::DeclarationError;
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
-    BTreeMap,
+    BTreeMap, BTreeSet,
 };
 
 /// An environment for the CEL execution.
@@ -54,6 +54,7 @@ use std::collections::{
 /// ```
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
+    namespaces: BTreeSet<String>,
     types: TypeRegistry,
     error_on_duplicate_map_keys: bool,
 }
@@ -62,6 +63,7 @@ impl Default for Env {
     fn default() -> Self {
         Env {
             functions: BTreeMap::new(),
+            namespaces: BTreeSet::new(),
             types: TypeRegistry::default(),
             error_on_duplicate_map_keys: true,
         }
@@ -119,6 +121,9 @@ impl Env {
                 let mut value = FunctionDecl::new(name);
                 value.add_overload(id.to_string(), false, args, op)?;
                 vacant_entry.insert(value);
+                if let Some((namespace, _)) = name.split_once('.') {
+                    self.namespaces.insert(namespace.to_owned());
+                }
                 Ok(())
             }
             Occupied(occupied_entry) => {
@@ -127,6 +132,10 @@ impl Env {
                     .add_overload(id.to_string(), false, args, op)
             }
         }
+    }
+
+    pub(crate) fn has_namespace(&self, namespace: &str) -> bool {
+        self.namespaces.contains(namespace)
     }
 
     /// Finds a global function overload that matches the given name and arguments.
@@ -418,6 +427,19 @@ mod tests {
     #[test]
     fn test_env_default() {
         let _: Arc<dyn Send + Sync> = Arc::new(Env::default());
+    }
+
+    #[test]
+    fn a_qualified_overload_declares_its_namespace() {
+        let mut env = Env::default();
+        env.add_overload("a.b.f", "a_b_f", vec![], noop).unwrap();
+        env.add_overload("g", "g", vec![], noop).unwrap();
+        env.add_member_overload("c.m", "c_m", types::INT_TYPE, vec![], noop)
+            .unwrap();
+        assert!(env.has_namespace("a"));
+        assert!(!env.has_namespace("a.b"));
+        assert!(!env.has_namespace("g"));
+        assert!(!env.has_namespace("c"), "member overloads aren't qualified");
     }
 
     #[test]

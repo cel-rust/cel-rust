@@ -6,7 +6,7 @@ use crate::macros::{impl_conversions, impl_handler};
 use crate::objects::Opaque;
 use crate::resolvers::AllArguments;
 use crate::{ExecutionError, FunctionContext, Value};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 impl_conversions!(
@@ -476,6 +476,7 @@ impl_handler!(C1, C2, C3, C4, C5, C6, C7, C8, C9);
 #[derive(Default)]
 pub struct FunctionRegistry {
     functions: BTreeMap<String, Function>,
+    namespaces: BTreeSet<String>,
 }
 
 impl FunctionRegistry {
@@ -486,6 +487,13 @@ impl FunctionRegistry {
     {
         self.functions
             .insert(name.to_string(), function.into_function());
+        if let Some((namespace, _)) = name.split_once('.') {
+            self.namespaces.insert(namespace.to_owned());
+        }
+    }
+
+    pub(crate) fn has_namespace(&self, namespace: &str) -> bool {
+        self.namespaces.contains(namespace)
     }
 
     #[allow(dead_code)]
