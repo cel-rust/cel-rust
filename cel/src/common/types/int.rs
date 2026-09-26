@@ -1,6 +1,6 @@
 use crate::common::traits::Negator;
 use crate::common::traits::{self, Comparer};
-use crate::common::types::{CelDouble, CelString, CelUInt, Kind, Type};
+use crate::common::types::{CelDouble, CelString, CelUInt, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::ExecutionError;
 use std::any::Any;
@@ -30,6 +30,10 @@ impl Deref for Int {
 
 impl Val for Int {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::INT_TYPE
     }
 
@@ -277,69 +281,57 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a i64 {
     }
 }
 
-fn int<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    let arg = args.remove(0);
-    if arg.downcast_ref::<Int>().is_some() {
-        return Ok(arg);
-    }
-    let overflow = || ExecutionError::FunctionError {
-        function: "int".to_owned(),
-        message: "integer overflow".to_owned(),
-    };
-    let converted: Option<i64> =
-        match arg.get_type().kind() {
-            Kind::UInt => match arg.downcast_ref::<CelUInt>() {
-                None => None,
-                Some(u) => Some(i64::try_from(*u.inner()).map_err(|_| overflow())?),
-            },
-            Kind::Double => match arg.downcast_ref::<CelDouble>() {
-                None => None,
-                Some(d) => {
-                    let value = *d.inner();
-                    // Double to int conversions are limited to (minInt, maxInt) non-inclusive.
-                    // 'i64::MAX as f64' rounds up to 2^63, and the largest double below that
-                    // is 2^63 - 2^10, so the check also keeps 'value as i64' from saturating.
-                    // 'i64::MIN as f64' is exactly -(2^63), so the exclusive lower bound
-                    // rejects a double that i64 could actually hold. NaN, -infinity and
-                    // infinity will also be rejected.
-                    if !(value > (i64::MIN as f64) && value < (i64::MAX as f64)) {
-                        return Err(overflow());
-                    }
-                    Some(value as i64)
-                }
-            },
-            Kind::String => {
-                match arg.downcast_ref::<CelString>() {
-                    None => None,
-                    Some(s) => Some(s.inner().parse::<i64>().map_err(|e| {
-                        ExecutionError::FunctionError {
-                            function: "int".to_owned(),
-                            message: format!("string parse error: {e}"),
-                        }
-                    })?),
-                }
-            }
-            _ => None,
-        };
+fn int_from_int(this: &Int) -> Int {
+    *this
+}
 
-    match converted {
-        Some(value) => Ok(CowVal::owned(Int::from(value))),
-        None => Err(ExecutionError::FunctionError {
+fn int_from_uint(this: &CelUInt) -> Result<Int, ExecutionError> {
+    match i64::try_from(*this.inner()) {
+        Ok(value) => Ok(Int::from(value)),
+        Err(_) => Err(ExecutionError::FunctionError {
             function: "int".to_owned(),
-            message: format!("cannot convert {:?} to int", arg.as_ref()),
+            message: "integer overflow".to_owned(),
         }),
     }
 }
 
+fn int_from_double(this: &CelDouble) -> Result<Int, ExecutionError> {
+    let value = *this.inner();
+    // Double to int conversions are limited to (minInt, maxInt) non-inclusive.
+    // 'i64::MAX as f64' rounds up to 2^63, and the largest double below that
+    // is 2^63 - 2^10, so the check also keeps 'value as i64' from saturating.
+    // 'i64::MIN as f64' is exactly -(2^63), so the exclusive lower bound
+    // rejects a double that i64 could actually hold. NaN, -infinity and
+    // infinity will also be rejected.
+    if !(value > (i64::MIN as f64) && value < (i64::MAX as f64)) {
+        Err(ExecutionError::FunctionError {
+            function: "int".to_owned(),
+            message: "integer overflow".to_owned(),
+        })
+    } else {
+        Ok(Int::from(value as i64))
+    }
+}
+
+fn int_from_string(this: &CelString<'_>) -> Result<Int, ExecutionError> {
+    this.inner()
+        .parse::<i64>()
+        .map(Int::from)
+        .map_err(|e| ExecutionError::FunctionError {
+            function: "int".to_owned(),
+            message: format!("string parse error: {e}"),
+        })
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload("int", "int64_to_int64", vec![super::INT_TYPE], int)
-        .expect("Must be unique id");
-    env.add_overload("int", "uint64_to_int64", vec![super::UINT_TYPE], int)
-        .expect("Must be unique id");
-    env.add_overload("int", "double_to_int64", vec![super::DOUBLE_TYPE], int)
-        .expect("Must be unique id");
-    env.add_overload("int", "string_to_int64", vec![super::STRING_TYPE], int)
-        .expect("Must be unique id");
+    crate::add_overload!(env, fn int_from_int: (Int) -> Int,
+        name = "int", id = "int64_to_int64");
+    crate::add_overload!(env, fn int_from_uint: (CelUInt) -> Result<Int>,
+        name = "int", id = "uint64_to_int64");
+    crate::add_overload!(env, fn int_from_double: (CelDouble) -> Result<Int>,
+        name = "int", id = "double_to_int64");
+    crate::add_overload!(env, fn int_from_string: (CelString) -> Result<Int>,
+        name = "int", id = "string_to_int64");
 }
 
 #[cfg(test)]

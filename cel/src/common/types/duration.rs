@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
-use crate::common::types::{CelInt, Type};
+use crate::common::types::{CelInt, CelString, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use std::any::Any;
@@ -28,6 +28,10 @@ impl Deref for Duration {
 
 impl Val for Duration {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::DURATION_TYPE
     }
 
@@ -164,83 +168,42 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a chrono::Duration {
     }
 }
 
-fn millis<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
-        Ok(Box::new(CelInt::from(ts.inner().num_milliseconds())))
-    })
+fn get_milliseconds(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_milliseconds())
 }
 
-fn seconds<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
-        Ok(Box::new(CelInt::from(ts.inner().num_seconds())))
-    })
+fn get_seconds(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_seconds())
 }
 
-fn minutes<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
-        Ok(Box::new(CelInt::from(ts.inner().num_minutes())))
-    })
+fn get_minutes(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_minutes())
 }
 
-fn hours<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    super::unary_fn(args, super::DURATION_TYPE, |ts: &Duration| {
-        Ok(Box::new(CelInt::from(ts.inner().num_hours())))
-    })
+fn get_hours(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_hours())
 }
 
-fn duration<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    super::string_fn(args, |value: &str| {
-        let (_, duration) = crate::duration::parse_duration(value)
-            .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
-        Ok(Box::new(Duration::from(duration)))
-    })
+fn duration_from_string(this: &CelString<'_>) -> Result<Duration, ExecutionError> {
+    let (_, d) = crate::duration::parse_duration(this.inner())
+        .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
+    Ok(Duration::from(d))
+}
+
+fn duration_from_duration(this: &Duration) -> Duration {
+    *this
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload(
-        "duration",
-        "string_to_duration",
-        vec![super::STRING_TYPE],
-        duration,
-    )
-    .expect("Must be unique");
-    env.add_overload(
-        "duration",
-        "duration_to_duration",
-        vec![super::DURATION_TYPE],
-        super::noop,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getHours",
-        "duration_to_hours",
-        super::DURATION_TYPE,
-        Vec::default(),
-        hours,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getMinutes",
-        "duration_to_minutes",
-        super::DURATION_TYPE,
-        Vec::default(),
-        minutes,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getSeconds",
-        "duration_to_seconds",
-        super::DURATION_TYPE,
-        Vec::default(),
-        seconds,
-    )
-    .expect("Must be unique");
-    env.add_member_overload(
-        "getMilliseconds",
-        "duration_to_millis",
-        super::DURATION_TYPE,
-        Vec::default(),
-        millis,
-    )
-    .expect("Must be unique");
+    crate::add_overload!(env, fn duration_from_string: (CelString) -> Result<Duration>,
+        name = "duration", id = "string_to_duration");
+    crate::add_overload!(env, fn duration_from_duration: (Duration) -> Duration,
+        name = "duration", id = "duration_to_duration");
+    crate::add_member_overload!(env, fn get_hours: (Duration) -> CelInt, id = "duration_to_hours");
+    crate::add_member_overload!(env, fn get_minutes: (Duration) -> CelInt,
+        id = "duration_to_minutes");
+    crate::add_member_overload!(env, fn get_seconds: (Duration) -> CelInt,
+        id = "duration_to_seconds");
+    crate::add_member_overload!(env, fn get_milliseconds: (Duration) -> CelInt,
+        id = "duration_to_millis");
 }

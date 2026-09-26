@@ -422,6 +422,14 @@ impl Val for OpaqueVal {
         &self.r#type
     }
 
+    /// `OpaqueVal`'s runtime type is per-instance - the opaque type name is part of
+    /// the value - so there is no single static `Type` to return, and it
+    /// cannot be named in the overload-registration macros. Use
+    /// [`get_type`](Val::get_type) on a value instead.
+    fn cel_type() -> &'static Type {
+        panic!("`OpaqueVal` has no static `Val::cel_type()`: its type varies per value")
+    }
+
     fn equals(&self, other: &dyn Val) -> bool {
         if other.get_type() != self.get_type() {
             false
@@ -2085,6 +2093,10 @@ mod tests {
                 &LIST_TYPE
             }
 
+            fn cel_type() -> &'static Type {
+                &LIST_TYPE
+            }
+
             fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
                 self.0.fetch_add(1, Ordering::SeqCst);
                 Box::new(CountedVal(self.0.clone()))
@@ -3309,6 +3321,10 @@ mod tests {
             &self.0
         }
 
+        fn cel_type() -> &'static Type {
+            panic!("`Ip` builds its opaque `Type` per value")
+        }
+
         fn equals(&self, other: &dyn Val) -> bool {
             other.downcast_ref::<Ip>().is_some_and(|o| o.1 == self.1)
         }
@@ -3340,6 +3356,10 @@ mod tests {
 
     impl Val for LazyList {
         fn get_type(&self) -> &Type {
+            &LIST_TYPE
+        }
+
+        fn cel_type() -> &'static Type {
             &LIST_TYPE
         }
 

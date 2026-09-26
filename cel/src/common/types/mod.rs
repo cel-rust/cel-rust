@@ -1,5 +1,4 @@
 use crate::common::traits;
-#[cfg(feature = "chrono")]
 use crate::ExecutionError;
 use std::borrow::Cow;
 
@@ -23,9 +22,8 @@ pub(crate) mod type_val;
 pub(crate) mod uint;
 
 use crate::common::traits::TraitSet;
+use crate::common::value::CowVal;
 use crate::common::value::{Builtin, BuiltinRef, Val};
-#[cfg(feature = "chrono")]
-use crate::common::value::{CowVal, StaticVal};
 pub use bool::Bool as CelBool;
 pub use bytes::Bytes as CelBytes;
 pub use double::Double as CelDouble;
@@ -387,43 +385,8 @@ impl<'v> Builtin<'v> {
     }
 }
 
-#[cfg(feature = "chrono")]
-type UnaryFn<A> = fn(&A) -> Result<Box<dyn Val>, ExecutionError>;
-
-/// Applies `func` to the single `'static` argument of type `A`.
-#[cfg(feature = "chrono")]
-fn unary_fn<'b, 'v, A: StaticVal>(
-    args: Vec<CowVal<'b, 'v>>,
-    type_a: Type,
-    func: UnaryFn<A>,
-) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    let arg = &args[0];
-    match arg.downcast_ref::<A>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: arg.get_type().name().to_string(),
-            want: type_a.name().to_string(),
-        }),
-        Some(arg) => Ok(CowVal::Owned(func(arg)?)),
-    }
-}
-
-/// Applies `func` to the single string argument.
-#[cfg(feature = "chrono")]
-fn string_fn<'b, 'v>(
-    args: Vec<CowVal<'b, 'v>>,
-    func: fn(&str) -> Result<Box<dyn Val>, ExecutionError>,
-) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    let arg = &args[0];
-    match arg.downcast_ref::<CelString>() {
-        None => Err(ExecutionError::UnexpectedType {
-            got: arg.get_type().name().to_string(),
-            want: STRING_TYPE.name().to_string(),
-        }),
-        Some(arg) => Ok(CowVal::Owned(func(arg.inner())?)),
-    }
-}
-
-#[cfg(feature = "chrono")]
+/// The identity overload: hands the argument straight back, keeping a borrow
+/// borrowed rather than cloning the value out of it.
 fn noop<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(args.remove(0))
 }

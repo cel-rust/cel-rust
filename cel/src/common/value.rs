@@ -32,6 +32,9 @@ use std::ops::Deref;
 ///
 /// impl Val for Ip {
 ///     fn get_type(&self) -> &Type {
+///         <Self as Val>::cel_type()
+///     }
+///     fn cel_type() -> &'static Type {
 ///         static IP: Type = Type::new_unspecified_type("ip");
 ///         &IP
 ///     }
@@ -49,6 +52,23 @@ use std::ops::Deref;
 /// ```
 pub trait Val: Debug + Send + Sync {
     fn get_type(&self) -> &Type;
+
+    /// Returns the runtime `Type` of this Val as a statically-callable
+    /// associated function (no `self`).
+    ///
+    /// Used by the [`add_overload!`](crate::add_overload) and
+    /// [`add_member_overload!`](crate::add_member_overload) macros to
+    /// derive the argument / return types of a registered overload from
+    /// the Rust type of a fn parameter.
+    ///
+    /// Every `Val` implementation must provide this. A type whose runtime
+    /// `Type` varies per-instance (e.g. `Struct`, whose type name depends on
+    /// the value) has no static answer to give and should panic here; such a
+    /// type cannot be named in those macros, and callers should reach for
+    /// [`get_type`](Val::get_type) on a value instead.
+    fn cel_type() -> &'static Type
+    where
+        Self: Sized;
 
     // Accessors for operators that produce values carry a `'v` that `Self`
     // outlives, so that the operator's result can be bounded by the

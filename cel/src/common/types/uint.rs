@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Divider, Modder, Multiplier, Subtractor, Zeroer};
-use crate::common::types::{CelDouble, CelInt, CelString, Kind, Type};
+use crate::common::types::{CelDouble, CelInt, CelString, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use std::any::Any;
@@ -29,6 +29,10 @@ impl Deref for UInt {
 
 impl Val for UInt {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::UINT_TYPE
     }
 
@@ -262,67 +266,55 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a u64 {
     }
 }
 
-fn uint<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    let arg = args.remove(0);
-    if arg.downcast_ref::<UInt>().is_some() {
-        return Ok(arg);
-    }
-    let overflow = || ExecutionError::FunctionError {
-        function: "uint".to_owned(),
-        message: "unsigned integer overflow".to_owned(),
-    };
-    let converted: Option<u64> =
-        match arg.get_type().kind() {
-            Kind::Int => match arg.downcast_ref::<CelInt>() {
-                None => None,
-                Some(i) => Some(u64::try_from(*i.inner()).map_err(|_| overflow())?),
-            },
-            Kind::Double => match arg.downcast_ref::<CelDouble>() {
-                None => None,
-                Some(d) => {
-                    let value = *d.inner();
-                    // Double to uint conversions are limited to [0, maxUint).
-                    // 'u64::MAX as f64' rounds up to 2^64 and the largest double below that
-                    // is 2^64 - 2^11, so the check also keeps 'value as u64' from saturating.
-                    // NaN, -infinity and infinity will also be rejected.
-                    if !(value >= 0.0 && value < (u64::MAX as f64)) {
-                        return Err(overflow());
-                    }
-                    Some(value as u64)
-                }
-            },
-            Kind::String => {
-                match arg.downcast_ref::<CelString>() {
-                    None => None,
-                    Some(s) => Some(s.inner().parse::<u64>().map_err(|e| {
-                        ExecutionError::FunctionError {
-                            function: "uint".to_owned(),
-                            message: format!("string parse error: {e}"),
-                        }
-                    })?),
-                }
-            }
-            _ => None,
-        };
+fn uint_from_uint(this: &UInt) -> UInt {
+    *this
+}
 
-    match converted {
-        Some(value) => Ok(CowVal::owned(UInt::from(value))),
-        None => Err(ExecutionError::FunctionError {
+fn uint_from_int(this: &CelInt) -> Result<UInt, ExecutionError> {
+    match u64::try_from(*this.inner()) {
+        Ok(value) => Ok(UInt::from(value)),
+        Err(_) => Err(ExecutionError::FunctionError {
             function: "uint".to_owned(),
-            message: format!("cannot convert {:?} to uint", arg.as_ref()),
+            message: "unsigned integer overflow".to_owned(),
         }),
     }
 }
 
+fn uint_from_double(this: &CelDouble) -> Result<UInt, ExecutionError> {
+    let value = *this.inner();
+    // Double to uint conversions are limited to [0, maxUint).
+    // 'u64::MAX as f64' rounds up to 2^64 and the largest double below that
+    // is 2^64 - 2^11, so the check also keeps 'value as u64' from saturating.
+    // NaN, -infinity and infinity will also be rejected.
+    if !(value >= 0.0 && value < (u64::MAX as f64)) {
+        return Err(ExecutionError::FunctionError {
+            function: "uint".to_owned(),
+            message: "unsigned integer overflow".to_owned(),
+        });
+    }
+
+    Ok(UInt::from(value as u64))
+}
+
+fn uint_from_string(this: &CelString<'_>) -> Result<UInt, ExecutionError> {
+    this.inner()
+        .parse::<u64>()
+        .map(UInt::from)
+        .map_err(|e| ExecutionError::FunctionError {
+            function: "uint".to_owned(),
+            message: format!("string parse error: {e}"),
+        })
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    env.add_overload("uint", "uint64_to_uint64", vec![super::UINT_TYPE], uint)
-        .expect("Must be unique id");
-    env.add_overload("uint", "int64_to_uint64", vec![super::INT_TYPE], uint)
-        .expect("Must be unique id");
-    env.add_overload("uint", "double_to_uint64", vec![super::DOUBLE_TYPE], uint)
-        .expect("Must be unique id");
-    env.add_overload("uint", "string_to_uint64", vec![super::STRING_TYPE], uint)
-        .expect("Must be unique id");
+    crate::add_overload!(env, fn uint_from_uint: (UInt) -> UInt,
+        name = "uint", id = "uint64_to_uint64");
+    crate::add_overload!(env, fn uint_from_int: (CelInt) -> Result<UInt>,
+        name = "uint", id = "int64_to_uint64");
+    crate::add_overload!(env, fn uint_from_double: (CelDouble) -> Result<UInt>,
+        name = "uint", id = "double_to_uint64");
+    crate::add_overload!(env, fn uint_from_string: (CelString) -> Result<UInt>,
+        name = "uint", id = "string_to_uint64");
 }
 
 #[cfg(test)]
