@@ -58,7 +58,6 @@ mod timestamp_conversions {
     }
 
     // Test: type_comparison
-    #[should_panic]
     #[test]
     fn type_comparison() {
         run_test(&dedent!(
@@ -100,7 +99,6 @@ mod duration_conversions {
     }
 
     // Test: type_comparison
-    #[should_panic]
     #[test]
     fn type_comparison() {
         run_test(&dedent!(

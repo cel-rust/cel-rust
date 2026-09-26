@@ -1397,8 +1397,25 @@ impl Value {
                 })
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
-                let left = Value::resolve_val(select.operand.deref(), ctx)?;
-                select_field(left, &select.field, select.test)
+                // `has(a.b.c)` tests for `c` on `a.b`: only its operand is a name
+                let name = if select.test {
+                    select.operand.expr.qualified_name_segments()
+                } else {
+                    expr.expr.qualified_name_segments()
+                };
+                let Some(name) = name else {
+                    let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                    return select_field(left, &select.field, select.test);
+                };
+                let (mut value, fields) = resolve_qualified_name(ctx, &name)?;
+                for field in fields {
+                    value = select_field(value, field, false)?;
+                }
+                if select.test {
+                    select_field(value, &select.field, true)
+                } else {
+                    Ok(value)
+                }
             }
             Expr::List(list_expr) => {
                 let mut list: Vec<Box<dyn Val + 'v>> = Vec::with_capacity(list_expr.elements.len());
@@ -1709,6 +1726,37 @@ fn qualified_function_name(ctx: &Context, target: &Expression, func_name: &str) 
     }
     name.push_str(func_name);
     (ctx.env().has_overload(&name) || ctx.get_function(&name).is_some()).then_some(name)
+}
+
+/// Resolves the qualified name `a.b.c`, given as its segments, to a value
+/// and the fields left to select on it.
+///
+/// As in cel-go, the most specific name wins: the variable `a.b.c`, else the
+/// type `a.b.c`, else the variable `a.b` with `c` left to select, else the
+/// variable `a` with `b` and `c` left. Only the whole name can be a type, as
+/// types have no fields.
+fn resolve_qualified_name<'e, 'p, 'v, 's>(
+    ctx: &'e Context<'p, 'v>,
+    segments: &'s [&'e str],
+) -> Result<(CowVal<'e, 'v>, &'s [&'e str]), ExecutionError> {
+    let name = segments.join(".");
+    let mut len = name.len();
+    for prefix in (1..=segments.len()).rev() {
+        let candidate = &name[..len];
+        if let Some(value) = ctx.get_variable(candidate) {
+            return Ok((value, &segments[prefix..]));
+        }
+        if prefix == segments.len() {
+            if let Some(t) = ctx.env().types().find_type(candidate) {
+                return Ok((CowVal::owned(CelType::from(t)), &[]));
+            }
+        }
+        // drop the last segment and its dot
+        len = len.saturating_sub(segments[prefix - 1].len() + 1);
+    }
+    Err(ExecutionError::UndeclaredReference(Arc::new(
+        segments[0].to_owned(),
+    )))
 }
 
 /// Selects `field` on `left`, the already resolved operand of a select:
@@ -2709,6 +2757,130 @@ mod tests {
                 );
                 assert_eq!(type_name(&Context::default(), name), Ok(name.to_owned()));
             }
+        }
+    }
+
+    mod qualified_idents {
+        use crate::common::types::Type;
+        use crate::{Context, Env, ExecutionError, Program, Value};
+        use std::collections::HashMap;
+        use std::sync::Arc;
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        fn undeclared(name: &str) -> Result<Value, ExecutionError> {
+            Err(ExecutionError::UndeclaredReference(Arc::new(
+                name.to_string(),
+            )))
+        }
+
+        #[test]
+        fn a_qualified_variable_resolves() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b.c", "yeah");
+            assert_eq!(execute(&context, "a.b.c"), Ok("yeah".into()));
+        }
+
+        /// The most specific name wins, as in cel-go: `a.b.c` is the
+        /// variable `a.b.c` rather than the field `c` of the variable `a.b`.
+        #[test]
+        fn the_longest_variable_name_wins() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b.c", "yeah");
+            context.add_variable_from_value("a.b", HashMap::from([("c", "oops")]));
+            assert_eq!(execute(&context, "a.b.c"), Ok("yeah".into()));
+            assert_eq!(
+                execute(&context, "a.b"),
+                Ok(HashMap::from([("c", "oops")]).into())
+            );
+        }
+
+        #[test]
+        fn fields_are_selected_on_a_qualified_variable() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b", HashMap::from([("c", "x")]));
+            assert_eq!(execute(&context, "a.b.c"), Ok("x".into()));
+            context.add_variable_from_value("a.list", vec![1, 2]);
+            assert_eq!(execute(&context, "a.list.size()"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn fields_are_selected_on_a_variable() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a", HashMap::from([("b", HashMap::from([("c", 1)]))]));
+            assert_eq!(execute(&context, "a.b.c"), Ok(Value::Int(1)));
+            let context = Context::default();
+            assert_eq!(
+                execute(&context, "[{'b': 1}].map(a, a.b)"),
+                Ok(vec![1].into())
+            );
+        }
+
+        #[test]
+        fn a_qualified_type_resolves() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::new_opaque_type("my.pkg.Ip")).unwrap();
+            let context = Context::with_env(Arc::new(env));
+            assert_eq!(
+                execute(
+                    &context,
+                    "type(my.pkg.Ip) == type && my.pkg.Ip == my.pkg.Ip"
+                ),
+                Ok(Value::Bool(true))
+            );
+        }
+
+        #[cfg(feature = "chrono")]
+        #[test]
+        fn well_known_types_resolve() {
+            let context = Context::default();
+            assert_eq!(
+                execute(
+                    &context,
+                    "type(duration('1s')) == google.protobuf.Duration \
+                     && type(timestamp('2009-02-13T23:31:30Z')) == google.protobuf.Timestamp"
+                ),
+                Ok(Value::Bool(true))
+            );
+        }
+
+        /// A variable shadows a type of the same name, qualified or not.
+        #[test]
+        fn a_qualified_variable_shadows_a_type() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::new_opaque_type("my.pkg.Ip")).unwrap();
+            let mut context = Context::with_env(Arc::new(env));
+            context.add_variable_from_value("my.pkg.Ip", 1);
+            assert_eq!(execute(&context, "my.pkg.Ip"), Ok(Value::Int(1)));
+        }
+
+        /// Types have no fields: only the whole name is looked up as a type.
+        #[test]
+        fn a_type_is_only_the_whole_name() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::new_opaque_type("a.b")).unwrap();
+            let context = Context::with_env(Arc::new(env));
+            assert_eq!(execute(&context, "a.b.c"), undeclared("a"));
+        }
+
+        #[test]
+        fn an_unresolved_qualified_name_reports_its_root() {
+            assert_eq!(execute(&Context::default(), "a.b.c"), undeclared("a"));
+        }
+
+        /// `has(a.b.c)` tests for `c` on the name `a.b`.
+        #[test]
+        fn a_presence_test_resolves_its_operand_as_a_name() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b", HashMap::from([("c", 1)]));
+            assert_eq!(execute(&context, "has(a.b.c)"), Ok(Value::Bool(true)));
+            assert_eq!(execute(&context, "has(a.b.d)"), Ok(Value::Bool(false)));
+
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b.c", 1);
+            assert_eq!(execute(&context, "has(a.b.c)"), undeclared("a"));
         }
     }
 
