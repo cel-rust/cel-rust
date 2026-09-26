@@ -170,6 +170,17 @@ impl<'p, 'v> Context<'p, 'v> {
         }
     }
 
+    /// Whether a function named `namespace.…` is declared, in the `Env` or
+    /// added to the root context.
+    pub(crate) fn has_function_namespace(&self, namespace: &str) -> bool {
+        match self {
+            Context::Root { functions, env, .. } => {
+                env.has_namespace(namespace) || functions.has_namespace(namespace)
+            }
+            Context::Child { parent, .. } => parent.has_function_namespace(namespace),
+        }
+    }
+
     #[allow(dead_code)]
     pub(crate) fn get_function(&self, name: &str) -> Option<&Function> {
         match self {
@@ -624,6 +635,17 @@ mod test {
         let context = Context::default();
         let mut child = context.new_inner_scope();
         assert_eq!(child.add_function("size", |a: i64| a), Ok(()),);
+    }
+
+    #[test]
+    fn a_qualified_function_declares_its_namespace() {
+        let mut context = Context::default();
+        context.add_function("a.b.f", |i: i64| i).unwrap();
+        context.add_function("g", |i: i64| i).unwrap();
+        assert!(context.has_function_namespace("a"));
+        assert!(!context.has_function_namespace("g"));
+        assert!(context.has_function_namespace("optional"), "from the Env");
+        assert!(context.new_inner_scope().has_function_namespace("a"));
     }
 
     /// Type names are resolved by the interpreter, not looked up as variables.

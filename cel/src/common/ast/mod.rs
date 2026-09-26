@@ -40,6 +40,20 @@ pub enum Expr {
 }
 
 impl Expr {
+    /// The first segment of the qualified name this expression spells, see
+    /// [`qualified_name_segments`](Self::qualified_name_segments), found
+    /// without allocating: `a.b.c` is `a`.
+    pub(crate) fn qualified_name_root(&self) -> Option<&str> {
+        let mut expr = self;
+        loop {
+            match expr {
+                Expr::Ident(name) => return Some(name),
+                Expr::Select(select) if !select.test => expr = &select.operand.expr,
+                _ => return None,
+            }
+        }
+    }
+
     /// The segments of the qualified name this expression spells, root first:
     /// `a.b.c` is `["a", "b", "c"]`. Only an identifier, or field selections on
     /// one, spells a name: anything else, a presence test included, is `None`.
@@ -228,7 +242,8 @@ pub struct OffsetRange {
 mod tests {
     use super::IdedExpr;
 
-    /// Checks `qualified_name_segments` against the AST of every parser backend.
+    /// Checks `qualified_name_segments`, and `qualified_name_root`, against the
+    /// AST of every parser backend.
     fn assert_segments(source: &str, expected: Option<&[&str]>) {
         let asts: Vec<(&str, IdedExpr)> = vec![
             (
@@ -253,6 +268,11 @@ mod tests {
             assert_eq!(
                 ast.expr.qualified_name_segments().as_deref(),
                 expected,
+                "{source} with {backend}"
+            );
+            assert_eq!(
+                ast.expr.qualified_name_root(),
+                expected.map(|segments| segments[0]),
                 "{source} with {backend}"
             );
         }
