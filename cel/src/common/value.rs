@@ -32,6 +32,9 @@ use std::ops::Deref;
 ///
 /// impl Val for Ip {
 ///     fn get_type(&self) -> &Type {
+///         <Self as Val>::cel_type()
+///     }
+///     fn cel_type() -> &'static Type {
 ///         static IP: Type = Type::new_unspecified_type("ip");
 ///         &IP
 ///     }
@@ -58,20 +61,14 @@ pub trait Val: Debug + Send + Sync {
     /// derive the argument / return types of a registered overload from
     /// the Rust type of a fn parameter.
     ///
-    /// The default panics; override on any Val type that should be usable
-    /// in those macros. Types whose runtime `Type` varies per-instance
-    /// (e.g. `Struct`, whose type name depends on the value) cannot
-    /// provide a meaningful implementation and inherit the default.
+    /// Every `Val` implementation must provide this. A type whose runtime
+    /// `Type` varies per-instance (e.g. `Struct`, whose type name depends on
+    /// the value) has no static answer to give and should panic here; such a
+    /// type cannot be named in those macros, and callers should reach for
+    /// [`get_type`](Val::get_type) on a value instead.
     fn cel_type() -> &'static Type
     where
-        Self: Sized,
-    {
-        panic!(
-            "`Val::cel_type()` not implemented for `{}` — override on your Val impl to use it \
-             with the overload-registration macros",
-            std::any::type_name::<Self>()
-        )
-    }
+        Self: Sized;
 
     // Accessors for operators that produce values carry a `'v` that `Self`
     // outlives, so that the operator's result can be bounded by the

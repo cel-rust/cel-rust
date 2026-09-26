@@ -394,6 +394,10 @@ mod test {
                 &DYN_TYPE
             }
 
+            fn cel_type() -> &'static Type {
+                &DYN_TYPE
+            }
+
             fn as_indexer<'b, 'v>(&'b self) -> Option<&'b (dyn Indexer + 'v)>
             where
                 Self: 'v,
@@ -456,6 +460,10 @@ mod test {
 
         impl Val for CountedVal {
             fn get_type(&self) -> &Type {
+                &DYN_TYPE
+            }
+
+            fn cel_type() -> &'static Type {
                 &DYN_TYPE
             }
 

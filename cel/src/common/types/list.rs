@@ -35,6 +35,10 @@ impl<'v> Deref for DefaultList<'v> {
 
 impl<'v> Val for DefaultList<'v> {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &types::LIST_TYPE
     }
 
@@ -406,6 +410,10 @@ pub mod tests {
         impl Val for NumericKindOnly {
             fn get_type(&self) -> &Type {
                 self.0
+            }
+
+            fn cel_type() -> &'static Type {
+                panic!("the type under test is the one this value was built with")
             }
 
             fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
