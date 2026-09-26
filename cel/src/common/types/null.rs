@@ -8,6 +8,10 @@ pub struct Null;
 
 impl Val for Null {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &super::NULL_TYPE
     }
 

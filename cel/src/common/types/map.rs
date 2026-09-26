@@ -41,6 +41,10 @@ impl<'v> Clone for DefaultMap<'v> {
 
 impl<'v> Val for DefaultMap<'v> {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &types::MAP_TYPE
     }
 
