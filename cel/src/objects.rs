@@ -1356,9 +1356,17 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let args = args?;
-                        let qualified_func = match &target.expr {
-                            Expr::Ident(prefix) => {
-                                let qualified_name = format!("{prefix}.{}", call.func_name);
+                        let qualified_func = match target.expr.qualified_name_segments() {
+                            Some(segments) => {
+                                let mut qualified_name = String::with_capacity(
+                                    segments.iter().map(|s| s.len() + 1).sum::<usize>()
+                                        + call.func_name.len(),
+                                );
+                                for segment in segments {
+                                    qualified_name.push_str(segment);
+                                    qualified_name.push('.');
+                                }
+                                qualified_name.push_str(&call.func_name);
                                 if let Some(op) = ctx.env().find_overload(&qualified_name, &args) {
                                     return op(args);
                                 }
@@ -1374,7 +1382,7 @@ impl Value {
                                     None => None,
                                 }
                             }
-                            _ => None,
+                            None => None,
                         };
                         let (target, func, args) = match qualified_func {
                             None => {
@@ -1418,85 +1426,7 @@ impl Value {
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
                 let left = Value::resolve_val(select.operand.deref(), ctx)?;
-                // borrows the field name from the AST
-                let key: CelString = select.field.as_str().into();
-                let no_such_key = || ExecutionError::NoSuchKey(Arc::new(select.field.clone()));
-                let overload_error = |value: &dyn Val| {
-                    ExecutionError::overload_for_values("_._", [value, &key], false)
-                };
-
-                // Plain `.field` on an `Optional` propagates optional-ness
-                // per cel-spec — matches cel-go `applyQualifiers` at
-                // `interpreter/attributes.go:1259` where an initial optional
-                // operand makes the whole qualifier chain optional. `has()`
-                // (test=true) on the same shape returns Bool(false) when the
-                // chain is empty.
-                let left = match unwrap_optional(left) {
-                    Unwrapped::NotOptional(left) => left,
-                    // Optional::none() short-circuits — the chain stops.
-                    Unwrapped::None => {
-                        return if select.test {
-                            Ok(bool(false))
-                        } else {
-                            Ok(CowVal::owned(CelOptional::none()))
-                        }
-                    }
-                    // Otherwise unwrap and access the field. A missing key on
-                    // a real container maps to Optional::none(); a field
-                    // access on a value that isn't a container at all
-                    // (Null, Int, …) is an error, matching cel-go's
-                    // `errorOnBadPresenceTest=true` mode which the cel-spec
-                    // conformance runner enables (see
-                    // `interpreter/attributes.go:1382` and
-                    // `conformance/conformance_test.go:87`).
-                    Unwrapped::Some(inner) => {
-                        return if select.test {
-                            let has = inner
-                                .as_indexer()
-                                .ok_or_else(no_such_key)?
-                                .get(&key)
-                                .is_ok();
-                            Ok(bool(has))
-                        } else {
-                            // a non-container operand is an error, a missing
-                            // key maps to `optional.none()`
-                            if inner.as_indexer().is_none() {
-                                return Err(no_such_key());
-                            }
-                            Ok(CowVal::owned(
-                                match index_into(inner, &key, "_._", |_| no_such_key()) {
-                                    Ok(v) => CelOptional::of(v.into_owned()),
-                                    Err(_) => CelOptional::none(),
-                                },
-                            ))
-                        };
-                    }
-                };
-
-                if select.test {
-                    match left.get_type().kind() {
-                        Kind::Map => Ok(bool(
-                            left.as_container()
-                                .ok_or_else(no_such_key)?
-                                .contains(&key)?,
-                        )),
-                        #[cfg(feature = "structs")]
-                        Kind::Struct => Ok(bool(
-                            left.as_indexer()
-                                .is_some_and(|indexer| indexer.get(&key).is_ok()),
-                        )),
-                        _ => index_into(left, &key, "_._", overload_error),
-                    }
-                } else {
-                    let is_map = left.get_type().kind() == Kind::Map;
-                    index_into(left, &key, "_._", |value| {
-                        if is_map {
-                            no_such_key()
-                        } else {
-                            overload_error(value)
-                        }
-                    })
-                }
+                select_field(left, &select.field, select.test)
             }
             Expr::List(list_expr) => {
                 let mut list: Vec<Box<dyn Val + 'v>> = Vec::with_capacity(list_expr.elements.len());
@@ -1759,6 +1689,94 @@ fn try_bool(val: Result<CowVal<'_, '_>, ExecutionError>) -> Result<bool, Executi
                 want: "bool".to_owned(),
             }),
         Err(err) => Result::Err(err),
+    }
+}
+
+/// Selects `field` on `left`, the already resolved operand of a select:
+/// `left.field`, or `has(left.field)` when `test` is set.
+#[inline(always)]
+fn select_field<'b, 'v>(
+    left: CowVal<'b, 'v>,
+    field: &str,
+    test: bool,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    // borrows the field name from the AST
+    let key: CelString = field.into();
+    let no_such_key = || ExecutionError::NoSuchKey(Arc::new(field.to_owned()));
+    let overload_error =
+        |value: &dyn Val| ExecutionError::overload_for_values("_._", [value, &key], false);
+
+    // Plain `.field` on an `Optional` propagates optional-ness
+    // per cel-spec — matches cel-go `applyQualifiers` at
+    // `interpreter/attributes.go:1259` where an initial optional
+    // operand makes the whole qualifier chain optional. `has()`
+    // (test=true) on the same shape returns Bool(false) when the
+    // chain is empty.
+    let left = match unwrap_optional(left) {
+        Unwrapped::NotOptional(left) => left,
+        // Optional::none() short-circuits — the chain stops.
+        Unwrapped::None => {
+            return if test {
+                Ok(bool(false))
+            } else {
+                Ok(CowVal::owned(CelOptional::none()))
+            }
+        }
+        // Otherwise unwrap and access the field. A missing key on
+        // a real container maps to Optional::none(); a field
+        // access on a value that isn't a container at all
+        // (Null, Int, …) is an error, matching cel-go's
+        // `errorOnBadPresenceTest=true` mode which the cel-spec
+        // conformance runner enables (see
+        // `interpreter/attributes.go:1382` and
+        // `conformance/conformance_test.go:87`).
+        Unwrapped::Some(inner) => {
+            return if test {
+                let has = inner
+                    .as_indexer()
+                    .ok_or_else(no_such_key)?
+                    .get(&key)
+                    .is_ok();
+                Ok(bool(has))
+            } else {
+                // a non-container operand is an error, a missing
+                // key maps to `optional.none()`
+                if inner.as_indexer().is_none() {
+                    return Err(no_such_key());
+                }
+                Ok(CowVal::owned(
+                    match index_into(inner, &key, "_._", |_| no_such_key()) {
+                        Ok(v) => CelOptional::of(v.into_owned()),
+                        Err(_) => CelOptional::none(),
+                    },
+                ))
+            };
+        }
+    };
+
+    if test {
+        match left.get_type().kind() {
+            Kind::Map => Ok(bool(
+                left.as_container()
+                    .ok_or_else(no_such_key)?
+                    .contains(&key)?,
+            )),
+            #[cfg(feature = "structs")]
+            Kind::Struct => Ok(bool(
+                left.as_indexer()
+                    .is_some_and(|indexer| indexer.get(&key).is_ok()),
+            )),
+            _ => index_into(left, &key, "_._", overload_error),
+        }
+    } else {
+        let is_map = left.get_type().kind() == Kind::Map;
+        index_into(left, &key, "_._", |value| {
+            if is_map {
+                no_such_key()
+            } else {
+                overload_error(value)
+            }
+        })
     }
 }
 
@@ -2599,6 +2617,65 @@ mod tests {
             "not_a_type",
             ExecutionError::UndeclaredReference(Arc::new("not_a_type".to_string())),
         );
+    }
+
+    mod qualified_functions {
+        use crate::common::types::{CelInt, INT_TYPE};
+        use crate::common::value::CowVal;
+        use crate::{Context, Env, ExecutionError, Program, Value};
+        use std::collections::HashMap;
+        use std::sync::Arc;
+
+        fn increment<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+            let i = args[0].downcast_ref::<CelInt>().unwrap();
+            Ok(CowVal::owned(CelInt::from(i.inner() + 1)))
+        }
+
+        fn context_with_overload(name: &str) -> Context<'static, 'static> {
+            let mut env = Env::stdlib();
+            env.add_overload(name, "increment_int", vec![INT_TYPE], increment)
+                .unwrap();
+            Context::with_env(Arc::new(env))
+        }
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        #[test]
+        fn an_overload_resolves_through_one_qualifier() {
+            let context = context_with_overload("a.f");
+            assert_eq!(execute(&context, "a.f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn an_overload_resolves_through_several_qualifiers() {
+            let context = context_with_overload("a.b.f");
+            assert_eq!(execute(&context, "a.b.f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn a_function_resolves_through_several_qualifiers() {
+            let mut context = Context::default();
+            context.add_function("a.b.f", |i: i64| i + 1).unwrap();
+            assert_eq!(execute(&context, "a.b.f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn a_mismatched_qualified_overload_names_the_qualified_function() {
+            let context = context_with_overload("a.b.f");
+            let error = execute(&context, "a.b.f('one')").unwrap_err();
+            assert!(error.to_string().contains("a.b.f"), "{error}");
+        }
+
+        /// Without a function of the qualified name, the call is a member
+        /// call on the selected field.
+        #[test]
+        fn a_member_call_on_a_selected_field_is_not_qualified() {
+            let mut context = Context::default();
+            context.add_variable_from_value("m", HashMap::from([("b", vec![1, 2])]));
+            assert_eq!(execute(&context, "m.b.size()"), Ok(Value::Int(2)));
+        }
     }
 
     mod opaque {
