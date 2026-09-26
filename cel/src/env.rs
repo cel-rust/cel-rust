@@ -4,12 +4,13 @@ use crate::common::{
     types::{self, Type},
     value::CowVal,
 };
+use crate::registry::TypeRegistry;
 use crate::DeclarationError;
 #[cfg(feature = "structs")]
-use crate::{common::types::CelStruct, common::value::Val, ExecutionError};
+use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
-    BTreeMap,
+    BTreeMap, BTreeSet,
 };
 
 /// An environment for the CEL execution.
@@ -32,7 +33,7 @@ use std::collections::{
 ///     StructDef::new("cel.MyStruct".to_owned())
 ///         .add_field("some_field".to_owned(), types::STRING_TYPE)
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
-/// );
+/// ).unwrap();
 /// }
 /// ```
 ///
@@ -53,8 +54,8 @@ use std::collections::{
 /// ```
 pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
-    #[cfg(feature = "structs")]
-    structs: BTreeMap<String, StructDef>,
+    namespaces: BTreeSet<String>,
+    types: TypeRegistry,
     error_on_duplicate_map_keys: bool,
 }
 
@@ -62,8 +63,8 @@ impl Default for Env {
     fn default() -> Self {
         Env {
             functions: BTreeMap::new(),
-            #[cfg(feature = "structs")]
-            structs: BTreeMap::new(),
+            namespaces: BTreeSet::new(),
+            types: TypeRegistry::default(),
             error_on_duplicate_map_keys: true,
         }
     }
@@ -76,12 +77,14 @@ impl Env {
     /// CEL specification.
     pub fn stdlib() -> Env {
         let mut env = Env::default();
+        types::bool::stdlib(&mut env);
         types::bytes::stdlib(&mut env);
         types::double::stdlib(&mut env);
         types::r#dyn::stdlib(&mut env);
         types::int::stdlib(&mut env);
         types::list::stdlib(&mut env);
         types::map::stdlib(&mut env);
+        types::null::stdlib(&mut env);
         types::optional::stdlib(&mut env);
         types::string::stdlib(&mut env);
         types::type_val::stdlib(&mut env);
@@ -118,6 +121,9 @@ impl Env {
                 let mut value = FunctionDecl::new(name);
                 value.add_overload(id.to_string(), false, args, op)?;
                 vacant_entry.insert(value);
+                if let Some((namespace, _)) = name.split_once('.') {
+                    self.namespaces.insert(namespace.to_owned());
+                }
                 Ok(())
             }
             Occupied(occupied_entry) => {
@@ -126,6 +132,10 @@ impl Env {
                     .add_overload(id.to_string(), false, args, op)
             }
         }
+    }
+
+    pub(crate) fn has_namespace(&self, namespace: &str) -> bool {
+        self.namespaces.contains(namespace)
     }
 
     /// Finds a global function overload that matches the given name and arguments.
@@ -198,16 +208,56 @@ impl Env {
             .is_some_and(|function| function.has_overload(true))
     }
 
-    /// Adds a custom struct definition to the environment.
-    #[cfg(feature = "structs")]
-    pub fn add_struct(&mut self, def: StructDef) {
-        self.structs.insert(def.name.clone(), def);
+    /// Registers a type with the environment, so that expressions can refer
+    /// to it by name.
+    ///
+    /// The name resolves to the type value, unless a variable of the same name
+    /// shadows it. Values need not be registered to be evaluated: registering
+    /// their type is what lets an expression name it.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Program, Value};
+    /// use cel::common::types::Type;
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_type(Type::new_opaque_type("Ip")).unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    ///
+    /// let program = Program::compile("type(Ip) == type").unwrap();
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::TypeConflict`] if another type is
+    /// already registered under that name, and with
+    /// [`DeclarationError::InvalidTypeName`] if the name is not an identifier,
+    /// or several separated by dots. Registering an equal type again is fine.
+    pub fn add_type(&mut self, t: Type) -> Result<(), DeclarationError> {
+        self.types.register(t)
     }
 
-    /// Finds a struct definition by name.
+    /// The types registered with the environment.
+    pub fn types(&self) -> &TypeRegistry {
+        &self.types
+    }
+
+    /// Adds a struct type to the environment, so that struct literals can
+    /// construct it, e.g. `cel.MyStruct{some_field: 'value'}`.
+    ///
+    /// Its type is registered too, as [`add_type`](Self::add_type) does, so
+    /// that expressions can name it: `type(x) == cel.MyStruct`.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::TypeConflict`] if a struct type, or
+    /// another type, is already registered under that name, and with
+    /// [`DeclarationError::InvalidTypeName`] if the name is not an identifier,
+    /// or several separated by dots.
     #[cfg(feature = "structs")]
-    pub(crate) fn find_struct(&self, name: &str) -> Option<&StructDef> {
-        self.structs.get(name)
+    pub fn add_struct(&mut self, s: impl StructType + 'static) -> Result<(), DeclarationError> {
+        self.types.register_struct(Box::new(s))
     }
 
     /// Sets whether a map literal that repeats a key is an error.
@@ -254,11 +304,11 @@ impl Env {
 ///     StructDef::new("MyStruct".to_owned())
 ///         .add_field("some_field".to_owned(), types::STRING_TYPE)
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
-/// );
+/// ).unwrap();
 /// ```
 #[cfg(feature = "structs")]
 pub struct StructDef {
-    name: String,
+    r#type: Type,
     fields: BTreeMap<String, Type>,
     defaults: BTreeMap<String, Box<dyn Val>>,
 }
@@ -271,7 +321,7 @@ impl StructDef {
     /// referenced in CEL expressions (e.g., `cel.MyStruct`).
     pub fn new(name: String) -> Self {
         Self {
-            name,
+            r#type: Type::new_struct(name),
             fields: Default::default(),
             defaults: Default::default(),
         }
@@ -318,12 +368,12 @@ impl StructDef {
     /// - A field is missing and has no default value.
     /// - A field's type does not match the type in the definition.
     /// - An unknown field name is provided.
-    #[cfg(feature = "structs")]
-    pub(crate) fn new_struct<'b, 'v>(
+    fn new_struct<'b, 'v>(
         &self,
         fields: BTreeMap<String, CowVal<'b, 'v>>,
     ) -> Result<CelStruct<'v>, ExecutionError> {
-        let mut s = CelStruct::new(self.name.clone());
+        let name = self.r#type.name();
+        let mut s = CelStruct::new(name.to_owned());
         let mut fields = fields;
         for (field, default) in &self.defaults {
             if let Some(value) = fields.remove(field) {
@@ -338,20 +388,33 @@ impl StructDef {
                     if t != value.get_type() {
                         return Err(ExecutionError::UnexpectedType {
                             got: value.get_type().name().to_owned(),
-                            want: format!("{} for field {field} in {}", t.name(), self.name),
+                            want: format!("{} for field {field} in {name}", t.name()),
                         });
                     }
                     s.add_field_value(field, value);
                 }
                 None => {
                     return Err(ExecutionError::NoSuchKey(std::sync::Arc::new(format!(
-                        "field `{field}` on struct `{}`",
-                        self.name
+                        "field `{field}` on struct `{name}`"
                     ))))
                 }
             }
         }
         Ok(s)
+    }
+}
+
+#[cfg(feature = "structs")]
+impl StructType for StructDef {
+    fn get_type(&self) -> &Type {
+        &self.r#type
+    }
+
+    fn new_value<'b, 'v>(
+        &self,
+        fields: BTreeMap<String, CowVal<'b, 'v>>,
+    ) -> Result<Box<dyn Val + 'v>, ExecutionError> {
+        Ok(Box::new(self.new_struct(fields)?))
     }
 }
 
@@ -364,6 +427,56 @@ mod tests {
     #[test]
     fn test_env_default() {
         let _: Arc<dyn Send + Sync> = Arc::new(Env::default());
+    }
+
+    #[test]
+    fn a_qualified_overload_declares_its_namespace() {
+        let mut env = Env::default();
+        env.add_overload("a.b.f", "a_b_f", vec![], noop).unwrap();
+        env.add_overload("g", "g", vec![], noop).unwrap();
+        env.add_member_overload("c.m", "c_m", types::INT_TYPE, vec![], noop)
+            .unwrap();
+        assert!(env.has_namespace("a"));
+        assert!(!env.has_namespace("a.b"));
+        assert!(!env.has_namespace("g"));
+        assert!(!env.has_namespace("c"), "member overloads aren't qualified");
+    }
+
+    #[test]
+    fn the_standard_library_registers_its_types() {
+        let names = [
+            "bool",
+            "bytes",
+            "double",
+            "int",
+            "list",
+            "map",
+            "null_type",
+            "optional_type",
+            "string",
+            "type",
+            "uint",
+            #[cfg(feature = "chrono")]
+            "google.protobuf.Duration",
+            #[cfg(feature = "chrono")]
+            "google.protobuf.Timestamp",
+        ];
+        let stdlib = Env::stdlib();
+        let default = Env::default();
+        for name in names {
+            assert_eq!(stdlib.types().find_type(name).map(Type::name), Some(name));
+            assert!(default.types().find_type(name).is_none(), "{name}");
+        }
+    }
+
+    #[test]
+    fn add_type_rejects_another_type_of_a_registered_name() {
+        let mut env = Env::stdlib();
+        assert_eq!(
+            env.add_type(Type::new_opaque_type("optional_type")),
+            Err(DeclarationError::type_conflict("optional_type"))
+        );
+        assert_eq!(env.add_type(types::OPTIONAL_TYPE), Ok(()));
     }
 
     fn noop<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, crate::ExecutionError> {

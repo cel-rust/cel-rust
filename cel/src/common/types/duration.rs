@@ -197,6 +197,7 @@ fn duration<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Executi
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(super::DURATION_TYPE).expect("Must be unique");
     env.add_overload(
         "duration",
         "string_to_duration",

@@ -130,6 +130,11 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a bool {
     }
 }
 
+pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::BOOL_TYPE)
+        .expect("Must be unique");
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

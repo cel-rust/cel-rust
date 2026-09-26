@@ -409,10 +409,6 @@ enums::strong_proto3::type_nested
 fields::map_fields::map_key_mixed_numbers_double_key
 fields::map_fields::map_key_mixed_numbers_int_key
 fields::map_fields::map_key_mixed_numbers_uint_key
-fields::qualified_identifier_resolution::ident_with_longest_prefix_check
-fields::qualified_identifier_resolution::map_field_select
-fields::qualified_identifier_resolution::qualified_ident
-fields::qualified_identifier_resolution::qualified_identifier_resolution_unchecked
 fields::r#in::mixed_numbers_and_keys_absent
 fields::r#in::mixed_numbers_and_keys_present
 integer_math::int64_math::int64_min_negate
@@ -641,7 +637,6 @@ math_ext::trunc::negative
 math_ext::trunc::positive
 namespace::namespace::self_eval_container_lookup
 namespace::namespace::self_eval_container_lookup_unchecked
-namespace::qualified::self_eval_qualified_lookup
 optionals::optionals::empty_map_optflatmap_hasvalue
 optionals::optionals::empty_struct_optindex_hasvalue
 optionals::optionals::has_optional_ofnonzerovalue_struct_optional_ofnonzerovalue_map_optindex_field
@@ -1036,7 +1031,6 @@ string_ext::trim::unicode_space_chars_1
 string_ext::trim::unicode_space_chars_2
 string_ext::trim::unicode_space_chars_3
 timestamps::duration_conversions::tostring_duration
-timestamps::duration_conversions::type_comparison
 timestamps::duration_converters::get_milliseconds
 timestamps::duration_range::add_over
 timestamps::duration_range::add_under
@@ -1048,7 +1042,6 @@ timestamps::timestamp_arithmetic::add_time_to_duration
 timestamps::timestamp_conversions::toint_timestamp
 timestamps::timestamp_conversions::tostring_timestamp
 timestamps::timestamp_conversions::tostring_timestamp_nanos
-timestamps::timestamp_conversions::type_comparison
 timestamps::timestamp_range::from_string_under
 timestamps::timestamp_range::sub_time_duration_over
 timestamps::timestamp_range::sub_time_duration_under

@@ -39,6 +39,44 @@ pub enum Expr {
     Struct(StructExpr),
 }
 
+impl Expr {
+    /// The first segment of the qualified name this expression spells, see
+    /// [`qualified_name_segments`](Self::qualified_name_segments), found
+    /// without allocating: `a.b.c` is `a`.
+    pub(crate) fn qualified_name_root(&self) -> Option<&str> {
+        let mut expr = self;
+        loop {
+            match expr {
+                Expr::Ident(name) => return Some(name),
+                Expr::Select(select) if !select.test => expr = &select.operand.expr,
+                _ => return None,
+            }
+        }
+    }
+
+    /// The segments of the qualified name this expression spells, root first:
+    /// `a.b.c` is `["a", "b", "c"]`. Only an identifier, or field selections on
+    /// one, spells a name: anything else, a presence test included, is `None`.
+    pub(crate) fn qualified_name_segments(&self) -> Option<Vec<&str>> {
+        let mut segments = Vec::new();
+        let mut expr = self;
+        loop {
+            match expr {
+                Expr::Ident(name) => {
+                    segments.push(name.as_str());
+                    segments.reverse();
+                    return Some(segments);
+                }
+                Expr::Select(select) if !select.test => {
+                    segments.push(select.field.as_str());
+                    expr = &select.operand.expr;
+                }
+                _ => return None,
+            }
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum LiteralValue {
     Boolean(CelBool),
@@ -198,4 +236,92 @@ impl SourceInfo {
 pub struct OffsetRange {
     pub start: u32,
     pub stop: u32,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::IdedExpr;
+
+    /// Checks `qualified_name_segments`, and `qualified_name_root`, against the
+    /// AST of every parser backend.
+    fn assert_segments(source: &str, expected: Option<&[&str]>) {
+        let asts: Vec<(&str, IdedExpr)> = vec![
+            (
+                "parser",
+                crate::parser::Parser::default()
+                    .enable_ident_escape_syntax(true)
+                    .enable_optional_syntax(true)
+                    .parse(source)
+                    .unwrap(),
+            ),
+            #[cfg(feature = "parser_pratt")]
+            (
+                "pratt_parser",
+                crate::parser::PrattParser::default()
+                    .enable_ident_escape_syntax(true)
+                    .enable_optional_syntax(true)
+                    .parse(source)
+                    .unwrap(),
+            ),
+        ];
+        for (backend, ast) in asts {
+            assert_eq!(
+                ast.expr.qualified_name_segments().as_deref(),
+                expected,
+                "{source} with {backend}"
+            );
+            assert_eq!(
+                ast.expr.qualified_name_root(),
+                expected.map(|segments| segments[0]),
+                "{source} with {backend}"
+            );
+        }
+    }
+
+    #[test]
+    fn an_identifier_is_a_one_segment_name() {
+        assert_segments("a", Some(&["a"]));
+    }
+
+    #[test]
+    fn field_selections_on_an_identifier_are_a_qualified_name() {
+        assert_segments("a.b.c", Some(&["a", "b", "c"]));
+        assert_segments(
+            "google.protobuf.Duration",
+            Some(&["google", "protobuf", "Duration"]),
+        );
+        assert_segments("a.`b-c`", Some(&["a", "b-c"]));
+    }
+
+    #[test]
+    fn other_expressions_are_not_a_name() {
+        for source in [
+            "1",
+            "a[0].b",
+            "a.b()",
+            "f().b",
+            "a.?b",
+            "(a + b).c",
+            "{'b': 1}.b",
+            "has(a.b)",
+        ] {
+            assert_segments(source, None);
+        }
+    }
+
+    /// `has(a.b.c)` tests for `c` on the name `a.b`.
+    #[test]
+    fn the_operand_of_a_presence_test_can_be_a_name() {
+        let ast = crate::parser::Parser::default()
+            .parse("has(a.b.c)")
+            .unwrap();
+        let super::Expr::Select(select) = &ast.expr else {
+            panic!("has() is a select, got {:?}", ast.expr);
+        };
+        assert!(select.test);
+        assert_eq!(
+            select.operand.expr.qualified_name_segments(),
+            Some(vec!["a", "b"])
+        );
+    }
 }

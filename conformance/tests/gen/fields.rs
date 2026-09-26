@@ -701,7 +701,6 @@ mod qualified_identifier_resolution {
     use dedent::dedent;
 
     // Test: qualified_ident
-    #[should_panic]
     #[test]
     fn qualified_ident() {
         run_test(&dedent!(
@@ -721,7 +720,6 @@ mod qualified_identifier_resolution {
     }
 
     // Test: map_field_select
-    #[should_panic]
     #[test]
     fn map_field_select() {
         run_test(&dedent!(
@@ -757,7 +755,6 @@ mod qualified_identifier_resolution {
     }
 
     // Test: qualified_identifier_resolution_unchecked
-    #[should_panic]
     #[test]
     fn qualified_identifier_resolution_unchecked() {
         run_test(&dedent!(
@@ -871,7 +868,6 @@ mod qualified_identifier_resolution {
     }
 
     // Test: ident_with_longest_prefix_check
-    #[should_panic]
     #[test]
     fn ident_with_longest_prefix_check() {
         run_test(&dedent!(

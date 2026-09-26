@@ -362,7 +362,9 @@ where
 /// ```rust
 /// use std::fmt::{Debug, Formatter, Result as FmtResult};
 /// use std::sync::Arc;
+/// use cel::common::types::Type;
 /// use cel::objects::{Opaque, Value};
+/// use cel::{Context, Env, Program};
 ///
 /// #[derive(Eq, PartialEq)]
 /// struct MyId(u64);
@@ -379,6 +381,15 @@ where
 /// let a = Value::Opaque(Arc::new(MyId(7)));
 /// let b = Value::Opaque(Arc::new(MyId(7)));
 /// assert_eq!(a, b);
+///
+/// // Registering its type lets expressions name it.
+/// let mut env = Env::stdlib();
+/// env.add_type(Type::new_opaque_type("example.MyId")).unwrap();
+/// let mut context = Context::with_env(Arc::new(env));
+/// context.add_variable_from_value("id", a);
+///
+/// let program = Program::compile("type(id) == example.MyId").unwrap();
+/// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
 /// ```
 pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {
     /// Returns a stable, fully-qualified type name for this value's runtime type.
@@ -1327,173 +1338,79 @@ impl Value {
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
-                        let args = args?;
-                        if let Some(op) = ctx.env().find_overload(&call.func_name, &args) {
-                            return op(args);
-                        }
-                        let func = match ctx.get_function(call.func_name.as_str()) {
-                            Some(func) => func,
-                            None if ctx.env().has_overload(&call.func_name) => {
-                                return Err(ExecutionError::overload_for_values(
-                                    &call.func_name,
-                                    args.iter().map(|arg| arg.as_ref()),
-                                    false,
-                                ));
-                            }
-                            None => {
-                                return Err(ExecutionError::UndeclaredReference(
-                                    call.func_name.clone().into(),
-                                ));
-                            }
-                        };
-                        let mut ctx = FunctionContext::new(&call.func_name, None, ctx, args);
-                        (func)(&mut ctx)
+                        call_function(ctx, &call.func_name, &call.func_name, args?)
                     }
-                    Some(target) => {
+                    Some(target_expr) => {
                         let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
                             .args
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
-                        let args = args?;
-                        let qualified_func = match &target.expr {
-                            Expr::Ident(prefix) => {
-                                let qualified_name = format!("{prefix}.{}", call.func_name);
-                                if let Some(op) = ctx.env().find_overload(&qualified_name, &args) {
-                                    return op(args);
-                                }
-                                match ctx.get_function(&qualified_name) {
-                                    Some(func) => Some(func),
-                                    None if ctx.env().has_overload(&qualified_name) => {
-                                        return Err(ExecutionError::overload_for_values(
-                                            &qualified_name,
-                                            args.iter().map(|arg| arg.as_ref()),
-                                            false,
-                                        ));
-                                    }
-                                    None => None,
-                                }
-                            }
-                            _ => None,
-                        };
-                        let (target, func, args) = match qualified_func {
+                        let mut args = args?;
+                        // As in cel-go, a call whose target spells a qualified
+                        // name that, with the function's, names a function is
+                        // a call to that function: `optional.of(x)` calls
+                        // `optional.of`.
+                        if let Some(name) =
+                            qualified_function_name(ctx, target_expr, &call.func_name)
+                        {
+                            return call_function(ctx, &name, &call.func_name, args);
+                        }
+                        let target = Value::resolve_val(target_expr, ctx)?;
+                        args.insert(0, target);
+                        if let Some(op) = ctx.env().find_member_overload(&call.func_name, &args) {
+                            return op(args);
+                        }
+                        let func = match ctx.get_function(&call.func_name) {
+                            Some(func) => func,
                             None => {
-                                let target = Value::resolve_val(target, ctx)?;
-                                let mut args = args;
-                                args.insert(0, target);
-                                if let Some(op) =
-                                    ctx.env().find_member_overload(&call.func_name, &args)
-                                {
-                                    return op(args);
-                                }
-                                let func = match ctx.get_function(call.func_name.as_str()) {
-                                    Some(func) => func,
-                                    None if ctx.env().has_member_overload(&call.func_name) => {
-                                        return Err(ExecutionError::overload_for_values(
-                                            &call.func_name,
-                                            args.iter().map(|arg| arg.as_ref()),
-                                            true,
-                                        ));
-                                    }
-                                    None => {
-                                        return Err(ExecutionError::UndeclaredReference(
-                                            call.func_name.clone().into(),
-                                        ));
-                                    }
-                                };
-                                let target = args.remove(0);
-                                (Some(target), func, args)
+                                return Err(if ctx.env().has_member_overload(&call.func_name) {
+                                    ExecutionError::overload_for_values(
+                                        &call.func_name,
+                                        args.iter().map(|arg| arg.as_ref()),
+                                        true,
+                                    )
+                                } else {
+                                    ExecutionError::UndeclaredReference(
+                                        call.func_name.clone().into(),
+                                    )
+                                });
                             }
-                            Some(func) => (None, func, args),
                         };
-                        let mut ctx = FunctionContext::new(&call.func_name, target, ctx, args);
+                        let target = args.remove(0);
+                        let mut ctx =
+                            FunctionContext::new(&call.func_name, Some(target), ctx, args);
                         (func)(&mut ctx)
                     }
                 }
             }
+            // a variable shadows a type of the same name
             Expr::Ident(name) => Ok(ctx
                 .get_variable(name)
+                .or_else(|| {
+                    let t = ctx.env().types().find_type(name)?;
+                    Some(CowVal::owned(CelType::from(t)))
+                })
                 .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
             Expr::Select(select) => {
-                let left = Value::resolve_val(select.operand.deref(), ctx)?;
-                // borrows the field name from the AST
-                let key: CelString = select.field.as_str().into();
-                let no_such_key = || ExecutionError::NoSuchKey(Arc::new(select.field.clone()));
-                let overload_error = |value: &dyn Val| {
-                    ExecutionError::overload_for_values("_._", [value, &key], false)
-                };
-
-                // Plain `.field` on an `Optional` propagates optional-ness
-                // per cel-spec — matches cel-go `applyQualifiers` at
-                // `interpreter/attributes.go:1259` where an initial optional
-                // operand makes the whole qualifier chain optional. `has()`
-                // (test=true) on the same shape returns Bool(false) when the
-                // chain is empty.
-                let left = match unwrap_optional(left) {
-                    Unwrapped::NotOptional(left) => left,
-                    // Optional::none() short-circuits — the chain stops.
-                    Unwrapped::None => {
-                        return if select.test {
-                            Ok(bool(false))
-                        } else {
-                            Ok(CowVal::owned(CelOptional::none()))
-                        }
-                    }
-                    // Otherwise unwrap and access the field. A missing key on
-                    // a real container maps to Optional::none(); a field
-                    // access on a value that isn't a container at all
-                    // (Null, Int, …) is an error, matching cel-go's
-                    // `errorOnBadPresenceTest=true` mode which the cel-spec
-                    // conformance runner enables (see
-                    // `interpreter/attributes.go:1382` and
-                    // `conformance/conformance_test.go:87`).
-                    Unwrapped::Some(inner) => {
-                        return if select.test {
-                            let has = inner
-                                .as_indexer()
-                                .ok_or_else(no_such_key)?
-                                .get(&key)
-                                .is_ok();
-                            Ok(bool(has))
-                        } else {
-                            // a non-container operand is an error, a missing
-                            // key maps to `optional.none()`
-                            if inner.as_indexer().is_none() {
-                                return Err(no_such_key());
-                            }
-                            Ok(CowVal::owned(
-                                match index_into(inner, &key, "_._", |_| no_such_key()) {
-                                    Ok(v) => CelOptional::of(v.into_owned()),
-                                    Err(_) => CelOptional::none(),
-                                },
-                            ))
-                        };
-                    }
-                };
-
-                if select.test {
-                    match left.get_type().kind() {
-                        Kind::Map => Ok(bool(
-                            left.as_container()
-                                .ok_or_else(no_such_key)?
-                                .contains(&key)?,
-                        )),
-                        #[cfg(feature = "structs")]
-                        Kind::Struct => Ok(bool(
-                            left.as_indexer()
-                                .is_some_and(|indexer| indexer.get(&key).is_ok()),
-                        )),
-                        _ => index_into(left, &key, "_._", overload_error),
-                    }
+                // `has(a.b.c)` tests for `c` on `a.b`: only its operand is a name
+                let name = if select.test {
+                    select.operand.expr.qualified_name_segments()
                 } else {
-                    let is_map = left.get_type().kind() == Kind::Map;
-                    index_into(left, &key, "_._", |value| {
-                        if is_map {
-                            no_such_key()
-                        } else {
-                            overload_error(value)
-                        }
-                    })
+                    expr.expr.qualified_name_segments()
+                };
+                let Some(name) = name else {
+                    let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                    return select_field(left, &select.field, select.test);
+                };
+                let (mut value, fields) = resolve_qualified_name(ctx, &name)?;
+                for field in fields {
+                    value = select_field(value, field, false)?;
+                }
+                if select.test {
+                    select_field(value, &select.field, true)
+                } else {
+                    Ok(value)
                 }
             }
             Expr::List(list_expr) => {
@@ -1595,13 +1512,12 @@ impl Value {
                 }
                 #[cfg(feature = "structs")]
                 {
-                    let struct_def =
-                        ctx.env()
-                            .find_struct(&name)
-                            .ok_or(ExecutionError::UnexpectedType {
-                                got: name.to_owned(),
-                                want: "known struct".to_owned(),
-                            })?;
+                    let struct_type = ctx.env().types().find_struct(&name).ok_or(
+                        ExecutionError::UnexpectedType {
+                            got: name.to_owned(),
+                            want: "known struct".to_owned(),
+                        },
+                    )?;
                     let mut fields = std::collections::BTreeMap::new();
                     for entry in &strct.entries {
                         match &entry.expr {
@@ -1616,8 +1532,7 @@ impl Value {
                             }
                         }
                     }
-                    let s = struct_def.new_struct(fields)?;
-                    Ok(CowVal::owned(s))
+                    Ok(CowVal::Owned(struct_type.new_value(fields)?))
                 }
             }
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
@@ -1757,6 +1672,176 @@ fn try_bool(val: Result<CowVal<'_, '_>, ExecutionError>) -> Result<bool, Executi
                 want: "bool".to_owned(),
             }),
         Err(err) => Result::Err(err),
+    }
+}
+
+/// Calls the global function `name` with `args`. The function is told
+/// `ftx_name`, borrowed for as long as the result: a qualified function is
+/// told its unqualified name.
+#[inline(always)]
+fn call_function<'e, 'p, 'v>(
+    ctx: &'e Context<'p, 'v>,
+    name: &str,
+    ftx_name: &'e str,
+    args: Vec<CowVal<'e, 'v>>,
+) -> Result<CowVal<'e, 'v>, ExecutionError> {
+    if let Some(op) = ctx.env().find_overload(name, &args) {
+        return op(args);
+    }
+    let func = match ctx.get_function(name) {
+        Some(func) => func,
+        None if ctx.env().has_overload(name) => {
+            return Err(ExecutionError::overload_for_values(
+                name,
+                args.iter().map(|arg| arg.as_ref()),
+                false,
+            ));
+        }
+        None => {
+            return Err(ExecutionError::UndeclaredReference(name.to_owned().into()));
+        }
+    };
+    let mut ctx = FunctionContext::new(ftx_name, None, ctx, args);
+    (func)(&mut ctx)
+}
+
+/// The name of the function a call on `target` names when `target` spells a
+/// qualified name: `a.b.f()` calls the function `a.b.f`, if there is one,
+/// rather than `f` on `a.b`. Mirrors cel-go's `resolveFunction`, deciding on
+/// the name alone, but on every evaluation: a target whose first segment is
+/// no function's namespace, as most are, is told apart without allocating.
+fn qualified_function_name(ctx: &Context, target: &Expression, func_name: &str) -> Option<String> {
+    if !ctx.has_function_namespace(target.expr.qualified_name_root()?) {
+        return None;
+    }
+    let segments = target.expr.qualified_name_segments()?;
+    let mut name = String::with_capacity(
+        segments.iter().map(|s| s.len() + 1).sum::<usize>() + func_name.len(),
+    );
+    for segment in segments {
+        name.push_str(segment);
+        name.push('.');
+    }
+    name.push_str(func_name);
+    (ctx.env().has_overload(&name) || ctx.get_function(&name).is_some()).then_some(name)
+}
+
+/// Resolves the qualified name `a.b.c`, given as its segments, to a value
+/// and the fields left to select on it.
+///
+/// As in cel-go, the most specific name wins: the variable `a.b.c`, else the
+/// type `a.b.c`, else the variable `a.b` with `c` left to select, else the
+/// variable `a` with `b` and `c` left. Only the whole name can be a type, as
+/// types have no fields.
+fn resolve_qualified_name<'e, 'p, 'v, 's>(
+    ctx: &'e Context<'p, 'v>,
+    segments: &'s [&'e str],
+) -> Result<(CowVal<'e, 'v>, &'s [&'e str]), ExecutionError> {
+    let name = segments.join(".");
+    let mut len = name.len();
+    for prefix in (1..=segments.len()).rev() {
+        let candidate = &name[..len];
+        if let Some(value) = ctx.get_variable(candidate) {
+            return Ok((value, &segments[prefix..]));
+        }
+        if prefix == segments.len() {
+            if let Some(t) = ctx.env().types().find_type(candidate) {
+                return Ok((CowVal::owned(CelType::from(t)), &[]));
+            }
+        }
+        // drop the last segment and its dot
+        len = len.saturating_sub(segments[prefix - 1].len() + 1);
+    }
+    Err(ExecutionError::UndeclaredReference(Arc::new(
+        segments[0].to_owned(),
+    )))
+}
+
+/// Selects `field` on `left`, the already resolved operand of a select:
+/// `left.field`, or `has(left.field)` when `test` is set.
+#[inline(always)]
+fn select_field<'b, 'v>(
+    left: CowVal<'b, 'v>,
+    field: &str,
+    test: bool,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    // borrows the field name from the AST
+    let key: CelString = field.into();
+    let no_such_key = || ExecutionError::NoSuchKey(Arc::new(field.to_owned()));
+    let overload_error =
+        |value: &dyn Val| ExecutionError::overload_for_values("_._", [value, &key], false);
+
+    // Plain `.field` on an `Optional` propagates optional-ness
+    // per cel-spec — matches cel-go `applyQualifiers` at
+    // `interpreter/attributes.go:1259` where an initial optional
+    // operand makes the whole qualifier chain optional. `has()`
+    // (test=true) on the same shape returns Bool(false) when the
+    // chain is empty.
+    let left = match unwrap_optional(left) {
+        Unwrapped::NotOptional(left) => left,
+        // Optional::none() short-circuits — the chain stops.
+        Unwrapped::None => {
+            return if test {
+                Ok(bool(false))
+            } else {
+                Ok(CowVal::owned(CelOptional::none()))
+            }
+        }
+        // Otherwise unwrap and access the field. A missing key on
+        // a real container maps to Optional::none(); a field
+        // access on a value that isn't a container at all
+        // (Null, Int, …) is an error, matching cel-go's
+        // `errorOnBadPresenceTest=true` mode which the cel-spec
+        // conformance runner enables (see
+        // `interpreter/attributes.go:1382` and
+        // `conformance/conformance_test.go:87`).
+        Unwrapped::Some(inner) => {
+            return if test {
+                let has = inner
+                    .as_indexer()
+                    .ok_or_else(no_such_key)?
+                    .get(&key)
+                    .is_ok();
+                Ok(bool(has))
+            } else {
+                // a non-container operand is an error, a missing
+                // key maps to `optional.none()`
+                if inner.as_indexer().is_none() {
+                    return Err(no_such_key());
+                }
+                Ok(CowVal::owned(
+                    match index_into(inner, &key, "_._", |_| no_such_key()) {
+                        Ok(v) => CelOptional::of(v.into_owned()),
+                        Err(_) => CelOptional::none(),
+                    },
+                ))
+            };
+        }
+    };
+
+    if test {
+        match left.get_type().kind() {
+            Kind::Map => Ok(bool(
+                left.as_container()
+                    .ok_or_else(no_such_key)?
+                    .contains(&key)?,
+            )),
+            #[cfg(feature = "structs")]
+            Kind::Struct => Ok(bool(
+                left.as_indexer()
+                    .is_some_and(|indexer| indexer.get(&key).is_ok()),
+            )),
+            _ => index_into(left, &key, "_._", overload_error),
+        }
+    } else {
+        let is_map = left.get_type().kind() == Kind::Map;
+        index_into(left, &key, "_._", |value| {
+            if is_map {
+                no_such_key()
+            } else {
+                overload_error(value)
+            }
+        })
     }
 }
 
@@ -2555,6 +2640,366 @@ mod tests {
         assert!(result.is_err(), "Should error on missing map key");
     }
 
+    /// The built-in type names are identifiers resolving to type values.
+    #[test]
+    fn type_names_resolve_as_type_values() {
+        let context = Context::default();
+        for expr in [
+            "type(true) == bool",
+            "type(b'') == bytes",
+            "type(1.0) == double",
+            "type(1) == int",
+            "type([]) == list",
+            "type({}) == map",
+            "type(null) == null_type",
+            "type(optional.none()) == optional_type",
+            "type('') == string",
+            "type(int) == type",
+            "type(1u) == uint",
+        ] {
+            let program = Program::compile(expr).unwrap();
+            assert_eq!(program.execute(&context), Ok(Value::Bool(true)), "{expr}");
+        }
+    }
+
+    /// A variable shadows a type of the same name, whether bound on the
+    /// context or by a comprehension in a child scope.
+    #[test]
+    fn a_variable_shadows_a_type_name() {
+        let mut context = Context::default();
+        context.add_variable_from_value("int", 42);
+        let program = Program::compile("int").unwrap();
+        assert_eq!(program.execute(&context), Ok(Value::Int(42)));
+
+        let context = Context::default();
+        let program = Program::compile("[1].map(int, int + 1)").unwrap();
+        assert_eq!(program.execute(&context), Ok(vec![2].into()));
+    }
+
+    #[test]
+    fn an_unknown_identifier_is_an_undeclared_reference() {
+        test_execution_error(
+            "not_a_type",
+            ExecutionError::UndeclaredReference(Arc::new("not_a_type".to_string())),
+        );
+    }
+
+    mod registered_types {
+        use crate::common::types::{CelType, Kind, Type};
+        use crate::common::value::{StaticVal, Val};
+        use crate::{Context, Env, ExecutionError, Program, Value};
+        use std::any::Any;
+        use std::sync::Arc;
+
+        static IP_TYPE: Type = Type::simple_type(Kind::Opaque, "Ip");
+
+        #[derive(Debug)]
+        struct Ip(u32);
+
+        impl Val for Ip {
+            fn get_type(&self) -> &Type {
+                &IP_TYPE
+            }
+            fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                Box::new(Ip(self.0))
+            }
+            fn as_any(&self) -> Option<&dyn Any> {
+                Some(self)
+            }
+        }
+        impl StaticVal for Ip {}
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        #[test]
+        fn a_registered_type_resolves_as_a_type_value() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::simple_type(Kind::Opaque, "Ip")).unwrap();
+            let mut context = Context::with_env(Arc::new(env));
+            context.add_variable_as_val("ip", Box::new(Ip(0x7f000001)));
+            assert_eq!(execute(&context, "type(ip) == Ip"), Ok(Value::Bool(true)));
+            assert_eq!(execute(&context, "type(1) == Ip"), Ok(Value::Bool(false)));
+        }
+
+        #[test]
+        fn an_unregistered_type_is_an_undeclared_reference() {
+            let mut context = Context::default();
+            context.add_variable_as_val("ip", Box::new(Ip(0x7f000001)));
+            assert_eq!(
+                execute(&context, "type(ip) == Ip"),
+                Err(ExecutionError::UndeclaredReference(Arc::new(
+                    "Ip".to_string()
+                )))
+            );
+        }
+
+        /// Evaluates `expr` to a type value, and returns its name.
+        fn type_name(context: &Context, expr: &str) -> Result<String, ExecutionError> {
+            let ast = crate::parser::Parser::default().parse(expr).unwrap();
+            let value = Value::resolve_val(&ast, context)?;
+            Ok(value.downcast_ref::<CelType>().unwrap().name().to_owned())
+        }
+
+        /// Types are known once a library registered them, the core types
+        /// included.
+        #[test]
+        fn types_come_with_the_standard_library() {
+            for name in ["int", "optional_type"] {
+                assert_eq!(
+                    type_name(&Context::empty(), name),
+                    Err(ExecutionError::UndeclaredReference(Arc::new(
+                        name.to_string()
+                    )))
+                );
+                assert_eq!(type_name(&Context::default(), name), Ok(name.to_owned()));
+            }
+        }
+    }
+
+    mod qualified_idents {
+        use crate::common::types::Type;
+        use crate::{Context, Env, ExecutionError, Program, Value};
+        use std::collections::HashMap;
+        use std::sync::Arc;
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        fn undeclared(name: &str) -> Result<Value, ExecutionError> {
+            Err(ExecutionError::UndeclaredReference(Arc::new(
+                name.to_string(),
+            )))
+        }
+
+        #[test]
+        fn a_qualified_variable_resolves() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b.c", "yeah");
+            assert_eq!(execute(&context, "a.b.c"), Ok("yeah".into()));
+        }
+
+        /// The most specific name wins, as in cel-go: `a.b.c` is the
+        /// variable `a.b.c` rather than the field `c` of the variable `a.b`.
+        #[test]
+        fn the_longest_variable_name_wins() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b.c", "yeah");
+            context.add_variable_from_value("a.b", HashMap::from([("c", "oops")]));
+            assert_eq!(execute(&context, "a.b.c"), Ok("yeah".into()));
+            assert_eq!(
+                execute(&context, "a.b"),
+                Ok(HashMap::from([("c", "oops")]).into())
+            );
+        }
+
+        #[test]
+        fn fields_are_selected_on_a_qualified_variable() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b", HashMap::from([("c", "x")]));
+            assert_eq!(execute(&context, "a.b.c"), Ok("x".into()));
+            context.add_variable_from_value("a.list", vec![1, 2]);
+            assert_eq!(execute(&context, "a.list.size()"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn fields_are_selected_on_a_variable() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a", HashMap::from([("b", HashMap::from([("c", 1)]))]));
+            assert_eq!(execute(&context, "a.b.c"), Ok(Value::Int(1)));
+            let context = Context::default();
+            assert_eq!(
+                execute(&context, "[{'b': 1}].map(a, a.b)"),
+                Ok(vec![1].into())
+            );
+        }
+
+        #[test]
+        fn a_qualified_type_resolves() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::new_opaque_type("my.pkg.Ip")).unwrap();
+            let context = Context::with_env(Arc::new(env));
+            assert_eq!(
+                execute(
+                    &context,
+                    "type(my.pkg.Ip) == type && my.pkg.Ip == my.pkg.Ip"
+                ),
+                Ok(Value::Bool(true))
+            );
+        }
+
+        #[cfg(feature = "chrono")]
+        #[test]
+        fn well_known_types_resolve() {
+            let context = Context::default();
+            assert_eq!(
+                execute(
+                    &context,
+                    "type(duration('1s')) == google.protobuf.Duration \
+                     && type(timestamp('2009-02-13T23:31:30Z')) == google.protobuf.Timestamp"
+                ),
+                Ok(Value::Bool(true))
+            );
+        }
+
+        /// A variable shadows a type of the same name, qualified or not.
+        #[test]
+        fn a_qualified_variable_shadows_a_type() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::new_opaque_type("my.pkg.Ip")).unwrap();
+            let mut context = Context::with_env(Arc::new(env));
+            context.add_variable_from_value("my.pkg.Ip", 1);
+            assert_eq!(execute(&context, "my.pkg.Ip"), Ok(Value::Int(1)));
+        }
+
+        /// Types have no fields: only the whole name is looked up as a type.
+        #[test]
+        fn a_type_is_only_the_whole_name() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::new_opaque_type("a.b")).unwrap();
+            let context = Context::with_env(Arc::new(env));
+            assert_eq!(execute(&context, "a.b.c"), undeclared("a"));
+        }
+
+        #[test]
+        fn an_unresolved_qualified_name_reports_its_root() {
+            assert_eq!(execute(&Context::default(), "a.b.c"), undeclared("a"));
+        }
+
+        /// `has(a.b.c)` tests for `c` on the name `a.b`.
+        #[test]
+        fn a_presence_test_resolves_its_operand_as_a_name() {
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b", HashMap::from([("c", 1)]));
+            assert_eq!(execute(&context, "has(a.b.c)"), Ok(Value::Bool(true)));
+            assert_eq!(execute(&context, "has(a.b.d)"), Ok(Value::Bool(false)));
+
+            let mut context = Context::default();
+            context.add_variable_from_value("a.b.c", 1);
+            assert_eq!(execute(&context, "has(a.b.c)"), undeclared("a"));
+        }
+    }
+
+    mod qualified_functions {
+        use crate::common::types::{CelInt, INT_TYPE};
+        use crate::common::value::CowVal;
+        use crate::{Context, Env, ExecutionError, Program, Value};
+        use std::collections::HashMap;
+        use std::sync::Arc;
+
+        fn increment<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+            let i = args[0].downcast_ref::<CelInt>().unwrap();
+            Ok(CowVal::owned(CelInt::from(i.inner() + 1)))
+        }
+
+        fn context_with_overload(name: &str) -> Context<'static, 'static> {
+            let mut env = Env::stdlib();
+            env.add_overload(name, "increment_int", vec![INT_TYPE], increment)
+                .unwrap();
+            Context::with_env(Arc::new(env))
+        }
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        #[test]
+        fn an_overload_resolves_through_one_qualifier() {
+            let context = context_with_overload("a.f");
+            assert_eq!(execute(&context, "a.f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn an_overload_resolves_through_several_qualifiers() {
+            let context = context_with_overload("a.b.f");
+            assert_eq!(execute(&context, "a.b.f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn a_function_resolves_through_several_qualifiers() {
+            let mut context = Context::default();
+            context.add_function("a.b.f", |i: i64| i + 1).unwrap();
+            assert_eq!(execute(&context, "a.b.f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn a_mismatched_qualified_overload_names_the_qualified_function() {
+            let context = context_with_overload("a.b.f");
+            let error = execute(&context, "a.b.f('one')").unwrap_err();
+            assert!(error.to_string().contains("a.b.f"), "{error}");
+        }
+
+        /// As in cel-go, the qualified function is called rather than a
+        /// method that applies to the target.
+        #[test]
+        fn a_qualified_function_is_called_before_a_method() {
+            fn forty_two<'b, 'v>(_: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+                Ok(CowVal::owned(CelInt::from(42)))
+            }
+            let mut env = Env::stdlib();
+            env.add_overload("m.size", "m_size", vec![], forty_two)
+                .unwrap();
+            let mut context = Context::with_env(Arc::new(env));
+            context.add_variable_from_value("m", vec![1, 2]);
+            assert_eq!(execute(&context, "m.size()"), Ok(Value::Int(42)));
+        }
+
+        /// A namespace of functions is no function: a call with no function
+        /// of its qualified name is a method call.
+        #[test]
+        fn a_method_is_called_on_a_variable_named_as_a_namespace() {
+            let mut context = Context::default();
+            context.add_variable_from_value("optional", vec![1, 2]);
+            assert_eq!(execute(&context, "optional.size()"), Ok(Value::Int(2)));
+            assert_eq!(
+                execute(&context, "optional.of(1).hasValue()"),
+                Ok(Value::Bool(true))
+            );
+        }
+
+        /// A comprehension's scope finds the namespaces of its root context.
+        #[test]
+        fn a_qualified_function_is_called_in_a_child_scope() {
+            let context = context_with_overload("a.f");
+            assert_eq!(execute(&context, "[1].map(x, a.f(x))"), Ok(vec![2].into()));
+            let mut context = Context::default();
+            context.add_function("a.b.f", |i: i64| i + 1).unwrap();
+            assert_eq!(
+                execute(&context, "[1].map(x, a.b.f(x))"),
+                Ok(vec![2].into())
+            );
+        }
+
+        #[test]
+        fn a_qualified_function_is_called_when_no_method_applies() {
+            let mut context = context_with_overload("a.f");
+            context.add_variable_from_value("a", 1);
+            assert_eq!(execute(&context, "a.f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn a_call_on_an_undeclared_target_reports_the_target() {
+            let context = Context::default();
+            assert_eq!(
+                execute(&context, "foo.bar()"),
+                Err(ExecutionError::UndeclaredReference(Arc::new(
+                    "foo".to_string()
+                )))
+            );
+        }
+
+        /// Without a function of the qualified name, the call is a member
+        /// call on the selected field.
+        #[test]
+        fn a_member_call_on_a_selected_field_is_not_qualified() {
+            let mut context = Context::default();
+            context.add_variable_from_value("m", HashMap::from([("b", vec![1, 2])]));
+            assert_eq!(execute(&context, "m.b.size()"), Ok(Value::Int(2)));
+        }
+    }
+
     mod opaque {
         use crate::objects::{Map, Opaque, OpaqueVal, OptionalValue};
         use crate::parser::Parser;
@@ -3109,7 +3554,8 @@ mod tests {
         #[test]
         fn test_empty_struct() {
             let mut env = Env::stdlib();
-            env.add_struct(StructDef::new(String::from("cel.MyStruct")));
+            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+                .unwrap();
             let program = Program::compile("cel.MyStruct {}").unwrap();
             let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
             match value {
@@ -3125,7 +3571,8 @@ mod tests {
                 StructDef::new(String::from("cel.Problem"))
                     .add_field(String::from("solved"), types::BOOL_TYPE)
                     .add_field(String::from("answer"), types::INT_TYPE),
-            );
+            )
+            .unwrap();
             let program =
                 Program::compile("cel.Problem { solved: 0 != null, answer: 21 * 2 }").unwrap();
             let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
@@ -3157,7 +3604,8 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { some: 'value' }.some").unwrap();
             let value = program.execute(&Context::with_env(env.into())).unwrap();
             assert_eq!(value, Value::String(Arc::new("value".to_owned())));
@@ -3169,7 +3617,8 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { not_here: 'value' }").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
             assert_eq!(
@@ -3187,7 +3636,8 @@ mod tests {
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
                     .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { some: 'value' }.here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
             assert_eq!(result, Ok(Value::String(Arc::new(String::from("yes")))));
@@ -3200,7 +3650,8 @@ mod tests {
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
                     .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
-            );
+            )
+            .unwrap();
             let program =
                 Program::compile("cel.MyStruct { some: 'value', here: 'totally' }.here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
@@ -3214,7 +3665,8 @@ mod tests {
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("name".into(), types::STRING_TYPE)
                     .add_field("value".into(), types::INT_TYPE),
-            );
+            )
+            .unwrap();
 
             let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
             my_struct.add_field_value("name".to_owned(), CowVal::owned(CelString::from("test")));
@@ -3249,7 +3701,8 @@ mod tests {
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
-            );
+            )
+            .unwrap();
             let program = Program::compile("cel.MyStruct { some: 'value' }.not_here").unwrap();
             let result = program.execute(&Context::with_env(env.into()));
             assert_eq!(
@@ -3272,13 +3725,107 @@ mod tests {
         }
 
         #[test]
+        fn a_struct_name_is_its_type() {
+            let mut env = Env::stdlib();
+            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+                .unwrap();
+            let context = Context::with_env(Arc::new(env));
+            let program =
+                Program::compile("type(cel.MyStruct{}) == cel.MyStruct && type(1) != cel.MyStruct")
+                    .unwrap();
+            assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+        }
+
+        #[test]
+        fn a_struct_can_only_be_added_once() {
+            let mut env = Env::stdlib();
+            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+                .unwrap();
+            assert_eq!(
+                env.add_struct(StructDef::new(String::from("cel.MyStruct"))),
+                Err(crate::DeclarationError::type_conflict("cel.MyStruct"))
+            );
+        }
+
+        /// Any [`StructType`](crate::StructType) can be constructed by a
+        /// struct literal, whatever value it makes.
+        #[test]
+        fn a_custom_struct_type_is_constructed() {
+            use crate::common::types::Type;
+            use crate::common::value::StaticVal;
+            use crate::StructType;
+            use std::any::Any;
+            use std::collections::BTreeMap;
+
+            static POINT_TYPE: Type = Type::new_struct_type("geo.Point");
+
+            #[derive(Debug, PartialEq)]
+            struct Point(i64, i64);
+
+            impl Val for Point {
+                fn get_type(&self) -> &Type {
+                    &POINT_TYPE
+                }
+                fn equals(&self, other: &dyn Val) -> bool {
+                    other.downcast_ref::<Point>() == Some(self)
+                }
+                fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                    Box::new(Point(self.0, self.1))
+                }
+                fn as_any(&self) -> Option<&dyn Any> {
+                    Some(self)
+                }
+            }
+            impl StaticVal for Point {}
+
+            struct PointType;
+
+            impl StructType for PointType {
+                fn get_type(&self) -> &Type {
+                    &POINT_TYPE
+                }
+                fn new_value<'b, 'v>(
+                    &self,
+                    fields: BTreeMap<String, CowVal<'b, 'v>>,
+                ) -> Result<Box<dyn Val + 'v>, ExecutionError> {
+                    let coordinate = |name: &str| {
+                        fields
+                            .get(name)
+                            .and_then(|v| v.downcast_ref::<CelInt>())
+                            .map(|i| *i.inner())
+                            .unwrap_or_default()
+                    };
+                    Ok(Box::new(Point(coordinate("x"), coordinate("y"))))
+                }
+            }
+
+            let mut env = Env::stdlib();
+            env.add_struct(PointType).unwrap();
+            let context = Context::with_env(Arc::new(env));
+            let ast = crate::parser::Parser::default()
+                .parse("geo.Point{x: 1, y: 2}")
+                .unwrap();
+            let value = Value::resolve_val(&ast, &context).unwrap();
+            assert_eq!(value.downcast_ref::<Point>(), Some(&Point(1, 2)));
+
+            let program = Program::compile(
+                "geo.Point{x: 1, y: 2} == geo.Point{y: 2, x: 1} \
+                 && geo.Point{x: 1} != geo.Point{} \
+                 && type(geo.Point{}) == geo.Point",
+            )
+            .unwrap();
+            assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+        }
+
+        #[test]
         fn add_struct_variable_to_context() {
             let mut env = Env::stdlib();
             env.add_struct(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("name".into(), types::STRING_TYPE)
                     .add_field("value".into(), types::INT_TYPE),
-            );
+            )
+            .unwrap();
 
             let mut my_struct = CelStruct::new("cel.MyStruct".to_owned());
             my_struct.add_field_value("name".to_owned(), CowVal::owned(CelString::from("test")));

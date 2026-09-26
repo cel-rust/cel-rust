@@ -5,8 +5,9 @@
 //! ## Optional Features
 //!
 //! - `structs`: Enables support for custom struct types. This allows you to define
-//!   struct definitions using [`StructDef`] and add them to your [`Env`].
-//!   Custom structs can then be instantiated and accessed within CEL expressions.
+//!   struct definitions using [`StructDef`], or any other `StructType`, and add
+//!   them to your [`Env`]. Custom structs can then be instantiated and accessed
+//!   within CEL expressions.
 //! - `chrono`: Enables support for `duration` and `timestamp` types using the `chrono` crate.
 //! - `regex`: Enables support for regular expressions.
 //! - `json`: Enables conversion between CEL values and JSON.
@@ -43,8 +44,12 @@ mod duration;
 pub use ser::{Duration, Timestamp};
 
 pub use env::Env;
+mod registry;
 #[cfg(feature = "structs")]
 pub use env::StructDef;
+#[cfg(feature = "structs")]
+pub use registry::StructType;
+pub use registry::TypeRegistry;
 
 mod ser;
 pub use ser::to_value;
@@ -323,6 +328,16 @@ pub enum DeclarationError {
     /// overload is a member function.
     #[error("Cannot declare overload '{id}' of '{function}': one with the same id or signature is already declared")]
     DuplicateOverload { function: String, id: String },
+    /// A type could not be registered because another type is already
+    /// registered under the same name.
+    ///
+    /// Registering a type equal to the registered one is not a conflict.
+    #[error("Cannot register type '{name}': another type with that name is already registered")]
+    TypeConflict { name: String },
+    /// A type could not be registered because its name is not an identifier,
+    /// or several separated by dots, so no expression could refer to it.
+    #[error("Cannot register type '{name}': not a valid type name")]
+    InvalidTypeName { name: String },
 }
 
 impl DeclarationError {
@@ -336,6 +351,18 @@ impl DeclarationError {
         DeclarationError::DuplicateOverload {
             function: function.to_string(),
             id: id.to_string(),
+        }
+    }
+
+    pub fn type_conflict(name: &str) -> Self {
+        DeclarationError::TypeConflict {
+            name: name.to_string(),
+        }
+    }
+
+    pub fn invalid_type_name(name: &str) -> Self {
+        DeclarationError::InvalidTypeName {
+            name: name.to_string(),
         }
     }
 }

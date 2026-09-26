@@ -20,19 +20,23 @@ use std::ops::Deref;
 ///
 /// Return `Some(self)` from [`Val::as_any`] and implement the [`StaticVal`]
 /// marker so that `downcast_ref` can recover the
-/// concrete type:
+/// concrete type. Register its type with [`Env::add_type`](crate::Env::add_type)
+/// for expressions to name it, e.g. `type(addr) == ip`:
 ///
 /// ```
 /// use cel::common::types::Type;
 /// use cel::common::value::{StaticVal, Val};
+/// use cel::{Context, Env, Program, Value};
 /// use std::any::Any;
+/// use std::sync::Arc;
+///
+/// static IP: Type = Type::new_unspecified_type("ip");
 ///
 /// #[derive(Debug)]
 /// struct Ip(u32);
 ///
 /// impl Val for Ip {
 ///     fn get_type(&self) -> &Type {
-///         static IP: Type = Type::new_unspecified_type("ip");
 ///         &IP
 ///     }
 ///     fn equals(&self, other: &dyn Val) -> bool {
@@ -46,6 +50,14 @@ use std::ops::Deref;
 ///     }
 /// }
 /// impl StaticVal for Ip {}
+///
+/// let mut env = Env::stdlib();
+/// env.add_type(IP.to_owned()).unwrap();
+/// let mut context = Context::with_env(Arc::new(env));
+/// context.add_variable_as_val("addr", Box::new(Ip(0x7f000001)));
+///
+/// let program = Program::compile("type(addr) == ip").unwrap();
+/// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
 /// ```
 pub trait Val: Debug + Send + Sync {
     fn get_type(&self) -> &Type;
