@@ -168,34 +168,34 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a chrono::Duration {
     }
 }
 
-fn get_milliseconds<'b, 'v>(this: &Duration) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().num_milliseconds())))
+fn get_milliseconds(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_milliseconds())
 }
 
-fn get_seconds<'b, 'v>(this: &Duration) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().num_seconds())))
+fn get_seconds(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_seconds())
 }
 
-fn get_minutes<'b, 'v>(this: &Duration) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().num_minutes())))
+fn get_minutes(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_minutes())
 }
 
-fn get_hours<'b, 'v>(this: &Duration) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().num_hours())))
+fn get_hours(this: &Duration) -> CelInt {
+    CelInt::from(this.inner().num_hours())
 }
 
-fn duration_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn duration_from_string(this: &CelString<'_>) -> Result<Duration, ExecutionError> {
     let (_, d) = crate::duration::parse_duration(this.inner())
         .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
-    Ok(CowVal::owned(Duration::from(d)))
+    Ok(Duration::from(d))
 }
 
-fn duration_from_duration<'b, 'v>(this: &Duration) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(*this))
+fn duration_from_duration(this: &Duration) -> Duration {
+    *this
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    crate::add_overload!(env, fn duration_from_string: (CelString) -> Duration,
+    crate::add_overload!(env, fn duration_from_string: (CelString) -> Result<Duration>,
         name = "duration", id = "string_to_duration");
     crate::add_overload!(env, fn duration_from_duration: (Duration) -> Duration,
         name = "duration", id = "duration_to_duration");

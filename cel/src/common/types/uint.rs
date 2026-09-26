@@ -266,13 +266,13 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a u64 {
     }
 }
 
-fn uint_from_uint<'b, 'v>(this: &UInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(*this))
+fn uint_from_uint(this: &UInt) -> UInt {
+    *this
 }
 
-fn uint_from_int<'b, 'v>(this: &CelInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn uint_from_int(this: &CelInt) -> Result<UInt, ExecutionError> {
     match u64::try_from(*this.inner()) {
-        Ok(value) => Ok(CowVal::owned(UInt::from(value))),
+        Ok(value) => Ok(UInt::from(value)),
         Err(_) => Err(ExecutionError::FunctionError {
             function: "uint".to_owned(),
             message: "unsigned integer overflow".to_owned(),
@@ -280,7 +280,7 @@ fn uint_from_int<'b, 'v>(this: &CelInt) -> Result<CowVal<'b, 'v>, ExecutionError
     }
 }
 
-fn uint_from_double<'b, 'v>(this: &CelDouble) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn uint_from_double(this: &CelDouble) -> Result<UInt, ExecutionError> {
     let value = *this.inner();
     // Double to uint conversions are limited to [0, maxUint).
     // 'u64::MAX as f64' rounds up to 2^64 and the largest double below that
@@ -293,13 +293,13 @@ fn uint_from_double<'b, 'v>(this: &CelDouble) -> Result<CowVal<'b, 'v>, Executio
         });
     }
 
-    Ok(CowVal::owned(UInt::from(value as u64)))
+    Ok(UInt::from(value as u64))
 }
 
-fn uint_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn uint_from_string(this: &CelString<'_>) -> Result<UInt, ExecutionError> {
     this.inner()
         .parse::<u64>()
-        .map(|v| CowVal::owned(UInt::from(v)))
+        .map(UInt::from)
         .map_err(|e| ExecutionError::FunctionError {
             function: "uint".to_owned(),
             message: format!("string parse error: {e}"),
@@ -309,11 +309,11 @@ fn uint_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, Exec
 pub(crate) fn stdlib(env: &mut crate::Env) {
     crate::add_overload!(env, fn uint_from_uint: (UInt) -> UInt,
         name = "uint", id = "uint64_to_uint64");
-    crate::add_overload!(env, fn uint_from_int: (CelInt) -> UInt,
+    crate::add_overload!(env, fn uint_from_int: (CelInt) -> Result<UInt>,
         name = "uint", id = "int64_to_uint64");
-    crate::add_overload!(env, fn uint_from_double: (CelDouble) -> UInt,
+    crate::add_overload!(env, fn uint_from_double: (CelDouble) -> Result<UInt>,
         name = "uint", id = "double_to_uint64");
-    crate::add_overload!(env, fn uint_from_string: (CelString) -> UInt,
+    crate::add_overload!(env, fn uint_from_string: (CelString) -> Result<UInt>,
         name = "uint", id = "string_to_uint64");
 }
 

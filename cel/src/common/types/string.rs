@@ -224,39 +224,26 @@ pub(crate) fn take_string<'b, 'v>(arg: CowVal<'b, 'v>) -> Result<String<'v>, Cow
     }
 }
 
-fn contains<'b, 'v>(
-    this: &String<'_>,
-    needle: &String<'_>,
-) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelBool::from(this.contains(needle.inner()))))
+fn contains(this: &String<'_>, needle: &String<'_>) -> CelBool {
+    CelBool::from(this.contains(needle.inner()))
 }
 
-fn ends_with<'b, 'v>(
-    this: &String<'_>,
-    needle: &String<'_>,
-) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelBool::from(this.ends_with(needle.inner()))))
+fn ends_with(this: &String<'_>, needle: &String<'_>) -> CelBool {
+    CelBool::from(this.ends_with(needle.inner()))
 }
 
-fn starts_with<'b, 'v>(
-    this: &String<'_>,
-    needle: &String<'_>,
-) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelBool::from(
-        this.starts_with(needle.inner()),
-    )))
+fn starts_with(this: &String<'_>, needle: &String<'_>) -> CelBool {
+    CelBool::from(this.starts_with(needle.inner()))
 }
 
-fn size<'b, 'v>(this: &String<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().len() as i64)))
+fn size(this: &String<'_>) -> CelInt {
+    CelInt::from(this.inner().len() as i64)
 }
 
 #[cfg(feature = "regex")]
-fn matches<'b, 'v>(this: &String<'_>, re: &String<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn matches(this: &String<'_>, re: &String<'_>) -> Result<CelBool, ExecutionError> {
     match regex::Regex::new(re.inner()) {
-        Ok(compiled) => Ok(CowVal::owned(CelBool::from(
-            compiled.is_match(this.inner()),
-        ))),
+        Ok(compiled) => Ok(CelBool::from(compiled.is_match(this.inner()))),
         Err(err) => Err(ExecutionError::FunctionError {
             function: "matches".to_string(),
             message: format!("'{}' not a valid regex:\n{err}", re.inner()),
@@ -264,34 +251,30 @@ fn matches<'b, 'v>(this: &String<'_>, re: &String<'_>) -> Result<CowVal<'b, 'v>,
     }
 }
 
-fn string_from_int<'b, 'v>(this: &CelInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(String::from(this.to_string())))
+fn string_from_int(this: &CelInt) -> String<'static> {
+    String::from(this.to_string())
 }
 
-fn string_from_uint<'b, 'v>(this: &CelUInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(String::from(this.to_string())))
+fn string_from_uint(this: &CelUInt) -> String<'static> {
+    String::from(this.to_string())
 }
 
-fn string_from_double<'b, 'v>(this: &CelDouble) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(String::from(this.to_string())))
+fn string_from_double(this: &CelDouble) -> String<'static> {
+    String::from(this.to_string())
 }
 
-fn string_from_bytes<'b, 'v>(this: &CelBytes<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(String::from(
-        StdString::from_utf8_lossy(this.inner()).into_owned(),
-    )))
-}
-
-#[cfg(feature = "chrono")]
-fn string_from_timestamp<'b, 'v>(this: &CelTimestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(String::from(this.inner().to_rfc3339())))
+fn string_from_bytes(this: &CelBytes<'_>) -> String<'static> {
+    String::from(StdString::from_utf8_lossy(this.inner()).into_owned())
 }
 
 #[cfg(feature = "chrono")]
-fn string_from_duration<'b, 'v>(this: &CelDuration) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(String::from(
-        crate::duration::format_duration(this.inner()),
-    )))
+fn string_from_timestamp(this: &CelTimestamp) -> String<'static> {
+    String::from(this.inner().to_rfc3339())
+}
+
+#[cfg(feature = "chrono")]
+fn string_from_duration(this: &CelDuration) -> String<'static> {
+    String::from(crate::duration::format_duration(this.inner()))
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
@@ -327,7 +310,7 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         id = "string_size");
     crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool);
     #[cfg(feature = "regex")]
-    crate::add_member_overload!(env, fn matches: (String, String) -> CelBool);
+    crate::add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>);
 }
 
 #[cfg(test)]

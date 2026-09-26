@@ -242,8 +242,8 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         id = "bytes_size");
 }
 
-fn size<'b, 'v>(this: &Bytes<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(this.size()))
+fn size(this: &Bytes<'_>) -> CelInt {
+    this.size()
 }
 
 #[cfg(test)]

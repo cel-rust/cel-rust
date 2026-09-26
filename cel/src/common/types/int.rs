@@ -281,13 +281,13 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a i64 {
     }
 }
 
-fn int_from_int<'b, 'v>(this: &Int) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(*this))
+fn int_from_int(this: &Int) -> Int {
+    *this
 }
 
-fn int_from_uint<'b, 'v>(this: &CelUInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn int_from_uint(this: &CelUInt) -> Result<Int, ExecutionError> {
     match i64::try_from(*this.inner()) {
-        Ok(value) => Ok(CowVal::owned(Int::from(value))),
+        Ok(value) => Ok(Int::from(value)),
         Err(_) => Err(ExecutionError::FunctionError {
             function: "int".to_owned(),
             message: "integer overflow".to_owned(),
@@ -295,7 +295,7 @@ fn int_from_uint<'b, 'v>(this: &CelUInt) -> Result<CowVal<'b, 'v>, ExecutionErro
     }
 }
 
-fn int_from_double<'b, 'v>(this: &CelDouble) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn int_from_double(this: &CelDouble) -> Result<Int, ExecutionError> {
     let value = *this.inner();
     // Double to int conversions are limited to (minInt, maxInt) non-inclusive.
     // 'i64::MAX as f64' rounds up to 2^63, and the largest double below that
@@ -309,14 +309,14 @@ fn int_from_double<'b, 'v>(this: &CelDouble) -> Result<CowVal<'b, 'v>, Execution
             message: "integer overflow".to_owned(),
         })
     } else {
-        Ok(CowVal::owned(Int::from(value as i64)))
+        Ok(Int::from(value as i64))
     }
 }
 
-fn int_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn int_from_string(this: &CelString<'_>) -> Result<Int, ExecutionError> {
     this.inner()
         .parse::<i64>()
-        .map(|v| CowVal::owned(Int::from(v)))
+        .map(Int::from)
         .map_err(|e| ExecutionError::FunctionError {
             function: "int".to_owned(),
             message: format!("string parse error: {e}"),
@@ -326,11 +326,11 @@ fn int_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, Execu
 pub(crate) fn stdlib(env: &mut crate::Env) {
     crate::add_overload!(env, fn int_from_int: (Int) -> Int,
         name = "int", id = "int64_to_int64");
-    crate::add_overload!(env, fn int_from_uint: (CelUInt) -> Int,
+    crate::add_overload!(env, fn int_from_uint: (CelUInt) -> Result<Int>,
         name = "int", id = "uint64_to_int64");
-    crate::add_overload!(env, fn int_from_double: (CelDouble) -> Int,
+    crate::add_overload!(env, fn int_from_double: (CelDouble) -> Result<Int>,
         name = "int", id = "double_to_int64");
-    crate::add_overload!(env, fn int_from_string: (CelString) -> Int,
+    crate::add_overload!(env, fn int_from_string: (CelString) -> Result<Int>,
         name = "int", id = "string_to_int64");
 }
 

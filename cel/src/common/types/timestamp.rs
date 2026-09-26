@@ -204,71 +204,65 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a chrono::DateTime<chrono::FixedO
     }
 }
 
-fn get_milliseconds<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(
-        this.inner().timestamp_subsec_millis() as i64,
-    )))
+fn get_milliseconds(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().timestamp_subsec_millis() as i64)
 }
 
-fn get_seconds<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().second() as i64)))
+fn get_seconds(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().second() as i64)
 }
 
-fn get_minutes<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().minute() as i64)))
+fn get_minutes(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().minute() as i64)
 }
 
-fn get_hours<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().hour() as i64)))
+fn get_hours(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().hour() as i64)
 }
 
-fn get_day_of_week<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(
-        this.inner().weekday().num_days_from_sunday() as i64,
-    )))
+fn get_day_of_week(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().weekday().num_days_from_sunday() as i64)
 }
 
-fn get_date<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().day() as i64)))
+fn get_date(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().day() as i64)
 }
 
-fn get_day_of_month<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().day0() as i64)))
+fn get_day_of_month(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().day0() as i64)
 }
 
-fn get_day_of_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn get_day_of_year(this: &Timestamp) -> CelInt {
     let year = this
         .inner()
         .checked_sub_days(Days::new(this.inner().day0() as u64))
         .unwrap()
         .checked_sub_months(Months::new(this.inner().month0()))
         .unwrap();
-    Ok(CowVal::owned(CelInt::from(
-        this.inner().signed_duration_since(year).num_days(),
-    )))
+    CelInt::from(this.inner().signed_duration_since(year).num_days())
 }
 
-fn get_month<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().month0() as i64)))
+fn get_month(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().month0() as i64)
 }
 
-fn get_full_year<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(CelInt::from(this.inner().year() as i64)))
+fn get_full_year(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().year() as i64)
 }
 
-fn timestamp_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(Timestamp::from(
+fn timestamp_from_string(this: &CelString<'_>) -> Result<Timestamp, ExecutionError> {
+    Ok(Timestamp::from(
         chrono::DateTime::parse_from_rfc3339(this.inner())
             .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
-    )))
+    ))
 }
 
-fn timestamp_from_timestamp<'b, 'v>(this: &Timestamp) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(this.clone()))
+fn timestamp_from_timestamp(this: &Timestamp) -> Timestamp {
+    this.clone()
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
-    crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Timestamp,
+    crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Result<Timestamp>,
         name = "timestamp", id = "string_to_timestamp");
     crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
         name = "timestamp", id = "timestamp_to_timestamp");

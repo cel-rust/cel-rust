@@ -231,22 +231,22 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a f64 {
     }
 }
 
-fn double_from_double<'b, 'v>(this: &Double) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(*this))
+fn double_from_double(this: &Double) -> Double {
+    *this
 }
 
-fn double_from_int<'b, 'v>(this: &CelInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(Double::from(*this.inner() as f64)))
+fn double_from_int(this: &CelInt) -> Double {
+    Double::from(*this.inner() as f64)
 }
 
-fn double_from_uint<'b, 'v>(this: &CelUInt) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    Ok(CowVal::owned(Double::from(*this.inner() as f64)))
+fn double_from_uint(this: &CelUInt) -> Double {
+    Double::from(*this.inner() as f64)
 }
 
-fn double_from_string<'b, 'v>(this: &CelString<'_>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+fn double_from_string(this: &CelString<'_>) -> Result<Double, ExecutionError> {
     this.inner()
         .parse::<f64>()
-        .map(|v| CowVal::owned(Double::from(v)))
+        .map(Double::from)
         .map_err(|e| ExecutionError::FunctionError {
             function: "double".to_owned(),
             message: format!("string parse error: {e}"),
@@ -260,7 +260,7 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         name = "double", id = "int64_to_double");
     crate::add_overload!(env, fn double_from_uint: (CelUInt) -> Double,
         name = "double", id = "uint64_to_double");
-    crate::add_overload!(env, fn double_from_string: (CelString) -> Double,
+    crate::add_overload!(env, fn double_from_string: (CelString) -> Result<Double>,
         name = "double", id = "string_to_double");
 }
 
