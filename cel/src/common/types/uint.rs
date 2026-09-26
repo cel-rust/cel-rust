@@ -1,8 +1,8 @@
 use crate::common::traits::{Adder, Comparer, Divider, Modder, Multiplier, Subtractor, Zeroer};
 use crate::common::types::{CelDouble, CelInt, CelString, Kind, Type};
-use crate::common::value::{Downcast, Val};
+use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
-use std::borrow::Cow;
+use std::any::Any;
 use std::cmp::Ordering;
 use std::ops::Deref;
 
@@ -32,7 +32,10 @@ impl Val for UInt {
         &super::UINT_TYPE
     }
 
-    fn as_adder(&self) -> Option<&dyn Adder> {
+    fn as_adder<'b, 'v>(&'b self) -> Option<&'b (dyn Adder + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -40,19 +43,31 @@ impl Val for UInt {
         Some(self)
     }
 
-    fn as_divider(&self) -> Option<&dyn Divider> {
+    fn as_divider<'b, 'v>(&'b self) -> Option<&'b (dyn Divider + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
-    fn as_modder(&self) -> Option<&dyn Modder> {
+    fn as_modder<'b, 'v>(&'b self) -> Option<&'b (dyn Modder + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
-    fn as_multiplier(&self) -> Option<&dyn Multiplier> {
+    fn as_multiplier<'b, 'v>(&'b self) -> Option<&'b (dyn Multiplier + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
-    fn as_subtractor(&self) -> Option<&dyn Subtractor> {
+    fn as_subtractor<'b, 'v>(&'b self) -> Option<&'b (dyn Subtractor + 'v)>
+    where
+        Self: 'v,
+    {
         Some(self)
     }
 
@@ -66,29 +81,49 @@ impl Val for UInt {
             .unwrap_or(false)
     }
 
-    fn clone_as_boxed(&self) -> Box<dyn Val> {
-        Box::new(UInt(self.0))
+    fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+    where
+        Self: 'v,
+    {
+        Box::new(*self)
+    }
+
+    fn as_any(&self) -> Option<&dyn Any> {
+        Some(self)
     }
 }
 
+impl StaticVal for UInt {}
+
+fn overflow(op: &'static str, lhs: &dyn Val, rhs: &dyn Val) -> ExecutionError {
+    ExecutionError::Overflow(
+        op,
+        lhs.try_into().unwrap_or(Value::Null),
+        rhs.try_into().unwrap_or(Value::Null),
+    )
+}
+
+fn unsupported(op: &'static str, lhs: &dyn Val, rhs: &dyn Val) -> ExecutionError {
+    ExecutionError::UnsupportedBinaryOperator(
+        op,
+        lhs.try_into().unwrap_or(Value::Null),
+        rhs.try_into().unwrap_or(Value::Null),
+    )
+}
+
 impl Adder for UInt {
-    fn add<'a>(&'a self, rhs: &dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn add<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_add(rhs.0).ok_or_else(|| {
-                    ExecutionError::Overflow(
-                        "add",
-                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                    )
-                })?,
-            ))))
+            Ok(CowVal::owned(UInt(
+                self.0
+                    .checked_add(rhs.0)
+                    .ok_or_else(|| overflow("add", self, rhs))?,
+            )))
         } else {
-            Err(ExecutionError::UnsupportedBinaryOperator(
-                "add",
-                (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                rhs.try_into().unwrap_or(Value::Null),
-            ))
+            Err(unsupported("add", self, rhs))
         }
     }
 }
@@ -115,95 +150,75 @@ impl Comparer for UInt {
 }
 
 impl Divider for UInt {
-    fn div<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn div<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
             if rhs.0 == 0 {
                 return Err(ExecutionError::DivisionByZero(self.0.into()));
             }
-            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_div(rhs.0).ok_or_else(|| {
-                    ExecutionError::Overflow(
-                        "div",
-                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                    )
-                })?,
-            ))))
+            Ok(CowVal::owned(UInt(
+                self.0
+                    .checked_div(rhs.0)
+                    .ok_or_else(|| overflow("div", self, rhs))?,
+            )))
         } else {
-            Err(ExecutionError::UnsupportedBinaryOperator(
-                "div",
-                (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                rhs.try_into().unwrap_or(Value::Null),
-            ))
+            Err(unsupported("div", self, rhs))
         }
     }
 }
 
 impl Modder for UInt {
-    fn modulo<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn modulo<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
             if rhs.0 == 0 {
                 return Err(ExecutionError::RemainderByZero(self.0.into()));
             }
-            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_rem(rhs.0).ok_or_else(|| {
-                    ExecutionError::Overflow(
-                        "rem",
-                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                    )
-                })?,
-            ))))
+            Ok(CowVal::owned(UInt(
+                self.0
+                    .checked_rem(rhs.0)
+                    .ok_or_else(|| overflow("rem", self, rhs))?,
+            )))
         } else {
-            Err(ExecutionError::UnsupportedBinaryOperator(
-                "rem",
-                (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                rhs.try_into().unwrap_or(Value::Null),
-            ))
+            Err(unsupported("rem", self, rhs))
         }
     }
 }
 
 impl Multiplier for UInt {
-    fn mul<'a>(&self, rhs: &'a dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn mul<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_mul(rhs.0).ok_or_else(|| {
-                    ExecutionError::Overflow(
-                        "mul",
-                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                    )
-                })?,
-            ))))
+            Ok(CowVal::owned(UInt(
+                self.0
+                    .checked_mul(rhs.0)
+                    .ok_or_else(|| overflow("mul", self, rhs))?,
+            )))
         } else {
-            Err(ExecutionError::UnsupportedBinaryOperator(
-                "mul",
-                (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                rhs.try_into().unwrap_or(Value::Null),
-            ))
+            Err(unsupported("mul", self, rhs))
         }
     }
 }
 
 impl Subtractor for UInt {
-    fn sub<'a>(&'a self, rhs: &'_ dyn Val) -> Result<Cow<'a, dyn Val>, ExecutionError> {
+    fn sub<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
+    where
+        Self: 'v,
+    {
         if let Some(rhs) = rhs.downcast_ref::<Self>() {
-            Ok(Cow::<dyn Val>::Owned(Box::new(UInt(
-                self.0.checked_sub(rhs.0).ok_or_else(|| {
-                    ExecutionError::Overflow(
-                        "sub",
-                        (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                        (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                    )
-                })?,
-            ))))
+            Ok(CowVal::owned(UInt(
+                self.0
+                    .checked_sub(rhs.0)
+                    .ok_or_else(|| overflow("sub", self, rhs))?,
+            )))
         } else {
-            Err(ExecutionError::UnsupportedBinaryOperator(
-                "sub",
-                (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                rhs.try_into().unwrap_or(Value::Null),
-            ))
+            Err(unsupported("sub", self, rhs))
         }
     }
 }
@@ -226,10 +241,10 @@ impl From<u64> for UInt {
     }
 }
 
-impl TryFrom<Box<dyn Val>> for u64 {
-    type Error = Box<dyn Val>;
+impl<'v> TryFrom<Box<dyn Val + 'v>> for u64 {
+    type Error = Box<dyn Val + 'v>;
 
-    fn try_from(value: Box<dyn Val>) -> Result<Self, Self::Error> {
+    fn try_from(value: Box<dyn Val + 'v>) -> Result<Self, Self::Error> {
         if let Some(u) = value.downcast_ref::<UInt>() {
             return Ok(u.0);
         }
@@ -237,9 +252,9 @@ impl TryFrom<Box<dyn Val>> for u64 {
     }
 }
 
-impl<'a> TryFrom<&'a dyn Val> for &'a u64 {
-    type Error = &'a dyn Val;
-    fn try_from(value: &'a dyn Val) -> Result<Self, Self::Error> {
+impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a u64 {
+    type Error = &'a (dyn Val + 'v);
+    fn try_from(value: &'a (dyn Val + 'v)) -> Result<Self, Self::Error> {
         if let Some(u) = value.downcast_ref::<UInt>() {
             return Ok(&u.0);
         }
@@ -247,61 +262,54 @@ impl<'a> TryFrom<&'a dyn Val> for &'a u64 {
     }
 }
 
-fn uint<'a>(args: Vec<Cow<'a, dyn Val>>) -> Result<Cow<'a, dyn Val>, ExecutionError> {
-    let mut args = args;
-    let arg = args.remove(0).into_owned();
-    let ret: Result<Box<UInt>, Box<dyn Val>> = match arg.get_type().kind() {
-        Kind::UInt => arg.downcast::<UInt>(),
-        Kind::Int => match arg.downcast::<CelInt>() {
-            Err(arg) => Err(arg),
-            Ok(arg) => match u64::try_from(*arg.inner()) {
-                Ok(value) => Ok(Box::new(UInt::from(value))),
-                Err(_) => {
-                    return Err(ExecutionError::FunctionError {
-                        function: "uint".to_owned(),
-                        message: "unsigned integer overflow".to_owned(),
-                    });
-                }
-            },
-        },
-        Kind::Double => match arg.downcast::<CelDouble>() {
-            Err(arg) => Err(arg),
-            Ok(arg) => {
-                let value = *arg.inner();
-                // Double to uint conversions are limited to [0, maxUint).
-                // 'u64::MAX as f64' rounds up to 2^64 and the largest double below that
-                // is 2^64 - 2^11, so the check also keeps 'value as u64' from saturating.
-                // NaN, -infinity and infinity will also be rejected.
-                if !(value >= 0.0 && value < (u64::MAX as f64)) {
-                    return Err(ExecutionError::FunctionError {
-                        function: "uint".to_owned(),
-                        message: "unsigned integer overflow".to_owned(),
-                    });
-                }
-
-                Ok(Box::new(UInt::from(value as u64)))
-            }
-        },
-        Kind::String => match arg.downcast::<CelString>() {
-            Err(arg) => Err(arg),
-            Ok(arg) => match arg.inner().parse::<u64>() {
-                Ok(arg) => Ok(Box::new(UInt::from(arg))),
-                Err(e) => {
-                    return Err(ExecutionError::FunctionError {
-                        function: "uint".to_owned(),
-                        message: format!("string parse error: {e}"),
-                    })
-                }
-            },
-        },
-        _ => Err(arg),
+fn uint<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let arg = args.remove(0);
+    if arg.downcast_ref::<UInt>().is_some() {
+        return Ok(arg);
+    }
+    let overflow = || ExecutionError::FunctionError {
+        function: "uint".to_owned(),
+        message: "unsigned integer overflow".to_owned(),
     };
+    let converted: Option<u64> =
+        match arg.get_type().kind() {
+            Kind::Int => match arg.downcast_ref::<CelInt>() {
+                None => None,
+                Some(i) => Some(u64::try_from(*i.inner()).map_err(|_| overflow())?),
+            },
+            Kind::Double => match arg.downcast_ref::<CelDouble>() {
+                None => None,
+                Some(d) => {
+                    let value = *d.inner();
+                    // Double to uint conversions are limited to [0, maxUint).
+                    // 'u64::MAX as f64' rounds up to 2^64 and the largest double below that
+                    // is 2^64 - 2^11, so the check also keeps 'value as u64' from saturating.
+                    // NaN, -infinity and infinity will also be rejected.
+                    if !(value >= 0.0 && value < (u64::MAX as f64)) {
+                        return Err(overflow());
+                    }
+                    Some(value as u64)
+                }
+            },
+            Kind::String => {
+                match arg.downcast_ref::<CelString>() {
+                    None => None,
+                    Some(s) => Some(s.inner().parse::<u64>().map_err(|e| {
+                        ExecutionError::FunctionError {
+                            function: "uint".to_owned(),
+                            message: format!("string parse error: {e}"),
+                        }
+                    })?),
+                }
+            }
+            _ => None,
+        };
 
-    match ret {
-        Ok(ret) => Ok(Cow::<dyn Val>::Owned(ret)),
-        Err(arg) => Err(ExecutionError::FunctionError {
+    match converted {
+        Some(value) => Ok(CowVal::owned(UInt::from(value))),
+        None => Err(ExecutionError::FunctionError {
             function: "uint".to_owned(),
-            message: format!("cannot convert {arg:?} to uint"),
+            message: format!("cannot convert {:?} to uint", arg.as_ref()),
         }),
     }
 }

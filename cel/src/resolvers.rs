@@ -29,7 +29,7 @@ impl Resolver for AllArguments {
     fn resolve(&self, ctx: &FunctionContext) -> ResolveResult {
         let mut args = Vec::with_capacity(ctx.args.len());
         for arg in ctx.args.iter() {
-            args.push(arg.as_ref().try_into()?);
+            args.push(Value::try_from(arg.as_ref())?);
         }
         Ok(Value::List(args.into()))
     }

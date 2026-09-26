@@ -220,11 +220,20 @@ impl ExecutionError {
     }
 
     pub(crate) fn with_overload_context(self, context: ExecutionError) -> Self {
+        self.with_lazy_overload_context(|| context)
+    }
+
+    /// Like [`with_overload_context`](Self::with_overload_context), but the context
+    /// is only built if it is going to replace `self`.
+    pub(crate) fn with_lazy_overload_context(
+        self,
+        context: impl FnOnce() -> ExecutionError,
+    ) -> Self {
         match self {
             ExecutionError::NoSuchOverload(_)
             | ExecutionError::ValuesNotComparable(_, _)
             | ExecutionError::UnsupportedKeyType(_)
-            | ExecutionError::UnexpectedType { .. } => context,
+            | ExecutionError::UnexpectedType { .. } => context(),
             error => error,
         }
     }
