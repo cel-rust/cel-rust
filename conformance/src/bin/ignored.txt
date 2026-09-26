@@ -405,10 +405,6 @@ enums::strong_proto3::select_default
 enums::strong_proto3::select_neg
 enums::strong_proto3::type_global
 enums::strong_proto3::type_nested
-fields::qualified_identifier_resolution::ident_with_longest_prefix_check
-fields::qualified_identifier_resolution::map_field_select
-fields::qualified_identifier_resolution::qualified_ident
-fields::qualified_identifier_resolution::qualified_identifier_resolution_unchecked
 lists::index::zero_based_double
 macros2::all::list_elem_all_true
 macros2::all::list_elem_error_shortcircuit
@@ -633,7 +629,6 @@ math_ext::trunc::negative
 math_ext::trunc::positive
 namespace::namespace::self_eval_container_lookup
 namespace::namespace::self_eval_container_lookup_unchecked
-namespace::qualified::self_eval_qualified_lookup
 optionals::optionals::empty_map_optflatmap_hasvalue
 optionals::optionals::empty_struct_optindex_hasvalue
 optionals::optionals::has_optional_ofnonzerovalue_struct_optional_ofnonzerovalue_map_optindex_field
@@ -1023,13 +1018,11 @@ string_ext::trim::unicode_space_chars_1
 string_ext::trim::unicode_space_chars_2
 string_ext::trim::unicode_space_chars_3
 timestamps::duration_conversions::tostring_duration
-timestamps::duration_conversions::type_comparison
 timestamps::duration_converters::get_milliseconds
 timestamps::timestamp_arithmetic::add_time_to_duration
 timestamps::timestamp_conversions::toint_timestamp
 timestamps::timestamp_conversions::tostring_timestamp
 timestamps::timestamp_conversions::tostring_timestamp_nanos
-timestamps::timestamp_conversions::type_comparison
 timestamps::timestamp_range::from_string_under
 timestamps::timestamp_selectors_tz::getdate
 timestamps::timestamp_selectors_tz::getdayofmonth_name_neg

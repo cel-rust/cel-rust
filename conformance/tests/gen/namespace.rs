@@ -11,7 +11,6 @@ mod qualified {
     use dedent::dedent;
 
     // Test: self_eval_qualified_lookup
-    #[should_panic]
     #[test]
     fn self_eval_qualified_lookup() {
         run_test(&dedent!(
