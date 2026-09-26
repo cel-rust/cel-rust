@@ -46,6 +46,8 @@ pub use env::Env;
 mod registry;
 #[cfg(feature = "structs")]
 pub use env::StructDef;
+#[cfg(feature = "structs")]
+pub use registry::StructType;
 pub use registry::TypeRegistry;
 
 mod ser;

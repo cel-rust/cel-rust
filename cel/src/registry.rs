@@ -1,6 +1,33 @@
 use crate::common::types::Type;
+#[cfg(feature = "structs")]
+use crate::common::value::{CowVal, Val};
 use crate::DeclarationError;
+#[cfg(feature = "structs")]
+use crate::ExecutionError;
 use std::collections::BTreeMap;
+use std::fmt::{Debug, Formatter};
+
+/// A struct type that expressions can construct, e.g. `acme.Account{id: 1}`.
+///
+/// [`StructDef`](crate::StructDef) is one; implementing this trait lets
+/// a struct literal construct any other [`Val`], e.g. a Rust type of your own.
+#[cfg(feature = "structs")]
+pub trait StructType: Send + Sync {
+    /// The struct's type: its name is the one struct literals construct it
+    /// by, and the one it is registered under.
+    fn get_type(&self) -> &Type;
+
+    /// Creates a value of this type from the fields of a struct literal.
+    ///
+    /// # Errors
+    ///
+    /// Fails when the fields do not make a value of this type, e.g. an
+    /// unknown field or a value of the wrong type.
+    fn new_value<'b, 'v>(
+        &self,
+        fields: BTreeMap<String, CowVal<'b, 'v>>,
+    ) -> Result<Box<dyn Val + 'v>, ExecutionError>;
+}
 
 /// The types known to an [`Env`](crate::Env), by name.
 ///
@@ -8,9 +35,23 @@ use std::collections::BTreeMap;
 /// to the type value, e.g. `type(1) == int`. The registry starts out empty:
 /// the environment's libraries register their types, e.g. the standard
 /// library registers `int` and `optional_type`.
-#[derive(Debug, Default)]
+///
+/// A struct type registered with [`StructType`] can also be constructed.
+#[derive(Default)]
 pub struct TypeRegistry {
     types: BTreeMap<String, Type>,
+    #[cfg(feature = "structs")]
+    structs: BTreeMap<String, Box<dyn StructType>>,
+}
+
+impl Debug for TypeRegistry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let mut debug = f.debug_struct("TypeRegistry");
+        debug.field("types", &self.types);
+        #[cfg(feature = "structs")]
+        debug.field("structs", &self.structs.keys());
+        debug.finish()
+    }
 }
 
 impl TypeRegistry {
@@ -43,6 +84,34 @@ impl TypeRegistry {
                 Ok(())
             }
         }
+    }
+
+    /// Finds the struct type registered under `name`.
+    #[cfg(feature = "structs")]
+    pub fn find_struct(&self, name: &str) -> Option<&dyn StructType> {
+        self.structs.get(name).map(Box::as_ref)
+    }
+
+    /// Registers `s` and its type under its type's name.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::TypeConflict`] if a struct type, or
+    /// a type other than `s`'s, is registered under the same name, and with
+    /// [`DeclarationError::InvalidTypeName`] as [`register`](Self::register)
+    /// does. A failed registration leaves the registry as it was.
+    #[cfg(feature = "structs")]
+    pub(crate) fn register_struct(
+        &mut self,
+        s: Box<dyn StructType>,
+    ) -> Result<(), DeclarationError> {
+        let name = s.get_type().name();
+        if self.structs.contains_key(name) {
+            return Err(DeclarationError::type_conflict(name));
+        }
+        self.register(s.get_type().to_owned())?;
+        self.structs.insert(name.to_owned(), s);
+        Ok(())
     }
 }
 
@@ -128,6 +197,72 @@ mod tests {
                 Ok(()),
                 "{name:?}"
             );
+        }
+    }
+
+    #[cfg(feature = "structs")]
+    mod structs {
+        use super::super::*;
+        use crate::common::types::{Kind, INT_TYPE};
+        use crate::StructDef;
+
+        #[test]
+        fn a_struct_is_registered_with_its_type() {
+            let mut registry = TypeRegistry::default();
+            assert_eq!(
+                registry.register_struct(Box::new(StructDef::new("acme.Account".into()))),
+                Ok(())
+            );
+            let s = registry.find_struct("acme.Account").unwrap();
+            assert_eq!(s.get_type().name(), "acme.Account");
+            let t = registry.find_type("acme.Account").unwrap();
+            assert_eq!(t.kind(), Kind::Struct);
+        }
+
+        #[test]
+        fn a_struct_of_a_registered_name_is_a_conflict() {
+            let mut registry = TypeRegistry::default();
+            registry
+                .register_struct(Box::new(StructDef::new("acme.Account".into())))
+                .unwrap();
+            assert_eq!(
+                registry.register_struct(Box::new(
+                    StructDef::new("acme.Account".into()).add_field("id".into(), INT_TYPE)
+                )),
+                Err(DeclarationError::type_conflict("acme.Account"))
+            );
+
+            registry.register(INT_TYPE).unwrap();
+            assert_eq!(
+                registry.register_struct(Box::new(StructDef::new("int".into()))),
+                Err(DeclarationError::type_conflict("int"))
+            );
+            assert!(registry.find_struct("int").is_none());
+            assert_eq!(registry.find_type("int"), Some(&INT_TYPE));
+        }
+
+        /// Its type may be registered before the struct is.
+        #[test]
+        fn a_struct_of_a_registered_equal_type_is_registered() {
+            let mut registry = TypeRegistry::default();
+            registry
+                .register(Type::new_struct_type("acme.Account"))
+                .unwrap();
+            assert_eq!(
+                registry.register_struct(Box::new(StructDef::new("acme.Account".into()))),
+                Ok(())
+            );
+            assert!(registry.find_struct("acme.Account").is_some());
+        }
+
+        #[test]
+        fn a_struct_of_an_invalid_name_is_not_registered() {
+            let mut registry = TypeRegistry::default();
+            assert_eq!(
+                registry.register_struct(Box::new(StructDef::new("acme-Account".into()))),
+                Err(DeclarationError::invalid_type_name("acme-Account"))
+            );
+            assert!(registry.find_struct("acme-Account").is_none());
         }
     }
 }
