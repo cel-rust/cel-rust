@@ -4,6 +4,7 @@ use crate::common::{
     types::{self, Type},
     value::CowVal,
 };
+use crate::DeclarationError;
 #[cfg(feature = "structs")]
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError};
 use std::collections::{
@@ -100,14 +101,18 @@ impl Env {
     /// The id is the unique identifier for this overload (e.g., `equals_int64`).
     /// The args are the expected argument types.
     /// The op is the function implementation.
-    #[allow(clippy::result_unit_err)]
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::DuplicateOverload`] if an overload of that
+    /// name is already declared with the same id, or with the same signature.
     pub fn add_overload(
         &mut self,
         name: &str,
         id: &str,
         args: Vec<types::Type>,
         op: Function,
-    ) -> Result<(), ()> {
+    ) -> Result<(), DeclarationError> {
         match self.functions.entry(name.to_owned()) {
             Vacant(vacant_entry) => {
                 let mut value = FunctionDecl::new(name);
@@ -145,7 +150,11 @@ impl Env {
     /// The target is the type of the receiver.
     /// The args are the expected argument types (excluding the receiver).
     /// The op is the function implementation.
-    #[allow(clippy::result_unit_err)]
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::DuplicateOverload`] if an overload of that
+    /// name is already declared with the same id, or with the same signature.
     pub fn add_member_overload(
         &mut self,
         name: &str,
@@ -153,7 +162,7 @@ impl Env {
         target: Type,
         args: Vec<types::Type>,
         op: Function,
-    ) -> Result<(), ()> {
+    ) -> Result<(), DeclarationError> {
         let mut args = args;
         args.insert(0, target);
         match self.functions.entry(name.to_owned()) {
@@ -349,10 +358,104 @@ impl StructDef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::value::Val;
     use std::sync::Arc;
 
     #[test]
     fn test_env_default() {
         let _: Arc<dyn Send + Sync> = Arc::new(Env::default());
+    }
+
+    fn noop<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, crate::ExecutionError> {
+        Ok(args.into_iter().next().unwrap())
+    }
+
+    fn duplicate(function: &str, id: &str) -> DeclarationError {
+        DeclarationError::duplicate_overload(function, id)
+    }
+
+    #[test]
+    fn add_overload_rejects_a_duplicate_id() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        // another signature, but the id is taken
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::STRING_TYPE], noop),
+            Err(duplicate("f", "f_int"))
+        );
+    }
+
+    #[test]
+    fn add_overload_rejects_a_duplicate_signature() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        // another id, but the signature is taken
+        assert_eq!(
+            env.add_overload("f", "other_id", vec![types::INT_TYPE], noop),
+            Err(duplicate("f", "other_id"))
+        );
+    }
+
+    #[test]
+    fn add_member_overload_rejects_a_duplicate_id_or_signature() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_member_overload("f", "int_f", types::INT_TYPE, vec![], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_member_overload("f", "int_f", types::STRING_TYPE, vec![], noop),
+            Err(duplicate("f", "int_f"))
+        );
+        assert_eq!(
+            env.add_member_overload("f", "other_id", types::INT_TYPE, vec![], noop),
+            Err(duplicate("f", "other_id"))
+        );
+    }
+
+    /// An id is unique across the global and member overloads of a function,
+    /// while a signature also includes whether the overload is a member: `f(int)`
+    /// and `int.f()` are different overloads, but may not share an id.
+    #[test]
+    fn a_global_and_a_member_overload_may_share_a_shape_but_not_an_id() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_member_overload("f", "int_f", types::INT_TYPE, vec![], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_member_overload("f", "f_int", types::STRING_TYPE, vec![], noop),
+            Err(duplicate("f", "f_int"))
+        );
+    }
+
+    /// The same id is fine on another function, and a rejected overload leaves the
+    /// environment as it was.
+    #[test]
+    fn a_rejected_overload_is_not_declared() {
+        let mut env = Env::default();
+        env.add_overload("f", "f_int", vec![types::INT_TYPE], noop)
+            .unwrap();
+        assert!(env
+            .add_overload("f", "f_dup", vec![types::INT_TYPE], noop)
+            .is_err());
+        assert!(env
+            .add_overload("g", "f_int", vec![types::INT_TYPE], noop)
+            .is_ok());
+
+        let int: Box<dyn Val> = Box::new(crate::common::types::CelInt::from(1));
+        assert!(env.find_overload("f", &[CowVal::Owned(int)]).is_some());
+        assert!(env.has_overload("f") && env.has_overload("g"));
+        assert!(!env.has_member_overload("f"));
     }
 }

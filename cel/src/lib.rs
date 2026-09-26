@@ -299,6 +299,47 @@ impl ExecutionError {
     }
 }
 
+/// An error declaring something in an [`Env`] or a [`Context`].
+///
+/// Declarations are made once the program is parsed and before it is evaluated,
+/// which is what sets this apart from an [`ExecutionError`], raised while a
+/// program runs.
+#[derive(Error, Clone, Debug, PartialEq)]
+#[non_exhaustive]
+pub enum DeclarationError {
+    /// A function could not be added to a [`Context`] because its name is already
+    /// declared as an overload in the [`Env`].
+    ///
+    /// When a call is resolved, overloads take precedence over the functions
+    /// added to a [`Context`]: a function sharing a name with an overload would
+    /// be shadowed for every call that overload accepts.
+    #[error("Cannot add function '{function}': an overload with that name is already declared")]
+    OverloadConflict { function: String },
+    /// An overload could not be declared for a function because one with the same
+    /// id, or with the same signature, is already declared.
+    ///
+    /// An id is unique across all the overloads of a function, member functions
+    /// included. A signature is the argument types, together with whether the
+    /// overload is a member function.
+    #[error("Cannot declare overload '{id}' of '{function}': one with the same id or signature is already declared")]
+    DuplicateOverload { function: String, id: String },
+}
+
+impl DeclarationError {
+    pub fn overload_conflict(function: &str) -> Self {
+        DeclarationError::OverloadConflict {
+            function: function.to_string(),
+        }
+    }
+
+    pub fn duplicate_overload(function: &str, id: &str) -> Self {
+        DeclarationError::DuplicateOverload {
+            function: function.to_string(),
+            id: id.to_string(),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Program {
     expression: Expression,

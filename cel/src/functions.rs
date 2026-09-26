@@ -230,7 +230,7 @@ mod tests {
         .for_each(|a| {
             let input: &(&str, &str) = a;
             let mut context = Context::default();
-            context.add_function("max", super::max);
+            context.add_function("max", super::max).unwrap();
             let ctx = Some(context);
             let r = test_script(input.1, ctx);
             assert_eq!(r, Ok(true.into()), "{}", input.0);
@@ -256,7 +256,7 @@ mod tests {
         .for_each(|a| {
             let input: &(&str, &str) = a;
             let mut context = Context::default();
-            context.add_function("min", super::min);
+            context.add_function("min", super::min).unwrap();
             let ctx = Some(context);
             let r = test_script(input.1, ctx);
             assert_eq!(r, Ok(true.into()), "{}", input.0);

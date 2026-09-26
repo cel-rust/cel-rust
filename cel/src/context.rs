@@ -3,7 +3,7 @@ use crate::common::value::{CowVal, Val};
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
-use crate::{Env, ExecutionError};
+use crate::{DeclarationError, Env, ExecutionError};
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -180,13 +180,48 @@ impl<'p, 'v> Context<'p, 'v> {
         }
     }
 
-    pub fn add_function<T: 'static, F>(&mut self, name: &str, value: F)
+    /// Adds a function, callable by `name` both as `name(..)` and as a method.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::OverloadConflict`] if `name` is already
+    /// declared as an overload in this context's [`Env`], whether a function or a
+    /// member function. When a call is resolved, overloads take precedence over
+    /// the functions added here: the function would be shadowed for every call an
+    /// overload accepts, and only be reached for the others, so which of the two
+    /// answers would depend on the types of the arguments. The standard library
+    /// declares overloads for `size`, `contains`, `startsWith`, `string`,
+    /// `int`, ... Choose another name, or declare it as an overload with
+    /// [`Env::add_overload`] instead.
+    ///
+    /// # Example
+    /// ```
+    /// use cel::{Context, DeclarationError};
+    ///
+    /// let mut context = Context::default();
+    /// context.add_function("add", |a: i64, b: i64| a + b).unwrap();
+    ///
+    /// // `size` is declared as an overload by the standard library
+    /// assert_eq!(
+    ///     context.add_function("size", |a: i64| a),
+    ///     Err(DeclarationError::overload_conflict("size")),
+    /// );
+    /// ```
+    pub fn add_function<T: 'static, F>(
+        &mut self,
+        name: &str,
+        value: F,
+    ) -> Result<(), DeclarationError>
     where
         F: IntoFunction<T> + 'static + Send + Sync,
     {
-        if let Context::Root { functions, .. } = self {
+        if let Context::Root { functions, env, .. } = self {
+            if env.has_overload(name) || env.has_member_overload(name) {
+                return Err(DeclarationError::overload_conflict(name));
+            }
             functions.add(name, value);
         };
+        Ok(())
     }
 
     pub fn resolve(&self, expr: &Expression) -> Result<Value, ExecutionError> {
@@ -217,7 +252,7 @@ impl<'p, 'v> Context<'p, 'v> {
     /// ```
     /// use cel::Context;
     /// let mut context = Context::empty();
-    /// context.add_function("add", |a: i64, b: i64| a + b);
+    /// context.add_function("add", |a: i64, b: i64| a + b).unwrap();
     /// ```
     pub fn empty() -> Self {
         Context::Root {
@@ -512,5 +547,84 @@ mod test {
         drop(inner);
         let s = escaped.downcast_ref::<CelString>().unwrap();
         assert!(std::ptr::eq(s.inner(), owned.as_str()));
+    }
+
+    /// Overloads take precedence over the functions added to a `Context`, so a
+    /// function may not reuse the name of one: a global overload, a member
+    /// overload, both, or a namespaced one.
+    #[test]
+    fn add_function_rejects_a_name_declared_as_an_overload() {
+        use crate::{Context, DeclarationError};
+
+        let mut context = Context::default();
+        for name in ["int", "startsWith", "size", "optional.of"] {
+            assert_eq!(
+                context.add_function(name, |a: i64| a),
+                Err(DeclarationError::overload_conflict(name)),
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn add_function_accepts_a_name_no_overload_uses() {
+        use crate::{Context, Program};
+
+        let mut context = Context::default();
+        assert_eq!(context.add_function("add", |a: i64, b: i64| a + b), Ok(()));
+        let program = Program::compile("add(2, 3)").unwrap();
+        assert_eq!(program.execute(&context), Ok(5.into()));
+    }
+
+    /// A rejected function must not be registered anyway: were it, `size(1)`
+    /// (which no `size` overload accepts) would fall through to it.
+    #[test]
+    fn a_rejected_function_is_not_registered() {
+        use crate::{Context, ExecutionError, Program};
+
+        let mut context = Context::default();
+        assert!(context.add_function("size", |_: i64| 42_i64).is_err());
+
+        let program = Program::compile("size(1)").unwrap();
+        assert!(matches!(
+            program.execute(&context),
+            Err(ExecutionError::NoSuchOverload(_))
+        ));
+        let program = Program::compile("size('abc')").unwrap();
+        assert_eq!(program.execute(&context), Ok(3.into()));
+    }
+
+    /// The conflict is with the overloads of the context's own `Env`: an empty
+    /// one declares none, so the standard names are free.
+    #[test]
+    fn add_function_only_conflicts_with_the_overloads_of_its_env() {
+        use crate::common::types::INT_TYPE;
+        use crate::common::value::CowVal;
+        use crate::{Context, DeclarationError, Env, ExecutionError};
+        use std::sync::Arc;
+
+        assert_eq!(Context::empty().add_function("size", |a: i64| a), Ok(()),);
+
+        fn custom<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+            Ok(args.into_iter().next().unwrap())
+        }
+        let mut env = Env::default();
+        env.add_overload("custom", "custom_int", vec![INT_TYPE], custom)
+            .unwrap();
+        let mut context = Context::with_env(Arc::new(env));
+        assert_eq!(
+            context.add_function("custom", |a: i64| a),
+            Err(DeclarationError::overload_conflict("custom")),
+        );
+        assert_eq!(context.add_function("other", |a: i64| a), Ok(()));
+    }
+
+    #[test]
+    fn add_function_on_a_child_is_a_silent_noop_ignores_dups() {
+        use crate::Context;
+
+        let context = Context::default();
+        let mut child = context.new_inner_scope();
+        assert_eq!(child.add_function("size", |a: i64| a), Ok(()),);
     }
 }

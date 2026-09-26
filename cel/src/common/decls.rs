@@ -1,6 +1,7 @@
 use crate::common::functions::Function;
 use crate::common::types::Type;
 use crate::common::value::{CowVal, Val};
+use crate::DeclarationError;
 
 pub struct FunctionDecl {
     pub name: String,
@@ -47,9 +48,9 @@ impl FunctionDecl {
         member_function: bool,
         arg_types: Vec<Type>,
         op: Function,
-    ) -> Result<(), ()> {
+    ) -> Result<(), DeclarationError> {
         if self.is_present(&id, member_function, &arg_types) {
-            return Err(());
+            return Err(DeclarationError::duplicate_overload(&self.name, &id));
         }
         self.overloads.push(OverloadDecl {
             id,

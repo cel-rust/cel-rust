@@ -294,12 +294,12 @@ pub(crate) trait FromContext<'a, 'context, 'call> {
 /// # use cel::{Program, Context};
 /// use cel::extractors::This;
 /// # let mut context = Context::default();
-/// # context.add_function("startsWith", starts_with);
+/// # context.add_function("hasPrefix", has_prefix).unwrap();
 ///
 /// /// Notice how `This` refers to the target value when called as a method,
 /// /// but the first argument when called as a function.
-/// let program1 = "'foobar'.startsWith('foo') == true";
-/// let program2 = "startsWith('foobar', 'foo') == true";
+/// let program1 = "'foobar'.hasPrefix('foo') == true";
+/// let program2 = "hasPrefix('foobar', 'foo') == true";
 /// # let program1 = Program::compile(program1).unwrap();
 /// # let program2 = Program::compile(program2).unwrap();
 /// # let value = program1.execute(&context).unwrap();
@@ -307,7 +307,7 @@ pub(crate) trait FromContext<'a, 'context, 'call> {
 /// # let value = program2.execute(&context).unwrap();
 /// # assert_eq!(value, true.into());
 ///
-/// fn starts_with(This(this): This<Arc<String>>, prefix: Arc<String>) -> bool {
+/// fn has_prefix(This(this): This<Arc<String>>, prefix: Arc<String>) -> bool {
 ///     this.starts_with(prefix.as_str())
 /// }
 /// ```
@@ -315,7 +315,7 @@ pub(crate) trait FromContext<'a, 'context, 'call> {
 /// # Type of `This`
 /// This also accepts a type `T` which determines the specific type
 /// that's extracted. Any type that supports [`FromVal`] can be used.
-/// In the previous example, the method `startsWith` is only ever called
+/// In the previous example, the method `hasPrefix` is only ever called
 /// on a string, so we can use `This<Rc<String>>` to extract the string
 /// automatically prior to our method actually being called.
 ///
