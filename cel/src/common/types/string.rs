@@ -307,6 +307,8 @@ fn string<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Execu
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::STRING_TYPE)
+        .expect("Must be unique");
     env.add_overload(
         "string",
         "string_to_string",

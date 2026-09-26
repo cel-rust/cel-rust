@@ -315,6 +315,8 @@ fn uint<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Executi
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::UINT_TYPE)
+        .expect("Must be unique");
     env.add_overload("uint", "uint64_to_uint64", vec![super::UINT_TYPE], uint)
         .expect("Must be unique id");
     env.add_overload("uint", "int64_to_uint64", vec![super::INT_TYPE], uint)
