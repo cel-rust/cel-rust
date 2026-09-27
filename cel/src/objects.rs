@@ -3740,7 +3740,7 @@ mod tests {
         #[test]
         fn test_empty_struct() {
             let mut env = Env::stdlib();
-            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+            env.add_type(StructDef::new(String::from("cel.MyStruct")))
                 .unwrap();
             let program = Program::compile("cel.MyStruct {}").unwrap();
             let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
@@ -3753,7 +3753,7 @@ mod tests {
         #[test]
         fn test_struct() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.Problem"))
                     .add_field(String::from("solved"), types::BOOL_TYPE)
                     .add_field(String::from("answer"), types::INT_TYPE),
@@ -3787,7 +3787,7 @@ mod tests {
         #[test]
         fn test_struct_field_access() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
             )
@@ -3800,7 +3800,7 @@ mod tests {
         #[test]
         fn test_struct_no_such_field() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
             )
@@ -3818,7 +3818,7 @@ mod tests {
         #[test]
         fn test_struct_with_default() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
                     .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
@@ -3832,7 +3832,7 @@ mod tests {
         #[test]
         fn test_struct_with_default_overwritten() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE)
                     .add_field_with_default("here".into(), Box::new(CelString::from("yes"))),
@@ -3847,7 +3847,7 @@ mod tests {
         #[test]
         fn test_struct_has_macro() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("name".into(), types::STRING_TYPE)
                     .add_field("value".into(), types::INT_TYPE),
@@ -3884,7 +3884,7 @@ mod tests {
         #[test]
         fn test_struct_no_such_field_access() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("some".into(), types::STRING_TYPE),
             )
@@ -3913,7 +3913,7 @@ mod tests {
         #[test]
         fn a_struct_name_is_its_type() {
             let mut env = Env::stdlib();
-            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+            env.add_type(StructDef::new(String::from("cel.MyStruct")))
                 .unwrap();
             let context = Context::with_env(Arc::new(env));
             let program =
@@ -3922,13 +3922,38 @@ mod tests {
             assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
         }
 
+        /// A struct type's `Type` alone names it; its `StructType`, e.g.
+        /// a `StructDef`, also constructs it, even once the `Type` is known.
+        #[test]
+        fn a_struct_is_constructed_once_its_struct_type_is_added() {
+            let program = Program::compile("type(cel.MyStruct{}) == cel.MyStruct").unwrap();
+            let mut env = Env::stdlib();
+            env.add_type(types::Type::new_struct_type("cel.MyStruct"))
+                .unwrap();
+            let unknown = Err(ExecutionError::UnexpectedType {
+                got: String::from("cel.MyStruct"),
+                want: String::from("known struct"),
+            });
+            assert_eq!(program.execute(&Context::with_env(Arc::new(env))), unknown);
+
+            let mut env = Env::stdlib();
+            env.add_type(types::Type::new_struct_type("cel.MyStruct"))
+                .unwrap();
+            env.add_type(StructDef::new(String::from("cel.MyStruct")))
+                .unwrap();
+            assert_eq!(
+                program.execute(&Context::with_env(Arc::new(env))),
+                Ok(Value::Bool(true))
+            );
+        }
+
         #[test]
         fn a_struct_can_only_be_added_once() {
             let mut env = Env::stdlib();
-            env.add_struct(StructDef::new(String::from("cel.MyStruct")))
+            env.add_type(StructDef::new(String::from("cel.MyStruct")))
                 .unwrap();
             assert_eq!(
-                env.add_struct(StructDef::new(String::from("cel.MyStruct"))),
+                env.add_type(StructDef::new(String::from("cel.MyStruct"))),
                 Err(crate::DeclarationError::type_conflict("cel.MyStruct"))
             );
         }
@@ -3986,7 +4011,7 @@ mod tests {
             }
 
             let mut env = Env::stdlib();
-            env.add_struct(PointType).unwrap();
+            env.add_type(PointType).unwrap();
             let context = Context::with_env(Arc::new(env));
             let ast = crate::parser::Parser::default()
                 .parse("geo.Point{x: 1, y: 2}")
@@ -4006,7 +4031,7 @@ mod tests {
         #[test]
         fn add_struct_variable_to_context() {
             let mut env = Env::stdlib();
-            env.add_struct(
+            env.add_type(
                 StructDef::new(String::from("cel.MyStruct"))
                     .add_field("name".into(), types::STRING_TYPE)
                     .add_field("value".into(), types::INT_TYPE),

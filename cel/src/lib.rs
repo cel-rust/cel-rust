@@ -49,7 +49,7 @@ mod registry;
 pub use env::StructDef;
 #[cfg(feature = "structs")]
 pub use registry::StructType;
-pub use registry::TypeRegistry;
+pub use registry::{TypeDecl, TypeRegistry};
 
 mod ser;
 pub use ser::to_value;

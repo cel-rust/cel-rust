@@ -29,6 +29,34 @@ pub trait StructType: Send + Sync {
     ) -> Result<Box<dyn Val + 'v>, ExecutionError>;
 }
 
+/// A type to register with an [`Env`](crate::Env), see
+/// [`Env::add_type`](crate::Env::add_type).
+///
+/// Anything that converts into one can be registered: a [`Type`], which
+/// expressions can then name, or, with the `structs` feature, a `StructType`,
+/// which they can also construct.
+pub enum TypeDecl {
+    /// A type expressions can name: `type(x) == my.pkg.Ip`.
+    Type(Type),
+    /// A struct type, which expressions can also construct:
+    /// `acme.Account{id: 1}`.
+    #[cfg(feature = "structs")]
+    Struct(Box<dyn StructType>),
+}
+
+impl From<Type> for TypeDecl {
+    fn from(t: Type) -> Self {
+        TypeDecl::Type(t)
+    }
+}
+
+#[cfg(feature = "structs")]
+impl<T: StructType + 'static> From<T> for TypeDecl {
+    fn from(s: T) -> Self {
+        TypeDecl::Struct(Box::new(s))
+    }
+}
+
 /// The types known to an [`Env`](crate::Env), by name.
 ///
 /// A registered type's name can be used in an expression, where it resolves
@@ -37,7 +65,8 @@ pub trait StructType: Send + Sync {
 /// library registers `int` and `optional_type`.
 ///
 /// A struct type, registered as a `StructType` with the `structs` feature,
-/// can also be constructed.
+/// can also be constructed. Types are registered with
+/// [`Env::add_type`](crate::Env::add_type).
 #[derive(Default)]
 pub struct TypeRegistry {
     types: BTreeMap<String, Type>,
@@ -61,19 +90,30 @@ impl TypeRegistry {
         self.types.get(name)
     }
 
-    /// Registers `t` under its name.
+    /// Registers `decl`'s type under its name, and a struct type's
+    /// constructor with it.
     ///
     /// Registering a type that is already registered is a no-op, so that
-    /// libraries can each register a type they share.
+    /// libraries can each register a type they share, and a struct type may
+    /// be registered after its type was.
     ///
     /// # Errors
     ///
-    /// Fails with [`DeclarationError::TypeConflict`] if another type is
-    /// registered under the same name, and with
+    /// Fails with [`DeclarationError::TypeConflict`] if another type, or
+    /// another struct type, is registered under the same name, and with
     /// [`DeclarationError::InvalidTypeName`] if the name is not a, possibly
     /// qualified, identifier, e.g. `int` or `my.pkg.Type`, which no
-    /// expression could refer to.
-    pub(crate) fn register(&mut self, t: Type) -> Result<(), DeclarationError> {
+    /// expression could refer to. A failed registration leaves the registry
+    /// as it was.
+    pub(crate) fn register(&mut self, decl: impl Into<TypeDecl>) -> Result<(), DeclarationError> {
+        match decl.into() {
+            TypeDecl::Type(t) => self.register_type(t),
+            #[cfg(feature = "structs")]
+            TypeDecl::Struct(s) => self.register_struct(s),
+        }
+    }
+
+    fn register_type(&mut self, t: Type) -> Result<(), DeclarationError> {
         if !is_qualified_ident(t.name()) {
             return Err(DeclarationError::invalid_type_name(t.name()));
         }
@@ -93,24 +133,13 @@ impl TypeRegistry {
         self.structs.get(name).map(Box::as_ref)
     }
 
-    /// Registers `s` and its type under its type's name.
-    ///
-    /// # Errors
-    ///
-    /// Fails with [`DeclarationError::TypeConflict`] if a struct type, or
-    /// a type other than `s`'s, is registered under the same name, and with
-    /// [`DeclarationError::InvalidTypeName`] as [`register`](Self::register)
-    /// does. A failed registration leaves the registry as it was.
     #[cfg(feature = "structs")]
-    pub(crate) fn register_struct(
-        &mut self,
-        s: Box<dyn StructType>,
-    ) -> Result<(), DeclarationError> {
+    fn register_struct(&mut self, s: Box<dyn StructType>) -> Result<(), DeclarationError> {
         let name = s.get_type().name();
         if self.structs.contains_key(name) {
             return Err(DeclarationError::type_conflict(name));
         }
-        self.register(s.get_type().to_owned())?;
+        self.register_type(s.get_type().to_owned())?;
         self.structs.insert(name.to_owned(), s);
         Ok(())
     }
@@ -211,7 +240,7 @@ mod tests {
         fn a_struct_is_registered_with_its_type() {
             let mut registry = TypeRegistry::default();
             assert_eq!(
-                registry.register_struct(Box::new(StructDef::new("acme.Account".into()))),
+                registry.register(StructDef::new("acme.Account".into())),
                 Ok(())
             );
             let s = registry.find_struct("acme.Account").unwrap();
@@ -224,18 +253,18 @@ mod tests {
         fn a_struct_of_a_registered_name_is_a_conflict() {
             let mut registry = TypeRegistry::default();
             registry
-                .register_struct(Box::new(StructDef::new("acme.Account".into())))
+                .register(StructDef::new("acme.Account".into()))
                 .unwrap();
             assert_eq!(
-                registry.register_struct(Box::new(
+                registry.register(
                     StructDef::new("acme.Account".into()).add_field("id".into(), INT_TYPE)
-                )),
+                ),
                 Err(DeclarationError::type_conflict("acme.Account"))
             );
 
             registry.register(INT_TYPE).unwrap();
             assert_eq!(
-                registry.register_struct(Box::new(StructDef::new("int".into()))),
+                registry.register(StructDef::new("int".into())),
                 Err(DeclarationError::type_conflict("int"))
             );
             assert!(registry.find_struct("int").is_none());
@@ -250,7 +279,7 @@ mod tests {
                 .register(Type::new_struct_type("acme.Account"))
                 .unwrap();
             assert_eq!(
-                registry.register_struct(Box::new(StructDef::new("acme.Account".into()))),
+                registry.register(StructDef::new("acme.Account".into())),
                 Ok(())
             );
             assert!(registry.find_struct("acme.Account").is_some());
@@ -260,7 +289,7 @@ mod tests {
         fn a_struct_of_an_invalid_name_is_not_registered() {
             let mut registry = TypeRegistry::default();
             assert_eq!(
-                registry.register_struct(Box::new(StructDef::new("acme-Account".into()))),
+                registry.register(StructDef::new("acme-Account".into())),
                 Err(DeclarationError::invalid_type_name("acme-Account"))
             );
             assert!(registry.find_struct("acme-Account").is_none());

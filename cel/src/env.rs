@@ -4,7 +4,7 @@ use crate::common::{
     types::{self, Type},
     value::CowVal,
 };
-use crate::registry::TypeRegistry;
+use crate::registry::{TypeDecl, TypeRegistry};
 use crate::DeclarationError;
 #[cfg(feature = "structs")]
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
@@ -29,7 +29,7 @@ use std::collections::{
 /// use cel::{Env, StructDef, common::types, common::types::CelString};
 ///
 /// let mut env = Env::stdlib();
-/// env.add_struct(
+/// env.add_type(
 ///     StructDef::new("cel.MyStruct".to_owned())
 ///         .add_field("some_field".to_owned(), types::STRING_TYPE)
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
@@ -209,7 +209,7 @@ impl Env {
     }
 
     /// Registers a type with the environment, so that expressions can refer
-    /// to it by name.
+    /// to it by name, and, for a struct type, construct it.
     ///
     /// The name resolves to the type value, unless a variable of the same name
     /// shadows it. Values need not be registered to be evaluated: registering
@@ -228,36 +228,24 @@ impl Env {
     /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     ///
+    /// With the `structs` feature, registering a `StructType`, e.g. a
+    /// `StructDef`, also lets struct literals construct it:
+    /// `cel.MyStruct{some_field: 'value'}`.
+    ///
     /// # Errors
     ///
-    /// Fails with [`DeclarationError::TypeConflict`] if another type is
-    /// already registered under that name, and with
+    /// Fails with [`DeclarationError::TypeConflict`] if another type, or
+    /// another struct type, is already registered under that name, and with
     /// [`DeclarationError::InvalidTypeName`] if the name is not an identifier,
-    /// or several separated by dots. Registering an equal type again is fine.
-    pub fn add_type(&mut self, t: Type) -> Result<(), DeclarationError> {
+    /// or several separated by dots. Registering an equal type again is fine,
+    /// and so is registering a struct type whose type was registered alone.
+    pub fn add_type(&mut self, t: impl Into<TypeDecl>) -> Result<(), DeclarationError> {
         self.types.register(t)
     }
 
     /// The types registered with the environment.
     pub fn types(&self) -> &TypeRegistry {
         &self.types
-    }
-
-    /// Adds a struct type to the environment, so that struct literals can
-    /// construct it, e.g. `cel.MyStruct{some_field: 'value'}`.
-    ///
-    /// Its type is registered too, as [`add_type`](Self::add_type) does, so
-    /// that expressions can name it: `type(x) == cel.MyStruct`.
-    ///
-    /// # Errors
-    ///
-    /// Fails with [`DeclarationError::TypeConflict`] if a struct type, or
-    /// another type, is already registered under that name, and with
-    /// [`DeclarationError::InvalidTypeName`] if the name is not an identifier,
-    /// or several separated by dots.
-    #[cfg(feature = "structs")]
-    pub fn add_struct(&mut self, s: impl StructType + 'static) -> Result<(), DeclarationError> {
-        self.types.register_struct(Box::new(s))
     }
 
     /// Sets whether a map literal that repeats a key is an error.
@@ -304,7 +292,7 @@ impl Env {
 /// use cel::{Env, StructDef, common::types, common::types::CelString};
 ///
 /// let mut env = Env::stdlib();
-/// env.add_struct(
+/// env.add_type(
 ///     StructDef::new("MyStruct".to_owned())
 ///         .add_field("some_field".to_owned(), types::STRING_TYPE)
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
