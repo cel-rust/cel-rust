@@ -1472,18 +1472,15 @@ impl Value {
                 };
 
                 if select.test {
-                    match left.get_type().kind() {
-                        Kind::Map => Ok(bool(
-                            left.as_container()
-                                .ok_or_else(no_such_key)?
-                                .contains(&key)?,
-                        )),
-                        #[cfg(feature = "structs")]
-                        Kind::Struct => Ok(bool(
-                            left.as_indexer()
-                                .is_some_and(|indexer| indexer.get(&key).is_ok()),
-                        )),
-                        _ => index_into(left, &key, "_._", overload_error),
+                    let indexer = left
+                        .as_indexer()
+                        .ok_or_else(|| overload_error(left.as_ref()))?;
+                    match indexer.get(&key) {
+                        Ok(_) => Ok(bool(true)),
+                        Err(ExecutionError::NoSuchKey(_)) => Ok(bool(false)),
+                        Err(error) => {
+                            Err(error.with_lazy_overload_context(|| overload_error(left.as_ref())))
+                        }
                     }
                 } else {
                     let is_map = left.get_type().kind() == Kind::Map;
@@ -2553,6 +2550,123 @@ mod tests {
         let result = p.execute(&ctx);
 
         assert!(result.is_err(), "Should error on missing map key");
+    }
+
+    /// `has()` asks whether the value has the field, whatever its kind: as
+    /// cel-go's `refQualify` does, it goes by what the value can do.
+    mod presence {
+        use crate::common::traits::Indexer;
+        use crate::common::types::{CelString, Kind, Type};
+        use crate::common::value::{CowVal, Val};
+        use crate::{Context, ExecutionError, Program, Value};
+        use std::collections::HashMap;
+
+        /// A value of the user's own, with a field `path`, of any kind.
+        #[derive(Debug)]
+        struct Fields(Type);
+
+        impl Val for Fields {
+            fn get_type(&self) -> &Type {
+                &self.0
+            }
+            fn as_indexer<'b, 'v>(&'b self) -> Option<&'b (dyn Indexer + 'v)>
+            where
+                Self: 'v,
+            {
+                Some(self)
+            }
+            fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                Box::new(Fields(self.0.to_owned()))
+            }
+        }
+
+        impl Indexer for Fields {
+            fn get<'b, 'v>(&'b self, idx: &dyn Val) -> Result<CowVal<'b, 'v>, ExecutionError>
+            where
+                Self: 'v,
+            {
+                match idx.downcast_ref::<CelString>().map(|s| s.inner()) {
+                    Some("path") => Ok(CowVal::owned(CelString::from("/users/42"))),
+                    Some("broken") => Err(ExecutionError::function_error("path", "broken")),
+                    Some(field) => Err(ExecutionError::no_such_key(field)),
+                    None => Err(ExecutionError::no_such_key("?")),
+                }
+            }
+            fn steal<'v>(
+                self: Box<Self>,
+                idx: &dyn Val,
+            ) -> Result<Box<dyn Val + 'v>, ExecutionError>
+            where
+                Self: 'v,
+            {
+                self.get(idx).map(CowVal::into_owned)
+            }
+        }
+
+        fn execute(value: Box<dyn Val>, expr: &str) -> Result<Value, ExecutionError> {
+            let mut context = Context::default();
+            context.add_variable_as_val("v", value);
+            Program::compile(expr).unwrap().execute(&context)
+        }
+
+        #[test]
+        fn a_value_with_fields_has_them_whatever_its_kind() {
+            for t in [
+                Type::simple_type(Kind::Struct, "acme.Request"),
+                Type::simple_type(Kind::Opaque, "acme.Request"),
+                Type::simple_type(Kind::Unspecified, "acme.Request"),
+            ] {
+                let kind = t.kind();
+                assert_eq!(
+                    execute(Box::new(Fields(t.to_owned())), "has(v.path)"),
+                    Ok(Value::Bool(true)),
+                    "{kind:?}"
+                );
+                assert_eq!(
+                    execute(Box::new(Fields(t)), "has(v.missing)"),
+                    Ok(Value::Bool(false)),
+                    "{kind:?}"
+                );
+            }
+        }
+
+        /// Only a field reported missing is absent: any other error stands.
+        #[test]
+        fn a_field_that_fails_otherwise_is_an_error() {
+            assert_eq!(
+                execute(
+                    Box::new(Fields(Type::simple_type(Kind::Struct, "acme.Request"))),
+                    "has(v.broken)"
+                ),
+                Err(ExecutionError::function_error("path", "broken"))
+            );
+        }
+
+        #[test]
+        fn a_map_has_its_keys() {
+            let mut context = Context::default();
+            context.add_variable_from_value("m", HashMap::from([("a", 1)]));
+            let has = |expr| Program::compile(expr).unwrap().execute(&context);
+            assert_eq!(has("has(m.a)"), Ok(Value::Bool(true)));
+            assert_eq!(has("has(m.b)"), Ok(Value::Bool(false)));
+        }
+
+        /// A list is indexed by position, not by field name, and a scalar is
+        /// not indexed at all: testing either for a field is an error.
+        #[test]
+        fn a_value_without_fields_cannot_be_tested_for_one() {
+            let context = Context::default();
+            for (expr, operand) in [("has([1].f)", "list"), ("has((1).f)", "int")] {
+                assert_eq!(
+                    Program::compile(expr).unwrap().execute(&context),
+                    Err(ExecutionError::no_such_overload(
+                        "_._",
+                        vec![operand.to_owned(), "string".to_owned()]
+                    )),
+                    "{expr}"
+                );
+            }
+        }
     }
 
     mod opaque {
