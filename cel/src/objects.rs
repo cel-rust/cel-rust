@@ -2063,6 +2063,61 @@ mod tests {
         let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
+
+        // A borrowed map falls back to the other numeric key types too
+        for expr in ["numbers[1]", "numbers[1.0]"] {
+            let value = Program::compile(expr).unwrap().execute(&context);
+            assert_eq!(value, Ok("one".into()), "{expr}");
+        }
+    }
+
+    /// As in cel-go, a numeric key that misses falls back to its lossless conversion to the other
+    /// numeric key type, which isn't the same as `==`: `9007199254740993 == 9007199254740992.0`
+    /// holds, but a map with the former as key doesn't find it with the latter.
+    #[test]
+    fn test_numeric_map_key_lookup() {
+        let context = Context::default();
+        let eval = |expr: &str| Program::compile(expr).unwrap().execute(&context);
+
+        for expr in [
+            "{1u: 'x'}[1]",
+            "{1: 'x'}[1u]",
+            "{1u: 'x'}[1.0]",
+            "{1: 'x'}[1.0]",
+            "{0: 'x'}[-0.0]",
+            "{9223372036854775807u: 'x'}[9223372036854775807]",
+            "{9223372036854775808u: 'x'}[9223372036854775808.0]",
+            "{9007199254740992: 'x'}[9007199254740992.0]",
+        ] {
+            assert_eq!(eval(expr), Ok("x".into()), "{expr}");
+        }
+        for expr in [
+            "{1: 'x'}[1.5]",
+            "{18446744073709551615u: 'x'}[-1]",
+            "{9007199254740993: 'x'}[9007199254740992.0]",
+            "{9223372036854775807: 'x'}[9223372036854775808.0]",
+            "{18446744073709551615u: 'x'}[18446744073709551616.0]",
+            // cel-go rejects -2^63 when converting a double to an int
+            "{-9223372036854775808: 'x'}[-9223372036854775808.0]",
+            "{1: 'x'}[0.0/0.0]",
+            "{1: 'x'}[1.0/0.0]",
+        ] {
+            let value = eval(expr);
+            assert!(
+                matches!(value, Err(ExecutionError::NoSuchKey(_))),
+                "{expr} gave {value:?}"
+            );
+        }
+        for expr in [
+            // The exact key wins
+            "{1: 'a', 1u: 'b'}[1] == 'a' && {1: 'a', 1u: 'b'}[1u] == 'b'",
+            "1 in {1u: 'x'} && 1.0 in {1u: 'x'} && !(1.5 in {1u: 'x'})",
+            "{1: 'a'} == {1u: 'a'} && {1u: 'a'} == {1: 'a'}",
+            // Only our keys are looked up in the other map, so this isn't symmetric, as in cel-go
+            "{1: 'a', 1u: 'a'} == {1: 'a', 2u: 'a'} && {1: 'a', 2u: 'a'} != {1: 'a', 1u: 'a'}",
+        ] {
+            assert_eq!(eval(expr), Ok(true.into()), "{expr}");
+        }
     }
 
     /// A registered [`crate::magic::Function`] that hands back one of its arguments

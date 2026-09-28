@@ -542,7 +542,6 @@ mod eq_literal {
     }
 
     // Test: eq_map_mixed_type_numbers
-    #[should_panic]
     #[test]
     fn eq_map_mixed_type_numbers() {
         run_test(&dedent!(
