@@ -2,10 +2,10 @@ use crate::common::traits::Negator;
 use crate::common::traits::{self, Comparer};
 use crate::common::types::{CelDouble, CelString, CelUInt, Kind, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
-use crate::ExecutionError;
+use crate::{ExecutionError, Value};
 use std::any::Any;
 use std::cmp::Ordering;
-use std::ops::{Deref, Neg};
+use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct Int(i64);
@@ -214,7 +214,12 @@ impl Negator for Int {
     where
         Self: 'v,
     {
-        Ok(Box::new(Self::from(self.0.neg())))
+        let t: Self = self
+            .0
+            .checked_neg()
+            .ok_or_else(|| ExecutionError::Overflow("negate", self.0.into(), Value::Null))?
+            .into();
+        Ok(Box::new(t))
     }
 }
 
@@ -383,6 +388,24 @@ mod tests {
         // No wrapping: -1 is not u64::MAX
         assert!(!CelInt::from(-1).equals(&CelUInt::from(u64::MAX)));
         assert!(!CelUInt::from(u64::MAX).equals(&CelInt::from(-1)));
+    }
+
+    #[test]
+    fn test_negate() {
+        let context = Context::default();
+
+        let program = Program::compile("-(-9223372036854775807)").unwrap();
+        assert_eq!(program.execute(&context), Ok(i64::MAX.into()));
+
+        let program = Program::compile("-(-9223372036854775808)").unwrap();
+        assert_eq!(
+            program.execute(&context),
+            Err(crate::ExecutionError::Overflow(
+                "negate",
+                i64::MIN.into(),
+                crate::Value::Null
+            ))
+        );
     }
 
     #[test]
