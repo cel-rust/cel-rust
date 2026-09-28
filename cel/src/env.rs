@@ -307,7 +307,10 @@ impl Env {
     /// ```
     ///
     /// [`extensions::strings`]: crate::extensions::strings
-    pub fn add_extension(&mut self, extension: impl FnOnce(&mut Env)) {
+    pub fn add_extension(
+        &mut self,
+        extension: impl FnOnce(&mut Env) -> Result<(), DeclarationError>,
+    ) -> Result<(), DeclarationError> {
         extension(self)
     }
 

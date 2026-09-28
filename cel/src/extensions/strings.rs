@@ -5,10 +5,10 @@
 
 use crate::common::types::{CelInt, CelList, CelString};
 use crate::common::value::Val;
-use crate::{Env, ExecutionError};
+use crate::{DeclarationError, Env, ExecutionError};
 
 /// Registers the strings extension's overloads on `env`.
-pub fn extension(env: &mut Env) {
+pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
     crate::add_member_overload!(env, fn char_at: (CelString, CelInt) -> Result<CelString>);
     crate::add_member_overload!(env, fn index_of: (CelString, CelString) -> CelInt);
     crate::add_member_overload!(env, fn index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
@@ -31,6 +31,7 @@ pub fn extension(env: &mut Env) {
     crate::add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>);
     crate::add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
         name = "substring");
+    Ok(())
 }
 
 fn out_of_range(function: &str, idx: i64) -> ExecutionError {
@@ -270,7 +271,8 @@ mod tests {
 
     fn eval(expr: &str) -> Result<Value, ExecutionError> {
         let mut env = Env::stdlib();
-        env.add_extension(crate::extensions::strings);
+        env.add_extension(crate::extensions::strings)
+            .expect("We can't test the extension, if we can't register it");
         let ctx = Context::with_env(Arc::new(env));
         Program::compile(expr)
             .expect("This must be valid CEL")
