@@ -9,28 +9,28 @@ use crate::{DeclarationError, Env, ExecutionError};
 
 /// Registers the strings extension's overloads on `env`.
 pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    crate::add_member_overload!(env, fn char_at: (CelString, CelInt) -> Result<CelString>);
-    crate::add_member_overload!(env, fn index_of: (CelString, CelString) -> CelInt);
-    crate::add_member_overload!(env, fn index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
-        name = "indexOf");
-    crate::add_member_overload!(env, fn last_index_of: (CelString, CelString) -> CelInt);
-    crate::add_member_overload!(env, fn last_index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
-        name = "lastIndexOf");
-    crate::add_member_overload!(env, fn join: (CelList) -> Result<CelString>);
-    crate::add_member_overload!(env, fn join_sep: (CelList, CelString) -> Result<CelString>,
-        name = "join");
-    crate::add_member_overload!(env, fn lower_ascii: (CelString) -> CelString);
-    crate::add_member_overload!(env, fn upper_ascii: (CelString) -> CelString);
-    crate::add_member_overload!(env, fn trim: (CelString) -> CelString);
-    crate::add_member_overload!(env, fn replace: (CelString, CelString, CelString) -> CelString);
-    crate::add_member_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> CelString,
-        name = "replace");
-    crate::add_member_overload!(env, fn split: (CelString, CelString) -> CelList);
-    crate::add_member_overload!(env, fn split_n: (CelString, CelString, CelInt) -> CelList,
-        name = "split");
-    crate::add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>);
-    crate::add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
-        name = "substring");
+    crate::try_add_member_overload!(env, fn char_at: (CelString, CelInt) -> Result<CelString>)?;
+    crate::try_add_member_overload!(env, fn index_of: (CelString, CelString) -> CelInt)?;
+    crate::try_add_member_overload!(env, fn index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
+        name = "indexOf")?;
+    crate::try_add_member_overload!(env, fn last_index_of: (CelString, CelString) -> CelInt)?;
+    crate::try_add_member_overload!(env, fn last_index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
+        name = "lastIndexOf")?;
+    crate::try_add_member_overload!(env, fn join: (CelList) -> Result<CelString>)?;
+    crate::try_add_member_overload!(env, fn join_sep: (CelList, CelString) -> Result<CelString>,
+        name = "join")?;
+    crate::try_add_member_overload!(env, fn lower_ascii: (CelString) -> CelString)?;
+    crate::try_add_member_overload!(env, fn upper_ascii: (CelString) -> CelString)?;
+    crate::try_add_member_overload!(env, fn trim: (CelString) -> CelString)?;
+    crate::try_add_member_overload!(env, fn replace: (CelString, CelString, CelString) -> CelString)?;
+    crate::try_add_member_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> CelString,
+        name = "replace")?;
+    crate::try_add_member_overload!(env, fn split: (CelString, CelString) -> CelList)?;
+    crate::try_add_member_overload!(env, fn split_n: (CelString, CelString, CelInt) -> CelList,
+        name = "split")?;
+    crate::try_add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>)?;
+    crate::try_add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
+        name = "substring")?;
     Ok(())
 }
 
@@ -266,8 +266,21 @@ fn substring_range(
 
 #[cfg(test)]
 mod tests {
-    use crate::{Context, Env, ExecutionError, Program, Value};
+    use crate::{Context, DeclarationError, Env, ExecutionError, Program, Value};
     use std::sync::Arc;
+
+    #[test]
+    fn registering_twice_is_an_error() {
+        let mut env = Env::stdlib();
+        assert_eq!(env.add_extension(crate::extensions::strings), Ok(()));
+        assert_eq!(
+            env.add_extension(crate::extensions::strings),
+            Err(DeclarationError::duplicate_overload(
+                "charAt",
+                "string.charAt(int)"
+            ))
+        );
+    }
 
     fn eval(expr: &str) -> Result<Value, ExecutionError> {
         let mut env = Env::stdlib();

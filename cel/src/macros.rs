@@ -225,8 +225,51 @@ macro_rules! __overload_result {
 /// // `len` returns a `CelInt`, not a `CelString`.
 /// cel::add_member_overload!(env, fn len: (CelString) -> CelString);
 /// ```
+///
+/// # Panics
+///
+/// If the `Env` already declares an overload of that name with the same id,
+/// or the same signature. Use [`try_add_member_overload!`] to get the
+/// [`DeclarationError`](crate::DeclarationError) back instead.
 #[macro_export]
 macro_rules! add_member_overload {
+    ($($input:tt)*) => {
+        ::std::result::Result::expect(
+            $crate::try_add_member_overload!($($input)*),
+            "Must be unique id",
+        )
+    };
+}
+
+/// Like [`add_member_overload!`], but evaluates to the
+/// `Result<(), DeclarationError>` of the registration instead of panicking,
+/// e.g. when an extension library registers an overload the `Env` already
+/// declares.
+///
+/// Takes the same input as [`add_member_overload!`].
+///
+/// ```
+/// use cel::common::types::{CelBool, CelString};
+/// use cel::{DeclarationError, Env};
+///
+/// fn is_empty(this: &CelString<'_>) -> CelBool {
+///     CelBool::from(this.inner().is_empty())
+/// }
+///
+/// fn extension(env: &mut Env) -> Result<(), DeclarationError> {
+///     cel::try_add_member_overload!(env, fn is_empty: (CelString) -> CelBool)?;
+///     Ok(())
+/// }
+///
+/// let mut env = Env::stdlib();
+/// assert_eq!(env.add_extension(extension), Ok(()));
+/// assert_eq!(
+///     env.add_extension(extension),
+///     Err(DeclarationError::duplicate_overload("isEmpty", "string.isEmpty()")),
+/// );
+/// ```
+#[macro_export]
+macro_rules! try_add_member_overload {
     // The four result shapes, most specific first: `$ret:ty` would otherwise
     // swallow `&T` and `Result<T>` whole. `Result`'s error type is always
     // `ExecutionError`, so spelling it out is optional.
@@ -264,8 +307,9 @@ macro_rules! add_member_overload {
     };
 }
 
-/// The body behind [`add_member_overload!`], with the result shape resolved to
-/// one of [`__overload_result!`]'s tags. Not for direct use.
+/// The body behind [`try_add_member_overload!`], with the result shape resolved
+/// to one of [`__overload_result!`]'s tags. Evaluates to the registration's
+/// `Result`. Not for direct use.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __add_member_overload {
@@ -331,7 +375,6 @@ macro_rules! __add_member_overload {
             ],
             __wrapper,
         )
-        .expect("Must be unique id");
     }};
 }
 
@@ -437,9 +480,45 @@ macro_rules! __overload_receiver_override {
 ///
 /// Either may be overridden via trailing `name = "..."` / `id = "..."`
 /// key-value args, in either order.
+///
+/// # Panics
+///
+/// If the `Env` already declares an overload of that name with the same id,
+/// or the same signature. Use [`try_add_overload!`] to get the
+/// [`DeclarationError`](crate::DeclarationError) back instead.
 #[macro_export]
 macro_rules! add_overload {
-    // The four result shapes, most specific first - see `add_member_overload!`.
+    ($($input:tt)*) => {
+        ::std::result::Result::expect(
+            $crate::try_add_overload!($($input)*),
+            "Must be unique id",
+        )
+    };
+}
+
+/// Like [`add_overload!`], but evaluates to the `Result<(), DeclarationError>`
+/// of the registration instead of panicking.
+///
+/// Takes the same input as [`add_overload!`].
+///
+/// ```
+/// use cel::common::types::{CelInt, CelString};
+/// use cel::{DeclarationError, Env};
+///
+/// fn size(this: &CelString<'_>) -> CelInt {
+///     CelInt::from(this.inner().len() as i64)
+/// }
+///
+/// let mut env = Env::stdlib();
+/// assert_eq!(
+///     cel::try_add_overload!(env, fn size: (CelString) -> CelInt, id = "size_string"),
+///     Err(DeclarationError::duplicate_overload("size", "size_string")),
+/// );
+/// ```
+#[macro_export]
+macro_rules! try_add_overload {
+    // The four result shapes, most specific first - see
+    // `try_add_member_overload!`.
     (
         $env:expr,
         fn $fn:ident : ( $($arg:ty),* $(,)? ) -> Result<&$ret:ty $(, $err:ty)?>
@@ -470,9 +549,9 @@ macro_rules! add_overload {
     };
 }
 
-/// The body behind [`add_overload!`], with the result shape resolved to one of
-/// [`__overload_result!`]'s tags. Handles the zero-argument case too. Not for
-/// direct use.
+/// The body behind [`try_add_overload!`], with the result shape resolved to one
+/// of [`__overload_result!`]'s tags. Handles the zero-argument case too.
+/// Evaluates to the registration's `Result`. Not for direct use.
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __add_overload {
@@ -522,7 +601,6 @@ macro_rules! __add_overload {
             ],
             __wrapper,
         )
-        .expect("Must be unique id");
     }};
 }
 
