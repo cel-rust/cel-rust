@@ -5,7 +5,7 @@ use cargo_toml::Manifest;
 const GENERATED_HEADER_PREFIX: &str = "// CEL_SPEC_VERSION: ";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("CARGO_CFG_FEATURE").unwrap_or_default() == "skip-version-check" {
+    if std::env::var_os("CARGO_FEATURE_SKIP_VERSION_CHECK").is_some() {
         return Ok(());
     }
 
