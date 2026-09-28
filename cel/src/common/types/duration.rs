@@ -5,6 +5,12 @@ use crate::{ExecutionError, Value};
 use std::any::Any;
 use std::ops::Deref;
 
+/// CEL durations are limited to what fits in an `i64` count of nanoseconds,
+/// the same range as cel-go's `time.Duration`.
+pub(crate) fn out_of_range(d: &chrono::Duration) -> bool {
+    d.num_nanoseconds().is_none()
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Duration(chrono::Duration);
 
@@ -79,12 +85,18 @@ impl Adder for Duration {
         Self: 'v,
     {
         if let Some(rhs) = rhs.downcast_ref::<Duration>() {
-            Ok(CowVal::owned(Duration(
-                // todo report the proper values in the error
-                self.0
-                    .checked_add(&rhs.0)
-                    .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
-            )))
+            let overflow = || {
+                ExecutionError::Overflow(
+                    "add",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                )
+            };
+            let result = self.0.checked_add(&rhs.0).ok_or_else(overflow)?;
+            if out_of_range(&result) {
+                return Err(overflow());
+            }
+            Ok(CowVal::owned(Duration(result)))
         } else {
             Err(crate::ExecutionError::UnsupportedBinaryOperator(
                 "add",
@@ -111,12 +123,18 @@ impl Subtractor for Duration {
         Self: 'v,
     {
         if let Some(rhs) = rhs.downcast_ref::<Duration>() {
-            Ok(CowVal::owned(Duration(
-                // todo report the proper values in the error
-                self.0
-                    .checked_sub(&rhs.0)
-                    .ok_or_else(|| ExecutionError::Overflow("add", Value::Null, Value::Null))?,
-            )))
+            let overflow = || {
+                ExecutionError::Overflow(
+                    "sub",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                )
+            };
+            let result = self.0.checked_sub(&rhs.0).ok_or_else(overflow)?;
+            if out_of_range(&result) {
+                return Err(overflow());
+            }
+            Ok(CowVal::owned(Duration(result)))
         } else {
             Err(ExecutionError::unsupported_binary_operator(
                 "sub", self, rhs,
@@ -192,6 +210,12 @@ fn duration<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Executi
     super::string_fn(args, |value: &str| {
         let (_, duration) = crate::duration::parse_duration(value)
             .map_err(|e| ExecutionError::function_error("duration", e.to_string()))?;
+        if out_of_range(&duration) {
+            return Err(ExecutionError::function_error(
+                "duration",
+                "range error parsing duration",
+            ));
+        }
         Ok(Box::new(Duration::from(duration)))
     })
 }

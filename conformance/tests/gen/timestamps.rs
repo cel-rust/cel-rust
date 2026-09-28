@@ -873,7 +873,6 @@ mod timestamp_range {
     }
 
     // Test: sub_time_duration_over
-    #[should_panic]
     #[test]
     fn sub_time_duration_over() {
         run_test(&dedent!(
@@ -887,7 +886,6 @@ mod timestamp_range {
     }
 
     // Test: sub_time_duration_under
-    #[should_panic]
     #[test]
     fn sub_time_duration_under() {
         run_test(&dedent!(
@@ -908,7 +906,6 @@ mod duration_range {
     use dedent::dedent;
 
     // Test: from_string_under
-    #[should_panic]
     #[test]
     fn from_string_under() {
         run_test(&dedent!(
@@ -922,7 +919,6 @@ mod duration_range {
     }
 
     // Test: from_string_over
-    #[should_panic]
     #[test]
     fn from_string_over() {
         run_test(&dedent!(
@@ -936,7 +932,6 @@ mod duration_range {
     }
 
     // Test: add_under
-    #[should_panic]
     #[test]
     fn add_under() {
         run_test(&dedent!(
@@ -950,7 +945,6 @@ mod duration_range {
     }
 
     // Test: add_over
-    #[should_panic]
     #[test]
     fn add_over() {
         run_test(&dedent!(
@@ -964,7 +958,6 @@ mod duration_range {
     }
 
     // Test: sub_under
-    #[should_panic]
     #[test]
     fn sub_under() {
         run_test(&dedent!(
@@ -978,7 +971,6 @@ mod duration_range {
     }
 
     // Test: sub_over
-    #[should_panic]
     #[test]
     fn sub_over() {
         run_test(&dedent!(

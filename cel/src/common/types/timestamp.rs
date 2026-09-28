@@ -147,9 +147,15 @@ impl Subtractor for Timestamp {
             }
             Ok(CowVal::owned(Self(result)))
         } else if let Some(rhs) = rhs.downcast_ref::<Self>() {
-            Ok(CowVal::owned(CelDuration::from(
-                self.0.signed_duration_since(rhs.inner()),
-            )))
+            let result = self.0.signed_duration_since(rhs.inner());
+            if crate::common::types::duration::out_of_range(&result) {
+                return Err(ExecutionError::Overflow(
+                    "sub",
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
+                ));
+            }
+            Ok(CowVal::owned(CelDuration::from(result)))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "sub",

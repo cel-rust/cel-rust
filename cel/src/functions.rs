@@ -392,7 +392,17 @@ mod tests {
                 "timestamp underflow",
                 "timestamp('0001-01-01T00:00:00Z') + duration('-1s')",
                 "Overflow from binary operator 'add': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: -1, nanos: 0 })",
-            )
+            ),
+            (
+                "timestamp difference exceeds duration range",
+                "timestamp('9999-12-31T23:59:59Z') - timestamp('0001-01-01T00:00:00Z')",
+                "Overflow from binary operator 'sub': Timestamp(9999-12-31T23:59:59+00:00), Timestamp(0001-01-01T00:00:00+00:00)",
+            ),
+            (
+                "timestamp difference exceeds duration range (negative)",
+                "timestamp('0001-01-01T00:00:00Z') - timestamp('9999-12-31T23:59:59Z')",
+                "Overflow from binary operator 'sub': Timestamp(0001-01-01T00:00:00+00:00), Timestamp(9999-12-31T23:59:59+00:00)",
+            ),
         ]
         .iter()
         .for_each(assert_error)
@@ -447,6 +457,41 @@ mod tests {
         ]
         .iter()
         .for_each(assert_script);
+
+        [
+            (
+                "duration from_string over range",
+                "duration('320000000000s')",
+                "Error executing function 'duration': range error parsing duration",
+            ),
+            (
+                "duration from_string under range",
+                "duration('-320000000000s')",
+                "Error executing function 'duration': range error parsing duration",
+            ),
+            (
+                "duration add over range",
+                "duration('9000000000s') + duration('9000000000s')",
+                "Overflow from binary operator 'add': Duration(TimeDelta { secs: 9000000000, nanos: 0 }), Duration(TimeDelta { secs: 9000000000, nanos: 0 })",
+            ),
+            (
+                "duration add under range",
+                "duration('-9000000000s') + duration('-9000000000s')",
+                "Overflow from binary operator 'add': Duration(TimeDelta { secs: -9000000000, nanos: 0 }), Duration(TimeDelta { secs: -9000000000, nanos: 0 })",
+            ),
+            (
+                "duration sub over range",
+                "duration('9000000000s') - duration('-9000000000s')",
+                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: 9000000000, nanos: 0 }), Duration(TimeDelta { secs: -9000000000, nanos: 0 })",
+            ),
+            (
+                "duration sub under range",
+                "duration('-9000000000s') - duration('9000000000s')",
+                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: -9000000000, nanos: 0 }), Duration(TimeDelta { secs: 9000000000, nanos: 0 })",
+            ),
+        ]
+        .iter()
+        .for_each(assert_error);
     }
 
     #[cfg(feature = "chrono")]

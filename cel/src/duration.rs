@@ -36,9 +36,19 @@ pub fn parse_duration(i: &str) -> IResult<&str, Duration> {
     if i == "0" {
         return Ok((i, Duration::zero()));
     }
-    let (i, duration) = many1(parse_number_unit)(i)
-        .map(|(i, d)| (i, d.iter().fold(Duration::zero(), |acc, next| acc + *next)))?;
+    let (i, components) = many1(parse_number_unit)(i)?;
+    let mut duration = Duration::zero();
+    for component in components {
+        duration = match duration.checked_add(&component) {
+            Some(duration) => duration,
+            None => return Err(too_large(i)),
+        };
+    }
     Ok((i, duration * if neg.is_some() { -1 } else { 1 }))
+}
+
+fn too_large(i: &str) -> nom::Err<nom::error::Error<&str>> {
+    nom::Err::Failure(nom::error::Error::new(i, nom::error::ErrorKind::TooLarge))
 }
 
 enum Unit {
@@ -66,8 +76,10 @@ impl Unit {
 fn parse_number_unit(i: &str) -> IResult<&str, Duration> {
     let (i, num) = double(i)?;
     let (i, unit) = parse_unit(i)?;
-    let duration = to_duration(num, unit);
-    Ok((i, duration))
+    match to_duration(num, unit) {
+        Some(duration) => Ok((i, duration)),
+        None => Err(too_large(i)),
+    }
 }
 
 fn parse_negative(i: &str) -> IResult<&str, ()> {
@@ -86,8 +98,21 @@ fn parse_unit(i: &str) -> IResult<&str, Unit> {
     ))(i)
 }
 
-fn to_duration(num: f64, unit: Unit) -> Duration {
-    Duration::nanoseconds((num * unit.nanos() as f64).trunc() as i64)
+/// Components past the `i64` nanosecond range are clamped to `Duration::MAX`/`MIN`
+/// so the caller reports them as out of range.
+fn to_duration(num: f64, unit: Unit) -> Option<Duration> {
+    let nanos = num * unit.nanos() as f64;
+    if nanos.is_nan() {
+        return None;
+    }
+    if nanos.abs() > i64::MAX as f64 {
+        return Some(if nanos > 0.0 {
+            Duration::MAX
+        } else {
+            Duration::MIN
+        });
+    }
+    Some(Duration::nanoseconds(nanos as i64))
 }
 
 /// Formats a [`Duration`] into a string. String returns a string representing the
@@ -263,6 +288,8 @@ mod tests {
         "0h0m1s" => Duration::seconds(1),
         "0" => Duration::zero(),
         "-0" => Duration::zero(),
+        "9223372036854775807ns" => Duration::nanoseconds(i64::MAX),
+        "-9223372036854775807ns" => Duration::nanoseconds(-i64::MAX),
     }
 
     assert_duration_format! {
