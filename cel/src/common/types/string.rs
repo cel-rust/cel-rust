@@ -140,7 +140,7 @@ impl Comparer for String<'_> {
 
 impl Sizer for String<'_> {
     fn size(&self) -> CelInt {
-        (self.inner().len() as i64).into()
+        (self.inner().chars().count() as i64).into()
     }
 }
 

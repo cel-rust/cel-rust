@@ -133,6 +133,15 @@ mod tests {
             ("size as a list method", "[1, 2, 3].size() == 3"),
             ("size as a string method", "'foobar'.size() == 6"),
             ("size as a bytes method", "b'foobar'.size() == 6"),
+            (
+                "size of unicode string counts code points",
+                "size('πέντε') == 5",
+            ),
+            ("size of unicode string as a method", "'πέντε'.size() == 5"),
+            (
+                "size of unicode bytes counts raw bytes",
+                "size(bytes('πέντε')) == 10",
+            ),
         ]
         .iter()
         .for_each(assert_script);

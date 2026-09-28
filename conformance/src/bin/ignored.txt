@@ -869,8 +869,6 @@ proto3::set_null::single_timestamp
 proto3::set_null::single_value
 proto3::singular_bind::int32
 proto3::singular_bind::int64
-string::size::one_unicode
-string::size::unicode
 string_ext::ascii_casing::lowerascii
 string_ext::ascii_casing::lowerascii_unicode
 string_ext::ascii_casing::lowerascii_unicode_with_space
