@@ -258,6 +258,7 @@ fn optional_or_value<'b, 'v>(
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(types::OPTIONAL_TYPE).expect("Must be unique");
     env.add_overload("optional.none", "optional_none", vec![], optional_none)
         .expect("Must be unique");
     env.add_overload(

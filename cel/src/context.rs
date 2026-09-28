@@ -1,4 +1,3 @@
-use crate::common::types::CelType;
 use crate::common::value::{CowVal, Val};
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
@@ -160,8 +159,7 @@ impl<'p, 'v> Context<'p, 'v> {
                 ..
             } => resolver
                 .and_then(|r| r.resolve(name))
-                .or_else(|| variables.get(name).map(|v| CowVal::Borrowed(v.as_ref())))
-                .or_else(|| CelType::for_ident(name).map(CowVal::owned)),
+                .or_else(|| variables.get(name).map(|v| CowVal::Borrowed(v.as_ref()))),
         }
     }
 
@@ -169,6 +167,17 @@ impl<'p, 'v> Context<'p, 'v> {
         match self {
             Context::Root { env, .. } => env.as_ref(),
             Context::Child { parent, .. } => parent.env(),
+        }
+    }
+
+    /// Whether a function named `namespace.…` is declared, in the `Env` or
+    /// added to the root context.
+    pub(crate) fn has_function_namespace(&self, namespace: &str) -> bool {
+        match self {
+            Context::Root { functions, env, .. } => {
+                env.has_namespace(namespace) || functions.has_namespace(namespace)
+            }
+            Context::Child { parent, .. } => parent.has_function_namespace(namespace),
         }
     }
 
@@ -626,5 +635,24 @@ mod test {
         let context = Context::default();
         let mut child = context.new_inner_scope();
         assert_eq!(child.add_function("size", |a: i64| a), Ok(()),);
+    }
+
+    #[test]
+    fn a_qualified_function_declares_its_namespace() {
+        let mut context = Context::default();
+        context.add_function("a.b.f", |i: i64| i).unwrap();
+        context.add_function("g", |i: i64| i).unwrap();
+        assert!(context.has_function_namespace("a"));
+        assert!(!context.has_function_namespace("g"));
+        assert!(context.has_function_namespace("optional"), "from the Env");
+        assert!(context.new_inner_scope().has_function_namespace("a"));
+    }
+
+    /// Type names are resolved by the interpreter, not looked up as variables.
+    #[test]
+    fn a_type_name_is_not_a_variable() {
+        let context = Context::default();
+        assert!(context.get_variable("int").is_none());
+        assert!(context.new_inner_scope().get_variable("int").is_none());
     }
 }

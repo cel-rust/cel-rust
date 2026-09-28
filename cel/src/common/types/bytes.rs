@@ -222,6 +222,8 @@ fn string_to_bytes<'b, 'v>(
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
+    env.add_type(crate::common::types::BYTES_TYPE)
+        .expect("Must be unique");
     env.add_overload(
         "bytes",
         "string_to_bytes",
