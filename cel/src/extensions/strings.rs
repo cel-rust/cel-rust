@@ -90,10 +90,13 @@ fn index_of_offset(
 ) -> Result<CelInt, ExecutionError> {
     let offset = *offset.inner();
     let runes: Vec<char> = this.chars().collect();
-    if needle.is_empty() {
-        return Ok(offset.into());
+    if offset < 0 {
+        return Err(out_of_range("indexOf", offset));
     }
-    if offset < 0 || offset >= runes.len() as i64 {
+    if needle.is_empty() {
+        return Ok(offset.min(runes.len() as i64).into());
+    }
+    if offset >= runes.len() as i64 {
         return Err(out_of_range("indexOf", offset));
     }
     let needle: Vec<char> = needle.chars().collect();
@@ -117,10 +120,13 @@ fn last_index_of_offset(
 ) -> Result<CelInt, ExecutionError> {
     let offset = *offset.inner();
     let runes: Vec<char> = this.chars().collect();
-    if needle.is_empty() {
-        return Ok(offset.into());
+    if offset < 0 {
+        return Err(out_of_range("lastIndexOf", offset));
     }
-    if offset < 0 || offset >= runes.len() as i64 {
+    if needle.is_empty() {
+        return Ok(offset.min(runes.len() as i64).into());
+    }
+    if offset >= runes.len() as i64 {
         return Err(out_of_range("lastIndexOf", offset));
     }
     let needle: Vec<char> = needle.chars().collect();
@@ -305,6 +311,9 @@ mod tests {
             "'hello mellow'.indexOf('ello', 20)",
             "index out of range: 20",
         );
+        assert_eval("'abc'.indexOf('', 3)", 3);
+        assert_eval("'abc'.indexOf('', 20)", 3);
+        assert_error("'abc'.indexOf('', -1)", "index out of range: -1");
     }
 
     #[test]
@@ -321,6 +330,9 @@ mod tests {
             "index out of range: 20",
         );
         assert_error("'tacocat'.lastIndexOf('a', -1)", "index out of range: -1");
+        assert_eval("'abc'.lastIndexOf('', 3)", 3);
+        assert_eval("'abc'.lastIndexOf('', 20)", 3);
+        assert_error("'abc'.lastIndexOf('', -1)", "index out of range: -1");
     }
 
     #[test]
