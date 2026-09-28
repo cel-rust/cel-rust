@@ -23,7 +23,6 @@ mod timestamp_conversions {
     }
 
     // Test: toString_timestamp
-    #[should_panic]
     #[test]
     fn tostring_timestamp() {
         run_test(&dedent!(
@@ -35,7 +34,6 @@ mod timestamp_conversions {
     }
 
     // Test: toString_timestamp_nanos
-    #[should_panic]
     #[test]
     fn tostring_timestamp_nanos() {
         run_test(&dedent!(
@@ -76,7 +74,6 @@ mod duration_conversions {
     use dedent::dedent;
 
     // Test: toString_duration
-    #[should_panic]
     #[test]
     fn tostring_duration() {
         run_test(&dedent!(

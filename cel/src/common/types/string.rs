@@ -269,12 +269,12 @@ fn string_from_bytes(this: &CelBytes<'_>) -> String<'static> {
 
 #[cfg(feature = "chrono")]
 fn string_from_timestamp(this: &CelTimestamp) -> String<'static> {
-    String::from(this.inner().to_rfc3339())
+    String::from(this.to_rfc3339_nano())
 }
 
 #[cfg(feature = "chrono")]
 fn string_from_duration(this: &CelDuration) -> String<'static> {
-    String::from(crate::duration::format_duration(this.inner()))
+    String::from(crate::duration::format_duration_seconds(this.inner()))
 }
 
 pub(crate) fn stdlib(env: &mut crate::Env) {

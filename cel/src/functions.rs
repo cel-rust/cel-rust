@@ -317,11 +317,11 @@ mod tests {
             ),
             (
                 "timestamp string",
-                "string(timestamp('2023-05-28T00:00:00Z')) == '2023-05-28T00:00:00+00:00'",
+                "string(timestamp('2023-05-28T00:00:00Z')) == '2023-05-28T00:00:00Z'",
             ),
             (
                 "timestamp timestamp",
-                "string(timestamp(timestamp('2023-05-28T00:00:00Z'))) == '2023-05-28T00:00:00+00:00'",
+                "string(timestamp(timestamp('2023-05-28T00:00:00Z'))) == '2023-05-28T00:00:00Z'",
             ),
             (
                 "timestamp getFullYear",
@@ -513,10 +513,26 @@ mod tests {
     #[test]
     fn test_chrono_string() {
         [
-            ("duration", "string(duration('1h30m')) == '1h30m0s'"),
+            ("duration", "string(duration('1h30m')) == '5400s'"),
             (
                 "timestamp",
-                "string(timestamp('2023-05-29T00:00:00Z')) == '2023-05-29T00:00:00+00:00'",
+                "string(timestamp('2023-05-29T00:00:00Z')) == '2023-05-29T00:00:00Z'",
+            ),
+            (
+                "timestamp zero fraction",
+                "string(timestamp('2023-05-29T00:00:00.000Z')) == '2023-05-29T00:00:00Z'",
+            ),
+            (
+                "timestamp half-second fraction",
+                "string(timestamp('2023-05-29T00:00:00.500Z')) == '2023-05-29T00:00:00.5Z'",
+            ),
+            (
+                "timestamp non-trailing-zero fraction",
+                "string(timestamp('2023-05-29T00:00:00.120Z')) == '2023-05-29T00:00:00.12Z'",
+            ),
+            (
+                "timestamp string with a leap second",
+                "string(timestamp('1998-12-31T23:59:60.25Z')) == '1998-12-31T23:59:60.25Z'",
             ),
         ]
         .iter()
