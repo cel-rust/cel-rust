@@ -140,6 +140,12 @@ fn lookup<T>(key: &dyn Val, mut probe: impl FnMut(&dyn AsKeyRef) -> Option<T>) -
         .or_else(|| fallback_keys(key).iter().flatten().find_map(|k| probe(k)))
 }
 
+/// Whether `map` has `key`, or the same number as the other numeric key type: the spec has map
+/// keys compare with numeric equality, so `{0: 1, 0u: 2}` repeats a key.
+pub(crate) fn has_key<V>(map: &HashMap<Key<'_>, V>, key: &Key<'_>) -> bool {
+    lookup(key.inner(), |k| map.get(k)).is_some()
+}
+
 /// The keys a numeric `key` falls back to on a miss, in the order to try them.
 fn fallback_keys(key: &dyn Val) -> [Option<KeyRef<'static>>; 2] {
     if let Some(i) = key.downcast_ref::<CelInt>() {

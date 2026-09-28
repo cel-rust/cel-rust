@@ -407,7 +407,6 @@ enums::strong_proto3::type_global
 enums::strong_proto3::type_nested
 fields::qualified_identifier_resolution::ident_with_longest_prefix_check
 fields::qualified_identifier_resolution::map_field_select
-fields::qualified_identifier_resolution::map_value_repeat_key_heterogeneous
 fields::qualified_identifier_resolution::qualified_ident
 fields::qualified_identifier_resolution::qualified_identifier_resolution_unchecked
 integer_math::int64_math::int64_min_negate

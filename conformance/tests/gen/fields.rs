@@ -963,7 +963,6 @@ mod qualified_identifier_resolution {
     }
 
     // Test: map_value_repeat_key_heterogeneous
-    #[should_panic]
     #[test]
     fn map_value_repeat_key_heterogeneous() {
         run_test(&dedent!(
