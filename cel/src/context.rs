@@ -3,6 +3,7 @@ use crate::common::value::{CowVal, Val};
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
+use crate::runtime::{Frame, Interrupt};
 use crate::{DeclarationError, Env, ExecutionError};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -35,21 +36,35 @@ use std::sync::Arc;
 /// # Lifetimes
 ///
 /// `'v` bounds the data the context's values may borrow: the
-/// [`VariableResolver`] it references and any [`Val`] bound with
-/// [`add_variable_as_val`](Context::add_variable_as_val). Values resolved
+/// [`VariableResolver`] and [`Interrupt`] it references and any [`Val`] bound
+/// with [`add_variable_as_val`](Context::add_variable_as_val). Values resolved
 /// against the context borrow for at most `'v`. `'p` is the borrow of the
 /// parent context for a child scope; a root context does not use it.
+///
+/// # Interruption
+///
+/// An evaluation can be cancelled cooperatively by setting an [`Interrupt`]
+/// handle with [`set_interrupt`](Self::set_interrupt), and bounded by an
+/// iteration budget configured on the [`Env`] through
+/// [`RuntimeOptions`](crate::RuntimeOptions). See the [`runtime`](crate::runtime)
+/// module for details.
+#[non_exhaustive]
 pub enum Context<'p, 'v> {
+    #[non_exhaustive]
     Root {
         functions: FunctionRegistry,
         variables: BTreeMap<String, Box<dyn Val + 'v>>,
         resolver: Option<&'v dyn VariableResolver>,
+        interrupt: Option<&'v dyn Interrupt>,
         env: Arc<Env>,
     },
+    #[non_exhaustive]
     Child {
         parent: &'p Context<'p, 'v>,
         variables: BTreeMap<String, Box<dyn Val + 'v>>,
         resolver: Option<&'v dyn VariableResolver>,
+        interrupt: Option<&'v dyn Interrupt>,
+        frame: Option<Frame<'v>>,
     },
 }
 
@@ -134,6 +149,71 @@ impl<'p, 'v> Context<'p, 'v> {
         }
     }
 
+    /// Sets the [`Interrupt`] handle polled while evaluating comprehensions.
+    ///
+    /// The handle is consulted for every evaluation performed with this context
+    /// (or a scope derived from it) until it is replaced. When it reports an
+    /// interruption, evaluation fails with
+    /// [`ExecutionError::Interrupted`](crate::ExecutionError::Interrupted).
+    ///
+    /// # Example
+    /// ```
+    /// use cel::{Context, ExecutionError, Program};
+    /// use std::sync::atomic::{AtomicBool, Ordering};
+    ///
+    /// let cancelled = AtomicBool::new(false);
+    /// let mut ctx = Context::default();
+    /// ctx.set_interrupt(&cancelled);
+    ///
+    /// let program = Program::compile("[1, 2, 3].all(x, x > 0)").unwrap();
+    /// assert_eq!(program.execute(&ctx), Ok(true.into()));
+    ///
+    /// cancelled.store(true, Ordering::Relaxed);
+    /// assert_eq!(program.execute(&ctx), Err(ExecutionError::Interrupted));
+    /// ```
+    pub fn set_interrupt(&mut self, i: &'v dyn Interrupt) {
+        match self {
+            Context::Root { interrupt, .. } => {
+                *interrupt = Some(i);
+            }
+            Context::Child { interrupt, .. } => {
+                *interrupt = Some(i);
+            }
+        }
+    }
+
+    /// The nearest [`Interrupt`] handle set on this context or one of its parents.
+    fn interrupt(&self) -> Option<&'v dyn Interrupt> {
+        match self {
+            Context::Root { interrupt, .. } => *interrupt,
+            Context::Child {
+                interrupt, parent, ..
+            } => interrupt.or_else(|| parent.interrupt()),
+        }
+    }
+
+    /// The [`Frame`] of the evaluation this context takes part in, if any.
+    pub(crate) fn frame(&self) -> Option<&Frame<'v>> {
+        match self {
+            Context::Root { .. } => None,
+            Context::Child { frame, parent, .. } => frame.as_ref().or_else(|| parent.frame()),
+        }
+    }
+
+    /// Creates an inner scope carrying a fresh [`Frame`] for a new evaluation.
+    ///
+    /// Callers must check [`frame`](Self::frame) first: a nested evaluation must
+    /// share the frame of the evaluation it runs within, not start its own.
+    pub(crate) fn new_frame_scope<'b>(&'b self) -> Context<'b, 'v> {
+        Context::Child {
+            parent: self,
+            variables: Default::default(),
+            resolver: None,
+            interrupt: None,
+            frame: Some(Frame::new(self.env().options(), self.interrupt())),
+        }
+    }
+
     /// Looks a variable up: the resolver first, then this scope's variables,
     /// then the parent scopes. The result borrows from the context where it
     /// can and is bounded by `'v` where the resolver or a bound value
@@ -148,6 +228,7 @@ impl<'p, 'v> Context<'p, 'v> {
                 variables,
                 parent,
                 resolver,
+                ..
             } => resolver.and_then(|r| r.resolve(name)).or_else(|| {
                 variables
                     .get(name)
@@ -240,6 +321,8 @@ impl<'p, 'v> Context<'p, 'v> {
             parent: self,
             variables: Default::default(),
             resolver: None,
+            interrupt: None,
+            frame: None,
         }
     }
 
@@ -260,6 +343,7 @@ impl<'p, 'v> Context<'p, 'v> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            interrupt: None,
         }
     }
 
@@ -269,6 +353,7 @@ impl<'p, 'v> Context<'p, 'v> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            interrupt: None,
         }
     }
 }
@@ -280,6 +365,7 @@ impl Default for Context<'_, '_> {
             variables: Default::default(),
             functions: Default::default(),
             resolver: None,
+            interrupt: None,
         }
     }
 }

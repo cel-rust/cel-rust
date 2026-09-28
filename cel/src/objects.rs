@@ -991,15 +991,38 @@ impl TryFrom<Value> for Box<dyn Val> {
 
 impl Value {
     pub fn resolve_all(expr: &[Expression], ctx: &Context) -> ResolveResult {
-        let mut res = Vec::with_capacity(expr.len());
-        for expr in expr {
-            res.push(Value::resolve(expr, ctx)?);
-        }
-        Ok(Value::List(res.into()))
+        Self::with_frame(ctx, |ctx| {
+            let mut res = Vec::with_capacity(expr.len());
+            for expr in expr {
+                res.push(Self::resolve_val(expr, ctx)?.as_ref().try_into()?);
+            }
+            Ok(Value::List(res.into()))
+        })
     }
 
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
-        Self::resolve_val(expr, ctx)?.as_ref().try_into()
+        Self::with_frame(ctx, |ctx| Self::resolve_val(expr, ctx)?.as_ref().try_into())
+    }
+
+    /// Runs `f` within the evaluation frame of `ctx`, creating one if this is
+    /// the outermost entry point of the evaluation.
+    ///
+    /// Re-entrant calls (a custom function resolving an expression, or running
+    /// a nested program) find the existing frame and share its budget and
+    /// interrupt handle. Only the call that created the frame applies the
+    /// abort backstop, so a nested call cannot observe and discard an abort.
+    fn with_frame<T>(
+        ctx: &Context,
+        f: impl FnOnce(&Context) -> Result<T, ExecutionError>,
+    ) -> Result<T, ExecutionError> {
+        if ctx.frame().is_some() {
+            return f(ctx);
+        }
+        let ctx = ctx.new_frame_scope();
+        let result = f(&ctx);
+        ctx.frame()
+            .expect("frame scope carries a frame")
+            .finish(result)
     }
 
     /// Evaluates `expr` against `ctx`.
@@ -1008,6 +1031,12 @@ impl Value {
     /// variable borrows the context (`'e`), and anything carrying data the
     /// context's resolver or values borrow is bounded by `'v`. Nothing is
     /// copied unless an operation produces a new value.
+    ///
+    /// Unlike [`resolve`](Self::resolve), this does not create an evaluation
+    /// frame when called outside of an evaluation: interruption and the
+    /// iteration budget only apply when a frame exists, so prefer
+    /// [`resolve`](Self::resolve) or [`Program::execute`](crate::Program::execute)
+    /// as entry points.
     #[inline(always)]
     pub fn resolve_val<'e, 'p, 'v>(
         expr: &'e Expression,
@@ -1028,7 +1057,10 @@ impl Value {
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            let left = try_bool(Value::resolve_val(&call.args[0], ctx));
+                            let left = match try_bool(Value::resolve_val(&call.args[0], ctx)) {
+                                Err(e) if e.is_fatal() => return Err(e),
+                                left => left,
+                            };
                             return if Ok(true) == left {
                                 Ok(bool(true))
                             } else {
@@ -1047,7 +1079,10 @@ impl Value {
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = try_bool(Value::resolve_val(&call.args[0], ctx));
+                            let left = match try_bool(Value::resolve_val(&call.args[0], ctx)) {
+                                Err(e) if e.is_fatal() => return Err(e),
+                                left => left,
+                            };
                             return if Ok(false) == left {
                                 Ok(bool(false))
                             } else {
@@ -1112,6 +1147,7 @@ impl Value {
                             return if is_optional {
                                 Ok(CowVal::owned(match result {
                                     Ok(val) => CelOptional::of(val.into_owned()),
+                                    Err(e) if e.is_fatal() => return Err(e),
                                     Err(_) => CelOptional::none(),
                                 }))
                             } else {
@@ -1145,6 +1181,7 @@ impl Value {
                                 ExecutionError::overload_for_values("_?._", [value, field], false)
                             }) {
                                 Ok(v) => CelOptional::of(v.into_owned()),
+                                Err(e) if e.is_fatal() => return Err(e),
                                 Err(_) => CelOptional::none(),
                             };
                             return Ok(CowVal::owned(result));
@@ -1313,9 +1350,10 @@ impl Value {
                             ));
                         }
                         operators::NOT_STRICTLY_FALSE => {
-                            return Ok(bool(
-                                try_bool(Value::resolve_val(&call.args[0], ctx)).unwrap_or(true),
-                            ));
+                            return match try_bool(Value::resolve_val(&call.args[0], ctx)) {
+                                Err(e) if e.is_fatal() => Err(e),
+                                res => Ok(bool(res.unwrap_or(true))),
+                            };
                         }
                         _ => (),
                     }
@@ -1465,6 +1503,7 @@ impl Value {
                             Ok(CowVal::owned(
                                 match index_into(inner, &key, "_._", |_| no_such_key()) {
                                     Ok(v) => CelOptional::of(v.into_owned()),
+                                    Err(e) if e.is_fatal() => return Err(e),
                                     Err(_) => CelOptional::none(),
                                 },
                             ))
@@ -1561,6 +1600,7 @@ impl Value {
                     }
                 }
 
+                let frame = ctx.frame();
                 let mut ctx = ctx.new_inner_scope();
                 ctx.add_variable_as_val(&comprehension.accu_var, accu_init.into_owned());
 
@@ -1572,6 +1612,9 @@ impl Value {
                     })?
                     .iter();
                 while let Some(item) = items.next() {
+                    if let Some(frame) = frame {
+                        frame.tick()?;
+                    }
                     if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
                         break;
                     }
