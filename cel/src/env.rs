@@ -291,6 +291,26 @@ impl Env {
         &self.types
     }
 
+    /// Adds an extension library, such as [`extensions::strings`], by
+    /// handing it this environment to register its types and overloads on.
+    ///
+    /// ```
+    /// use cel::{extensions, Context, Env, Program, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_extension(extensions::strings);
+    /// let context = Context::with_env(Arc::new(env));
+    ///
+    /// let program = Program::compile("'TacoCat'.lowerAscii()").unwrap();
+    /// assert_eq!(program.execute(&context), Ok(Value::from("tacocat")));
+    /// ```
+    ///
+    /// [`extensions::strings`]: crate::extensions::strings
+    pub fn add_extension(&mut self, extension: impl FnOnce(&mut Env)) {
+        extension(self)
+    }
+
     /// Sets whether a map literal that repeats a key is an error.
     ///
     /// On by default, as the spec requires. Turning it off keeps the last entry
