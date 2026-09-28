@@ -1073,7 +1073,6 @@ mod bool {
     use dedent::dedent;
 
     // Test: string_1
-    #[should_panic]
     #[test]
     fn string_1() {
         run_test(&dedent!(
@@ -1085,7 +1084,6 @@ mod bool {
     }
 
     // Test: string_t
-    #[should_panic]
     #[test]
     fn string_t() {
         run_test(&dedent!(
@@ -1097,7 +1095,6 @@ mod bool {
     }
 
     // Test: string_true_lowercase
-    #[should_panic]
     #[test]
     fn string_true_lowercase() {
         run_test(&dedent!(
@@ -1109,7 +1106,6 @@ mod bool {
     }
 
     // Test: string_true_uppercase
-    #[should_panic]
     #[test]
     fn string_true_uppercase() {
         run_test(&dedent!(
@@ -1121,7 +1117,6 @@ mod bool {
     }
 
     // Test: string_true_pascalcase
-    #[should_panic]
     #[test]
     fn string_true_pascalcase() {
         run_test(&dedent!(
@@ -1133,7 +1128,6 @@ mod bool {
     }
 
     // Test: string_0
-    #[should_panic]
     #[test]
     fn string_0() {
         run_test(&dedent!(
@@ -1145,7 +1139,6 @@ mod bool {
     }
 
     // Test: string_f
-    #[should_panic]
     #[test]
     fn string_f() {
         run_test(&dedent!(
@@ -1157,7 +1150,6 @@ mod bool {
     }
 
     // Test: string_false_lowercase
-    #[should_panic]
     #[test]
     fn string_false_lowercase() {
         run_test(&dedent!(
@@ -1169,7 +1161,6 @@ mod bool {
     }
 
     // Test: string_false_uppercase
-    #[should_panic]
     #[test]
     fn string_false_uppercase() {
         run_test(&dedent!(
@@ -1181,7 +1172,6 @@ mod bool {
     }
 
     // Test: string_false_pascalcase
-    #[should_panic]
     #[test]
     fn string_false_pascalcase() {
         run_test(&dedent!(
@@ -1226,7 +1216,6 @@ mod identity {
     use dedent::dedent;
 
     // Test: bool
-    #[should_panic]
     #[test]
     fn bool() {
         run_test(&dedent!(

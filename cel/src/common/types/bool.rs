@@ -1,5 +1,5 @@
 use crate::common::traits::{Comparer, Zeroer};
-use crate::common::types::Type;
+use crate::common::types::{CelString, Type};
 use crate::common::value::{StaticVal, Val};
 use crate::ExecutionError;
 use std::any::Any;
@@ -118,9 +118,29 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a bool {
     }
 }
 
+fn bool_from_bool(this: &Bool) -> Bool {
+    *this
+}
+
+fn bool_from_string(this: &CelString<'_>) -> Result<Bool, ExecutionError> {
+    // Same accepted set as cel-cpp and cel-java. cel-go's strconv.ParseBool also takes "T" and "F".
+    match this.inner() {
+        "1" | "t" | "true" | "TRUE" | "True" => Ok(Bool(true)),
+        "0" | "f" | "false" | "FALSE" | "False" => Ok(Bool(false)),
+        _ => Err(ExecutionError::FunctionError {
+            function: "bool".to_owned(),
+            message: "Type conversion error from 'string' to 'bool'".to_owned(),
+        }),
+    }
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(crate::common::types::BOOL_TYPE)
         .expect("Must be unique");
+    crate::add_overload!(env, fn bool_from_bool: (Bool) -> Bool,
+        name = "bool", id = "bool_to_bool");
+    crate::add_overload!(env, fn bool_from_string: (CelString) -> Result<Bool>,
+        name = "bool", id = "string_to_bool");
 }
 
 #[cfg(test)]
@@ -128,6 +148,7 @@ mod tests {
     use super::*;
     use crate::common::types;
     use crate::common::types::Kind;
+    use crate::{Context, Program};
 
     #[test]
     fn test_from() {
@@ -153,5 +174,31 @@ mod tests {
         ));
         let program = crate::Program::compile("!false").unwrap();
         assert_eq!(program.execute(&context), Ok(true.into()));
+    }
+
+    fn eval(expr: &str) -> crate::objects::ResolveResult {
+        Program::compile(expr).unwrap().execute(&Context::default())
+    }
+
+    #[test]
+    fn test_conversion() {
+        assert_eq!(eval("bool(true)"), Ok(true.into()));
+        assert_eq!(eval("bool(false)"), Ok(false.into()));
+        for s in ["1", "t", "true", "TRUE", "True"] {
+            assert_eq!(eval(&format!("bool('{s}')")), Ok(true.into()), "{s}");
+        }
+        for s in ["0", "f", "false", "FALSE", "False"] {
+            assert_eq!(eval(&format!("bool('{s}')")), Ok(false.into()), "{s}");
+        }
+        for s in ["TrUe", "FaLsE", "T", "F", "yes", "", " true"] {
+            assert_eq!(
+                eval(&format!("bool('{s}')")),
+                Err(ExecutionError::FunctionError {
+                    function: "bool".to_owned(),
+                    message: "Type conversion error from 'string' to 'bool'".to_owned(),
+                }),
+                "{s}"
+            );
+        }
     }
 }

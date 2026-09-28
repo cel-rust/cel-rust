@@ -113,17 +113,6 @@ comparisons::ne_literal::ne_proto3_any_unpack_bytewise_fallback
 comparisons::ne_literal::ne_proto3_missing_fields_neq
 comparisons::ne_literal::ne_proto_different_types
 comparisons::ne_literal::ne_proto_nan_not_equal
-conversions::bool::string_0
-conversions::bool::string_1
-conversions::bool::string_f
-conversions::bool::string_false_lowercase
-conversions::bool::string_false_pascalcase
-conversions::bool::string_false_uppercase
-conversions::bool::string_t
-conversions::bool::string_true_lowercase
-conversions::bool::string_true_pascalcase
-conversions::bool::string_true_uppercase
-conversions::identity::bool
 conversions::identity::timestamp
 conversions::int::timestamp
 conversions::string::bytes_invalid
