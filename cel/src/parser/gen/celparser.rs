@@ -6,6 +6,7 @@
 #![allow(unused_imports)]
 #![allow(unused_mut)]
 #![allow(unused_braces)]
+#![allow(unused_parens)]
 use super::cellistener::*;
 use super::celvisitor::*;
 use antlr4rust::atn::{ATN, INVALID_ALT};
@@ -38,6 +39,13 @@ use std::marker::PhantomData;
 use std::ops::{Deref, DerefMut};
 use std::rc::Rc;
 use std::sync::Arc;
+
+const _: () = {
+    assert!(
+        antlr4rust::const_check::version("0", "6"),
+        "Incompatible version: either switch to v0.6 or regenerate with this version"
+    );
+};
 
 pub const CEL_EQUALS: i32 = 1;
 pub const CEL_NOT_EQUALS: i32 = 2;
@@ -215,7 +223,7 @@ where
     I: TokenStream<'input, TF = LocalTokenFactory<'input>> + TidAble<'input>,
 {
     base: BaseParserType<'input, I>,
-    interpreter: Arc<ParserATNSimulator>,
+    interpreter: Rc<ParserATNSimulator>,
     _shared_context_cache: Box<PredictionContextCache>,
     pub err_handler: Box<dyn ErrorStrategy<'input, BaseParserType<'input, I>>>,
 }
@@ -235,8 +243,7 @@ where
         input: I,
         strategy: Box<dyn ErrorStrategy<'input, BaseParserType<'input, I>>>,
     ) -> Self {
-        antlr4rust::recognizer::check_version("0", "5");
-        let interpreter = Arc::new(ParserATNSimulator::new(
+        let interpreter = Rc::new(ParserATNSimulator::new(
             _ATN.clone(),
             _decision_to_DFA.clone(),
             _shared_context_cache.clone(),
@@ -244,7 +251,7 @@ where
         Self {
             base: BaseParser::new_base_parser(
                 input,
-                Arc::clone(&interpreter),
+                Rc::clone(&interpreter),
                 CELParserExt {
                     _pd: Default::default(),
                 },
@@ -522,7 +529,8 @@ where
                 /*InvokeRule expr*/
                 recog.base.set_state(34);
                 let tmp = recog.expr()?;
-                cast_mut::<_, StartContext>(&mut _localctx).e = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<StartContext>(&mut _localctx) }).e = Some(tmp.clone());
 
                 recog.base.set_state(35);
                 recog.base.match_token(CEL_EOF, &mut recog.err_handler)?;
@@ -667,7 +675,8 @@ where
                 /*InvokeRule conditionalOr*/
                 recog.base.set_state(37);
                 let tmp = recog.conditionalOr()?;
-                cast_mut::<_, ExprContext>(&mut _localctx).e = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<ExprContext>(&mut _localctx) }).e = Some(tmp.clone());
 
                 recog.base.set_state(43);
                 recog.err_handler.sync(&mut recog.base)?;
@@ -678,12 +687,14 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_QUESTIONMARK, &mut recog.err_handler)?;
-                        cast_mut::<_, ExprContext>(&mut _localctx).op = Some(tmp.clone());
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                        (unsafe { cast_mut::<ExprContext>(&mut _localctx) }).op = Some(tmp.clone());
 
                         /*InvokeRule conditionalOr*/
                         recog.base.set_state(39);
                         let tmp = recog.conditionalOr()?;
-                        cast_mut::<_, ExprContext>(&mut _localctx).e1 = Some(tmp.clone());
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                        (unsafe { cast_mut::<ExprContext>(&mut _localctx) }).e1 = Some(tmp.clone());
 
                         recog.base.set_state(40);
                         recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
@@ -691,7 +702,8 @@ where
                         /*InvokeRule expr*/
                         recog.base.set_state(41);
                         let tmp = recog.expr()?;
-                        cast_mut::<_, ExprContext>(&mut _localctx).e2 = Some(tmp.clone());
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                        (unsafe { cast_mut::<ExprContext>(&mut _localctx) }).e2 = Some(tmp.clone());
                     }
                 }
             }
@@ -834,7 +846,8 @@ where
                 /*InvokeRule conditionalAnd*/
                 recog.base.set_state(45);
                 let tmp = recog.conditionalAnd()?;
-                cast_mut::<_, ConditionalOrContext>(&mut _localctx).e = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<ConditionalOrContext>(&mut _localctx) }).e = Some(tmp.clone());
 
                 recog.base.set_state(50);
                 recog.err_handler.sync(&mut recog.base)?;
@@ -846,28 +859,30 @@ where
                             let tmp = recog
                                 .base
                                 .match_token(CEL_LOGICAL_OR, &mut recog.err_handler)?;
-                            cast_mut::<_, ConditionalOrContext>(&mut _localctx).s9 =
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalOrContext>(&mut _localctx) }).s9 =
                                 Some(tmp.clone());
 
-                            let temp = cast_mut::<_, ConditionalOrContext>(&mut _localctx)
-                                .s9
-                                .clone()
-                                .unwrap();
-                            cast_mut::<_, ConditionalOrContext>(&mut _localctx)
+                            let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+				(unsafe { cast_mut::<ConditionalOrContext >(&mut _localctx) }).s9.clone().unwrap()
+				 ;
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalOrContext>(&mut _localctx) })
                                 .ops
                                 .push(temp);
 
                             /*InvokeRule conditionalAnd*/
                             recog.base.set_state(47);
                             let tmp = recog.conditionalAnd()?;
-                            cast_mut::<_, ConditionalOrContext>(&mut _localctx).conditionalAnd =
-                                Some(tmp.clone());
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalOrContext>(&mut _localctx) })
+                                .conditionalAnd = Some(tmp.clone());
 
-                            let temp = cast_mut::<_, ConditionalOrContext>(&mut _localctx)
-                                .conditionalAnd
-                                .clone()
-                                .unwrap();
-                            cast_mut::<_, ConditionalOrContext>(&mut _localctx)
+                            let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+				(unsafe { cast_mut::<ConditionalOrContext >(&mut _localctx) }).conditionalAnd.clone().unwrap()
+				 ;
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalOrContext>(&mut _localctx) })
                                 .e1
                                 .push(temp);
                         }
@@ -1016,7 +1031,9 @@ where
                 /*InvokeRule relation*/
                 recog.base.set_state(53);
                 let tmp = recog.relation_rec(0)?;
-                cast_mut::<_, ConditionalAndContext>(&mut _localctx).e = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<ConditionalAndContext>(&mut _localctx) }).e =
+                    Some(tmp.clone());
 
                 recog.base.set_state(58);
                 recog.err_handler.sync(&mut recog.base)?;
@@ -1028,28 +1045,30 @@ where
                             let tmp = recog
                                 .base
                                 .match_token(CEL_LOGICAL_AND, &mut recog.err_handler)?;
-                            cast_mut::<_, ConditionalAndContext>(&mut _localctx).s8 =
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalAndContext>(&mut _localctx) }).s8 =
                                 Some(tmp.clone());
 
-                            let temp = cast_mut::<_, ConditionalAndContext>(&mut _localctx)
-                                .s8
-                                .clone()
-                                .unwrap();
-                            cast_mut::<_, ConditionalAndContext>(&mut _localctx)
+                            let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+				(unsafe { cast_mut::<ConditionalAndContext >(&mut _localctx) }).s8.clone().unwrap()
+				 ;
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalAndContext>(&mut _localctx) })
                                 .ops
                                 .push(temp);
 
                             /*InvokeRule relation*/
                             recog.base.set_state(55);
                             let tmp = recog.relation_rec(0)?;
-                            cast_mut::<_, ConditionalAndContext>(&mut _localctx).relation =
-                                Some(tmp.clone());
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalAndContext>(&mut _localctx) })
+                                .relation = Some(tmp.clone());
 
-                            let temp = cast_mut::<_, ConditionalAndContext>(&mut _localctx)
-                                .relation
-                                .clone()
-                                .unwrap();
-                            cast_mut::<_, ConditionalAndContext>(&mut _localctx)
+                            let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+				(unsafe { cast_mut::<ConditionalAndContext >(&mut _localctx) }).relation.clone().unwrap()
+				 ;
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ConditionalAndContext>(&mut _localctx) })
                                 .e1
                                 .push(temp);
                         }
@@ -1277,13 +1296,15 @@ where
                                     ))?;
                                 }
                                 recog.base.set_state(65);
-                                cast_mut::<_, RelationContext>(&mut _localctx).op =
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe { cast_mut::<RelationContext>(&mut _localctx) }).op =
                                     recog.base.input.lt(1).cloned();
 
                                 _la = recog.base.input.la(1);
                                 if { !(((_la) & !0x3f) == 0 && ((1usize << _la) & 254) != 0) } {
                                     let tmp = recog.err_handler.recover_inline(&mut recog.base)?;
-                                    cast_mut::<_, RelationContext>(&mut _localctx).op =
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                    (unsafe { cast_mut::<RelationContext>(&mut _localctx) }).op =
                                         Some(tmp.clone());
                                 } else {
                                     if recog.base.input.la(1) == TOKEN_EOF {
@@ -1509,7 +1530,8 @@ where
                                             ))?;
                                         }
                                         recog.base.set_state(76);
-                                        cast_mut::<_, CalcContext>(&mut _localctx).op =
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                        (unsafe { cast_mut::<CalcContext>(&mut _localctx) }).op =
                                             recog.base.input.lt(1).cloned();
 
                                         _la = recog.base.input.la(1);
@@ -1520,8 +1542,9 @@ where
                                             let tmp = recog
                                                 .err_handler
                                                 .recover_inline(&mut recog.base)?;
-                                            cast_mut::<_, CalcContext>(&mut _localctx).op =
-                                                Some(tmp.clone());
+                                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                            (unsafe { cast_mut::<CalcContext>(&mut _localctx) })
+                                                .op = Some(tmp.clone());
                                         } else {
                                             if recog.base.input.la(1) == TOKEN_EOF {
                                                 recog.base.matched_eof = true
@@ -1557,7 +1580,8 @@ where
                                             ))?;
                                         }
                                         recog.base.set_state(79);
-                                        cast_mut::<_, CalcContext>(&mut _localctx).op =
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                        (unsafe { cast_mut::<CalcContext>(&mut _localctx) }).op =
                                             recog.base.input.lt(1).cloned();
 
                                         _la = recog.base.input.la(1);
@@ -1565,8 +1589,9 @@ where
                                             let tmp = recog
                                                 .err_handler
                                                 .recover_inline(&mut recog.base)?;
-                                            cast_mut::<_, CalcContext>(&mut _localctx).op =
-                                                Some(tmp.clone());
+                                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                            (unsafe { cast_mut::<CalcContext>(&mut _localctx) })
+                                                .op = Some(tmp.clone());
                                         } else {
                                             if recog.base.input.la(1) == TOKEN_EOF {
                                                 recog.base.matched_eof = true
@@ -2000,23 +2025,21 @@ where
                                     let tmp = recog
                                         .base
                                         .match_token(CEL_EXCLAM, &mut recog.err_handler)?;
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                     if let UnaryContextAll::LogicalNotContext(ctx) =
-                                        cast_mut::<_, UnaryContextAll>(&mut _localctx)
+                                        unsafe { cast_mut::<UnaryContextAll>(&mut _localctx) }
                                     {
                                         ctx.s19 = Some(tmp.clone());
                                     } else {
                                         unreachable!("cant cast");
                                     }
 
-                                    let temp = if let UnaryContextAll::LogicalNotContext(ctx) =
-                                        cast_mut::<_, UnaryContextAll>(&mut _localctx)
-                                    {
-                                        ctx.s19.clone().unwrap()
-                                    } else {
-                                        unreachable!("cant cast");
-                                    };
+                                    let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+						if let UnaryContextAll::LogicalNotContext(ctx) = unsafe { cast_mut::<UnaryContextAll >(&mut _localctx) } {
+						ctx.s19.clone().unwrap() } else {unreachable!("cant cast");} ;
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                     if let UnaryContextAll::LogicalNotContext(ctx) =
-                                        cast_mut::<_, UnaryContextAll>(&mut _localctx)
+                                        unsafe { cast_mut::<UnaryContextAll>(&mut _localctx) }
                                     {
                                         ctx.ops.push(temp);
                                     } else {
@@ -2047,31 +2070,31 @@ where
                         loop {
                             match _alt {
                                 x if x == 1 => {
-                                    recog.base.set_state(93);
-                                    let tmp = recog
-                                        .base
-                                        .match_token(CEL_MINUS, &mut recog.err_handler)?;
-                                    if let UnaryContextAll::NegateContext(ctx) =
-                                        cast_mut::<_, UnaryContextAll>(&mut _localctx)
                                     {
-                                        ctx.s18 = Some(tmp.clone());
-                                    } else {
-                                        unreachable!("cant cast");
-                                    }
+                                        recog.base.set_state(93);
+                                        let tmp = recog
+                                            .base
+                                            .match_token(CEL_MINUS, &mut recog.err_handler)?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                        if let UnaryContextAll::NegateContext(ctx) =
+                                            unsafe { cast_mut::<UnaryContextAll>(&mut _localctx) }
+                                        {
+                                            ctx.s18 = Some(tmp.clone());
+                                        } else {
+                                            unreachable!("cant cast");
+                                        }
 
-                                    let temp = if let UnaryContextAll::NegateContext(ctx) =
-                                        cast_mut::<_, UnaryContextAll>(&mut _localctx)
-                                    {
-                                        ctx.s18.clone().unwrap()
-                                    } else {
-                                        unreachable!("cant cast");
-                                    };
-                                    if let UnaryContextAll::NegateContext(ctx) =
-                                        cast_mut::<_, UnaryContextAll>(&mut _localctx)
-                                    {
-                                        ctx.ops.push(temp);
-                                    } else {
-                                        unreachable!("cant cast");
+                                        let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+							if let UnaryContextAll::NegateContext(ctx) = unsafe { cast_mut::<UnaryContextAll >(&mut _localctx) } {
+							ctx.s18.clone().unwrap() } else {unreachable!("cant cast");} ;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                        if let UnaryContextAll::NegateContext(ctx) =
+                                            unsafe { cast_mut::<UnaryContextAll>(&mut _localctx) }
+                                        {
+                                            ctx.ops.push(temp);
+                                        } else {
+                                            unreachable!("cant cast");
+                                        }
                                     }
                                 }
 
@@ -2692,8 +2715,9 @@ where
                                         let tmp = recog
                                             .base
                                             .match_token(CEL_DOT, &mut recog.err_handler)?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                         if let MemberContextAll::SelectContext(ctx) =
-                                            cast_mut::<_, MemberContextAll>(&mut _localctx)
+                                            unsafe { cast_mut::<MemberContextAll>(&mut _localctx) }
                                         {
                                             ctx.op = Some(tmp.clone());
                                         } else {
@@ -2710,9 +2734,10 @@ where
                                                     CEL_QUESTIONMARK,
                                                     &mut recog.err_handler,
                                                 )?;
-                                                if let MemberContextAll::SelectContext(ctx) =
-                                                    cast_mut::<_, MemberContextAll>(&mut _localctx)
-                                                {
+                                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                                if let MemberContextAll::SelectContext(ctx) = unsafe {
+                                                    cast_mut::<MemberContextAll>(&mut _localctx)
+                                                } {
                                                     ctx.opt = Some(tmp.clone());
                                                 } else {
                                                     unreachable!("cant cast");
@@ -2723,8 +2748,9 @@ where
                                         /*InvokeRule escapeIdent*/
                                         recog.base.set_state(109);
                                         let tmp = recog.escapeIdent()?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                         if let MemberContextAll::SelectContext(ctx) =
-                                            cast_mut::<_, MemberContextAll>(&mut _localctx)
+                                            unsafe { cast_mut::<MemberContextAll>(&mut _localctx) }
                                         {
                                             ctx.id = Some(tmp.clone());
                                         } else {
@@ -2761,8 +2787,9 @@ where
                                         let tmp = recog
                                             .base
                                             .match_token(CEL_DOT, &mut recog.err_handler)?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                         if let MemberContextAll::MemberCallContext(ctx) =
-                                            cast_mut::<_, MemberContextAll>(&mut _localctx)
+                                            unsafe { cast_mut::<MemberContextAll>(&mut _localctx) }
                                         {
                                             ctx.op = Some(tmp.clone());
                                         } else {
@@ -2773,8 +2800,9 @@ where
                                         let tmp = recog
                                             .base
                                             .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                         if let MemberContextAll::MemberCallContext(ctx) =
-                                            cast_mut::<_, MemberContextAll>(&mut _localctx)
+                                            unsafe { cast_mut::<MemberContextAll>(&mut _localctx) }
                                         {
                                             ctx.id = Some(tmp.clone());
                                         } else {
@@ -2785,8 +2813,9 @@ where
                                         let tmp = recog
                                             .base
                                             .match_token(CEL_LPAREN, &mut recog.err_handler)?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                         if let MemberContextAll::MemberCallContext(ctx) =
-                                            cast_mut::<_, MemberContextAll>(&mut _localctx)
+                                            unsafe { cast_mut::<MemberContextAll>(&mut _localctx) }
                                         {
                                             ctx.open = Some(tmp.clone());
                                         } else {
@@ -2796,16 +2825,17 @@ where
                                         recog.base.set_state(115);
                                         recog.err_handler.sync(&mut recog.base)?;
                                         _la = recog.base.input.la(1);
-                                        if ((_la - 10) & !0x3f) == 0
-                                            && ((1usize << (_la - 10)) & 132580181) != 0
+                                        if (((_la - 10) & !0x3f) == 0
+                                            && ((1usize << (_la - 10)) & 132580181) != 0)
                                         {
                                             {
                                                 /*InvokeRule exprList*/
                                                 recog.base.set_state(114);
                                                 let tmp = recog.exprList()?;
-                                                if let MemberContextAll::MemberCallContext(ctx) =
-                                                    cast_mut::<_, MemberContextAll>(&mut _localctx)
-                                                {
+                                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                                if let MemberContextAll::MemberCallContext(ctx) = unsafe {
+                                                    cast_mut::<MemberContextAll>(&mut _localctx)
+                                                } {
                                                     ctx.args = Some(tmp.clone());
                                                 } else {
                                                     unreachable!("cant cast");
@@ -2848,8 +2878,9 @@ where
                                         let tmp = recog
                                             .base
                                             .match_token(CEL_LBRACKET, &mut recog.err_handler)?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                         if let MemberContextAll::IndexContext(ctx) =
-                                            cast_mut::<_, MemberContextAll>(&mut _localctx)
+                                            unsafe { cast_mut::<MemberContextAll>(&mut _localctx) }
                                         {
                                             ctx.op = Some(tmp.clone());
                                         } else {
@@ -2866,9 +2897,10 @@ where
                                                     CEL_QUESTIONMARK,
                                                     &mut recog.err_handler,
                                                 )?;
-                                                if let MemberContextAll::IndexContext(ctx) =
-                                                    cast_mut::<_, MemberContextAll>(&mut _localctx)
-                                                {
+                                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                                if let MemberContextAll::IndexContext(ctx) = unsafe {
+                                                    cast_mut::<MemberContextAll>(&mut _localctx)
+                                                } {
                                                     ctx.opt = Some(tmp.clone());
                                                 } else {
                                                     unreachable!("cant cast");
@@ -2879,8 +2911,9 @@ where
                                         /*InvokeRule expr*/
                                         recog.base.set_state(123);
                                         let tmp = recog.expr()?;
+                                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                         if let MemberContextAll::IndexContext(ctx) =
-                                            cast_mut::<_, MemberContextAll>(&mut _localctx)
+                                            unsafe { cast_mut::<MemberContextAll>(&mut _localctx) }
                                         {
                                             ctx.index = Some(tmp.clone());
                                         } else {
@@ -3778,8 +3811,9 @@ where
                                 recog.base.set_state(131);
                                 let tmp =
                                     recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let PrimaryContextAll::IdentContext(ctx) =
-                                    cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                 {
                                     ctx.leadingDot = Some(tmp.clone());
                                 } else {
@@ -3792,8 +3826,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::IdentContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.id = Some(tmp.clone());
                         } else {
@@ -3814,8 +3849,9 @@ where
                                 recog.base.set_state(135);
                                 let tmp =
                                     recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let PrimaryContextAll::GlobalCallContext(ctx) =
-                                    cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                 {
                                     ctx.leadingDot = Some(tmp.clone());
                                 } else {
@@ -3828,8 +3864,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::GlobalCallContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.id = Some(tmp.clone());
                         } else {
@@ -3839,8 +3876,9 @@ where
                         {
                             recog.base.set_state(139);
                             let tmp = recog.base.match_token(CEL_LPAREN, &mut recog.err_handler)?;
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                             if let PrimaryContextAll::GlobalCallContext(ctx) =
-                                cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                             {
                                 ctx.op = Some(tmp.clone());
                             } else {
@@ -3850,15 +3888,16 @@ where
                             recog.base.set_state(141);
                             recog.err_handler.sync(&mut recog.base)?;
                             _la = recog.base.input.la(1);
-                            if ((_la - 10) & !0x3f) == 0
-                                && ((1usize << (_la - 10)) & 132580181) != 0
+                            if (((_la - 10) & !0x3f) == 0
+                                && ((1usize << (_la - 10)) & 132580181) != 0)
                             {
                                 {
                                     /*InvokeRule exprList*/
                                     recog.base.set_state(140);
                                     let tmp = recog.exprList()?;
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                     if let PrimaryContextAll::GlobalCallContext(ctx) =
-                                        cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                        unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                     {
                                         ctx.args = Some(tmp.clone());
                                     } else {
@@ -3883,8 +3922,9 @@ where
                         /*InvokeRule expr*/
                         recog.base.set_state(145);
                         let tmp = recog.expr()?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::NestedContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.e = Some(tmp.clone());
                         } else {
@@ -3904,8 +3944,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_LBRACKET, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::CreateListContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.op = Some(tmp.clone());
                         } else {
@@ -3915,13 +3956,15 @@ where
                         recog.base.set_state(150);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if ((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0 {
+                        if (((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0)
+                        {
                             {
                                 /*InvokeRule listInit*/
                                 recog.base.set_state(149);
                                 let tmp = recog.listInit()?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let PrimaryContextAll::CreateListContext(ctx) =
-                                    cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                 {
                                     ctx.elems = Some(tmp.clone());
                                 } else {
@@ -3953,8 +3996,9 @@ where
                     {
                         recog.base.set_state(156);
                         let tmp = recog.base.match_token(CEL_LBRACE, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::CreateStructContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.op = Some(tmp.clone());
                         } else {
@@ -3964,13 +4008,15 @@ where
                         recog.base.set_state(158);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if ((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0 {
+                        if (((_la - 10) & !0x3f) == 0 && ((1usize << (_la - 10)) & 132581205) != 0)
+                        {
                             {
                                 /*InvokeRule mapInitializerList*/
                                 recog.base.set_state(157);
                                 let tmp = recog.mapInitializerList()?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let PrimaryContextAll::CreateStructContext(ctx) =
-                                    cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                 {
                                     ctx.entries = Some(tmp.clone());
                                 } else {
@@ -4006,8 +4052,9 @@ where
                                 recog.base.set_state(164);
                                 let tmp =
                                     recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                    cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                 {
                                     ctx.leadingDot = Some(tmp.clone());
                                 } else {
@@ -4020,23 +4067,21 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::CreateMessageContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.IDENTIFIER = Some(tmp.clone());
                         } else {
                             unreachable!("cant cast");
                         }
 
-                        let temp = if let PrimaryContextAll::CreateMessageContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
-                        {
-                            ctx.IDENTIFIER.clone().unwrap()
-                        } else {
-                            unreachable!("cant cast");
-                        };
+                        let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					if let PrimaryContextAll::CreateMessageContext(ctx) = unsafe { cast_mut::<PrimaryContextAll >(&mut _localctx) } {
+					ctx.IDENTIFIER.clone().unwrap() } else {unreachable!("cant cast");} ;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::CreateMessageContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.ids.push(temp);
                         } else {
@@ -4051,23 +4096,21 @@ where
                                     recog.base.set_state(168);
                                     let tmp =
                                         recog.base.match_token(CEL_DOT, &mut recog.err_handler)?;
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                     if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                        cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                        unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                     {
                                         ctx.s16 = Some(tmp.clone());
                                     } else {
                                         unreachable!("cant cast");
                                     }
 
-                                    let temp = if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                        cast_mut::<_, PrimaryContextAll>(&mut _localctx)
-                                    {
-                                        ctx.s16.clone().unwrap()
-                                    } else {
-                                        unreachable!("cant cast");
-                                    };
+                                    let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+						if let PrimaryContextAll::CreateMessageContext(ctx) = unsafe { cast_mut::<PrimaryContextAll >(&mut _localctx) } {
+						ctx.s16.clone().unwrap() } else {unreachable!("cant cast");} ;
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                     if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                        cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                        unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                     {
                                         ctx.ops.push(temp);
                                     } else {
@@ -4077,23 +4120,21 @@ where
                                     let tmp = recog
                                         .base
                                         .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                     if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                        cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                        unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                     {
                                         ctx.IDENTIFIER = Some(tmp.clone());
                                     } else {
                                         unreachable!("cant cast");
                                     }
 
-                                    let temp = if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                        cast_mut::<_, PrimaryContextAll>(&mut _localctx)
-                                    {
-                                        ctx.IDENTIFIER.clone().unwrap()
-                                    } else {
-                                        unreachable!("cant cast");
-                                    };
+                                    let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+						if let PrimaryContextAll::CreateMessageContext(ctx) = unsafe { cast_mut::<PrimaryContextAll >(&mut _localctx) } {
+						ctx.IDENTIFIER.clone().unwrap() } else {unreachable!("cant cast");} ;
+                                    // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                     if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                        cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                        unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                     {
                                         ctx.ids.push(temp);
                                     } else {
@@ -4107,8 +4148,9 @@ where
                         }
                         recog.base.set_state(175);
                         let tmp = recog.base.match_token(CEL_LBRACE, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let PrimaryContextAll::CreateMessageContext(ctx) =
-                            cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                         {
                             ctx.op = Some(tmp.clone());
                         } else {
@@ -4118,13 +4160,14 @@ where
                         recog.base.set_state(177);
                         recog.err_handler.sync(&mut recog.base)?;
                         _la = recog.base.input.la(1);
-                        if ((_la - 20) & !0x3f) == 0 && ((1usize << (_la - 20)) & 196609) != 0 {
+                        if (((_la - 20) & !0x3f) == 0 && ((1usize << (_la - 20)) & 196609) != 0) {
                             {
                                 /*InvokeRule field_initializer_list*/
                                 recog.base.set_state(176);
                                 let tmp = recog.field_initializer_list()?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let PrimaryContextAll::CreateMessageContext(ctx) =
-                                    cast_mut::<_, PrimaryContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<PrimaryContextAll>(&mut _localctx) }
                                 {
                                     ctx.entries = Some(tmp.clone());
                                 } else {
@@ -4289,13 +4332,16 @@ where
                 /*InvokeRule expr*/
                 recog.base.set_state(186);
                 let tmp = recog.expr()?;
-                cast_mut::<_, ExprListContext>(&mut _localctx).expr = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<ExprListContext>(&mut _localctx) }).expr = Some(tmp.clone());
 
-                let temp = cast_mut::<_, ExprListContext>(&mut _localctx)
-                    .expr
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, ExprListContext>(&mut _localctx).e.push(temp);
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<ExprListContext >(&mut _localctx) }).expr.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<ExprListContext>(&mut _localctx) })
+                    .e
+                    .push(temp);
 
                 recog.base.set_state(191);
                 recog.err_handler.sync(&mut recog.base)?;
@@ -4309,13 +4355,17 @@ where
                             /*InvokeRule expr*/
                             recog.base.set_state(188);
                             let tmp = recog.expr()?;
-                            cast_mut::<_, ExprListContext>(&mut _localctx).expr = Some(tmp.clone());
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ExprListContext>(&mut _localctx) }).expr =
+                                Some(tmp.clone());
 
-                            let temp = cast_mut::<_, ExprListContext>(&mut _localctx)
-                                .expr
-                                .clone()
-                                .unwrap();
-                            cast_mut::<_, ExprListContext>(&mut _localctx).e.push(temp);
+                            let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+				(unsafe { cast_mut::<ExprListContext >(&mut _localctx) }).expr.clone().unwrap()
+				 ;
+                            // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                            (unsafe { cast_mut::<ExprListContext>(&mut _localctx) })
+                                .e
+                                .push(temp);
                         }
                     }
                     recog.base.set_state(193);
@@ -4452,13 +4502,15 @@ where
                 /*InvokeRule optExpr*/
                 recog.base.set_state(194);
                 let tmp = recog.optExpr()?;
-                cast_mut::<_, ListInitContext>(&mut _localctx).optExpr = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<ListInitContext>(&mut _localctx) }).optExpr =
+                    Some(tmp.clone());
 
-                let temp = cast_mut::<_, ListInitContext>(&mut _localctx)
-                    .optExpr
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, ListInitContext>(&mut _localctx)
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<ListInitContext >(&mut _localctx) }).optExpr.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<ListInitContext>(&mut _localctx) })
                     .elems
                     .push(temp);
 
@@ -4475,14 +4527,15 @@ where
                                 /*InvokeRule optExpr*/
                                 recog.base.set_state(196);
                                 let tmp = recog.optExpr()?;
-                                cast_mut::<_, ListInitContext>(&mut _localctx).optExpr =
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe { cast_mut::<ListInitContext>(&mut _localctx) }).optExpr =
                                     Some(tmp.clone());
 
-                                let temp = cast_mut::<_, ListInitContext>(&mut _localctx)
-                                    .optExpr
-                                    .clone()
-                                    .unwrap();
-                                cast_mut::<_, ListInitContext>(&mut _localctx)
+                                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					(unsafe { cast_mut::<ListInitContext >(&mut _localctx) }).optExpr.clone().unwrap()
+					 ;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe { cast_mut::<ListInitContext>(&mut _localctx) })
                                     .elems
                                     .push(temp);
                             }
@@ -4665,41 +4718,44 @@ where
                 /*InvokeRule optField*/
                 recog.base.set_state(202);
                 let tmp = recog.optField()?;
-                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).optField =
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<Field_initializer_listContext>(&mut _localctx) }).optField =
                     Some(tmp.clone());
 
-                let temp = cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                    .optField
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<Field_initializer_listContext >(&mut _localctx) }).optField.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<Field_initializer_listContext>(&mut _localctx) })
                     .fields
                     .push(temp);
 
                 recog.base.set_state(203);
                 let tmp = recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
-                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).s21 =
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<Field_initializer_listContext>(&mut _localctx) }).s21 =
                     Some(tmp.clone());
 
-                let temp = cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                    .s21
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<Field_initializer_listContext >(&mut _localctx) }).s21.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<Field_initializer_listContext>(&mut _localctx) })
                     .cols
                     .push(temp);
 
                 /*InvokeRule expr*/
                 recog.base.set_state(204);
                 let tmp = recog.expr()?;
-                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).expr =
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<Field_initializer_listContext>(&mut _localctx) }).expr =
                     Some(tmp.clone());
 
-                let temp = cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                    .expr
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<Field_initializer_listContext >(&mut _localctx) }).expr.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<Field_initializer_listContext>(&mut _localctx) })
                     .values
                     .push(temp);
 
@@ -4716,47 +4772,59 @@ where
                                 /*InvokeRule optField*/
                                 recog.base.set_state(206);
                                 let tmp = recog.optField()?;
-                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                                    .optField = Some(tmp.clone());
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<Field_initializer_listContext>(&mut _localctx)
+                                })
+                                .optField = Some(tmp.clone());
 
-                                let temp =
-                                    cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                                        .optField
-                                        .clone()
-                                        .unwrap();
-                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                                    .fields
-                                    .push(temp);
+                                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					(unsafe { cast_mut::<Field_initializer_listContext >(&mut _localctx) }).optField.clone().unwrap()
+					 ;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<Field_initializer_listContext>(&mut _localctx)
+                                })
+                                .fields
+                                .push(temp);
 
                                 recog.base.set_state(207);
                                 let tmp =
                                     recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
-                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).s21 =
-                                    Some(tmp.clone());
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<Field_initializer_listContext>(&mut _localctx)
+                                })
+                                .s21 = Some(tmp.clone());
 
-                                let temp =
-                                    cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                                        .s21
-                                        .clone()
-                                        .unwrap();
-                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                                    .cols
-                                    .push(temp);
+                                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					(unsafe { cast_mut::<Field_initializer_listContext >(&mut _localctx) }).s21.clone().unwrap()
+					 ;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<Field_initializer_listContext>(&mut _localctx)
+                                })
+                                .cols
+                                .push(temp);
 
                                 /*InvokeRule expr*/
                                 recog.base.set_state(208);
                                 let tmp = recog.expr()?;
-                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx).expr =
-                                    Some(tmp.clone());
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<Field_initializer_listContext>(&mut _localctx)
+                                })
+                                .expr = Some(tmp.clone());
 
-                                let temp =
-                                    cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                                        .expr
-                                        .clone()
-                                        .unwrap();
-                                cast_mut::<_, Field_initializer_listContext>(&mut _localctx)
-                                    .values
-                                    .push(temp);
+                                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					(unsafe { cast_mut::<Field_initializer_listContext >(&mut _localctx) }).expr.clone().unwrap()
+					 ;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<Field_initializer_listContext>(&mut _localctx)
+                                })
+                                .values
+                                .push(temp);
                             }
                         }
                     }
@@ -4885,7 +4953,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_QUESTIONMARK, &mut recog.err_handler)?;
-                        cast_mut::<_, OptFieldContext>(&mut _localctx).opt = Some(tmp.clone());
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                        (unsafe { cast_mut::<OptFieldContext>(&mut _localctx) }).opt =
+                            Some(tmp.clone());
                     }
                 }
 
@@ -5063,39 +5133,44 @@ where
                 /*InvokeRule optExpr*/
                 recog.base.set_state(220);
                 let tmp = recog.optExpr()?;
-                cast_mut::<_, MapInitializerListContext>(&mut _localctx).optExpr =
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) }).optExpr =
                     Some(tmp.clone());
 
-                let temp = cast_mut::<_, MapInitializerListContext>(&mut _localctx)
-                    .optExpr
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, MapInitializerListContext>(&mut _localctx)
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<MapInitializerListContext >(&mut _localctx) }).optExpr.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) })
                     .keys
                     .push(temp);
 
                 recog.base.set_state(221);
                 let tmp = recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
-                cast_mut::<_, MapInitializerListContext>(&mut _localctx).s21 = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) }).s21 =
+                    Some(tmp.clone());
 
-                let temp = cast_mut::<_, MapInitializerListContext>(&mut _localctx)
-                    .s21
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, MapInitializerListContext>(&mut _localctx)
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<MapInitializerListContext >(&mut _localctx) }).s21.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) })
                     .cols
                     .push(temp);
 
                 /*InvokeRule expr*/
                 recog.base.set_state(222);
                 let tmp = recog.expr()?;
-                cast_mut::<_, MapInitializerListContext>(&mut _localctx).expr = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) }).expr =
+                    Some(tmp.clone());
 
-                let temp = cast_mut::<_, MapInitializerListContext>(&mut _localctx)
-                    .expr
-                    .clone()
-                    .unwrap();
-                cast_mut::<_, MapInitializerListContext>(&mut _localctx)
+                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+			(unsafe { cast_mut::<MapInitializerListContext >(&mut _localctx) }).expr.clone().unwrap()
+			 ;
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) })
                     .values
                     .push(temp);
 
@@ -5112,42 +5187,51 @@ where
                                 /*InvokeRule optExpr*/
                                 recog.base.set_state(224);
                                 let tmp = recog.optExpr()?;
-                                cast_mut::<_, MapInitializerListContext>(&mut _localctx).optExpr =
-                                    Some(tmp.clone());
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<MapInitializerListContext>(&mut _localctx)
+                                })
+                                .optExpr = Some(tmp.clone());
 
-                                let temp = cast_mut::<_, MapInitializerListContext>(&mut _localctx)
-                                    .optExpr
-                                    .clone()
-                                    .unwrap();
-                                cast_mut::<_, MapInitializerListContext>(&mut _localctx)
+                                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					(unsafe { cast_mut::<MapInitializerListContext >(&mut _localctx) }).optExpr.clone().unwrap()
+					 ;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) })
                                     .keys
                                     .push(temp);
 
                                 recog.base.set_state(225);
                                 let tmp =
                                     recog.base.match_token(CEL_COLON, &mut recog.err_handler)?;
-                                cast_mut::<_, MapInitializerListContext>(&mut _localctx).s21 =
-                                    Some(tmp.clone());
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<MapInitializerListContext>(&mut _localctx)
+                                })
+                                .s21 = Some(tmp.clone());
 
-                                let temp = cast_mut::<_, MapInitializerListContext>(&mut _localctx)
-                                    .s21
-                                    .clone()
-                                    .unwrap();
-                                cast_mut::<_, MapInitializerListContext>(&mut _localctx)
+                                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					(unsafe { cast_mut::<MapInitializerListContext >(&mut _localctx) }).s21.clone().unwrap()
+					 ;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) })
                                     .cols
                                     .push(temp);
 
                                 /*InvokeRule expr*/
                                 recog.base.set_state(226);
                                 let tmp = recog.expr()?;
-                                cast_mut::<_, MapInitializerListContext>(&mut _localctx).expr =
-                                    Some(tmp.clone());
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe {
+                                    cast_mut::<MapInitializerListContext>(&mut _localctx)
+                                })
+                                .expr = Some(tmp.clone());
 
-                                let temp = cast_mut::<_, MapInitializerListContext>(&mut _localctx)
-                                    .expr
-                                    .clone()
-                                    .unwrap();
-                                cast_mut::<_, MapInitializerListContext>(&mut _localctx)
+                                let temp = // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+					(unsafe { cast_mut::<MapInitializerListContext >(&mut _localctx) }).expr.clone().unwrap()
+					 ;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                                (unsafe { cast_mut::<MapInitializerListContext>(&mut _localctx) })
                                     .values
                                     .push(temp);
                             }
@@ -5446,8 +5530,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_IDENTIFIER, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let EscapeIdentContextAll::SimpleIdentifierContext(ctx) =
-                            cast_mut::<_, EscapeIdentContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<EscapeIdentContextAll>(&mut _localctx) }
                         {
                             ctx.id = Some(tmp.clone());
                         } else {
@@ -5465,8 +5550,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_ESC_IDENTIFIER, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let EscapeIdentContextAll::EscapedIdentifierContext(ctx) =
-                            cast_mut::<_, EscapeIdentContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<EscapeIdentContextAll>(&mut _localctx) }
                         {
                             ctx.id = Some(tmp.clone());
                         } else {
@@ -5601,14 +5687,17 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_QUESTIONMARK, &mut recog.err_handler)?;
-                        cast_mut::<_, OptExprContext>(&mut _localctx).opt = Some(tmp.clone());
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                        (unsafe { cast_mut::<OptExprContext>(&mut _localctx) }).opt =
+                            Some(tmp.clone());
                     }
                 }
 
                 /*InvokeRule expr*/
                 recog.base.set_state(240);
                 let tmp = recog.expr()?;
-                cast_mut::<_, OptExprContext>(&mut _localctx).e = Some(tmp.clone());
+                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
+                (unsafe { cast_mut::<OptExprContext>(&mut _localctx) }).e = Some(tmp.clone());
             }
             Ok(())
         })();
@@ -6417,8 +6506,9 @@ where
                                 recog.base.set_state(242);
                                 let tmp =
                                     recog.base.match_token(CEL_MINUS, &mut recog.err_handler)?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let LiteralContextAll::IntContext(ctx) =
-                                    cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                                 {
                                     ctx.sign = Some(tmp.clone());
                                 } else {
@@ -6431,8 +6521,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_NUM_INT, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::IntContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
@@ -6449,8 +6540,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_NUM_UINT, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::UintContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
@@ -6471,8 +6563,9 @@ where
                                 recog.base.set_state(247);
                                 let tmp =
                                     recog.base.match_token(CEL_MINUS, &mut recog.err_handler)?;
+                                // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                                 if let LiteralContextAll::DoubleContext(ctx) =
-                                    cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                                    unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                                 {
                                     ctx.sign = Some(tmp.clone());
                                 } else {
@@ -6485,8 +6578,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_NUM_FLOAT, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::DoubleContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
@@ -6501,8 +6595,9 @@ where
                     {
                         recog.base.set_state(251);
                         let tmp = recog.base.match_token(CEL_STRING, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::StringContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
@@ -6517,8 +6612,9 @@ where
                     {
                         recog.base.set_state(252);
                         let tmp = recog.base.match_token(CEL_BYTES, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::BytesContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
@@ -6535,8 +6631,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_CEL_TRUE, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::BoolTrueContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
@@ -6553,8 +6650,9 @@ where
                         let tmp = recog
                             .base
                             .match_token(CEL_CEL_FALSE, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::BoolFalseContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
@@ -6569,8 +6667,9 @@ where
                     {
                         recog.base.set_state(255);
                         let tmp = recog.base.match_token(CEL_NUL, &mut recog.err_handler)?;
+                        // SAFETY: the borrow only covers this one field access, during which no other handle to the context is dereferenced.
                         if let LiteralContextAll::NullContext(ctx) =
-                            cast_mut::<_, LiteralContextAll>(&mut _localctx)
+                            unsafe { cast_mut::<LiteralContextAll>(&mut _localctx) }
                         {
                             ctx.tok = Some(tmp.clone());
                         } else {
