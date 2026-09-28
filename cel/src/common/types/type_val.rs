@@ -40,6 +40,10 @@ impl From<&Type> for CelType {
 
 impl Val for CelType {
     fn get_type(&self) -> &Type {
+        <Self as Val>::cel_type()
+    }
+
+    fn cel_type() -> &'static Type {
         &TYPE_TYPE
     }
 

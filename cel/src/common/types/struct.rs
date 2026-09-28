@@ -81,6 +81,14 @@ impl<'v> Val for Struct<'v> {
         &self.r#type
     }
 
+    /// `Struct`'s runtime type is per-instance - the struct type name is part of
+    /// the value - so there is no single static `Type` to return, and it
+    /// cannot be named in the overload-registration macros. Use
+    /// [`get_type`](Val::get_type) on a value instead.
+    fn cel_type() -> &'static Type {
+        panic!("`Struct` has no static `Val::cel_type()`: its type varies per value")
+    }
+
     fn clone_as_boxed<'w>(&self) -> Box<dyn Val + 'w>
     where
         Self: 'w,
