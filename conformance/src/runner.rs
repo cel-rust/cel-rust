@@ -40,6 +40,7 @@ pub fn run_test(simple_test_textproto: &str) {
     let mut env = Env::stdlib();
     env.set_container(&test.container)
         .expect("Invalid container name in conformance test");
+    env.add_extension(cel::extensions::strings);
     let mut context = Context::with_env(std::sync::Arc::new(env));
 
     if !test.bindings.is_empty() {
