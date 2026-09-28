@@ -1,4 +1,4 @@
-use crate::common::traits::{Comparer, Negator, Zeroer};
+use crate::common::traits::{Comparer, Zeroer};
 use crate::common::types::Type;
 use crate::common::value::{StaticVal, Val};
 use crate::ExecutionError;
@@ -42,13 +42,6 @@ impl Val for Bool {
         Some(self)
     }
 
-    fn as_negator<'b, 'v>(&'b self) -> Option<&'b (dyn Negator + 'v)>
-    where
-        Self: 'v,
-    {
-        Some(self)
-    }
-
     fn as_zeroer(&self) -> Option<&dyn Zeroer> {
         Some(self)
     }
@@ -78,15 +71,6 @@ impl Comparer for Bool {
         } else {
             Err(ExecutionError::values_not_comparable(self, rhs))
         }
-    }
-}
-
-impl Negator for Bool {
-    fn negate<'v>(&self) -> Result<Box<dyn Val + 'v>, ExecutionError>
-    where
-        Self: 'v,
-    {
-        Ok(Box::new(self.negate()))
     }
 }
 
@@ -148,5 +132,17 @@ mod tests {
         let value = Bool(true);
         assert_eq!(*value.get_type(), types::BOOL_TYPE);
         assert_eq!(value.get_type().kind, Kind::Boolean);
+    }
+
+    #[test]
+    fn test_unary_minus_is_not_logical_not() {
+        let context = crate::Context::default();
+        let program = crate::Program::compile("-false").unwrap();
+        assert!(matches!(
+            program.execute(&context),
+            Err(ExecutionError::NoSuchOverload(_))
+        ));
+        let program = crate::Program::compile("!false").unwrap();
+        assert_eq!(program.execute(&context), Ok(true.into()));
     }
 }

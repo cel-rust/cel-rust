@@ -409,8 +409,6 @@ fields::qualified_identifier_resolution::ident_with_longest_prefix_check
 fields::qualified_identifier_resolution::map_field_select
 fields::qualified_identifier_resolution::qualified_ident
 fields::qualified_identifier_resolution::qualified_identifier_resolution_unchecked
-integer_math::int64_math::int64_min_negate
-integer_math::int64_math::unary_minus_not_bool
 lists::index::zero_based_double
 macros2::all::list_elem_all_true
 macros2::all::list_elem_error_shortcircuit
