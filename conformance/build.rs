@@ -10,7 +10,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let manifest = Manifest::from_path(manifest_dir.join("Cargo.toml"))?;
+    let manifest_path = manifest_dir.join("Cargo.toml");
+    let manifest = Manifest::from_path(&manifest_path)?;
     let cel_spec_version = manifest
         .package()
         .metadata
@@ -24,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("cel_spec_version must be a string")?;
     let generated_version = manifest_dir.join("src").join("gen").join("version.rs");
     println!("cargo:rerun-if-changed={}", generated_version.display());
-    println!("cargo:rerun-if-changed={}", cel_spec_version);
+    println!("cargo:rerun-if-changed={}", manifest_path.display());
     ensure_generated_version(&generated_version, cel_spec_version)?;
     Ok(())
 }
