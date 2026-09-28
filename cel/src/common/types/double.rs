@@ -299,4 +299,45 @@ mod tests {
         assert!(!round.equals(&CelString::from("42")));
         assert!(!round.equals(&CelDouble::from(f64::NAN)));
     }
+
+    fn assert_equals_both_ways(a: &dyn Val, b: &dyn Val, expected: bool) {
+        assert_eq!(a.equals(b), expected, "{a:?} == {b:?}");
+        assert_eq!(b.equals(a), expected, "{b:?} == {a:?}");
+    }
+
+    #[test]
+    fn test_equals_integers_as_f64() {
+        // Same as cel-go: integers are converted to f64 before comparing, so precision is lost
+        // past 2^53, and i64::MAX and u64::MAX round up to 2^63 and 2^64.
+        let two_pow_53 = CelDouble::from(9007199254740992.0);
+        assert_equals_both_ways(&CelInt::from((1i64 << 53) + 1), &two_pow_53, true);
+        assert_equals_both_ways(&CelUInt::from((1u64 << 53) + 1), &two_pow_53, true);
+        assert_equals_both_ways(
+            &CelInt::from(i64::MAX),
+            &CelDouble::from(9223372036854775808.0),
+            true,
+        );
+        assert_equals_both_ways(
+            &CelInt::from(i64::MIN),
+            &CelDouble::from(-9223372036854775808.0),
+            true,
+        );
+        assert_equals_both_ways(
+            &CelUInt::from(u64::MAX),
+            &CelDouble::from(18446744073709551616.0),
+            true,
+        );
+        assert_equals_both_ways(&CelInt::from(0), &CelDouble::from(-0.0), true);
+        assert_equals_both_ways(&CelUInt::from(0), &CelDouble::from(-0.0), true);
+        assert_equals_both_ways(&CelInt::from(1), &CelDouble::from(1.5), false);
+        assert_equals_both_ways(&CelUInt::from(1), &CelDouble::from(1.5), false);
+    }
+
+    #[test]
+    fn test_equals_nan() {
+        let nan = CelDouble::from(f64::NAN);
+        assert_equals_both_ways(&nan, &nan, false);
+        assert_equals_both_ways(&CelInt::from(0), &nan, false);
+        assert_equals_both_ways(&CelUInt::from(0), &nan, false);
+    }
 }

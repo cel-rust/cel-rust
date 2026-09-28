@@ -1,5 +1,5 @@
 use crate::common::traits::{Container, Indexer, Iterable, Sizer, Zeroer};
-use crate::common::types::{CelBool, CelInt, CelString, CelUInt, Type};
+use crate::common::types::{CelBool, CelDouble, CelInt, CelString, CelUInt, Type};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
 use crate::common::{traits, types};
 use crate::ExecutionError;
@@ -78,14 +78,14 @@ impl<'v> Val for DefaultMap<'v> {
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
+        // As in cel-go, each of our keys is looked up in `other` with the numeric fallbacks of
+        // `lookup`, so `{1: "a"} == {1u: "a"}`.
         other.downcast_ref::<DefaultMap>().is_some_and(|other| {
             self.0.len() == other.0.len()
-                && self.0.iter().all(|(k, v)| {
-                    other
-                        .0
-                        .get(k as &dyn AsKeyRef)
-                        .is_some_and(|ov| v.equals(ov.as_ref()))
-                })
+                && self
+                    .0
+                    .iter()
+                    .all(|(k, v)| other.find(k.inner()).is_some_and(|ov| v.equals(ov)))
         })
     }
 
@@ -126,25 +126,101 @@ fn key_ref(key: &dyn Val) -> Option<&dyn AsKeyRef> {
     }
 }
 
+/// Whether `key` can be looked up in a map: any key type, or a double.
+fn is_lookup_key(key: &dyn Val) -> bool {
+    key_ref(key).is_some() || key.downcast_ref::<CelDouble>().is_some()
+}
+
+/// Probes for `key` the way cel-go does: as is first and, on a miss, as its lossless conversion
+/// to the other numeric key type, so `{1u: "One"}[1]` finds `"One"`. A double is only ever
+/// probed that way, as an int first and then as a uint.
+fn lookup<T>(key: &dyn Val, mut probe: impl FnMut(&dyn AsKeyRef) -> Option<T>) -> Option<T> {
+    key_ref(key)
+        .and_then(&mut probe)
+        .or_else(|| fallback_keys(key).iter().flatten().find_map(|k| probe(k)))
+}
+
+/// Whether `map` has `key`, or the same number as the other numeric key type: the spec has map
+/// keys compare with numeric equality, so `{0: 1, 0u: 2}` repeats a key.
+pub(crate) fn has_key<V>(map: &HashMap<Key<'_>, V>, key: &Key<'_>) -> bool {
+    lookup(key.inner(), |k| map.get(k)).is_some()
+}
+
+/// The keys a numeric `key` falls back to on a miss, in the order to try them.
+fn fallback_keys(key: &dyn Val) -> [Option<KeyRef<'static>>; 2] {
+    if let Some(i) = key.downcast_ref::<CelInt>() {
+        [u64::try_from(*i.inner()).ok().map(KeyRef::Uint), None]
+    } else if let Some(u) = key.downcast_ref::<CelUInt>() {
+        [i64::try_from(*u.inner()).ok().map(KeyRef::Int), None]
+    } else if let Some(d) = key.downcast_ref::<CelDouble>() {
+        let d = *d.inner();
+        [
+            double_to_int_lossless(d).map(KeyRef::Int),
+            double_to_uint_lossless(d).map(KeyRef::Uint),
+        ]
+    } else {
+        [None, None]
+    }
+}
+
+/// `d` as an `i64`, if it converts without loss. Mirrors cel-go, which also rejects -2^63.
+fn double_to_int_lossless(d: f64) -> Option<i64> {
+    // The range check comes first as `as` saturates: `2^63 as i64` would round-trip to 2^63.
+    if d > i64::MIN as f64 && d < i64::MAX as f64 {
+        let i = d as i64;
+        (i as f64 == d).then_some(i)
+    } else {
+        None
+    }
+}
+
+/// `d` as a `u64`, if it converts without loss. Mirrors cel-go.
+fn double_to_uint_lossless(d: f64) -> Option<u64> {
+    // `u64::MAX as f64` is 2^64, which is out of range.
+    if d >= 0.0 && d < u64::MAX as f64 {
+        let u = d as u64;
+        (u as f64 == d).then_some(u)
+    } else {
+        None
+    }
+}
+
 fn unsupported_key(key: &dyn Val) -> ExecutionError {
     ExecutionError::UnsupportedKeyType(key.try_into().unwrap_or(crate::Value::Null))
 }
 
-fn no_such_key(key: &dyn AsKeyRef) -> ExecutionError {
-    let key = match key.as_keyref() {
-        KeyRef::Bool(b) => b.to_string(),
-        KeyRef::Int(i) => i.to_string(),
-        KeyRef::String(s) => s.to_string(),
-        KeyRef::Uint(u) => u.to_string(),
+fn no_such_key(key: &dyn Val) -> ExecutionError {
+    let key = if let Some(s) = key.downcast_ref::<CelString>() {
+        s.inner().to_string()
+    } else if let Some(i) = key.downcast_ref::<CelInt>() {
+        i.inner().to_string()
+    } else if let Some(u) = key.downcast_ref::<CelUInt>() {
+        u.inner().to_string()
+    } else if let Some(d) = key.downcast_ref::<CelDouble>() {
+        d.inner().to_string()
+    } else if let Some(b) = key.downcast_ref::<CelBool>() {
+        b.inner().to_string()
+    } else {
+        String::new()
     };
     ExecutionError::NoSuchKey(Arc::new(key))
 }
 
+impl<'v> DefaultMap<'v> {
+    /// The value for `key`, see [`lookup`].
+    fn find<'b>(&'b self, key: &dyn Val) -> Option<&'b (dyn Val + 'v)> {
+        lookup(key, |k| self.0.get(k)).map(|v| v.as_ref())
+    }
+}
+
 impl Container for DefaultMap<'_> {
     fn contains(&self, key: &dyn Val) -> Result<bool, ExecutionError> {
-        match key_ref(key) {
-            Some(k) => Ok(self.0.contains_key(k)),
-            None => Err(unsupported_key(key)),
+        if self.find(key).is_some() {
+            Ok(true)
+        } else if is_lookup_key(key) {
+            Ok(false)
+        } else {
+            Err(unsupported_key(key))
         }
     }
 }
@@ -154,14 +230,14 @@ impl<'v> Indexer for DefaultMap<'v> {
     where
         Self: 'w,
     {
-        let k = key_ref(key).ok_or_else(|| ExecutionError::UnexpectedType {
-            got: key.get_type().name().to_owned(),
-            want: "map key".to_owned(),
-        })?;
-        self.0
-            .get(k)
-            .map(|v| CowVal::Borrowed(v.as_ref()))
-            .ok_or_else(|| no_such_key(k))
+        match self.find(key) {
+            Some(v) => Ok(CowVal::Borrowed(v)),
+            None if is_lookup_key(key) => Err(no_such_key(key)),
+            None => Err(ExecutionError::UnexpectedType {
+                got: key.get_type().name().to_owned(),
+                want: "map key".to_owned(),
+            }),
+        }
     }
 
     fn steal<'w>(self: Box<Self>, key: &dyn Val) -> Result<Box<dyn Val + 'w>, ExecutionError>
@@ -169,11 +245,11 @@ impl<'v> Indexer for DefaultMap<'v> {
         Self: 'w,
     {
         let mut map = self;
-        let k = key_ref(key).ok_or_else(|| unsupported_key(key))?;
-        map.0
-            .remove(k)
-            .map(|v| v as Box<dyn Val + 'w>)
-            .ok_or_else(|| no_such_key(k))
+        match lookup(key, |k| map.0.remove(k)) {
+            Some(v) => Ok(v as Box<dyn Val + 'w>),
+            None if is_lookup_key(key) => Err(no_such_key(key)),
+            None => Err(unsupported_key(key)),
+        }
     }
 }
 

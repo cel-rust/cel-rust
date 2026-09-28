@@ -374,6 +374,18 @@ mod tests {
     }
 
     #[test]
+    fn test_equals_uint_boundaries() {
+        let max = CelInt::from(i64::MAX);
+        assert!(max.equals(&CelUInt::from(i64::MAX as u64)));
+        assert!(CelUInt::from(i64::MAX as u64).equals(&max));
+        assert!(!max.equals(&CelUInt::from(i64::MAX as u64 + 1)));
+        assert!(!CelUInt::from(i64::MAX as u64 + 1).equals(&max));
+        // No wrapping: -1 is not u64::MAX
+        assert!(!CelInt::from(-1).equals(&CelUInt::from(u64::MAX)));
+        assert!(!CelUInt::from(u64::MAX).equals(&CelInt::from(-1)));
+    }
+
+    #[test]
     fn test_conversion_boundaries() {
         let context = Context::default();
 

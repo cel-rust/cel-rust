@@ -41,7 +41,6 @@ block_ext::basic::size_4
 block_ext::basic::ternary
 block_ext::basic::timestamp
 comparisons::eq_literal::eq_dyn_json_null
-comparisons::eq_literal::eq_map_mixed_type_numbers
 comparisons::eq_literal::not_eq_dyn_proto2_msg_null
 comparisons::eq_literal::not_eq_dyn_proto3_msg_null
 comparisons::eq_literal::not_eq_dyn_timestamp_null
@@ -406,15 +405,10 @@ enums::strong_proto3::select_default
 enums::strong_proto3::select_neg
 enums::strong_proto3::type_global
 enums::strong_proto3::type_nested
-fields::map_fields::map_key_mixed_numbers_double_key
-fields::map_fields::map_key_mixed_numbers_int_key
-fields::map_fields::map_key_mixed_numbers_uint_key
 fields::qualified_identifier_resolution::ident_with_longest_prefix_check
 fields::qualified_identifier_resolution::map_field_select
 fields::qualified_identifier_resolution::qualified_ident
 fields::qualified_identifier_resolution::qualified_identifier_resolution_unchecked
-fields::r#in::mixed_numbers_and_keys_absent
-fields::r#in::mixed_numbers_and_keys_present
 integer_math::int64_math::int64_min_negate
 integer_math::int64_math::unary_minus_not_bool
 lists::index::zero_based_double
@@ -646,9 +640,6 @@ optionals::optionals::empty_map_optflatmap_hasvalue
 optionals::optionals::empty_struct_optindex_hasvalue
 optionals::optionals::has_optional_ofnonzerovalue_struct_optional_ofnonzerovalue_map_optindex_field
 optionals::optionals::map_empty_submap_optflatmap_hasvalue
-optionals::optionals::map_key_mixed_numbers_double_key_optindex_value
-optionals::optionals::map_key_mixed_numbers_int_key_optindex_value
-optionals::optionals::map_key_mixed_numbers_uint_key_optindex_value
 optionals::optionals::map_optindex_optflatmap_optional_ofnonzerovalue_hasvalue
 optionals::optionals::map_submap_optflatmap_value
 optionals::optionals::map_submap_subkey_optflatmap_value

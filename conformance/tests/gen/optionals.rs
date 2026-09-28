@@ -737,7 +737,6 @@ mod optionals {
     }
 
     // Test: map_key_mixed_numbers_double_key_optindex_value
-    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_double_key_optindex_value() {
         run_test(&dedent!(
@@ -749,7 +748,6 @@ mod optionals {
     }
 
     // Test: map_key_mixed_numbers_uint_key_optindex_value
-    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_uint_key_optindex_value() {
         run_test(&dedent!(
@@ -761,7 +759,6 @@ mod optionals {
     }
 
     // Test: map_key_mixed_numbers_int_key_optindex_value
-    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_int_key_optindex_value() {
         run_test(&dedent!(

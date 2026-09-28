@@ -217,6 +217,10 @@ impl Env {
     /// cel-go does. Mirrors cel-java's `CelOptions.errorOnDuplicateMapKeys`,
     /// where the shipped default (`CelOptions.DEFAULT`) also errors.
     ///
+    /// Numeric keys compare by value, as the spec requires, so `{0: 1, 0u: 2}`
+    /// repeats a key too, which cel-java doesn't catch. With the check off, both
+    /// entries are kept, as in cel-go.
+    ///
     /// ```
     /// use cel::{Context, Env, Program, Value};
     /// use std::sync::Arc;

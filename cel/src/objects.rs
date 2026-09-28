@@ -1,5 +1,6 @@
 use crate::common::ast::{operators, ComprehensionExpr, EntryExpr, Expr};
 use crate::common::types::bool::Bool;
+use crate::common::types::map;
 use crate::common::types::optional::{unwrap_optional, Unwrapped};
 use crate::common::types::*;
 use crate::common::value::{BuiltinRef, CowVal, FromVal, StaticVal, Val};
@@ -1532,7 +1533,7 @@ impl Value {
                     };
 
                     if let Some(value) = value {
-                        if ctx.env().error_on_duplicate_map_keys() && map.contains_key(&key) {
+                        if ctx.env().error_on_duplicate_map_keys() && map::has_key(&map, &key) {
                             return Err(ExecutionError::DuplicateKey(Key::from(key).into()));
                         }
                         map.insert(key, value.into_owned());
@@ -2063,6 +2064,72 @@ mod tests {
         let program = Program::compile("numbers[1u]").unwrap();
         let value = program.execute(&context).unwrap();
         assert_eq!(value, "one".into());
+
+        // A borrowed map falls back to the other numeric key types too
+        for expr in ["numbers[1]", "numbers[1.0]"] {
+            let value = Program::compile(expr).unwrap().execute(&context);
+            assert_eq!(value, Ok("one".into()), "{expr}");
+        }
+    }
+
+    /// As in cel-go, a numeric key that misses falls back to its lossless conversion to the other
+    /// numeric key type, which isn't the same as `==`: `9007199254740993 == 9007199254740992.0`
+    /// holds, but a map with the former as key doesn't find it with the latter.
+    #[test]
+    fn test_numeric_map_key_lookup() {
+        let context = Context::default();
+        let eval = |expr: &str| Program::compile(expr).unwrap().execute(&context);
+
+        for expr in [
+            "{1u: 'x'}[1]",
+            "{1: 'x'}[1u]",
+            "{1u: 'x'}[1.0]",
+            "{1: 'x'}[1.0]",
+            "{0: 'x'}[-0.0]",
+            "{9223372036854775807u: 'x'}[9223372036854775807]",
+            "{9223372036854775808u: 'x'}[9223372036854775808.0]",
+            "{9007199254740992: 'x'}[9007199254740992.0]",
+        ] {
+            assert_eq!(eval(expr), Ok("x".into()), "{expr}");
+        }
+        for expr in [
+            "{1: 'x'}[1.5]",
+            "{18446744073709551615u: 'x'}[-1]",
+            "{9007199254740993: 'x'}[9007199254740992.0]",
+            "{9223372036854775807: 'x'}[9223372036854775808.0]",
+            "{18446744073709551615u: 'x'}[18446744073709551616.0]",
+            // cel-go rejects -2^63 when converting a double to an int
+            "{-9223372036854775808: 'x'}[-9223372036854775808.0]",
+            "{1: 'x'}[0.0/0.0]",
+            "{1: 'x'}[1.0/0.0]",
+        ] {
+            let value = eval(expr);
+            assert!(
+                matches!(value, Err(ExecutionError::NoSuchKey(_))),
+                "{expr} gave {value:?}"
+            );
+        }
+        for expr in [
+            "1 in {1u: 'x'} && 1.0 in {1u: 'x'} && !(1.5 in {1u: 'x'})",
+            "{1: 'a'} == {1u: 'a'} && {1u: 'a'} == {1: 'a'}",
+        ] {
+            assert_eq!(eval(expr), Ok(true.into()), "{expr}");
+        }
+
+        // A map can only hold both `1` and `1u` without the repeated key check, as in cel-go
+        let mut env = Env::stdlib();
+        env.set_error_on_duplicate_map_keys(false);
+        let context = Context::with_env(Arc::new(env));
+        let eval = |expr: &str| Program::compile(expr).unwrap().execute(&context);
+        for expr in [
+            // The exact key wins
+            "{1: 'a', 1u: 'b'}[1] == 'a' && {1: 'a', 1u: 'b'}[1u] == 'b'",
+            "{0: 1, 0u: 2}[0.0] == 1 && {0u: 2, 0: 1}[0.0] == 1",
+            // Only our keys are looked up in the other map, so this isn't symmetric, as in cel-go
+            "{1: 'a', 1u: 'a'} == {1: 'a', 2u: 'a'} && {1: 'a', 2u: 'a'} != {1: 'a', 1u: 'a'}",
+        ] {
+            assert_eq!(eval(expr), Ok(true.into()), "{expr}");
+        }
     }
 
     /// A registered [`crate::magic::Function`] that hands back one of its arguments
@@ -2256,6 +2323,9 @@ mod tests {
             "{1: 'a', 1: 'b'}",
             "{'a': 1, 'a': 2}",
             "{true: 1, false: 2, true: 3}",
+            // Numeric keys compare by value
+            "{0: 'a', 0u: 'b'}",
+            "{9223372036854775807u: 'a', 9223372036854775807: 'b'}",
         ] {
             let value = Program::compile(script).unwrap().execute(&context);
             assert!(
@@ -2270,6 +2340,10 @@ mod tests {
         let context = Context::default();
 
         let program = Program::compile("{1: 'a', 2: 'b', 'c': 3}").unwrap();
+        assert!(program.execute(&context).is_ok());
+
+        // No wrapping: -1 is not u64::MAX
+        let program = Program::compile("{-1: 'a', 18446744073709551615u: 'b'}").unwrap();
         assert!(program.execute(&context).is_ok());
     }
 

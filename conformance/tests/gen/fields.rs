@@ -66,7 +66,6 @@ mod map_fields {
     }
 
     // Test: map_key_mixed_numbers_double_key
-    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_double_key() {
         run_test(&dedent!(
@@ -91,7 +90,6 @@ mod map_fields {
     }
 
     // Test: map_key_mixed_numbers_uint_key
-    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_uint_key() {
         run_test(&dedent!(
@@ -103,7 +101,6 @@ mod map_fields {
     }
 
     // Test: map_key_mixed_numbers_int_key
-    #[should_panic]
     #[test]
     fn map_key_mixed_numbers_int_key() {
         run_test(&dedent!(
@@ -1033,7 +1030,6 @@ mod r#in {
     }
 
     // Test: mixed_numbers_and_keys_present
-    #[should_panic]
     #[test]
     fn mixed_numbers_and_keys_present() {
         run_test(&dedent!(
@@ -1045,7 +1041,6 @@ mod r#in {
     }
 
     // Test: mixed_numbers_and_keys_absent
-    #[should_panic]
     #[test]
     fn mixed_numbers_and_keys_absent() {
         run_test(&dedent!(
