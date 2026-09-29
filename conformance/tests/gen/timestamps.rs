@@ -11,7 +11,6 @@ mod timestamp_conversions {
     use dedent::dedent;
 
     // Test: toInt_timestamp
-    #[should_panic]
     #[test]
     fn toint_timestamp() {
         run_test(&dedent!(

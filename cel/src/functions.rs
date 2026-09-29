@@ -363,6 +363,30 @@ mod tests {
                 "timestamp getMilliseconds",
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
+            (
+                "timestamp to int",
+                "int(timestamp('2009-02-13T23:31:30Z')) == 1234567890",
+            ),
+            (
+                "timestamp to int drops sub-second precision",
+                "int(timestamp('2009-02-13T23:31:30.999Z')) == 1234567890",
+            ),
+            (
+                "timestamp to int before epoch",
+                "int(timestamp('1969-12-31T23:59:59Z')) == -1",
+            ),
+            (
+                "int to timestamp",
+                "timestamp(1234567890) == timestamp('2009-02-13T23:31:30Z')",
+            ),
+            (
+                "int to timestamp at min",
+                "timestamp(-62135596800) == timestamp('0001-01-01T00:00:00Z')",
+            ),
+            (
+                "int to timestamp at max",
+                "timestamp(253402300799) == timestamp('9999-12-31T23:59:59Z')",
+            ),
         ]
         .iter()
         .for_each(assert_script);
@@ -376,6 +400,16 @@ mod tests {
             (
                 "timestamp out of range",
                 "timestamp('9999-12-32T23:59:59.999999999Z')",
+                "Error executing function 'timestamp': input is out of range",
+            ),
+            (
+                "int to timestamp below min",
+                "timestamp(-62135596801)",
+                "Error executing function 'timestamp': input is out of range",
+            ),
+            (
+                "int to timestamp above max",
+                "timestamp(253402300800)",
                 "Error executing function 'timestamp': input is out of range",
             ),
             (

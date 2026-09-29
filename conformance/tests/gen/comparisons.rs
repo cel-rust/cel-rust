@@ -769,7 +769,6 @@ mod eq_literal {
     }
 
     // Test: not_eq_dyn_timestamp_null
-    #[should_panic]
     #[test]
     fn not_eq_dyn_timestamp_null() {
         run_test(&dedent!(

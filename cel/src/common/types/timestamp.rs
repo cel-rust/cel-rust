@@ -267,12 +267,31 @@ fn timestamp_from_timestamp(this: &Timestamp) -> Timestamp {
     this.clone()
 }
 
+fn timestamp_from_int(this: &CelInt) -> Result<Timestamp, ExecutionError> {
+    let out_of_range = || ExecutionError::function_error("timestamp", "input is out of range");
+    let result = chrono::DateTime::from_timestamp(*this.inner(), 0)
+        .ok_or_else(out_of_range)?
+        .fixed_offset();
+    if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
+        return Err(out_of_range());
+    }
+    Ok(Timestamp::from(result))
+}
+
+fn int_from_timestamp(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().timestamp())
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(super::TIMESTAMP_TYPE).expect("Must be unique");
     crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Result<Timestamp>,
         name = "timestamp", id = "string_to_timestamp");
     crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
         name = "timestamp", id = "timestamp_to_timestamp");
+    crate::add_overload!(env, fn timestamp_from_int: (CelInt) -> Result<Timestamp>,
+        name = "timestamp", id = "int64_to_timestamp");
+    crate::add_overload!(env, fn int_from_timestamp: (Timestamp) -> CelInt,
+        name = "int", id = "timestamp_to_int64");
     crate::add_member_overload!(env, fn get_full_year: (Timestamp) -> CelInt,
         id = "timestamp_to_year");
     crate::add_member_overload!(env, fn get_month: (Timestamp) -> CelInt,

@@ -490,7 +490,6 @@ mod int {
     }
 
     // Test: timestamp
-    #[should_panic]
     #[test]
     fn timestamp() {
         run_test(&dedent!(
@@ -1293,7 +1292,6 @@ mod identity {
     }
 
     // Test: timestamp
-    #[should_panic]
     #[test]
     fn timestamp() {
         run_test(&dedent!(
