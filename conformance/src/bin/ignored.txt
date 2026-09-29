@@ -115,7 +115,6 @@ comparisons::ne_literal::ne_proto_different_types
 comparisons::ne_literal::ne_proto_nan_not_equal
 conversions::identity::timestamp
 conversions::int::timestamp
-conversions::string::bytes_invalid
 dynamic::any::field_assign_proto2
 dynamic::any::field_assign_proto3
 dynamic::any::field_read_proto2
