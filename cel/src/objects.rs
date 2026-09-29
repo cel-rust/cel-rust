@@ -1499,14 +1499,18 @@ impl Value {
                         want: "iterable".to_owned(),
                     })?
                     .iter();
+                let mut deferred = DeferredErrors::of(comprehension);
                 while let Some(item) = items.next() {
                     if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
                         break;
                     }
                     ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
-                    let accu = Value::resolve_val(&comprehension.loop_step, &ctx)?;
-                    ctx.add_variable_as_val(&comprehension.accu_var, accu.into_owned());
+                    let step = Value::resolve_val(&comprehension.loop_step, &ctx);
+                    if let Some(accu) = deferred.step(step)? {
+                        ctx.add_variable_as_val(&comprehension.accu_var, accu.into_owned());
+                    }
                 }
+                deferred.finish()?;
                 Ok(CowVal::Owned(
                     Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
                 ))
@@ -1578,6 +1582,86 @@ fn boolean_operator_error(
         }
         Err(error) => error,
         Ok(_) => ExecutionError::no_such_overload(operator, vec!["bool".to_owned(), right_type]),
+    }
+}
+
+/// The connective of an `all()` / `exists()` loop step: `@result && x` or
+/// `@result || x`.
+#[derive(Clone, Copy)]
+enum LogicalFold {
+    And,
+    Or,
+}
+
+impl LogicalFold {
+    fn of(comprehension: &ComprehensionExpr) -> Option<Self> {
+        let Expr::Call(call) = &comprehension.loop_step.expr else {
+            return None;
+        };
+        let folds_accu = call.target.is_none()
+            && matches!(
+                call.args.first().map(|arg| &arg.expr),
+                Some(Expr::Ident(name)) if *name == comprehension.accu_var
+            );
+        match call.func_name.as_str() {
+            operators::LOGICAL_AND if folds_accu => Some(Self::And),
+            operators::LOGICAL_OR if folds_accu => Some(Self::Or),
+            _ => None,
+        }
+    }
+
+    /// The operand that decides the result regardless of any error beside
+    /// it: `false` for `&&`, `true` for `||`.
+    fn absorbing(self) -> bool {
+        matches!(self, Self::Or)
+    }
+
+    fn absorbs(self, value: &dyn Val) -> bool {
+        value
+            .downcast_ref::<CelBool>()
+            .is_some_and(|b| *b.inner() == self.absorbing())
+    }
+}
+
+/// Errors from an `all()` / `exists()` loop step that a later element may
+/// still override, as in cel-go's `evalAnd` / `evalOr`: `error && false` is
+/// `false`, while `error && true` stays the error.
+struct DeferredErrors {
+    fold: Option<LogicalFold>,
+    pending: Option<ExecutionError>,
+}
+
+impl DeferredErrors {
+    fn of(comprehension: &ComprehensionExpr) -> Self {
+        Self {
+            fold: LogicalFold::of(comprehension),
+            pending: None,
+        }
+    }
+
+    /// Feeds one loop-step result. Returns the new accumulator, or `None`
+    /// when it must be left unchanged because an error is pending.
+    fn step<'b, 'v>(
+        &mut self,
+        step: Result<CowVal<'b, 'v>, ExecutionError>,
+    ) -> Result<Option<CowVal<'b, 'v>>, ExecutionError> {
+        match (step, self.fold) {
+            (Err(err), Some(_)) => {
+                self.pending = Some(err);
+                Ok(None)
+            }
+            (Err(err), None) => Err(err),
+            (Ok(accu), Some(fold)) if self.pending.is_some() && !fold.absorbs(&*accu) => Ok(None),
+            (Ok(accu), _) => {
+                self.pending = None;
+                Ok(Some(accu))
+            }
+        }
+    }
+
+    /// Fails with the error still pending once the loop ends.
+    fn finish(self) -> Result<(), ExecutionError> {
+        self.pending.map_or(Ok(()), Err)
     }
 }
 
@@ -2359,6 +2443,34 @@ mod tests {
         assert!(!recognised("[1, 2, 3].all(x, x > 0)"));
         assert!(!recognised("[1, 2, 3].exists(x, x > 2)"));
         assert!(!recognised("[1, 2, 3].exists_one(x, x > 2)"));
+    }
+
+    /// An element error in `all()` / `exists()` is absorbed by a later element
+    /// that produces the short-circuit value (`false` for `&&`, `true` for
+    /// `||`), and survives otherwise.
+    #[test]
+    fn test_all_and_exists_absorb_element_errors() {
+        let context = Context::default();
+        let eval = |expr: &str| Program::compile(expr).unwrap().execute(&context);
+        let div_by_zero = |expr: &str| {
+            assert!(
+                matches!(eval(expr), Err(ExecutionError::DivisionByZero(_))),
+                "{expr}"
+            );
+        };
+
+        assert_eq!(eval("[1, 2, 3].all(e, 6 / (2 - e) == 6)"), Ok(false.into()));
+        assert_eq!(eval("[2, 3].all(e, 6 / (2 - e) == 6)"), Ok(false.into()));
+        div_by_zero("[2, 1].all(e, 6 / (2 - e) == 6)");
+        div_by_zero("[2].all(e, 6 / (2 - e) == 6)");
+
+        assert_eq!(eval("[2, 0].exists(e, 6 / (2 - e) == 3)"), Ok(true.into()));
+        assert_eq!(
+            eval("[0, 2, 3].exists(e, 6 / (2 - e) == 3)"),
+            Ok(true.into())
+        );
+        div_by_zero("[2, 3].exists(e, 6 / (2 - e) == 3)");
+        div_by_zero("[2].exists(e, 6 / (2 - e) == 3)");
     }
 
     /// Building the result in place must be indistinguishable from the generic
