@@ -1,5 +1,6 @@
 use crate::common::traits::{Adder, Container, Indexer, Iterable, Sizer, Zeroer};
-use crate::common::types::{CelInt, CelUInt, Kind, Type};
+use crate::common::types::map::double_to_int_lossless;
+use crate::common::types::{CelDouble, CelInt, CelUInt, Kind, Type};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
 use crate::common::{traits, types};
 use crate::ExecutionError;
@@ -159,12 +160,27 @@ fn index(list: &dyn Val, idx: &dyn Val) -> Result<usize, ExecutionError> {
                 .inner();
             usize::try_from(idx).map_err(|_| ExecutionError::IndexOutOfBounds(idx.into()))
         }
+        Kind::Double => {
+            let d: f64 = *idx
+                .downcast_ref::<CelDouble>()
+                .ok_or_else(|| ExecutionError::overload_for_values("_[_]", [list, idx], false))?
+                .inner();
+            // Whole-number doubles index like an int; fractional ones have no overload.
+            let idx = double_to_int_lossless(d).ok_or_else(|| {
+                ExecutionError::UnsupportedIndex(
+                    idx.try_into().unwrap_or(crate::Value::Null),
+                    list.try_into().unwrap_or(crate::Value::Null),
+                )
+            })?;
+            usize::try_from(idx).map_err(|_| ExecutionError::IndexOutOfBounds(idx.into()))
+        }
         _ => Err(ExecutionError::UnexpectedType {
             got: idx.get_type().runtime_type_name.to_string(),
             want: format!(
-                "{}|{}",
+                "{}|{}|{}",
                 types::INT_TYPE.runtime_type_name,
-                types::UINT_TYPE.runtime_type_name
+                types::UINT_TYPE.runtime_type_name,
+                types::DOUBLE_TYPE.runtime_type_name
             ),
         }),
     }
@@ -348,10 +364,10 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 pub mod tests {
     use crate::common::traits::Indexer;
     use crate::common::types::list::DefaultList;
-    use crate::common::types::{self, CelInt, CelString, Type};
+    use crate::common::types::{self, CelDouble, CelInt, CelString, CelUInt, Type};
     use crate::common::value::{CowVal, Val};
     use crate::ExecutionError;
-    use crate::ExecutionError::{IndexOutOfBounds, UnexpectedType};
+    use crate::ExecutionError::{IndexOutOfBounds, UnexpectedType, UnsupportedIndex};
 
     #[test]
     fn list_has_indexer() {
@@ -382,14 +398,14 @@ pub mod tests {
             Indexer::get(&list, &idx).err(),
             Some(UnexpectedType {
                 got: "string".to_string(),
-                want: "int|uint".to_string(),
+                want: "int|uint|double".to_string(),
             })
         );
         assert_eq!(
             Indexer::steal(list.into(), &idx).err(),
             Some(UnexpectedType {
                 got: "string".to_string(),
-                want: "int|uint".to_string(),
+                want: "int|uint|double".to_string(),
             })
         );
     }
@@ -402,6 +418,33 @@ pub mod tests {
         let idx: CelInt = 0.into();
         let expected: CowVal<'_, '_> = CowVal::owned(Into::<CelString>::into("cel"));
         assert_eq!(Indexer::get(&list, &idx), Ok(expected));
+    }
+
+    #[test]
+    fn get_with_uint_index() {
+        let val: Box<dyn Val> = Box::new(Into::<CelString>::into("cel"));
+        let list = DefaultList(vec![val]);
+        let idx: CelUInt = 0u64.into();
+        let expected: CowVal<'_, '_> = CowVal::owned(Into::<CelString>::into("cel"));
+        assert_eq!(Indexer::get(&list, &idx), Ok(expected));
+    }
+
+    #[test]
+    fn get_with_whole_double_index() {
+        let val: Box<dyn Val> = Box::new(Into::<CelString>::into("cel"));
+        let list = DefaultList(vec![val]);
+        let idx: CelDouble = 0.0.into();
+        let expected: CowVal<'_, '_> = CowVal::owned(Into::<CelString>::into("cel"));
+        assert_eq!(Indexer::get(&list, &idx), Ok(expected));
+    }
+
+    #[test]
+    fn get_with_fractional_double_index_errs() {
+        let val: Box<dyn Val> = Box::new(Into::<CelString>::into("cel"));
+        let list = DefaultList(vec![val]);
+        let idx: CelDouble = 0.5.into();
+        let err = Indexer::get(&list, &idx).unwrap_err();
+        assert!(matches!(err, UnsupportedIndex(..)), "got {err:?}");
     }
 
     #[test]
@@ -423,7 +466,7 @@ pub mod tests {
             }
         }
 
-        for ty in [&types::INT_TYPE, &types::UINT_TYPE] {
+        for ty in [&types::INT_TYPE, &types::UINT_TYPE, &types::DOUBLE_TYPE] {
             let idx = NumericKindOnly(ty);
             let list = DefaultList::default();
             let expected = ExecutionError::no_such_overload(

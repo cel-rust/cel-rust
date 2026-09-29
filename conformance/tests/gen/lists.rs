@@ -110,7 +110,6 @@ mod index {
     }
 
     // Test: zero_based_double
-    #[should_panic]
     #[test]
     fn zero_based_double() {
         run_test(&dedent!(

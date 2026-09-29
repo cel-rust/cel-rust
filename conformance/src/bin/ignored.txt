@@ -393,7 +393,6 @@ enums::strong_proto3::select_default
 enums::strong_proto3::select_neg
 enums::strong_proto3::type_global
 enums::strong_proto3::type_nested
-lists::index::zero_based_double
 lists_ext::distinct::bools
 lists_ext::distinct::empty
 lists_ext::distinct::heterogeneous
