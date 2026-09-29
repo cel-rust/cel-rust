@@ -1,5 +1,5 @@
 use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
-use crate::common::types::{CelInt, CelString, Type};
+use crate::common::types::{CelInt, CelString, CelTimestamp, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use std::any::Any;
@@ -101,6 +101,15 @@ impl Adder for Duration {
                 return Err(overflow());
             }
             Ok(CowVal::owned(Duration(result)))
+        } else if let Some(rhs) = rhs.downcast_ref::<CelTimestamp>() {
+            // duration + timestamp commutes; reuse the timestamp range checks,
+            // but report the operands in the order they were written.
+            rhs.add(self)
+                .map(|ts| CowVal::Owned(ts.into_owned()))
+                .map_err(|e| match e {
+                    ExecutionError::Overflow(op, ts, d) => ExecutionError::Overflow(op, d, ts),
+                    e => e,
+                })
         } else {
             Err(crate::ExecutionError::UnsupportedBinaryOperator(
                 "add",

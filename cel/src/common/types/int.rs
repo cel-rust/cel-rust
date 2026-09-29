@@ -1,6 +1,7 @@
 use crate::common::traits::Negator;
 use crate::common::traits::{self, Comparer};
-use crate::common::types::{CelDouble, CelString, CelUInt, Type};
+use crate::common::types::timestamp::int_from_timestamp;
+use crate::common::types::{CelDouble, CelString, CelTimestamp, CelUInt, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
 use std::any::Any;
@@ -339,6 +340,8 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         name = "int", id = "double_to_int64");
     crate::add_overload!(env, fn int_from_string: (CelString) -> Result<Int>,
         name = "int", id = "string_to_int64");
+    crate::add_overload!(env, fn int_from_timestamp: (CelTimestamp) -> Int,
+        name = "int", id = "timestamp_to_int64");
 }
 
 #[cfg(test)]

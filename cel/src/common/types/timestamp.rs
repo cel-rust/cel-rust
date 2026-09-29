@@ -342,12 +342,26 @@ fn timestamp_from_timestamp(this: &Timestamp) -> Timestamp {
     this.clone()
 }
 
+fn timestamp_from_int(this: &CelInt) -> Result<Timestamp, ExecutionError> {
+    chrono::DateTime::from_timestamp(*this.inner(), 0)
+        .map(|ts| ts.fixed_offset())
+        .filter(|ts| *ts >= *MIN_TIMESTAMP && *ts <= *MAX_TIMESTAMP)
+        .map(Timestamp::from)
+        .ok_or_else(|| ExecutionError::function_error("timestamp", "timestamp out of range"))
+}
+
+pub(crate) fn int_from_timestamp(this: &Timestamp) -> CelInt {
+    CelInt::from(this.inner().timestamp())
+}
+
 pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(super::TIMESTAMP_TYPE).expect("Must be unique");
     crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Result<Timestamp>,
         name = "timestamp", id = "string_to_timestamp");
     crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
         name = "timestamp", id = "timestamp_to_timestamp");
+    crate::add_overload!(env, fn timestamp_from_int: (CelInt) -> Result<Timestamp>,
+        name = "timestamp", id = "int64_to_timestamp");
     crate::add_member_overload!(env, fn get_full_year: (Timestamp) -> CelInt,
         id = "timestamp_to_year");
     crate::add_member_overload!(env, fn get_month: (Timestamp) -> CelInt,
@@ -388,4 +402,58 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         name = "getSeconds", id = "timestamp_to_seconds_tz");
     crate::add_member_overload!(env, fn get_milliseconds_tz: (Timestamp, CelString) -> Result<CelInt>,
         name = "getMilliseconds", id = "timestamp_to_milliseconds_with_tz");
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{Context, Program};
+
+    fn eval(expr: &str) -> Result<crate::Value, crate::ExecutionError> {
+        Program::compile(expr).unwrap().execute(&Context::default())
+    }
+
+    #[test]
+    fn test_timestamp_from_int_range() {
+        assert_eq!(
+            eval("timestamp(-62135596800) == timestamp('0001-01-01T00:00:00Z')"),
+            Ok(true.into())
+        );
+        assert_eq!(
+            eval("timestamp(253402300799) == timestamp('9999-12-31T23:59:59Z')"),
+            Ok(true.into())
+        );
+        assert!(eval("timestamp(-62135596801)").is_err());
+        assert!(eval("timestamp(253402300800)").is_err());
+        assert!(eval("timestamp(9223372036854775807)").is_err());
+    }
+
+    #[test]
+    fn test_int_from_timestamp() {
+        assert_eq!(
+            eval("int(timestamp('2009-02-13T23:31:30Z'))"),
+            Ok(1234567890.into())
+        );
+        assert_eq!(eval("int(timestamp(-1))"), Ok((-1).into()));
+        // Floors like cel-go's time.Unix(), not truncation toward zero.
+        assert_eq!(
+            eval("int(timestamp('1969-12-31T23:59:59.500Z'))"),
+            Ok((-1).into())
+        );
+    }
+
+    #[test]
+    fn test_add_duration_timestamp() {
+        assert_eq!(
+            eval("duration('1s') + timestamp(0) == timestamp(1)"),
+            Ok(true.into())
+        );
+        assert!(matches!(
+            eval("duration('1s') + timestamp('9999-12-31T23:59:59Z')"),
+            Err(crate::ExecutionError::Overflow(
+                "add",
+                crate::Value::Duration(_),
+                crate::Value::Timestamp(_)
+            ))
+        ));
+    }
 }
