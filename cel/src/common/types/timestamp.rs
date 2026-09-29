@@ -350,7 +350,7 @@ fn timestamp_from_int(this: &CelInt) -> Result<Timestamp, ExecutionError> {
         .ok_or_else(|| ExecutionError::function_error("timestamp", "timestamp out of range"))
 }
 
-pub(crate) fn int_from_timestamp(this: &Timestamp) -> CelInt {
+fn int_from_timestamp(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().timestamp())
 }
 
@@ -362,6 +362,8 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         name = "timestamp", id = "timestamp_to_timestamp");
     crate::add_overload!(env, fn timestamp_from_int: (CelInt) -> Result<Timestamp>,
         name = "timestamp", id = "int64_to_timestamp");
+    crate::add_overload!(env, fn int_from_timestamp: (Timestamp) -> CelInt,
+        name = "int", id = "timestamp_to_int64");
     crate::add_member_overload!(env, fn get_full_year: (Timestamp) -> CelInt,
         id = "timestamp_to_year");
     crate::add_member_overload!(env, fn get_month: (Timestamp) -> CelInt,
