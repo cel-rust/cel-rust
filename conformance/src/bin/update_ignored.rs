@@ -56,7 +56,7 @@ fn update_ignored(existing: &str, log: &str) -> Result<Update, String> {
     let mut content = String::new();
     let mut present = BTreeSet::new();
     let mut removed = Vec::new();
-    for line in existing.lines() {
+    for line in existing.split_inclusive('\n') {
         let entry = line.trim();
         if unexpected_passes.contains(entry) {
             removed.push(entry.to_string());
@@ -64,7 +64,6 @@ fn update_ignored(existing: &str, log: &str) -> Result<Update, String> {
         }
         present.insert(entry);
         content.push_str(line);
-        content.push('\n');
     }
 
     let added: Vec<String> = failures
@@ -72,6 +71,9 @@ fn update_ignored(existing: &str, log: &str) -> Result<Update, String> {
         .filter(|name| !unexpected_passes.contains(*name) && !present.contains(name.as_str()))
         .cloned()
         .collect();
+    if !added.is_empty() && !content.is_empty() && !content.ends_with('\n') {
+        content.push('\n');
+    }
     for entry in &added {
         content.push_str(entry);
         content.push('\n');
@@ -92,21 +94,28 @@ fn parse_test_log(log: &str) -> Result<(BTreeSet<String>, BTreeSet<String>), Str
     let mut unexpected_passes = BTreeSet::new();
     let mut running = 0;
     let mut results = 0;
-    let mut segment_start = 0;
-    let mut offset = 0;
+    // Names listed under the last `failures:` line, and the test whose
+    // `---- NAME stdout ----` section is being read.
+    let mut names = Vec::new();
+    let mut listing = false;
+    let mut section = None;
 
-    for line in log.split_inclusive('\n') {
-        let line_start = offset;
-        offset += line.len();
-        let line = line.trim_end();
-
+    for line in log.lines().map(str::trim_end) {
         if line.starts_with("running ") && (line.ends_with(" tests") || line.ends_with(" test")) {
             running += 1;
+        } else if line == "failures:" {
+            names.clear();
+            listing = true;
         } else if let Some(name) = line
-            .strip_prefix("test ")
-            .and_then(|l| l.strip_suffix(" - should panic ... FAILED"))
+            .strip_prefix("---- ")
+            .and_then(|l| l.strip_suffix(" stdout ----"))
         {
-            unexpected_passes.insert(name.to_string());
+            listing = false;
+            section = Some(name);
+        } else if line.starts_with("note: test did not panic as expected") {
+            if let Some(name) = section {
+                unexpected_passes.insert(name.to_string());
+            }
         } else if let Some(summary) = line.strip_prefix("test result: ") {
             results += 1;
             let failed = summary
@@ -114,24 +123,17 @@ fn parse_test_log(log: &str) -> Result<(BTreeSet<String>, BTreeSet<String>), Str
                 .find_map(|part| part.strip_suffix(" failed"))
                 .and_then(|n| n.parse().ok())
                 .ok_or_else(|| format!("Unrecognised test summary: {line}"))?;
-
-            let segment = &log[segment_start..line_start];
-            let names: Vec<&str> = match segment.rfind("\nfailures:\n") {
-                Some(index) => segment[index + "\nfailures:\n".len()..]
-                    .lines()
-                    .map(str::trim)
-                    .filter(|l| !l.is_empty())
-                    .collect(),
-                None => Vec::new(),
-            };
             if names.len() != failed {
                 return Err(format!(
                     "Failure list has {} entries but the summary reports {failed} failed: {line}",
                     names.len()
                 ));
             }
-            failures.extend(names.into_iter().map(String::from));
-            segment_start = offset;
+            failures.extend(names.drain(..).map(String::from));
+            listing = false;
+            section = None;
+        } else if listing && !line.trim().is_empty() {
+            names.push(line.trim());
         }
     }
 
@@ -186,6 +188,27 @@ mod tests {
         assert_eq!(update.content, "# comment kept\na::b::still_broken\n");
         assert_eq!(update.removed, ["a::b::fixed"]);
         assert!(update.added.is_empty());
+
+        // `--quiet` / terse output drops the "should panic" marker, and a
+        // CRLF log must parse the same.
+        let terse = log.replace(
+            "test a::b::fixed - should panic ... FAILED",
+            "a::b::fixed --- FAILED",
+        );
+        for log in [terse.clone(), terse.replace('\n', "\r\n")] {
+            assert_eq!(
+                update_ignored(EXISTING, &log).unwrap().removed,
+                ["a::b::fixed"]
+            );
+        }
+    }
+
+    #[test]
+    fn existing_bytes_are_kept() {
+        let log = log("", "ok. 0 passed; 0 failed");
+        for existing in ["# c\r\na::b::x\r\n", "# c\na::b::x"] {
+            assert_eq!(update_ignored(existing, &log).unwrap().content, existing);
+        }
     }
 
     #[test]
