@@ -1147,7 +1147,6 @@ string_ext::trim::unicode_space_chars_3
 timestamps::duration_converters::get_milliseconds
 timestamps::timestamp_arithmetic::add_time_to_duration
 timestamps::timestamp_conversions::toint_timestamp
-timestamps::timestamp_range::from_string_under
 type_deduction::complex_initializers::list
 type_deduction::complex_initializers::map
 type_deduction::complex_initializers::r#struct
