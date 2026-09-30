@@ -5,12 +5,13 @@ use cargo_toml::Manifest;
 const GENERATED_HEADER_PREFIX: &str = "// CEL_SPEC_VERSION: ";
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    if std::env::var("CARGO_CFG_FEATURE").unwrap_or_default() == "skip-version-check" {
+    if std::env::var_os("CARGO_FEATURE_SKIP_VERSION_CHECK").is_some() {
         return Ok(());
     }
 
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    let manifest = Manifest::from_path(manifest_dir.join("Cargo.toml"))?;
+    let manifest_path = manifest_dir.join("Cargo.toml");
+    let manifest = Manifest::from_path(&manifest_path)?;
     let cel_spec_version = manifest
         .package()
         .metadata
@@ -24,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .ok_or("cel_spec_version must be a string")?;
     let generated_version = manifest_dir.join("src").join("gen").join("version.rs");
     println!("cargo:rerun-if-changed={}", generated_version.display());
-    println!("cargo:rerun-if-changed={}", cel_spec_version);
+    println!("cargo:rerun-if-changed={}", manifest_path.display());
     ensure_generated_version(&generated_version, cel_spec_version)?;
     Ok(())
 }
