@@ -43,7 +43,6 @@ mod optionals {
     }
 
     // Test: none_optMap_hasValue
-    #[should_panic]
     #[test]
     fn none_optmap_hasvalue() {
         run_test(&dedent!(
@@ -55,7 +54,6 @@ mod optionals {
     }
 
     // Test: empty_map_optFlatMap_hasValue
-    #[should_panic]
     #[test]
     fn empty_map_optflatmap_hasvalue() {
         run_test(&dedent!(
@@ -67,7 +65,6 @@ mod optionals {
     }
 
     // Test: map_empty_submap_optFlatMap_hasValue
-    #[should_panic]
     #[test]
     fn map_empty_submap_optflatmap_hasvalue() {
         run_test(&dedent!(
@@ -138,7 +135,6 @@ mod optionals {
     }
 
     // Test: map_submap_subkey_optFlatMap_value
-    #[should_panic]
     #[test]
     fn map_submap_subkey_optflatmap_value() {
         run_test(&dedent!(
@@ -150,7 +146,6 @@ mod optionals {
     }
 
     // Test: map_submap_optFlatMap_value
-    #[should_panic]
     #[test]
     fn map_submap_optflatmap_value() {
         run_test(&dedent!(
@@ -162,7 +157,6 @@ mod optionals {
     }
 
     // Test: map_optindex_optFlatMap_optional_ofNonZeroValue_hasValue
-    #[should_panic]
     #[test]
     fn map_optindex_optflatmap_optional_ofnonzerovalue_hasvalue() {
         run_test(&dedent!(
@@ -174,7 +168,6 @@ mod optionals {
     }
 
     // Test: optional_of_optMap_value
-    #[should_panic]
     #[test]
     fn optional_of_optmap_value() {
         run_test(&dedent!(

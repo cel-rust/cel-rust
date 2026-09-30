@@ -3740,6 +3740,52 @@ mod tests {
                 }))
             );
         }
+
+        #[test]
+        fn test_opt_map_and_opt_flat_map() {
+            let mut ctx = Context::default();
+            ctx.add_variable_from_value("o", Value::Int(3));
+            for (script, want) in [
+                ("optional.of(42).optMap(y, y + 1).value()", Value::Int(43)),
+                (
+                    "optional.none().optMap(y, y + 1).hasValue()",
+                    Value::Bool(false),
+                ),
+                ("optional.of(0).optMap(y, y).hasValue()", Value::Bool(true)),
+                ("optional.of(o).optMap(o, o * 2).value()", Value::Int(6)),
+                (
+                    "{'k': {'s': 'v'}}.?k.optFlatMap(k, k.?s).value()",
+                    Value::from("v"),
+                ),
+                (
+                    "{'k': {}}.?k.optFlatMap(k, k.?s).hasValue()",
+                    Value::Bool(false),
+                ),
+                ("{}.?k.optFlatMap(k, k.?s).hasValue()", Value::Bool(false)),
+                (
+                    "optional.of(1).optFlatMap(x, optional.ofNonZeroValue(x - 1)).hasValue()",
+                    Value::Bool(false),
+                ),
+            ] {
+                let expr = Parser::default()
+                    .enable_optional_syntax(true)
+                    .parse(script)
+                    .expect("Must parse");
+                assert_eq!(Value::resolve(&expr, &ctx), Ok(want), "{script}");
+            }
+        }
+
+        #[test]
+        fn test_opt_map_needs_optional_syntax_and_ident() {
+            assert!(Parser::default()
+                .parse("optional.of(1).optMap(x, x)")
+                .is_ok());
+            let err = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("optional.of(1).optMap(1 + 1, 2)")
+                .expect_err("Must fail");
+            assert!(err.to_string().contains("argument must be a simple name"));
+        }
     }
 
     #[cfg(feature = "structs")]
