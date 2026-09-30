@@ -78,4 +78,84 @@ mod bind {
             "#
         ));
     }
+
+    // Test: shadowing
+    #[should_panic]
+    #[test]
+    fn shadowing() {
+        run_test(&dedent!(
+            r#"
+                expr: "cel.bind(x, 0, x == 0)"
+                type_env: {
+                  name: "x"
+                  ident: {
+                    type: { primitive: INT64 }
+                  }
+                }
+                bindings: {
+                  key: "x"
+                  value: {
+                    value: { int64_value: 1 }
+                  }
+                }
+                value: {
+                  bool_value: true
+                }
+            "#
+        ));
+    }
+
+    // Test: shadowing_namespace_resolution
+    #[should_panic]
+    #[test]
+    fn shadowing_namespace_resolution() {
+        run_test(&dedent!(
+            r#"
+                expr: "cel.bind(x, 0, x == 0)"
+                container: "com.example"
+                type_env: {
+                  name: "com.example.x"
+                  ident: {
+                    type: { primitive: INT64 }
+                  }
+                }
+                bindings: {
+                  key: "com.example.x"
+                  value: {
+                    value: { int64_value: 1 }
+                  }
+                }
+                value: {
+                  bool_value: true
+                }
+            "#
+        ));
+    }
+
+    // Test: shadowing_namespace_resolution_selector
+    #[should_panic]
+    #[test]
+    fn shadowing_namespace_resolution_selector() {
+        run_test(&dedent!(
+            r#"
+                expr: "cel.bind(x, {'y': 0}, x.y == 0)"
+                container: "com.example"
+                type_env: {
+                  name: "com.example.x.y"
+                  ident: {
+                    type: { primitive: INT64 }
+                  }
+                }
+                bindings: {
+                  key: "com.example.x.y"
+                  value: {
+                    value: { int64_value: 1 }
+                  }
+                }
+                value: {
+                  bool_value: true
+                }
+            "#
+        ));
+    }
 }

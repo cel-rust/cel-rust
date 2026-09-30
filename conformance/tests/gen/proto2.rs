@@ -901,7 +901,7 @@ mod empty_field {
     fn repeated_enum() {
         run_test(&dedent!(
             r#"
-                container: "cel.expr.conformance.proto3"
+                container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{}.repeated_nested_enum"
                 value: { list_value: {} }
             "#
@@ -1334,6 +1334,136 @@ mod set_null {
             r#"
                 container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{single_timestamp: null} == TestAllTypes{}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: repeated_field_timestamp_null_pruned
+    #[should_panic]
+    #[test]
+    fn repeated_field_timestamp_null_pruned() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{repeated_timestamp: [timestamp(1), null]}.repeated_timestamp == [timestamp(1)]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: repeated_field_duration_null_pruned
+    #[should_panic]
+    #[test]
+    fn repeated_field_duration_null_pruned() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{repeated_duration: [duration('1s'), null]}.repeated_duration == [duration('1s')]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: repeated_field_wrapper_null_pruned
+    #[should_panic]
+    #[test]
+    fn repeated_field_wrapper_null_pruned() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{repeated_int32_wrapper: [1, null]}.repeated_int32_wrapper == [1]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: repeated_field_anytype_null_retained
+    #[should_panic]
+    #[test]
+    fn repeated_field_anytype_null_retained() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{repeated_any: [1, null]}.repeated_any == [1, null]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: repeated_field_jsontype_null_retained
+    #[should_panic]
+    #[test]
+    fn repeated_field_jsontype_null_retained() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{repeated_value: [google.protobuf.Value{bool_value: true}, null]}.repeated_value == [true, null]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_timestamp_null_pruned
+    #[should_panic]
+    #[test]
+    fn map_timestamp_null_pruned() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{map_bool_timestamp: {true: null, false: timestamp(1)}}.map_bool_timestamp == {false: timestamp(1)}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_duration_null_pruned
+    #[should_panic]
+    #[test]
+    fn map_duration_null_pruned() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{map_bool_duration: {true: null, false: duration('1s')}}.map_bool_duration == {false: duration('1s')}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_wrapper_null_pruned
+    #[should_panic]
+    #[test]
+    fn map_wrapper_null_pruned() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{map_bool_int32_wrapper: {true: null, false: 1}}.map_bool_int32_wrapper == {false: 1}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_anytype_null_retained
+    #[should_panic]
+    #[test]
+    fn map_anytype_null_retained() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{map_bool_any: {true: null, false: 1}}.map_bool_any == {true: null, false: 1}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_jsontype_null_retained
+    #[should_panic]
+    #[test]
+    fn map_jsontype_null_retained() {
+        run_test(&dedent!(
+            r#"
+                container: "cel.expr.conformance.proto2"
+                expr: "TestAllTypes{map_bool_value: {true: null, false: google.protobuf.Value{bool_value: true}}}.map_bool_value == {true: null, false: true}"
                 value: { bool_value: true }
             "#
         ));

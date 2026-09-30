@@ -805,12 +805,38 @@ mod timestamp_range {
         ));
     }
 
+    // Test: from_int_under
+    #[test]
+    fn from_int_under() {
+        run_test(&dedent!(
+            r#"
+                expr: "timestamp(-62135596801)"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
     // Test: from_string_over
     #[test]
     fn from_string_over() {
         run_test(&dedent!(
             r#"
                 expr: "timestamp('10000-01-01T00:00:00Z')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
+    // Test: from_int_over
+    #[test]
+    fn from_int_over() {
+        run_test(&dedent!(
+            r#"
+                expr: "timestamp(253402300800)"
                 eval_error {
                   errors { message: "range" }
                 }

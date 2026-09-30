@@ -228,7 +228,7 @@ mod repeat {
             r#"
                 description: "Primary = '{' [MapInits] '}'. Map literals with up to 32 entries."
                 expr: "{0: 'zero', 1: 'one', 2: 'two', 3: 'three', 4: 'four', 5: 'five', 6: 'six', 7: 'seven', 8: 'eight', 9: 'nine', 10: 'ten', 11: 'eleven', 12: 'twelve', 13: 'thirteen', 14: 'fourteen', 15: 'fifteen', 16: 'sixteen', 17: 'seventeen', 18: 'eighteen', 19: 'nineteen', 20: 'twenty', 21: 'twenty-one', 22: 'twenty-two', 23: 'twenty-three', 24: 'twenty-four', 25: 'twenty-five', 26: 'twenty-six', 27: 'twenty-seven', 28: 'twenty-eight', 29: 'twenty-nine', 30: 'thirty', 31: 'thirty-one'}[17]"
-                value { string_value: 'seventeen' }
+                value { string_value: "seventeen" }
             "#
         ));
     }
@@ -303,8 +303,9 @@ mod string_literals {
     fn single_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: "' \\\\ \\\? \\\" \\\' \\` '"
-                value: { string_value: " \\ \? \" \' ` " }
+                # ' \\ \? \" \' \` '
+                expr: "' \\\\ \\? \\\" \\\' \\` '"
+                value: { string_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -314,8 +315,8 @@ mod string_literals {
     fn double_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: '" \\\\ \\\? \\\" \\\' \\` "'
-                value: { string_value: " \\ \? \" \' ` " }
+                expr: '" \\\\ \\? \\\" \\\' \\` "'
+                value: { string_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -325,8 +326,8 @@ mod string_literals {
     fn triple_single_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: "''' \\\\ \\\? \\\" \\\' \\` '''"
-                value: { string_value: " \\ \? \" \' ` " }
+                expr: "''' \\\\ \\? \\\" \\\' \\` '''"
+                value: { string_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -336,8 +337,8 @@ mod string_literals {
     fn triple_double_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: '""" \\\\ \\\? \\\" \\\' \\` """'
-                value: { string_value: " \\ \? \" \' ` " }
+                expr: '""" \\\\ \\? \\\" \\\' \\` """'
+                value: { string_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -348,7 +349,7 @@ mod string_literals {
         run_test(&dedent!(
             r#"
                 expr: "''' ? \" \' ` '''"
-                value: { string_value: " \? \" \' ` " }
+                value: { string_value: " ? \" \' ` " }
             "#
         ));
     }
@@ -359,7 +360,7 @@ mod string_literals {
         run_test(&dedent!(
             r#"
                 expr: '""" ? \" \' ` """'
-                value: { string_value: " \? \" \' ` " }
+                value: { string_value: " ? \" \' ` " }
             "#
         ));
     }
@@ -1190,8 +1191,8 @@ mod bytes_literals {
     fn single_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: "b' \\\\ \\\? \\\" \\\' \\` '"
-                value: { bytes_value: " \\ \? \" \' ` " }
+                expr: "b' \\\\ \\? \\\" \\\' \\` '"
+                value: { bytes_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -1201,8 +1202,8 @@ mod bytes_literals {
     fn double_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: 'b" \\\\ \\\? \\\" \\\' \\` "'
-                value: { bytes_value: " \\ \? \" \' ` " }
+                expr: 'b" \\\\ \\? \\\" \\\' \\` "'
+                value: { bytes_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -1212,8 +1213,8 @@ mod bytes_literals {
     fn triple_single_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: "b''' \\\\ \\\? \\\" \\\' \\` '''"
-                value: { bytes_value: " \\ \? \" \' ` " }
+                expr: "b''' \\\\ \\? \\\" \\\' \\` '''"
+                value: { bytes_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -1223,8 +1224,8 @@ mod bytes_literals {
     fn triple_double_quoted_escaped_punctuation() {
         run_test(&dedent!(
             r#"
-                expr: 'b""" \\\\ \\\? \\\" \\\' \\` """'
-                value: { bytes_value: " \\ \? \" \' ` " }
+                expr: 'b""" \\\\ \\? \\\" \\\' \\` """'
+                value: { bytes_value: " \\ ? \" \' ` " }
             "#
         ));
     }
@@ -1235,7 +1236,7 @@ mod bytes_literals {
         run_test(&dedent!(
             r#"
                 expr: "b''' ? \" \' ` '''"
-                value: { bytes_value: " \? \" \' ` " }
+                value: { bytes_value: " ? \" \' ` " }
             "#
         ));
     }
@@ -1246,7 +1247,7 @@ mod bytes_literals {
         run_test(&dedent!(
             r#"
                 expr: 'b""" ? \" \' ` """'
-                value: { bytes_value: " \? \" \' ` " }
+                value: { bytes_value: " ? \" \' ` " }
             "#
         ));
     }
@@ -1762,8 +1763,8 @@ mod bytes_literals {
     fn raw_single_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: "br' \\\\ \\\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '"
-                value: { bytes_value: " \\\\ \\\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: "br' \\\\ \\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '"
+                value: { bytes_value: " \\\\ \\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
@@ -1773,8 +1774,8 @@ mod bytes_literals {
     fn raw_double_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: 'br" \\\\ \\\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 "'
-                value: { bytes_value: " \\\\ \\\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: 'br" \\\\ \\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 "'
+                value: { bytes_value: " \\\\ \\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
@@ -1784,8 +1785,8 @@ mod bytes_literals {
     fn raw_triple_single_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: "br''' \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '''"
-                value: { bytes_value: " \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: "br''' \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '''"
+                value: { bytes_value: " \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
@@ -1795,8 +1796,8 @@ mod bytes_literals {
     fn raw_triple_double_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: 'br""" \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 """'
-                value: { bytes_value: " \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: 'br""" \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 """'
+                value: { bytes_value: " \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
@@ -1806,8 +1807,8 @@ mod bytes_literals {
     fn upper_raw_single_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: "bR' \\\\ \\\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '"
-                value: { bytes_value: " \\\\ \\\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: "bR' \\\\ \\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '"
+                value: { bytes_value: " \\\\ \\? \\\" \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
@@ -1817,8 +1818,8 @@ mod bytes_literals {
     fn upper_raw_double_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: 'bR" \\\\ \\\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 "'
-                value: { bytes_value: " \\\\ \\\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: 'bR" \\\\ \\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 "'
+                value: { bytes_value: " \\\\ \\? \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
@@ -1828,8 +1829,8 @@ mod bytes_literals {
     fn upper_raw_triple_single_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: "bR''' \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '''"
-                value: { bytes_value: " \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: "bR''' \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 '''"
+                value: { bytes_value: " \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
@@ -1839,8 +1840,8 @@ mod bytes_literals {
     fn upper_raw_triple_double_quoted_escapes() {
         run_test(&dedent!(
             r#"
-                expr: 'bR""" \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 """'
-                value: { bytes_value: " \\\\ \\\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
+                expr: 'bR""" \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 """'
+                value: { bytes_value: " \\\\ \\? \\\" \\\' \\` \\a \\b \\f \\t \\v \\n \\r \\000 \\x00 \\X00 \\u0000 \\U00000000 " }
             "#
         ));
     }
