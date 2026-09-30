@@ -168,7 +168,7 @@ fn fallback_keys(key: &dyn Val) -> [Option<KeyRef<'static>>; 2] {
 }
 
 /// `d` as an `i64`, if it converts without loss. Mirrors cel-go, which also rejects -2^63.
-fn double_to_int_lossless(d: f64) -> Option<i64> {
+pub(super) fn double_to_int_lossless(d: f64) -> Option<i64> {
     // The range check comes first as `as` saturates: `2^63 as i64` would round-trip to 2^63.
     if d > i64::MIN as f64 && d < i64::MAX as f64 {
         let i = d as i64;
