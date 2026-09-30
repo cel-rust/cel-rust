@@ -444,6 +444,21 @@ mod tests {
                 "Error executing function 'timestamp': input is out of range",
             ),
             (
+                "timestamp from_string under range",
+                "timestamp('0000-01-01T00:00:00Z')",
+                "Error executing function 'timestamp': range error parsing timestamp",
+            ),
+            (
+                "timestamp from_string under range via offset",
+                "timestamp('0001-01-01T00:00:00+01:00')",
+                "Error executing function 'timestamp': range error parsing timestamp",
+            ),
+            (
+                "timestamp from_string over range via offset",
+                "timestamp('9999-12-31T23:59:59-01:00')",
+                "Error executing function 'timestamp': range error parsing timestamp",
+            ),
+            (
                 "timestamp overflow",
                 "timestamp('9999-12-31T23:59:59Z') + duration('1s')",
                 "Overflow from binary operator 'add': Timestamp(9999-12-31T23:59:59+00:00), Duration(TimeDelta { secs: 1, nanos: 0 })",

@@ -327,10 +327,15 @@ with_time_zone! {
 }
 
 fn timestamp_from_string(this: &CelString<'_>) -> Result<Timestamp, ExecutionError> {
-    Ok(Timestamp::from(
-        chrono::DateTime::parse_from_rfc3339(this.inner())
-            .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?,
-    ))
+    let ts = chrono::DateTime::parse_from_rfc3339(this.inner())
+        .map_err(|e| ExecutionError::function_error("timestamp", e.to_string().as_str()))?;
+    if ts > *MAX_TIMESTAMP || ts < *MIN_TIMESTAMP {
+        return Err(ExecutionError::function_error(
+            "timestamp",
+            "range error parsing timestamp",
+        ));
+    }
+    Ok(Timestamp::from(ts))
 }
 
 fn timestamp_from_timestamp(this: &Timestamp) -> Timestamp {

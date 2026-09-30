@@ -777,7 +777,6 @@ mod timestamp_range {
     use dedent::dedent;
 
     // Test: from_string_under
-    #[should_panic]
     #[test]
     fn from_string_under() {
         run_test(&dedent!(
