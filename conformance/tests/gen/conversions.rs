@@ -586,7 +586,6 @@ mod string {
     }
 
     // Test: bytes_invalid
-    #[should_panic]
     #[test]
     fn bytes_invalid() {
         run_test(&dedent!(

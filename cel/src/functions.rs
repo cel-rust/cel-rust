@@ -658,6 +658,14 @@ mod tests {
         ]
         .iter()
         .for_each(assert_script);
+
+        [(
+            "bytes invalid utf-8",
+            "string(b'\\xff')",
+            "Error executing function 'string': invalid UTF-8 in bytes, cannot convert to string",
+        )]
+        .iter()
+        .for_each(assert_error);
     }
 
     #[test]
