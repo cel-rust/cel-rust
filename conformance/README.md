@@ -28,4 +28,8 @@ ignored tests,
 cargo test -p conformance | cargo run -p conformance --bin update_ignored
 ```
 
-and regenerate again.
+and regenerate again (followed by `cargo fmt -p conformance`). The update merges into
+`src/bin/ignored.txt`: new failures are appended, tests marked `should panic` that now pass are
+removed, and existing entries and `#` comments are kept. It writes nothing unless the log is
+complete. To rebuild the list from scratch, empty `src/bin/ignored.txt`, regenerate, run the
+update above, and regenerate again.
