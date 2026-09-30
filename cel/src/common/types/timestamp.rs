@@ -256,6 +256,62 @@ fn get_full_year(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().year() as i64)
 }
 
+/// Mirrors cel-go's `timeZone`: an IANA name, or a `[+-]HH:MM` offset when there is a colon.
+fn in_time_zone(this: &Timestamp, tz: &CelString<'_>) -> Result<Timestamp, ExecutionError> {
+    let tz = tz.inner();
+    let err = |e: &dyn std::fmt::Display| ExecutionError::function_error("timezone", e);
+    let dt = this.inner();
+    let Some((hours, minutes)) = tz.split_once(':') else {
+        let zone = if tz.is_empty() {
+            chrono_tz::UTC
+        } else {
+            tz.parse::<chrono_tz::Tz>()
+                .map_err(|_| err(&format!("unknown time zone {tz}")))?
+        };
+        return Ok(dt.with_timezone(&zone).fixed_offset().into());
+    };
+    let hr: i32 = hours.parse().map_err(|e| err(&e))?;
+    let min: i32 = minutes.parse().map_err(|e| err(&e))?;
+    if !(-23..=23).contains(&hr) {
+        return Err(err(&format!(
+            "timezone offset hours out of range [-23, 23]: {tz}"
+        )));
+    }
+    if !(0..=59).contains(&min) {
+        return Err(err(&format!(
+            "timezone offset minutes out of range [0, 59]: {tz}"
+        )));
+    }
+    let offset = if hours.starts_with('-') {
+        hr * 60 - min
+    } else {
+        hr * 60 + min
+    };
+    let offset = chrono::FixedOffset::east_opt(offset * 60).ok_or_else(|| err(&tz))?;
+    Ok(dt.with_timezone(&offset).into())
+}
+
+macro_rules! with_time_zone {
+    ($($name:ident => $get:ident),* $(,)?) => {$(
+        fn $name(this: &Timestamp, tz: &CelString<'_>) -> Result<CelInt, ExecutionError> {
+            Ok($get(&in_time_zone(this, tz)?))
+        }
+    )*};
+}
+
+with_time_zone! {
+    get_full_year_tz => get_full_year,
+    get_month_tz => get_month,
+    get_day_of_year_tz => get_day_of_year,
+    get_day_of_month_tz => get_day_of_month,
+    get_date_tz => get_date,
+    get_day_of_week_tz => get_day_of_week,
+    get_hours_tz => get_hours,
+    get_minutes_tz => get_minutes,
+    get_seconds_tz => get_seconds,
+    get_milliseconds_tz => get_milliseconds,
+}
+
 fn timestamp_from_string(this: &CelString<'_>) -> Result<Timestamp, ExecutionError> {
     Ok(Timestamp::from(
         chrono::DateTime::parse_from_rfc3339(this.inner())
@@ -293,4 +349,24 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         id = "timestamp_to_seconds");
     crate::add_member_overload!(env, fn get_milliseconds: (Timestamp) -> CelInt,
         id = "timestamp_to_millis");
+    crate::add_member_overload!(env, fn get_full_year_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getFullYear", id = "timestamp_to_year_with_tz");
+    crate::add_member_overload!(env, fn get_month_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getMonth", id = "timestamp_to_month_with_tz");
+    crate::add_member_overload!(env, fn get_day_of_year_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getDayOfYear", id = "timestamp_to_day_of_year_with_tz");
+    crate::add_member_overload!(env, fn get_day_of_month_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getDayOfMonth", id = "timestamp_to_day_of_month_with_tz");
+    crate::add_member_overload!(env, fn get_date_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getDate", id = "timestamp_to_day_of_month_1_based_with_tz");
+    crate::add_member_overload!(env, fn get_day_of_week_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getDayOfWeek", id = "timestamp_to_day_of_week_with_tz");
+    crate::add_member_overload!(env, fn get_hours_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getHours", id = "timestamp_to_hours_with_tz");
+    crate::add_member_overload!(env, fn get_minutes_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getMinutes", id = "timestamp_to_minutes_with_tz");
+    crate::add_member_overload!(env, fn get_seconds_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getSeconds", id = "timestamp_to_seconds_tz");
+    crate::add_member_overload!(env, fn get_milliseconds_tz: (Timestamp, CelString) -> Result<CelInt>,
+        name = "getMilliseconds", id = "timestamp_to_milliseconds_with_tz");
 }

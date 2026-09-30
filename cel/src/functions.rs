@@ -363,11 +363,76 @@ mod tests {
                 "timestamp getMilliseconds",
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
+            (
+                "timestamp getFullYear tz offset",
+                "timestamp('2023-01-01T05:30:00Z').getFullYear('-08:00') == 2022",
+            ),
+            (
+                "timestamp getMonth tz",
+                "timestamp('2023-01-01T05:30:00Z').getMonth('America/Los_Angeles') == 11",
+            ),
+            (
+                "timestamp getDayOfYear tz",
+                "timestamp('2023-01-01T05:30:00Z').getDayOfYear('-08:00') == 364",
+            ),
+            (
+                "timestamp getDayOfMonth tz",
+                "timestamp('2023-05-28T23:00:00Z').getDayOfMonth('+05:30') == 28",
+            ),
+            (
+                "timestamp getDate tz",
+                "timestamp('2023-05-28T23:00:00Z').getDate('+05:30') == 29",
+            ),
+            (
+                "timestamp getDayOfWeek tz",
+                "timestamp('2023-05-28T23:00:00Z').getDayOfWeek('+05:30') == 1",
+            ),
+            (
+                "timestamp getHours tz",
+                "timestamp('2023-05-28T23:00:00Z').getHours('05:30') == 4",
+            ),
+            (
+                "timestamp getMinutes tz",
+                "timestamp('2023-05-28T23:00:00Z').getMinutes('Asia/Kolkata') == 30",
+            ),
+            (
+                "timestamp getSeconds tz",
+                "timestamp('2023-05-28T00:00:06Z').getSeconds('-00:30') == 6",
+            ),
+            (
+                "timestamp getMilliseconds tz",
+                "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds('UTC') == 123",
+            ),
         ]
         .iter()
         .for_each(assert_script);
 
         [
+            (
+                "timestamp tz unknown name",
+                "timestamp('2023-05-28T00:00:00Z').getHours('Mars/Base')",
+                "Error executing function 'timezone': unknown time zone Mars/Base",
+            ),
+            (
+                "timestamp tz offset hours out of range",
+                "timestamp('2023-05-28T00:00:00Z').getHours('24:00')",
+                "Error executing function 'timezone': timezone offset hours out of range [-23, 23]: 24:00",
+            ),
+            (
+                "timestamp tz offset minutes out of range",
+                "timestamp('2023-05-28T00:00:00Z').getHours('+01:60')",
+                "Error executing function 'timezone': timezone offset minutes out of range [0, 59]: +01:60",
+            ),
+            (
+                "timestamp tz offset not a number",
+                "timestamp('2023-05-28T00:00:00Z').getHours('ab:00')",
+                "Error executing function 'timezone': invalid digit found in string",
+            ),
+            (
+                "timestamp tz wrong argument type",
+                "timestamp('2023-05-28T00:00:00Z').getHours(1)",
+                "found no matching overload for 'getHours' applied to 'google.protobuf.Timestamp.(int)'",
+            ),
             (
                 "timestamp out of range",
                 "timestamp('0000-01-00T00:00:00Z')",

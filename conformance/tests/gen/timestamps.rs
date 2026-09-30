@@ -234,7 +234,6 @@ mod timestamp_selectors_tz {
     use dedent::dedent;
 
     // Test: getDate
-    #[should_panic]
     #[test]
     fn getdate() {
         run_test(&dedent!(
@@ -246,7 +245,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_name_pos
-    #[should_panic]
     #[test]
     fn getdayofmonth_name_pos() {
         run_test(&dedent!(
@@ -258,7 +256,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_numerical_pos
-    #[should_panic]
     #[test]
     fn getdayofmonth_numerical_pos() {
         run_test(&dedent!(
@@ -270,7 +267,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_numerical_neg
-    #[should_panic]
     #[test]
     fn getdayofmonth_numerical_neg() {
         run_test(&dedent!(
@@ -282,7 +278,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfMonth_name_neg
-    #[should_panic]
     #[test]
     fn getdayofmonth_name_neg() {
         run_test(&dedent!(
@@ -294,7 +289,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfWeek
-    #[should_panic]
     #[test]
     fn getdayofweek() {
         run_test(&dedent!(
@@ -306,7 +300,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getDayOfYear
-    #[should_panic]
     #[test]
     fn getdayofyear() {
         run_test(&dedent!(
@@ -318,7 +311,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getFullYear
-    #[should_panic]
     #[test]
     fn getfullyear() {
         run_test(&dedent!(
@@ -330,7 +322,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getHours
-    #[should_panic]
     #[test]
     fn gethours() {
         run_test(&dedent!(
@@ -342,7 +333,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getMinutes
-    #[should_panic]
     #[test]
     fn getminutes() {
         run_test(&dedent!(
@@ -354,7 +344,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getMonth
-    #[should_panic]
     #[test]
     fn getmonth() {
         run_test(&dedent!(
@@ -366,7 +355,6 @@ mod timestamp_selectors_tz {
     }
 
     // Test: getSeconds
-    #[should_panic]
     #[test]
     fn getseconds() {
         run_test(&dedent!(
