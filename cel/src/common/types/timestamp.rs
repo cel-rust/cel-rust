@@ -20,6 +20,20 @@ impl Timestamp {
     pub fn inner(&self) -> &chrono::DateTime<chrono::FixedOffset> {
         &self.0
     }
+
+    /// Formats like cel-go's `Timestamp.ConvertToType(StringType)`: UTC,
+    /// always `Z`, and a trimmed fractional part (dropped when it's zero).
+    pub(crate) fn to_rfc3339_nano(&self) -> String {
+        let utc = self.0.with_timezone(&chrono::Utc);
+        let nanos = utc.timestamp_subsec_nanos() % 1_000_000_000;
+        let base = utc.format("%Y-%m-%dT%H:%M:%S");
+        if nanos == 0 {
+            format!("{base}Z")
+        } else {
+            let frac = format!("{nanos:09}");
+            format!("{base}.{}Z", frac.trim_end_matches('0'))
+        }
+    }
 }
 
 impl Val for Timestamp {

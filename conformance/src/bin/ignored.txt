@@ -1144,12 +1144,9 @@ string_ext::trim::unicode_no_trim
 string_ext::trim::unicode_space_chars_1
 string_ext::trim::unicode_space_chars_2
 string_ext::trim::unicode_space_chars_3
-timestamps::duration_conversions::tostring_duration
 timestamps::duration_converters::get_milliseconds
 timestamps::timestamp_arithmetic::add_time_to_duration
 timestamps::timestamp_conversions::toint_timestamp
-timestamps::timestamp_conversions::tostring_timestamp
-timestamps::timestamp_conversions::tostring_timestamp_nanos
 timestamps::timestamp_range::from_string_under
 type_deduction::complex_initializers::list
 type_deduction::complex_initializers::map
