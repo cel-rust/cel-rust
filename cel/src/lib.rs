@@ -8,7 +8,8 @@
 //!   struct definitions using [`StructDef`], or any other `StructType`, and add
 //!   them to your [`Env`]. Custom structs can then be instantiated and accessed
 //!   within CEL expressions.
-//! - `chrono`: Enables support for `duration` and `timestamp` types using the `chrono` crate.
+//! - `chrono`: Enables support for `duration` and `timestamp` types using the `chrono` crate (and `chrono-tz` for
+//!   IANA time zone arguments).
 //! - `regex`: Enables support for regular expressions.
 //! - `json`: Enables conversion between CEL values and JSON.
 //!
