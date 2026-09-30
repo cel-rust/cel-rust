@@ -3,6 +3,9 @@ use crate::common::ast::{
 };
 use crate::parser::{MacroExprHelper, ParseError};
 
+const OPT_MAP: &str = "optMap";
+const OPT_FLAT_MAP: &str = "optFlatMap";
+
 pub type MacroExpander = fn(
     helper: &mut MacroExprHelper,
     target: Option<IdedExpr>,
@@ -13,8 +16,15 @@ pub fn find_expander(
     func_name: &str,
     target: Option<&IdedExpr>,
     args: &[IdedExpr],
+    optional_syntax: bool,
 ) -> Option<MacroExpander> {
     match func_name {
+        OPT_MAP if optional_syntax && args.len() == 2 && target.is_some() => {
+            Some(opt_map_macro_expander)
+        }
+        OPT_FLAT_MAP if optional_syntax && args.len() == 2 && target.is_some() => {
+            Some(opt_flat_map_macro_expander)
+        }
         operators::HAS if args.len() == 1 && target.is_none() => Some(has_macro_expander),
         operators::EXISTS if args.len() == 2 && target.is_some() => Some(exists_macro_expander),
         operators::ALL if args.len() == 2 && target.is_some() => Some(all_macro_expander),
@@ -323,6 +333,98 @@ fn filter_macro_expander(
             result,
         }))),
     )
+}
+
+fn opt_map_macro_expander(
+    helper: &mut MacroExprHelper,
+    target: Option<IdedExpr>,
+    args: Vec<IdedExpr>,
+) -> Result<IdedExpr, ParseError> {
+    opt_macro_expander(helper, target, args, true)
+}
+
+fn opt_flat_map_macro_expander(
+    helper: &mut MacroExprHelper,
+    target: Option<IdedExpr>,
+    args: Vec<IdedExpr>,
+) -> Result<IdedExpr, ParseError> {
+    opt_macro_expander(helper, target, args, false)
+}
+
+/// `t.hasValue() ? [optional.of(]<expr>[)] with var = t.value() : optional.none()`,
+/// binding a non-identifier target once, as cel-go's optMap/optFlatMap do.
+fn opt_macro_expander(
+    helper: &mut MacroExprHelper,
+    target: Option<IdedExpr>,
+    mut args: Vec<IdedExpr>,
+    wrap: bool,
+) -> Result<IdedExpr, ParseError> {
+    let target = target.expect("Expected a target, but got `None`!");
+    let map_expr = args.pop().expect("Expected two args!");
+    let var = extract_ident(args.pop().expect("Expected two args!"), helper)?;
+
+    let unused = "#unused".to_string();
+    let target_var = match &target.expr {
+        Expr::Ident(name) => name.clone(),
+        _ => "@target".to_string(),
+    };
+
+    let ident = |helper: &mut MacroExprHelper| helper.next_expr(Expr::Ident(target_var.clone()));
+    let receiver = ident(helper);
+    let has_value = helper.next_expr(Expr::Call(CallExpr {
+        func_name: "hasValue".to_string(),
+        target: Some(Box::new(receiver)),
+        args: vec![],
+    }));
+    let receiver = ident(helper);
+    let value = helper.next_expr(Expr::Call(CallExpr {
+        func_name: "value".to_string(),
+        target: Some(Box::new(receiver)),
+        args: vec![],
+    }));
+
+    let comprehension = |helper: &mut MacroExprHelper, var: &str, init, result| {
+        let iter_range = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
+        let loop_cond = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
+        let loop_step = helper.next_expr(Expr::Ident(var.to_string()));
+        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+            iter_range,
+            iter_var: unused.clone(),
+            iter_var2: None,
+            accu_var: var.to_string(),
+            accu_init: init,
+            loop_cond,
+            loop_step,
+            result,
+        })))
+    };
+
+    let mut mapped = comprehension(helper, &var, value, map_expr);
+    if wrap {
+        let optional = helper.next_expr(Expr::Ident("optional".to_string()));
+        mapped = helper.next_expr(Expr::Call(CallExpr {
+            func_name: "of".to_string(),
+            target: Some(Box::new(optional)),
+            args: vec![mapped],
+        }));
+    }
+    let optional = helper.next_expr(Expr::Ident("optional".to_string()));
+    let none = helper.next_expr(Expr::Call(CallExpr {
+        func_name: "none".to_string(),
+        target: Some(Box::new(optional)),
+        args: vec![],
+    }));
+    let result = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::CONDITIONAL.to_string(),
+        target: None,
+        args: vec![has_value, mapped, none],
+    }));
+
+    if matches!(target.expr, Expr::Ident(_)) {
+        Ok(result)
+    } else {
+        Ok(comprehension(helper, &target_var, target, result))
+    }
 }
 
 fn extract_ident(expr: IdedExpr, helper: &mut MacroExprHelper) -> Result<String, ParseError> {

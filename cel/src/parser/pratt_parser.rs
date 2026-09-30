@@ -1471,7 +1471,12 @@ impl<'a> PrattParserWorker<'a> {
         target: Option<IdedExpr>,
         args: Vec<IdedExpr>,
     ) -> Option<IdedExpr> {
-        if let Some(expander) = macros::find_expander(func_name, target.as_ref(), &args) {
+        if let Some(expander) = macros::find_expander(
+            func_name,
+            target.as_ref(),
+            &args,
+            self.enable_optional_syntax,
+        ) {
             if self.helper.next_id as usize > self.max_expression_node_count {
                 let pos = self.helper.source_info.pos_for(id).unwrap_or((1, 1));
                 self.errors.push(ParseError {

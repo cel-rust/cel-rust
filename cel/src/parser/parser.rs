@@ -187,7 +187,7 @@ impl Parser {
         func_name: String,
         args: Vec<IdedExpr>,
     ) -> IdedExpr {
-        match macros::find_expander(&func_name, None, &args) {
+        match macros::find_expander(&func_name, None, &args, self.enable_optional_syntax) {
             None => IdedExpr {
                 id,
                 expr: Expr::Call(CallExpr {
@@ -216,7 +216,12 @@ impl Parser {
         target: IdedExpr,
         args: Vec<IdedExpr>,
     ) -> IdedExpr {
-        match macros::find_expander(&func_name, Some(&target), &args) {
+        match macros::find_expander(
+            &func_name,
+            Some(&target),
+            &args,
+            self.enable_optional_syntax,
+        ) {
             None => IdedExpr {
                 id,
                 expr: Expr::Call(CallExpr {
