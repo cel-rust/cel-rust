@@ -6,7 +6,7 @@ license = "MIT"
 rust-version = "1.86.0"
 
 [package.metadata.generate]
-cel_spec_version = "v0.25.1"
+cel_spec_version = "v0.25.3"
 
 [features]
 skip-version-check = []

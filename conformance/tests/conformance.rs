@@ -37,6 +37,9 @@ mod integer_math;
 #[path = "gen/lists.rs"]
 #[allow(clippy::all)]
 mod lists;
+#[path = "gen/lists_ext.rs"]
+#[allow(clippy::all)]
+mod lists_ext;
 #[path = "gen/logic.rs"]
 #[allow(clippy::all)]
 mod logic;
@@ -52,6 +55,9 @@ mod math_ext;
 #[path = "gen/namespace.rs"]
 #[allow(clippy::all)]
 mod namespace;
+#[path = "gen/network_ext.rs"]
+#[allow(clippy::all)]
+mod network_ext;
 #[path = "gen/optionals.rs"]
 #[allow(clippy::all)]
 mod optionals;

@@ -1300,6 +1300,34 @@ mod format {
         ));
     }
 
+    // Test: default precision for fixed-point clause with int
+    #[should_panic]
+    #[test]
+    fn default_precision_for_fixed_point_clause_with_int() {
+        run_test(&dedent!(
+            r#"
+                expr: '"%f".format([2])'
+                value: {
+                  string_value: '2.000000',
+                }
+            "#
+        ));
+    }
+
+    // Test: default precision for fixed-point clause with uint
+    #[should_panic]
+    #[test]
+    fn default_precision_for_fixed_point_clause_with_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: '"%f".format([3u])'
+                value: {
+                  string_value: '3.000000',
+                }
+            "#
+        ));
+    }
+
     // Test: default precision for scientific notation
     #[should_panic]
     #[test]
@@ -1309,6 +1337,34 @@ mod format {
                 expr: '"%e".format([2.71828])'
                 value: {
                   string_value: '2.718280e+00',
+                }
+            "#
+        ));
+    }
+
+    // Test: default precision for scientific notation with int
+    #[should_panic]
+    #[test]
+    fn default_precision_for_scientific_notation_with_int() {
+        run_test(&dedent!(
+            r#"
+                expr: '"%e".format([2])'
+                value: {
+                  string_value: '2.000000e+00',
+                }
+            "#
+        ));
+    }
+
+    // Test: default precision for scientific notation with uint
+    #[should_panic]
+    #[test]
+    fn default_precision_for_scientific_notation_with_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: '"%e".format([3u])'
+                value: {
+                  string_value: '3.000000e+00',
                 }
             "#
         ));
@@ -2923,6 +2979,46 @@ mod type_errors {
                     message: "no such overload"
                   }
                 }
+            "#
+        ));
+    }
+}
+
+// Section: reverse
+// Tests for (string).reverse(). Added in version 3.
+mod reverse {
+    use conformance::runner::run_test;
+    use dedent::dedent;
+
+    // Test: empty
+    #[should_panic]
+    #[test]
+    fn empty() {
+        run_test(&dedent!(
+            r#"
+                expr: "''.reverse() == ''"
+            "#
+        ));
+    }
+
+    // Test: single_character
+    #[should_panic]
+    #[test]
+    fn single_character() {
+        run_test(&dedent!(
+            r#"
+                expr: "'☺'.reverse() == '☺'"
+            "#
+        ));
+    }
+
+    // Test: multiple
+    #[should_panic]
+    #[test]
+    fn multiple() {
+        run_test(&dedent!(
+            r#"
+                expr: "'Ta©oCαt'.reverse() == 'tαCo©aT'"
             "#
         ));
     }
