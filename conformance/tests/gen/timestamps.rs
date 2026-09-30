@@ -11,7 +11,6 @@ mod timestamp_conversions {
     use dedent::dedent;
 
     // Test: toInt_timestamp
-    #[should_panic]
     #[test]
     fn toint_timestamp() {
         run_test(&dedent!(
@@ -483,7 +482,6 @@ mod timestamp_arithmetic {
     }
 
     // Test: add_time_to_duration
-    #[should_panic]
     #[test]
     fn add_time_to_duration() {
         run_test(&dedent!(

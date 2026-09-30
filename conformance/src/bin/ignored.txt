@@ -46,7 +46,6 @@ block_ext::basic::timestamp
 comparisons::eq_literal::eq_dyn_json_null
 comparisons::eq_literal::not_eq_dyn_proto2_msg_null
 comparisons::eq_literal::not_eq_dyn_proto3_msg_null
-comparisons::eq_literal::not_eq_dyn_timestamp_null
 comparisons::eq_wrapper::eq_bool
 comparisons::eq_wrapper::eq_bool_empty
 comparisons::eq_wrapper::eq_bool_not_null
@@ -116,8 +115,6 @@ comparisons::ne_literal::ne_proto3_any_unpack_bytewise_fallback
 comparisons::ne_literal::ne_proto3_missing_fields_neq
 comparisons::ne_literal::ne_proto_different_types
 comparisons::ne_literal::ne_proto_nan_not_equal
-conversions::identity::timestamp
-conversions::int::timestamp
 dynamic::any::field_assign_proto2
 dynamic::any::field_assign_proto3
 dynamic::any::field_read_proto2
@@ -1144,8 +1141,6 @@ string_ext::trim::unicode_space_chars_1
 string_ext::trim::unicode_space_chars_2
 string_ext::trim::unicode_space_chars_3
 timestamps::duration_converters::get_milliseconds
-timestamps::timestamp_arithmetic::add_time_to_duration
-timestamps::timestamp_conversions::toint_timestamp
 type_deduction::complex_initializers::list
 type_deduction::complex_initializers::map
 type_deduction::complex_initializers::r#struct
