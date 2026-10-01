@@ -132,7 +132,6 @@ mod namespace_shadowing {
     }
 
     // Test: disambiguation
-    #[should_panic]
     #[test]
     fn disambiguation() {
         run_test(&dedent!(
@@ -181,7 +180,6 @@ mod namespace_shadowing {
     }
 
     // Test: comprehension_shadowing_disambiguation
-    #[should_panic]
     #[test]
     fn comprehension_shadowing_disambiguation() {
         run_test(&dedent!(
@@ -223,7 +221,6 @@ mod namespace_shadowing {
     }
 
     // Test: comprehension_shadowing_selector
-    #[should_panic]
     #[test]
     fn comprehension_shadowing_selector() {
         run_test(&dedent!(
@@ -243,7 +240,6 @@ mod namespace_shadowing {
     }
 
     // Test: comprehension_shadowing_selector_parse_only
-    #[should_panic]
     #[test]
     fn comprehension_shadowing_selector_parse_only() {
         run_test(&dedent!(
@@ -305,7 +301,6 @@ mod namespace_shadowing {
     }
 
     // Test: comprehension_shadowing_namespaced_selector_disambiguation
-    #[should_panic]
     #[test]
     fn comprehension_shadowing_namespaced_selector_disambiguation() {
         run_test(&dedent!(

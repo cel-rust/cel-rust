@@ -1,3 +1,4 @@
+use crate::common::types::CelType;
 use crate::common::value::{CowVal, Val};
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
@@ -142,25 +143,42 @@ impl<'p, 'v> Context<'p, 'v> {
         S: AsRef<str>,
     {
         let name = name.as_ref();
-        match self {
+        self.scopes().find_map(|scope| scope.own_variable(name))
+    }
+
+    /// This scope, then its parents, innermost first.
+    fn scopes<'b>(&'b self) -> impl Iterator<Item = &'b Context<'p, 'v>> {
+        std::iter::successors(Some(self), |scope| match scope {
+            Context::Child { parent, .. } => Some(*parent),
+            Context::Root { .. } => None,
+        })
+    }
+
+    /// The scopes `name` may be resolved in: an absolute name, one with a
+    /// leading dot, skips the inner ones.
+    fn scopes_for<'b>(&'b self, name: &str) -> impl Iterator<Item = &'b Context<'p, 'v>> {
+        let absolute = name.starts_with('.');
+        self.scopes()
+            .filter(move |scope| !absolute || matches!(scope, Context::Root { .. }))
+    }
+
+    /// A variable of this scope alone.
+    fn own_variable<'b>(&'b self, name: &str) -> Option<CowVal<'b, 'v>> {
+        let (variables, resolver) = match self {
             Context::Child {
-                variables,
-                parent,
-                resolver,
-            } => resolver.and_then(|r| r.resolve(name)).or_else(|| {
-                variables
-                    .get(name)
-                    .map(|b| CowVal::Borrowed(b.as_ref()))
-                    .or_else(|| parent.get_variable(name))
-            }),
-            Context::Root {
                 variables,
                 resolver,
                 ..
-            } => resolver
-                .and_then(|r| r.resolve(name))
-                .or_else(|| variables.get(name).map(|v| CowVal::Borrowed(v.as_ref()))),
-        }
+            }
+            | Context::Root {
+                variables,
+                resolver,
+                ..
+            } => (variables, resolver),
+        };
+        resolver
+            .and_then(|r| r.resolve(name))
+            .or_else(|| variables.get(name).map(|v| CowVal::Borrowed(v.as_ref())))
     }
 
     pub(crate) fn env(&self) -> &Env {
@@ -179,6 +197,87 @@ impl<'p, 'v> Context<'p, 'v> {
             }
             Context::Child { parent, .. } => parent.has_function_namespace(namespace),
         }
+    }
+
+    /// Resolves `name` as an identifier: the innermost scope that has it
+    /// wins, and within a scope a variable shadows a type of the same name.
+    /// An absolute name skips the inner scopes.
+    pub(crate) fn resolve_ident(&self, name: &str) -> Option<CowVal<'_, 'v>> {
+        self.scopes_for(name)
+            .find_map(|scope| scope.resolve_own(name, true))
+    }
+
+    /// Resolves the qualified name `a.b.c`, given as its segments, to a value
+    /// and the fields left to select on it.
+    ///
+    /// The innermost scope that has any of it wins. Within a scope, as in
+    /// cel-go, the most specific name wins: the variable `a.b.c`, else the
+    /// type `a.b.c`, else the variable `a.b` with `c` left to select, else the
+    /// variable `a` with `b` and `c` left. Only the whole name can be a type,
+    /// as types have no fields.
+    pub(crate) fn resolve_qualified<'b, 's>(
+        &'b self,
+        segments: &'s [&'b str],
+    ) -> Result<(CowVal<'b, 'v>, &'s [&'b str]), ExecutionError> {
+        let name = segments.join(".");
+        for scope in self.scopes_for(&name) {
+            let mut len = name.len();
+            for prefix in (1..=segments.len()).rev() {
+                let whole = prefix == segments.len();
+                if let Some(value) = scope.resolve_own(&name[..len], whole) {
+                    return Ok((value, &segments[prefix..]));
+                }
+                // drop the last segment and its dot
+                len = len.saturating_sub(segments[prefix - 1].len() + 1);
+            }
+        }
+        Err(ExecutionError::UndeclaredReference(Arc::new(
+            segments[0].to_owned(),
+        )))
+    }
+
+    /// The variable of this scope called `name`, else, in the root scope, the
+    /// type, if `may_be_type`.
+    fn resolve_own(&self, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
+        let name = root_relative(name);
+        self.own_variable(name).or_else(|| {
+            if !may_be_type || !matches!(self, Context::Root { .. }) {
+                return None;
+            }
+            let t = self.env().types().find_type(name)?;
+            Some(CowVal::owned(CelType::from(t)))
+        })
+    }
+
+    fn has_function(&self, name: &str) -> bool {
+        self.env().has_overload(name) || self.get_function(name).is_some()
+    }
+
+    /// The name of the global function a call to `name` calls. Functions are
+    /// declared on the root scope, so an absolute name only loses its dot.
+    pub(crate) fn resolve_function<'n>(&self, name: &'n str) -> &'n str {
+        root_relative(name)
+    }
+
+    /// The name of the function a call on `target` names when `target` spells a
+    /// qualified name that, with `func_name`, names a declared function:
+    /// `a.b.f()` calls the function `a.b.f`, rather than `f` on `a.b`. Mirrors
+    /// cel-go's `resolveFunction`, deciding on the name alone, but on every
+    /// evaluation: a target whose first segment is no function's namespace, as
+    /// most are, is told apart without allocating.
+    pub(crate) fn resolve_qualified_function(
+        &self,
+        target: &Expression,
+        func_name: &str,
+    ) -> Option<String> {
+        let root = root_relative(target.expr.qualified_name_root()?);
+        if !self.has_function_namespace(root) {
+            return None;
+        }
+        let segments = target.expr.qualified_name_segments()?;
+        let name = format!("{}.{func_name}", segments.join("."));
+        let name = root_relative(&name);
+        self.has_function(name).then(|| name.to_owned())
     }
 
     #[allow(dead_code)]
@@ -280,6 +379,11 @@ impl<'p, 'v> Context<'p, 'v> {
             resolver: None,
         }
     }
+}
+
+/// `name` without the leading dot that makes it absolute.
+fn root_relative(name: &str) -> &str {
+    name.strip_prefix('.').unwrap_or(name)
 }
 
 impl Default for Context<'_, '_> {

@@ -1347,7 +1347,8 @@ impl Value {
                             .iter()
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
-                        call_function(ctx, &call.func_name, &call.func_name, args?)
+                        let name = ctx.resolve_function(&call.func_name);
+                        call_function(ctx, name, &call.func_name, args?)
                     }
                     Some(target_expr) => {
                         let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
@@ -1361,7 +1362,7 @@ impl Value {
                         // a call to that function: `optional.of(x)` calls
                         // `optional.of`.
                         if let Some(name) =
-                            qualified_function_name(ctx, target_expr, &call.func_name)
+                            ctx.resolve_qualified_function(target_expr, &call.func_name)
                         {
                             return call_function(ctx, &name, &call.func_name, args);
                         }
@@ -1393,14 +1394,9 @@ impl Value {
                     }
                 }
             }
-            // a variable shadows a type of the same name
-            Expr::Ident(name) => Ok(ctx
-                .get_variable(name)
-                .or_else(|| {
-                    let t = ctx.env().types().find_type(name)?;
-                    Some(CowVal::owned(CelType::from(t)))
-                })
-                .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))?),
+            Expr::Ident(name) => ctx
+                .resolve_ident(name)
+                .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string()))),
             Expr::Select(select) => {
                 // `has(a.b.c)` tests for `c` on `a.b`: only its operand is a name
                 let name = if select.test {
@@ -1412,7 +1408,7 @@ impl Value {
                     let left = Value::resolve_val(select.operand.deref(), ctx)?;
                     return select_field(left, &select.field, select.test);
                 };
-                let (mut value, fields) = resolve_qualified_name(ctx, &name)?;
+                let (mut value, fields) = ctx.resolve_qualified(&name)?;
                 for field in fields {
                     value = select_field(value, field, false)?;
                 }
@@ -1712,58 +1708,6 @@ fn call_function<'e, 'p, 'v>(
     };
     let mut ctx = FunctionContext::new(ftx_name, None, ctx, args);
     (func)(&mut ctx)
-}
-
-/// The name of the function a call on `target` names when `target` spells a
-/// qualified name: `a.b.f()` calls the function `a.b.f`, if there is one,
-/// rather than `f` on `a.b`. Mirrors cel-go's `resolveFunction`, deciding on
-/// the name alone, but on every evaluation: a target whose first segment is
-/// no function's namespace, as most are, is told apart without allocating.
-fn qualified_function_name(ctx: &Context, target: &Expression, func_name: &str) -> Option<String> {
-    if !ctx.has_function_namespace(target.expr.qualified_name_root()?) {
-        return None;
-    }
-    let segments = target.expr.qualified_name_segments()?;
-    let mut name = String::with_capacity(
-        segments.iter().map(|s| s.len() + 1).sum::<usize>() + func_name.len(),
-    );
-    for segment in segments {
-        name.push_str(segment);
-        name.push('.');
-    }
-    name.push_str(func_name);
-    (ctx.env().has_overload(&name) || ctx.get_function(&name).is_some()).then_some(name)
-}
-
-/// Resolves the qualified name `a.b.c`, given as its segments, to a value
-/// and the fields left to select on it.
-///
-/// As in cel-go, the most specific name wins: the variable `a.b.c`, else the
-/// type `a.b.c`, else the variable `a.b` with `c` left to select, else the
-/// variable `a` with `b` and `c` left. Only the whole name can be a type, as
-/// types have no fields.
-fn resolve_qualified_name<'e, 'p, 'v, 's>(
-    ctx: &'e Context<'p, 'v>,
-    segments: &'s [&'e str],
-) -> Result<(CowVal<'e, 'v>, &'s [&'e str]), ExecutionError> {
-    let name = segments.join(".");
-    let mut len = name.len();
-    for prefix in (1..=segments.len()).rev() {
-        let candidate = &name[..len];
-        if let Some(value) = ctx.get_variable(candidate) {
-            return Ok((value, &segments[prefix..]));
-        }
-        if prefix == segments.len() {
-            if let Some(t) = ctx.env().types().find_type(candidate) {
-                return Ok((CowVal::owned(CelType::from(t)), &[]));
-            }
-        }
-        // drop the last segment and its dot
-        len = len.saturating_sub(segments[prefix - 1].len() + 1);
-    }
-    Err(ExecutionError::UndeclaredReference(Arc::new(
-        segments[0].to_owned(),
-    )))
 }
 
 /// Selects `field` on `left`, the already resolved operand of a select:
@@ -3083,6 +3027,115 @@ mod tests {
             let mut context = Context::default();
             context.add_variable_from_value("a.b.c", 1);
             assert_eq!(execute(&context, "has(a.b.c)"), undeclared("a"));
+        }
+    }
+
+    mod scopes {
+        use crate::{Context, ExecutionError, Program, Value};
+        use std::collections::HashMap;
+        use std::sync::Arc;
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        fn undeclared(name: &str) -> Result<Value, ExecutionError> {
+            Err(ExecutionError::UndeclaredReference(Arc::new(
+                name.to_string(),
+            )))
+        }
+
+        #[test]
+        fn a_dotted_variable_of_an_inner_scope_resolves() {
+            let root = Context::default();
+            let mut child = root.new_inner_scope();
+            child.add_variable_from_value("a.b", 7);
+            child.add_variable_from_value("m.n", HashMap::from([("c", 8)]));
+            assert_eq!(execute(&child, "a.b"), Ok(Value::Int(7)));
+            assert_eq!(execute(&child, "m.n.c"), Ok(Value::Int(8)));
+        }
+
+        #[test]
+        fn an_inner_variable_shadows_a_dotted_root_name() {
+            let mut root = Context::default();
+            root.add_variable_from_value("a.b", 1);
+            root.add_variable_from_value("a", HashMap::from([("b", 2)]));
+            let mut child = root.new_inner_scope();
+            child.add_variable_from_value("a", HashMap::from([("b", 3)]));
+            assert_eq!(execute(&child, "a.b"), Ok(Value::Int(3)));
+            assert_eq!(execute(&root, "a.b"), Ok(Value::Int(1)));
+        }
+
+        #[test]
+        fn a_macro_variable_shadows_a_dotted_global() {
+            let mut context = Context::default();
+            context.add_variable_from_value("y.z", 1);
+            assert_eq!(
+                execute(&context, "[{'z':0}].exists(y, y.z == 0)"),
+                Ok(Value::Bool(true))
+            );
+            assert_eq!(execute(&context, "y.z"), Ok(Value::Int(1)));
+        }
+
+        #[test]
+        fn the_longest_prefix_wins_within_a_scope() {
+            let mut root = Context::default();
+            root.add_variable_from_value("a", HashMap::from([("b", 1)]));
+            let mut child = root.new_inner_scope();
+            child.add_variable_from_value("a.b", 2);
+            assert_eq!(execute(&child, "a.b"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn a_name_missing_from_an_inner_scope_resolves_in_its_parent() {
+            let mut root = Context::default();
+            root.add_variable_from_value("a.b", 1);
+            let mut child = root.new_inner_scope();
+            child.add_variable_from_value("a.c", 2);
+            assert_eq!(execute(&child, "a.b"), Ok(Value::Int(1)));
+        }
+
+        #[test]
+        fn a_leading_dot_skips_inner_scopes() {
+            let mut root = Context::default();
+            root.add_variable_from_value("q", 1);
+            let mut child = root.new_inner_scope();
+            child.add_variable_from_value("q", 2);
+            assert_eq!(execute(&child, "q"), Ok(Value::Int(2)));
+            assert_eq!(execute(&child, ".q"), Ok(Value::Int(1)));
+            assert_eq!(
+                execute(&root, "[2].map(q, .q + q)"),
+                Ok(Value::List(vec![Value::Int(3)].into()))
+            );
+        }
+
+        #[test]
+        fn a_leading_dot_resolves_a_dotted_root_name() {
+            let mut root = Context::default();
+            root.add_variable_from_value("a.b", 1);
+            assert_eq!(execute(&root, ".a.b"), Ok(Value::Int(1)));
+            assert_eq!(
+                execute(&root, "[{'b':2}].map(a, [a.b, .a.b])"),
+                Ok(Value::List(
+                    vec![Value::List(vec![Value::Int(2), Value::Int(1)].into())].into()
+                ))
+            );
+        }
+
+        #[test]
+        fn a_leading_dot_name_that_is_not_declared_is_reported() {
+            let context = Context::default();
+            assert_eq!(execute(&context, ".q"), undeclared(".q"));
+            assert_eq!(execute(&context, ".a.b"), undeclared(".a"));
+        }
+
+        #[test]
+        fn a_leading_dot_calls_a_global_function() {
+            let mut context = Context::default();
+            context.add_function("f", |i: i64| i + 1).unwrap();
+            context.add_function("a.g", |i: i64| i + 2).unwrap();
+            assert_eq!(execute(&context, ".f(1)"), Ok(Value::Int(2)));
+            assert_eq!(execute(&context, ".a.g(1)"), Ok(Value::Int(3)));
         }
     }
 
