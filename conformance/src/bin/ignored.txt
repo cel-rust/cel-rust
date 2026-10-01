@@ -658,11 +658,6 @@ math_ext::trunc::positive
 namespace::namespace::self_eval_container_lookup
 namespace::namespace::self_eval_container_lookup_unchecked
 namespace::namespace_shadowing::basic
-namespace::namespace_shadowing::comprehension_shadowing_disambiguation
-namespace::namespace_shadowing::comprehension_shadowing_namespaced_selector_disambiguation
-namespace::namespace_shadowing::comprehension_shadowing_selector
-namespace::namespace_shadowing::comprehension_shadowing_selector_parse_only
-namespace::namespace_shadowing::disambiguation
 network_ext::cidr::cidr_contains_cidr
 network_ext::cidr::cidr_contains_cidr_ipv4_exact
 network_ext::cidr::cidr_contains_cidr_ipv4_object
