@@ -473,7 +473,6 @@ macros2::transformmap::many
 macros2::transformmap::many_filter
 macros2::transformmap::one
 macros2::transformmap::one_filter
-macros::all::list_elem_error_shortcircuit
 math_ext::abs::negative_double
 math_ext::abs::negative_int
 math_ext::abs::positive_double
