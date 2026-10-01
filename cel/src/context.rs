@@ -4,6 +4,7 @@ use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
 use crate::{DeclarationError, Env, ExecutionError};
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
@@ -200,8 +201,9 @@ impl<'p, 'v> Context<'p, 'v> {
     }
 
     /// Resolves `name` as an identifier: the innermost scope that has it
-    /// wins, and within a scope a variable shadows a type of the same name.
-    /// An absolute name skips the inner scopes.
+    /// wins, and within a scope the variable, else the type, of each
+    /// container candidate in turn, most specific first. An absolute name
+    /// skips the inner scopes.
     pub(crate) fn resolve_ident(&self, name: &str) -> Option<CowVal<'_, 'v>> {
         self.scopes_for(name)
             .find_map(|scope| scope.resolve_own(name, true))
@@ -236,48 +238,75 @@ impl<'p, 'v> Context<'p, 'v> {
         )))
     }
 
-    /// The variable of this scope called `name`, else, in the root scope, the
-    /// type, if `may_be_type`.
+    /// The variable of this scope named by a container candidate of `name`,
+    /// else, in the root scope, the type, if `may_be_type`.
     fn resolve_own(&self, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
-        let name = root_relative(name);
-        self.own_variable(name).or_else(|| {
-            if !may_be_type || !matches!(self, Context::Root { .. }) {
-                return None;
-            }
-            let t = self.env().types().find_type(name)?;
-            Some(CowVal::owned(CelType::from(t)))
+        let env = self.env();
+        env.container().candidates(name).find_map(|candidate| {
+            self.own_variable(&candidate).or_else(|| {
+                if !may_be_type || !matches!(self, Context::Root { .. }) {
+                    return None;
+                }
+                let t = env.types().find_type(&candidate)?;
+                Some(CowVal::owned(CelType::from(t)))
+            })
         })
+    }
+
+    /// The struct type `name` names under the container.
+    #[cfg(feature = "structs")]
+    pub(crate) fn find_struct(&self, name: &str) -> Option<&dyn crate::StructType> {
+        let types = self.env().types();
+        self.env()
+            .container()
+            .candidates(name)
+            .find_map(|candidate| types.find_struct(&candidate))
     }
 
     fn has_function(&self, name: &str) -> bool {
         self.env().has_overload(name) || self.get_function(name).is_some()
     }
 
-    /// The name of the global function a call to `name` calls. Functions are
-    /// declared on the root scope, so an absolute name only loses its dot.
-    pub(crate) fn resolve_function<'n>(&self, name: &'n str) -> &'n str {
-        root_relative(name)
+    /// The global function a call to `name` calls under the container: the
+    /// first candidate that is declared, else the plain name, which then
+    /// reports itself undeclared. The plain name, the only candidate without
+    /// a container, is not checked here: the call does that.
+    pub(crate) fn resolve_function<'n>(&self, name: &'n str) -> Cow<'n, str> {
+        let mut candidates = self.env().container().candidates(name).peekable();
+        while let Some(candidate) = candidates.next() {
+            if candidates.peek().is_none() || self.has_function(&candidate) {
+                return candidate;
+            }
+        }
+        Cow::Borrowed(name)
     }
 
     /// The name of the function a call on `target` names when `target` spells a
     /// qualified name that, with `func_name`, names a declared function:
-    /// `a.b.f()` calls the function `a.b.f`, rather than `f` on `a.b`. Mirrors
-    /// cel-go's `resolveFunction`, deciding on the name alone, but on every
-    /// evaluation: a target whose first segment is no function's namespace, as
-    /// most are, is told apart without allocating.
+    /// `a.b.f()` calls the function `a.b.f`, rather than `f` on `a.b`, under
+    /// the container too. Mirrors cel-go's `resolveFunction`, deciding on the
+    /// name alone, but on every evaluation: a target whose first segment is no
+    /// function's namespace, as most are, is told apart without allocating.
     pub(crate) fn resolve_qualified_function(
         &self,
         target: &Expression,
         func_name: &str,
     ) -> Option<String> {
-        let root = root_relative(target.expr.qualified_name_root()?);
-        if !self.has_function_namespace(root) {
+        let container = self.env().container();
+        let root = target.expr.qualified_name_root()?;
+        if !container
+            .candidates(root)
+            .any(|c| self.has_function_namespace(c.split('.').next().unwrap_or_default()))
+        {
             return None;
         }
         let segments = target.expr.qualified_name_segments()?;
         let name = format!("{}.{func_name}", segments.join("."));
-        let name = root_relative(&name);
-        self.has_function(name).then(|| name.to_owned())
+        let found = container
+            .candidates(&name)
+            .find(|candidate| self.has_function(candidate))
+            .map(Cow::into_owned);
+        found
     }
 
     #[allow(dead_code)]
@@ -379,11 +408,6 @@ impl<'p, 'v> Context<'p, 'v> {
             resolver: None,
         }
     }
-}
-
-/// `name` without the leading dot that makes it absolute.
-fn root_relative(name: &str) -> &str {
-    name.strip_prefix('.').unwrap_or(name)
 }
 
 impl Default for Context<'_, '_> {

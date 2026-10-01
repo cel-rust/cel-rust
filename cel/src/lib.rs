@@ -25,6 +25,7 @@ mod macros;
 pub use macros::to_camel_case;
 
 pub mod common;
+mod container;
 pub mod context;
 mod env;
 pub mod parser;
@@ -341,6 +342,10 @@ pub enum DeclarationError {
     /// or several separated by dots, so no expression could refer to it.
     #[error("Cannot register type '{name}': not a valid type name")]
     InvalidTypeName { name: String },
+    /// A container could not be created because its name is not empty and
+    /// not an identifier, or several separated by dots.
+    #[error("Invalid container name '{name}': not an identifier, or several separated by dots")]
+    InvalidContainerName { name: String },
 }
 
 impl DeclarationError {
@@ -365,6 +370,12 @@ impl DeclarationError {
 
     pub fn invalid_type_name(name: &str) -> Self {
         DeclarationError::InvalidTypeName {
+            name: name.to_string(),
+        }
+    }
+
+    pub fn invalid_container_name(name: &str) -> Self {
+        DeclarationError::InvalidContainerName {
             name: name.to_string(),
         }
     }

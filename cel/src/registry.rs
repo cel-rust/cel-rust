@@ -146,7 +146,7 @@ impl TypeRegistry {
 }
 
 /// Whether `name` is an identifier, or several separated by dots.
-fn is_qualified_ident(name: &str) -> bool {
+pub(crate) fn is_qualified_ident(name: &str) -> bool {
     name.split('.').all(|ident| {
         let mut chars = ident.chars();
         chars
