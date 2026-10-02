@@ -1532,7 +1532,6 @@ mod ceil {
     use dedent::dedent;
 
     // Test: negative
-    #[should_panic]
     #[test]
     fn negative() {
         run_test(&dedent!(
@@ -1546,7 +1545,6 @@ mod ceil {
     }
 
     // Test: positive
-    #[should_panic]
     #[test]
     fn positive() {
         run_test(&dedent!(
@@ -1581,7 +1579,6 @@ mod floor {
     use dedent::dedent;
 
     // Test: negative
-    #[should_panic]
     #[test]
     fn negative() {
         run_test(&dedent!(
@@ -1595,7 +1592,6 @@ mod floor {
     }
 
     // Test: positive
-    #[should_panic]
     #[test]
     fn positive() {
         run_test(&dedent!(
@@ -1630,7 +1626,6 @@ mod round {
     use dedent::dedent;
 
     // Test: negative_down
-    #[should_panic]
     #[test]
     fn negative_down() {
         run_test(&dedent!(
@@ -1644,7 +1639,6 @@ mod round {
     }
 
     // Test: negative_up
-    #[should_panic]
     #[test]
     fn negative_up() {
         run_test(&dedent!(
@@ -1658,7 +1652,6 @@ mod round {
     }
 
     // Test: negative_mid
-    #[should_panic]
     #[test]
     fn negative_mid() {
         run_test(&dedent!(
@@ -1672,7 +1665,6 @@ mod round {
     }
 
     // Test: positive_down
-    #[should_panic]
     #[test]
     fn positive_down() {
         run_test(&dedent!(
@@ -1686,7 +1678,6 @@ mod round {
     }
 
     // Test: positive_up
-    #[should_panic]
     #[test]
     fn positive_up() {
         run_test(&dedent!(
@@ -1700,7 +1691,6 @@ mod round {
     }
 
     // Test: nan
-    #[should_panic]
     #[test]
     fn nan() {
         run_test(&dedent!(
@@ -1732,7 +1722,6 @@ mod trunc {
     use dedent::dedent;
 
     // Test: negative
-    #[should_panic]
     #[test]
     fn negative() {
         run_test(&dedent!(
@@ -1746,7 +1735,6 @@ mod trunc {
     }
 
     // Test: positive
-    #[should_panic]
     #[test]
     fn positive() {
         run_test(&dedent!(
@@ -1760,7 +1748,6 @@ mod trunc {
     }
 
     // Test: nan
-    #[should_panic]
     #[test]
     fn nan() {
         run_test(&dedent!(
@@ -1792,7 +1779,6 @@ mod abs {
     use dedent::dedent;
 
     // Test: uint
-    #[should_panic]
     #[test]
     fn uint() {
         run_test(&dedent!(
@@ -1806,7 +1792,6 @@ mod abs {
     }
 
     // Test: positive_int
-    #[should_panic]
     #[test]
     fn positive_int() {
         run_test(&dedent!(
@@ -1820,7 +1805,6 @@ mod abs {
     }
 
     // Test: negative_int
-    #[should_panic]
     #[test]
     fn negative_int() {
         run_test(&dedent!(
@@ -1834,7 +1818,6 @@ mod abs {
     }
 
     // Test: positive_double
-    #[should_panic]
     #[test]
     fn positive_double() {
         run_test(&dedent!(
@@ -1848,7 +1831,6 @@ mod abs {
     }
 
     // Test: negative_double
-    #[should_panic]
     #[test]
     fn negative_double() {
         run_test(&dedent!(
@@ -1883,7 +1865,6 @@ mod sign {
     use dedent::dedent;
 
     // Test: positive_uint
-    #[should_panic]
     #[test]
     fn positive_uint() {
         run_test(&dedent!(
@@ -1897,7 +1878,6 @@ mod sign {
     }
 
     // Test: zero_uint
-    #[should_panic]
     #[test]
     fn zero_uint() {
         run_test(&dedent!(
@@ -1911,7 +1891,6 @@ mod sign {
     }
 
     // Test: positive_int
-    #[should_panic]
     #[test]
     fn positive_int() {
         run_test(&dedent!(
@@ -1925,7 +1904,6 @@ mod sign {
     }
 
     // Test: negative_int
-    #[should_panic]
     #[test]
     fn negative_int() {
         run_test(&dedent!(
@@ -1939,7 +1917,6 @@ mod sign {
     }
 
     // Test: zero_int
-    #[should_panic]
     #[test]
     fn zero_int() {
         run_test(&dedent!(
@@ -1953,7 +1930,6 @@ mod sign {
     }
 
     // Test: positive_double
-    #[should_panic]
     #[test]
     fn positive_double() {
         run_test(&dedent!(
@@ -1967,7 +1943,6 @@ mod sign {
     }
 
     // Test: negative_double
-    #[should_panic]
     #[test]
     fn negative_double() {
         run_test(&dedent!(
@@ -1981,7 +1956,6 @@ mod sign {
     }
 
     // Test: zero_double
-    #[should_panic]
     #[test]
     fn zero_double() {
         run_test(&dedent!(
@@ -2016,7 +1990,6 @@ mod isnan {
     use dedent::dedent;
 
     // Test: true
-    #[should_panic]
     #[test]
     fn r#true() {
         run_test(&dedent!(
@@ -2027,7 +2000,6 @@ mod isnan {
     }
 
     // Test: false
-    #[should_panic]
     #[test]
     fn r#false() {
         run_test(&dedent!(
@@ -2059,7 +2031,6 @@ mod isinf {
     use dedent::dedent;
 
     // Test: true
-    #[should_panic]
     #[test]
     fn r#true() {
         run_test(&dedent!(
@@ -2070,7 +2041,6 @@ mod isinf {
     }
 
     // Test: false
-    #[should_panic]
     #[test]
     fn r#false() {
         run_test(&dedent!(
@@ -2102,7 +2072,6 @@ mod isfinite {
     use dedent::dedent;
 
     // Test: true
-    #[should_panic]
     #[test]
     fn r#true() {
         run_test(&dedent!(
@@ -2113,7 +2082,6 @@ mod isfinite {
     }
 
     // Test: false_nan
-    #[should_panic]
     #[test]
     fn false_nan() {
         run_test(&dedent!(
@@ -2124,7 +2092,6 @@ mod isfinite {
     }
 
     // Test: false_inf
-    #[should_panic]
     #[test]
     fn false_inf() {
         run_test(&dedent!(
@@ -2156,7 +2123,6 @@ mod bit_and {
     use dedent::dedent;
 
     // Test: int_int_non_intersect
-    #[should_panic]
     #[test]
     fn int_int_non_intersect() {
         run_test(&dedent!(
@@ -2170,7 +2136,6 @@ mod bit_and {
     }
 
     // Test: int_int_intersect
-    #[should_panic]
     #[test]
     fn int_int_intersect() {
         run_test(&dedent!(
@@ -2184,7 +2149,6 @@ mod bit_and {
     }
 
     // Test: int_int_intersect_neg
-    #[should_panic]
     #[test]
     fn int_int_intersect_neg() {
         run_test(&dedent!(
@@ -2198,7 +2162,6 @@ mod bit_and {
     }
 
     // Test: uint_uint_non_intersect
-    #[should_panic]
     #[test]
     fn uint_uint_non_intersect() {
         run_test(&dedent!(
@@ -2212,7 +2175,6 @@ mod bit_and {
     }
 
     // Test: uint_uint_intersect
-    #[should_panic]
     #[test]
     fn uint_uint_intersect() {
         run_test(&dedent!(
@@ -2247,7 +2209,6 @@ mod bit_or {
     use dedent::dedent;
 
     // Test: int_int_positive
-    #[should_panic]
     #[test]
     fn int_int_positive() {
         run_test(&dedent!(
@@ -2261,7 +2222,6 @@ mod bit_or {
     }
 
     // Test: int_int_positive_negative
-    #[should_panic]
     #[test]
     fn int_int_positive_negative() {
         run_test(&dedent!(
@@ -2275,7 +2235,6 @@ mod bit_or {
     }
 
     // Test: uint_uint
-    #[should_panic]
     #[test]
     fn uint_uint() {
         run_test(&dedent!(
@@ -2310,7 +2269,6 @@ mod bit_xor {
     use dedent::dedent;
 
     // Test: int_int_positive
-    #[should_panic]
     #[test]
     fn int_int_positive() {
         run_test(&dedent!(
@@ -2324,7 +2282,6 @@ mod bit_xor {
     }
 
     // Test: int_int_positive_negative
-    #[should_panic]
     #[test]
     fn int_int_positive_negative() {
         run_test(&dedent!(
@@ -2338,7 +2295,6 @@ mod bit_xor {
     }
 
     // Test: uint_uint
-    #[should_panic]
     #[test]
     fn uint_uint() {
         run_test(&dedent!(
@@ -2373,7 +2329,6 @@ mod bit_not {
     use dedent::dedent;
 
     // Test: int_positive
-    #[should_panic]
     #[test]
     fn int_positive() {
         run_test(&dedent!(
@@ -2387,7 +2342,6 @@ mod bit_not {
     }
 
     // Test: int_negative
-    #[should_panic]
     #[test]
     fn int_negative() {
         run_test(&dedent!(
@@ -2401,7 +2355,6 @@ mod bit_not {
     }
 
     // Test: int_zero
-    #[should_panic]
     #[test]
     fn int_zero() {
         run_test(&dedent!(
@@ -2415,7 +2368,6 @@ mod bit_not {
     }
 
     // Test: uint_positive
-    #[should_panic]
     #[test]
     fn uint_positive() {
         run_test(&dedent!(
@@ -2429,7 +2381,6 @@ mod bit_not {
     }
 
     // Test: uint_zero
-    #[should_panic]
     #[test]
     fn uint_zero() {
         run_test(&dedent!(
@@ -2464,7 +2415,6 @@ mod bit_shift_left {
     use dedent::dedent;
 
     // Test: int
-    #[should_panic]
     #[test]
     fn int() {
         run_test(&dedent!(
@@ -2478,7 +2428,6 @@ mod bit_shift_left {
     }
 
     // Test: int_large_shift
-    #[should_panic]
     #[test]
     fn int_large_shift() {
         run_test(&dedent!(
@@ -2492,7 +2441,6 @@ mod bit_shift_left {
     }
 
     // Test: int_negative_large_shift
-    #[should_panic]
     #[test]
     fn int_negative_large_shift() {
         run_test(&dedent!(
@@ -2506,7 +2454,6 @@ mod bit_shift_left {
     }
 
     // Test: uint
-    #[should_panic]
     #[test]
     fn uint() {
         run_test(&dedent!(
@@ -2520,7 +2467,6 @@ mod bit_shift_left {
     }
 
     // Test: uint_large_shift
-    #[should_panic]
     #[test]
     fn uint_large_shift() {
         run_test(&dedent!(
@@ -2570,7 +2516,6 @@ mod bit_shift_right {
     use dedent::dedent;
 
     // Test: int
-    #[should_panic]
     #[test]
     fn int() {
         run_test(&dedent!(
@@ -2584,7 +2529,6 @@ mod bit_shift_right {
     }
 
     // Test: int_large_shift
-    #[should_panic]
     #[test]
     fn int_large_shift() {
         run_test(&dedent!(
@@ -2598,7 +2542,6 @@ mod bit_shift_right {
     }
 
     // Test: int_negative
-    #[should_panic]
     #[test]
     fn int_negative() {
         run_test(&dedent!(
@@ -2612,7 +2555,6 @@ mod bit_shift_right {
     }
 
     // Test: int_negative_large_shift
-    #[should_panic]
     #[test]
     fn int_negative_large_shift() {
         run_test(&dedent!(
@@ -2626,7 +2568,6 @@ mod bit_shift_right {
     }
 
     // Test: uint
-    #[should_panic]
     #[test]
     fn uint() {
         run_test(&dedent!(
@@ -2640,7 +2581,6 @@ mod bit_shift_right {
     }
 
     // Test: uint_large_shift
-    #[should_panic]
     #[test]
     fn uint_large_shift() {
         run_test(&dedent!(
