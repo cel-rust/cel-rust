@@ -38,10 +38,11 @@ name = "parser"
 harness = false
 
 [features]
-default = ["regex", "chrono"]
+default = ["regex", "chrono", "ext_encoders"]
 parser_pratt = []
 bytes = ["dep:bytes"]
 json = ["dep:serde_json", "dep:base64"]
 regex = ["dep:regex"]
 chrono = ["dep:chrono", "dep:chrono-tz"]
+ext_encoders = ["dep:base64"]
 dhat-heap = [ ] # if you are doing heap profiling
