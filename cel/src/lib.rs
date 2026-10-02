@@ -8,6 +8,8 @@
 //!   IANA time zone arguments).
 //! - `regex`: Enables support for regular expressions.
 //! - `json`: Enables conversion between CEL values and JSON.
+//! - `ext_encoders` (default): Enables the [`extensions::encoders`] extension library, `base64.encode`
+//!   and `base64.decode`, using the `base64` crate.
 //!
 extern crate core;
 

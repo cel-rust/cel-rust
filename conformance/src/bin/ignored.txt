@@ -316,10 +316,6 @@ dynamic::value_struct::field_read_proto3_empty
 dynamic::value_struct::literal
 dynamic::value_struct::literal_empty
 dynamic::value_struct::var
-encoders_ext::decode::hello
-encoders_ext::decode::hello_without_padding
-encoders_ext::encode::hello
-encoders_ext::round_trip::hello
 enums::legacy_proto2::access_repeated_enum
 enums::legacy_proto2::arithmetic
 enums::legacy_proto2::assign_repeated_enum

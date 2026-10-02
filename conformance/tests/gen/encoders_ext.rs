@@ -10,7 +10,6 @@ mod encode {
     use dedent::dedent;
 
     // Test: hello
-    #[should_panic]
     #[test]
     fn hello() {
         run_test(&dedent!(
@@ -30,7 +29,6 @@ mod decode {
     use dedent::dedent;
 
     // Test: hello
-    #[should_panic]
     #[test]
     fn hello() {
         run_test(&dedent!(
@@ -44,7 +42,6 @@ mod decode {
     }
 
     // Test: hello_without_padding
-    #[should_panic]
     #[test]
     fn hello_without_padding() {
         run_test(&dedent!(
@@ -64,7 +61,6 @@ mod round_trip {
     use dedent::dedent;
 
     // Test: hello
-    #[should_panic]
     #[test]
     fn hello() {
         run_test(&dedent!(
