@@ -1,11 +1,13 @@
 #[cfg(feature = "ext_encoders")]
 mod encoders;
 mod lists;
+mod math;
 mod strings;
 
 #[cfg(feature = "ext_encoders")]
 pub use encoders::extension as encoders;
 pub use lists::extension as lists;
+pub use math::extension as math;
 pub use strings::extension as strings;
 
 use crate::common::traits::Iterable;
