@@ -3,8 +3,8 @@
 //!
 //! Indices are in code points, not bytes, as in the rest of CEL.
 
-use crate::common::types::{CelInt, CelList, CelString};
-use crate::common::value::Val;
+use crate::common::types::{CelInt, CelList, CelString, LIST_TYPE, STRING_TYPE};
+use crate::common::value::{CowVal, Val};
 use crate::{DeclarationError, Env, ExecutionError};
 
 /// Registers the strings extension's overloads on `env`.
@@ -16,9 +16,16 @@ pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
     crate::try_add_member_overload!(env, fn last_index_of: (CelString, CelString) -> CelInt)?;
     crate::try_add_member_overload!(env, fn last_index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
         name = "lastIndexOf")?;
-    crate::try_add_member_overload!(env, fn join: (CelList) -> Result<CelString>)?;
-    crate::try_add_member_overload!(env, fn join_sep: (CelList, CelString) -> Result<CelString>,
-        name = "join")?;
+    // Registered by hand, as the macro would downcast the receiver to a
+    // `CelList`: `join` takes any `list`, like the stdlib's list overloads.
+    env.add_member_overload("join", "list.join()", LIST_TYPE, vec![], join)?;
+    env.add_member_overload(
+        "join",
+        "list.join(string)",
+        LIST_TYPE,
+        vec![STRING_TYPE],
+        join_sep,
+    )?;
     crate::try_add_member_overload!(env, fn lower_ascii: (CelString) -> CelString)?;
     crate::try_add_member_overload!(env, fn upper_ascii: (CelString) -> CelString)?;
     crate::try_add_member_overload!(env, fn trim: (CelString) -> CelString)?;
@@ -136,27 +143,42 @@ fn last_index_of_offset(
         .into())
 }
 
-fn join(this: &CelList<'_>) -> Result<CelString<'static>, ExecutionError> {
-    join_with(this, "")
+fn join<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    match args.as_slice() {
+        [list] => join_with(list.as_ref(), ""),
+        _ => Err(ExecutionError::invalid_argument_count(1, args.len())),
+    }
 }
 
-fn join_sep(this: &CelList<'_>, sep: &CelString<'_>) -> Result<CelString<'static>, ExecutionError> {
-    join_with(this, sep.inner())
+fn join_sep<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    match args.as_slice() {
+        [list, sep] => join_with(list.as_ref(), string_arg(sep.as_ref())?.inner()),
+        _ => Err(ExecutionError::invalid_argument_count(2, args.len())),
+    }
 }
 
-fn join_with(list: &CelList<'_>, sep: &str) -> Result<CelString<'static>, ExecutionError> {
-    let parts = list
-        .iter()
-        .map(|v| {
-            v.downcast_ref::<CelString>()
-                .map(CelString::inner)
-                .ok_or_else(|| ExecutionError::UnexpectedType {
-                    got: v.get_type().name().to_owned(),
-                    want: CelString::cel_type().name().to_owned(),
-                })
+/// Concatenates the strings of any iterable `list`, `sep` between each.
+fn join_with<'b, 'v>(list: &dyn Val, sep: &str) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    let mut items = list
+        .as_iterable()
+        .ok_or_else(|| ExecutionError::UnexpectedType {
+            got: list.get_type().name().to_owned(),
+            want: "iterable".to_owned(),
+        })?
+        .iter();
+    let mut parts = Vec::new();
+    while let Some(item) = items.next() {
+        parts.push(string_arg(item)?.inner());
+    }
+    Ok(CowVal::owned(CelString::from(parts.join(sep))))
+}
+
+fn string_arg<'b, 'v>(val: &'b (dyn Val + 'v)) -> Result<&'b CelString<'v>, ExecutionError> {
+    val.downcast_ref::<CelString>()
+        .ok_or_else(|| ExecutionError::UnexpectedType {
+            got: val.get_type().name().to_owned(),
+            want: CelString::cel_type().name().to_owned(),
         })
-        .collect::<Result<Vec<_>, _>>()?;
-    Ok(parts.join(sep).into())
 }
 
 fn lower_ascii(this: &CelString<'_>) -> CelString<'static> {
@@ -266,6 +288,9 @@ fn substring_range(
 
 #[cfg(test)]
 mod tests {
+    use crate::common::traits::{self, Iterable};
+    use crate::common::types::{CelString, Type, LIST_TYPE};
+    use crate::common::value::Val;
     use crate::{Context, DeclarationError, Env, ExecutionError, Program, Value};
     use std::sync::Arc;
 
@@ -282,14 +307,21 @@ mod tests {
         );
     }
 
-    fn eval(expr: &str) -> Result<Value, ExecutionError> {
+    fn context() -> Context<'static, 'static> {
         let mut env = Env::stdlib();
         env.add_extension(crate::extensions::strings)
             .expect("We can't test the extension, if we can't register it");
-        let ctx = Context::with_env(Arc::new(env));
+        Context::with_env(Arc::new(env))
+    }
+
+    fn eval_in(ctx: &Context, expr: &str) -> Result<Value, ExecutionError> {
         Program::compile(expr)
             .expect("This must be valid CEL")
-            .execute(&ctx)
+            .execute(ctx)
+    }
+
+    fn eval(expr: &str) -> Result<Value, ExecutionError> {
+        eval_in(&context(), expr)
     }
 
     fn assert_eval(expr: &str, expected: impl Into<Value>) {
@@ -357,6 +389,63 @@ mod tests {
         assert_eval("['hello', 'mellow'].join(' ')", "hello mellow");
         assert_eval("[].join('-')", "");
         assert!(eval("['hello', 1].join()").is_err());
+    }
+
+    /// A `list` that is not a `CelList`, as a downstream crate would define
+    /// one: reachable only through `Val`'s trait accessors.
+    #[derive(Debug)]
+    struct OtherList(Vec<CelString<'static>>);
+
+    struct OtherListIter<'b>(std::slice::Iter<'b, CelString<'static>>);
+
+    impl<'b, 'v> traits::Iterator<'b, 'v> for OtherListIter<'b> {
+        fn next(&mut self) -> Option<&'b (dyn Val + 'v)> {
+            self.0.next().map(|s| s as &dyn Val)
+        }
+    }
+
+    impl Iterable for OtherList {
+        fn iter<'b, 'v>(&'b self) -> Box<dyn traits::Iterator<'b, 'v> + 'b>
+        where
+            Self: 'v,
+        {
+            Box::new(OtherListIter(self.0.iter()))
+        }
+    }
+
+    impl Val for OtherList {
+        fn get_type(&self) -> &Type {
+            &LIST_TYPE
+        }
+
+        fn cel_type() -> &'static Type {
+            &LIST_TYPE
+        }
+
+        fn as_iterable<'b, 'v>(&'b self) -> Option<&'b (dyn Iterable + 'v)>
+        where
+            Self: 'v,
+        {
+            Some(self)
+        }
+
+        fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v>
+        where
+            Self: 'v,
+        {
+            Box::new(OtherList(self.0.clone()))
+        }
+    }
+
+    #[test]
+    fn join_any_list() {
+        let mut ctx = context();
+        ctx.add_variable_as_val(
+            "names",
+            Box::new(OtherList(vec!["hello".into(), "mellow".into()])),
+        );
+        assert_eq!(eval_in(&ctx, "names.join()"), Ok("hellomellow".into()));
+        assert_eq!(eval_in(&ctx, "names.join(' ')"), Ok("hello mellow".into()));
     }
 
     #[test]
