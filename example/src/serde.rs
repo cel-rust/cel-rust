@@ -1,5 +1,6 @@
-use cel::{Context, Program};
+use cel::{Context, Env};
 use serde::Serialize;
+use std::sync::Arc;
 
 // An example struct that derives Serialize
 #[derive(Serialize)]
@@ -9,8 +10,9 @@ struct MyStruct {
 }
 
 fn main() {
-    let program = Program::compile("foo.a == foo.b").unwrap();
-    let mut context = Context::default();
+    let env = Arc::new(Env::stdlib());
+    let program = env.compile("foo.a == foo.b").unwrap();
+    let mut context = Context::with_env(env);
 
     // MyStruct will be implicitly serialized into the CEL appropriate types
     context

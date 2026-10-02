@@ -317,15 +317,15 @@ impl Env {
     /// their type is what lets an expression name it.
     ///
     /// ```
-    /// use cel::{Context, Env, Program, Value};
+    /// use cel::{Context, Env, Value};
     /// use cel::common::types::Type;
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.add_type(Type::new_opaque_type("Ip")).unwrap();
+    /// let program = env.compile("type(Ip) == type").unwrap();
     /// let context = Context::with_env(Arc::new(env));
     ///
-    /// let program = Program::compile("type(Ip) == type").unwrap();
     /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     ///
@@ -353,15 +353,15 @@ impl Env {
     /// Each call replaces the container; an empty name clears it.
     ///
     /// ```
-    /// use cel::{Context, Env, Program, Value};
+    /// use cel::{Context, Env, Value};
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.set_container("x").unwrap();
+    /// let program = env.compile("y").unwrap();
     /// let mut context = Context::with_env(Arc::new(env));
     /// context.add_variable_from_value("x.y", true);
     ///
-    /// let program = Program::compile("y").unwrap();
     /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     ///
@@ -425,14 +425,14 @@ impl Env {
     /// entries are kept, as in cel-go.
     ///
     /// ```
-    /// use cel::{Context, Env, Program, Value};
+    /// use cel::{Context, Env, Value};
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.set_error_on_duplicate_map_keys(false);
+    /// let program = env.compile("{'a': 1, 'a': 2}['a']").unwrap();
     /// let context = Context::with_env(Arc::new(env));
     ///
-    /// let program = Program::compile("{'a': 1, 'a': 2}['a']").unwrap();
     /// let value: Value = program.execute(&context).unwrap();
     /// assert_eq!(value, 2.into());
     /// ```

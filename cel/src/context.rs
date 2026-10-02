@@ -104,9 +104,10 @@ impl<'p, 'v> Context<'p, 'v> {
     ///
     /// ```ignore
     /// // `my_value` implements `Val` + `Indexer`, resolving fields on access.
-    /// let mut ctx = Context::default();
+    /// let env = Arc::new(Env::stdlib());
+    /// let mut ctx = Context::with_env(Arc::clone(&env));
     /// ctx.add_variable_as_val("input", Box::new(my_value));
-    /// let program = Program::compile("input.field")?;
+    /// let program = env.compile("input.field")?;
     /// // `input.field` calls `Indexer::get` on `my_value` only when evaluated.
     /// let result = program.execute(&ctx)?;
     /// ```

@@ -30,7 +30,7 @@
 use std::sync::{Arc, Mutex};
 
 use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
-use cel::{Context, Program, Value};
+use cel::{Context, Env, Value};
 use serde::{Deserialize, Serialize};
 
 // Policies dictating which text TODOs may contain
@@ -80,19 +80,25 @@ async fn list_todos(State(AppContext { todos, .. }): State<AppContext>) -> impl 
     Json(todos.lock().unwrap().clone())
 }
 
-// The policy engine for our TODOs app
-struct PolicyDecider(Context<'static, 'static>);
+// The policy engine for our TODOs app: the environment its policies are
+// compiled with, and the root context they're executed with
+struct PolicyDecider {
+    env: Arc<Env>,
+    context: Context<'static, 'static>,
+}
 
 impl PolicyDecider {
-    // Start with a wrapper around the default Context
+    // Start with the standard environment, and a root context on it
     fn new() -> Self {
-        Self(Context::default())
+        let env = Arc::new(Env::stdlib());
+        let context = Context::with_env(Arc::clone(&env));
+        Self { env, context }
     }
 
     // Determine whether a given TODO is allowed
     fn todo_is_allowed(&self, todo: &Todo) -> Result<bool, TodosError> {
         // Create a new mutable context out of the root context
-        let mut ctx = self.0.new_inner_scope();
+        let mut ctx = self.context.new_inner_scope();
         // Add the TODO's text as a variable so that it can be part of the expression
         ctx.add_variable_from_value("text", todo.text.clone());
 
@@ -102,8 +108,8 @@ impl PolicyDecider {
             TodoKind::Work => WORK_TODO_POLICY,
         };
 
-        // Compile the program
-        let program = Program::compile(policy)?;
+        // Compile the program with the environment it's executed with
+        let program = self.env.compile(policy)?;
 
         // Execute the program and either return a Boolean or the TODO is
         // considered invalid

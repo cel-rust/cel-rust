@@ -400,12 +400,26 @@ pub struct Program {
 }
 
 impl Program {
-    /// Compiles `source`, expanding the standard macros (`has`, `all`,
-    /// `exists`, `exists_one`, `map` and `filter`): the same as
+    /// Compiles `source` for the standard environment, expanding its macros
+    /// (`has`, `all`, `exists`, `exists_one`, `map` and `filter`): the same as
     /// [`Env::compile`] on [`Env::stdlib`], without building an `Env`.
     ///
-    /// The macros an `Env` has besides those, added with [`Env::add_macro`]
-    /// or by an extension, are only expanded by [`Env::compile`].
+    /// Don't use it for a program executed with an [`Env`] that extends the
+    /// standard one, whether with [`Env::add_extension`] or otherwise, e.g.
+    /// with [`Env::add_macro`]: the program would miss what that `Env` adds to
+    /// compiling, such as its macros. Compile with that `Env` instead:
+    ///
+    /// ```
+    /// use cel::{extensions, Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_extension(extensions::strings).unwrap();
+    /// let env = Arc::new(env);
+    /// let program = env.compile("'TacoCat'.lowerAscii()").unwrap();
+    /// let context = Context::with_env(env);
+    /// assert_eq!(program.execute(&context), Ok(Value::from("tacocat")));
+    /// ```
     pub fn compile(source: &str) -> Result<Program, ParseErrors> {
         Program::parse_with(Parser::default(), source)
     }
@@ -425,8 +439,8 @@ impl Program {
     ///
     /// # Example
     /// ```rust
-    /// # use cel::Program;
-    /// let program = Program::compile("a.b").unwrap();
+    /// # use cel::Env;
+    /// let program = Env::stdlib().compile("a.b").unwrap();
     /// let root = program.expression();
     /// assert_eq!(program.source_info().offset_for(root.id), Some((1, 1)));
     /// ```
@@ -442,8 +456,8 @@ impl Program {
     ///
     /// # Example
     /// ```rust
-    /// # use cel::Program;
-    /// let program = Program::compile("size(foo) > 0").unwrap();
+    /// # use cel::Env;
+    /// let program = Env::stdlib().compile("size(foo) > 0").unwrap();
     /// let references = program.references();
     ///
     /// assert!(references.has_function("size"));
