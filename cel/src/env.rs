@@ -5,14 +5,16 @@ use crate::common::{
     value::CowVal,
 };
 use crate::container::Container;
+use crate::parser::{Macro, Macros, Parser};
 use crate::registry::{TypeDecl, TypeRegistry};
-use crate::DeclarationError;
 #[cfg(feature = "structs")]
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
+use crate::{DeclarationError, ParseErrors, Program};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
     BTreeMap, BTreeSet,
 };
+use std::sync::Arc;
 
 /// An environment for the CEL execution.
 ///
@@ -57,6 +59,7 @@ pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
     namespaces: BTreeSet<String>,
     types: TypeRegistry,
+    macros: Arc<Macros>,
     error_on_duplicate_map_keys: bool,
     container: Container,
 }
@@ -67,6 +70,7 @@ impl Default for Env {
             functions: BTreeMap::new(),
             namespaces: BTreeSet::new(),
             types: TypeRegistry::default(),
+            macros: Arc::default(),
             error_on_duplicate_map_keys: true,
             container: Container::default(),
         }
@@ -98,7 +102,102 @@ impl Env {
             types::duration::stdlib(&mut env);
             types::timestamp::stdlib(&mut env);
         }
+        env.macros = Macros::standard();
         env
+    }
+
+    /// Returns a parser that expands the macros of this environment.
+    ///
+    /// [`Env::stdlib`] has the standard macros (`has`, `all`, `exists`,
+    /// `exists_one`, `map` and `filter`); an [`Env::default`] has none, so its
+    /// parser leaves such calls as they are written.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value};
+    ///
+    /// let env = Env::stdlib();
+    /// let expr = env.parser().parse("[1, 2, 3].exists(x, x > 2)").unwrap();
+    /// assert_eq!(Value::resolve(&expr, &Context::default()), Ok(Value::Bool(true)));
+    /// ```
+    pub fn parser(&self) -> Parser {
+        Parser::new().with_macros(Arc::clone(&self.macros))
+    }
+
+    /// Compiles `source` into a [`Program`], expanding the macros of this
+    /// environment: the standard ones of [`Env::stdlib`], and those added with
+    /// [`Env::add_macro`], by extensions included.
+    ///
+    /// Macros are expanded while compiling: the program doesn't depend on the
+    /// environment afterwards.
+    ///
+    /// # Errors
+    ///
+    /// Fails with the [`ParseErrors`] of `source`, a macro's included.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let env = Env::stdlib();
+    /// let program = env.compile("[1, 2, 3].exists(x, x > 2)").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+    /// ```
+    pub fn compile(&self, source: &str) -> Result<Program, ParseErrors> {
+        Program::parse_with(self.parser(), source)
+    }
+
+    /// Adds a macro, expanded by the programs this environment compiles with
+    /// [`Env::compile`], and by the parsers it builds with [`Env::parser`];
+    /// [`Program::compile`] only expands the standard ones.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::DuplicateMacro`] if a macro for the same
+    /// function, called the same way (globally or on a target) with as many
+    /// arguments, or with any number of them, is already added: the standard
+    /// ones of [`Env::stdlib`] included. A macro for any number of arguments
+    /// and one for an exact number coexist: the latter wins for its calls.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::common::ast::{operators, CallExpr, Expr};
+    /// use cel::parser::Macro;
+    /// use cel::{Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// // `implies(a, b)` is parsed as `!a || b`: true whenever `a` is false,
+    /// // whatever `b` evaluates to.
+    /// let implies = Macro::global("implies", 2, |helper, _target, args| {
+    ///     let b = args.pop().unwrap();
+    ///     let a = args.pop().unwrap();
+    ///     let not_a = helper.next_expr(Expr::Call(CallExpr {
+    ///         func_name: operators::LOGICAL_NOT.to_string(),
+    ///         target: None,
+    ///         args: vec![a],
+    ///     }));
+    ///     Ok(Some(helper.next_expr(Expr::Call(CallExpr {
+    ///         func_name: operators::LOGICAL_OR.to_string(),
+    ///         target: None,
+    ///         args: vec![not_a, b],
+    ///     }))))
+    /// });
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_macro(implies).unwrap();
+    /// let program = env.compile("implies(false, 1 / 0 == 1)").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+    /// ```
+    pub fn add_macro(&mut self, m: Macro) -> Result<(), DeclarationError> {
+        // The standard macros are shared by every `Env::stdlib()` and default
+        // parser: the first macro added copies them for this environment.
+        Arc::make_mut(&mut self.macros).add(m)
     }
 
     /// Adds a global function overload to the environment.
@@ -219,15 +318,15 @@ impl Env {
     /// their type is what lets an expression name it.
     ///
     /// ```
-    /// use cel::{Context, Env, Program, Value};
+    /// use cel::{Context, Env, Value};
     /// use cel::common::types::Type;
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.add_type(Type::new_opaque_type("Ip")).unwrap();
+    /// let program = env.compile("type(Ip) == type").unwrap();
     /// let context = Context::with_env(Arc::new(env));
     ///
-    /// let program = Program::compile("type(Ip) == type").unwrap();
     /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     ///
@@ -255,15 +354,15 @@ impl Env {
     /// Each call replaces the container; an empty name clears it.
     ///
     /// ```
-    /// use cel::{Context, Env, Program, Value};
+    /// use cel::{Context, Env, Value};
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.set_container("x").unwrap();
+    /// let program = env.compile("y").unwrap();
     /// let mut context = Context::with_env(Arc::new(env));
     /// context.add_variable_from_value("x.y", true);
     ///
-    /// let program = Program::compile("y").unwrap();
     /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     ///
@@ -292,17 +391,18 @@ impl Env {
     }
 
     /// Adds an extension library, such as [`extensions::strings`], by
-    /// handing it this environment to register its types and overloads on.
+    /// handing it this environment to register its types, overloads and
+    /// macros on. Compile with [`Env::compile`] for the macros to be expanded.
     ///
     /// ```
-    /// use cel::{extensions, Context, Env, Program, Value};
+    /// use cel::{extensions, Context, Env, Value};
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.add_extension(extensions::strings);
+    /// let program = env.compile("'TacoCat'.lowerAscii()").unwrap();
     /// let context = Context::with_env(Arc::new(env));
     ///
-    /// let program = Program::compile("'TacoCat'.lowerAscii()").unwrap();
     /// assert_eq!(program.execute(&context), Ok(Value::from("tacocat")));
     /// ```
     ///
@@ -326,14 +426,14 @@ impl Env {
     /// entries are kept, as in cel-go.
     ///
     /// ```
-    /// use cel::{Context, Env, Program, Value};
+    /// use cel::{Context, Env, Value};
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.set_error_on_duplicate_map_keys(false);
+    /// let program = env.compile("{'a': 1, 'a': 2}['a']").unwrap();
     /// let context = Context::with_env(Arc::new(env));
     ///
-    /// let program = Program::compile("{'a': 1, 'a': 2}['a']").unwrap();
     /// let value: Value = program.execute(&context).unwrap();
     /// assert_eq!(value, 2.into());
     /// ```
@@ -509,6 +609,126 @@ mod tests {
         Arc::get_mut(&mut env).unwrap().set_container("").unwrap();
         assert_eq!(env.container_name(), "");
         assert!(run(&env).is_err(), "`y` no longer means `x.y`");
+    }
+
+    #[test]
+    fn its_parser_expands_the_macros_of_the_env_only() {
+        use crate::common::ast::Expr;
+
+        let source = "[1].exists(x, x > 0)";
+        let expanded = Env::stdlib().parser().parse(source).unwrap();
+        assert!(
+            matches!(expanded.expr, Expr::Comprehension(_)),
+            "{expanded:?}"
+        );
+        let as_written = Env::default().parser().parse(source).unwrap();
+        assert!(matches!(as_written.expr, Expr::Call(_)), "{as_written:?}");
+    }
+
+    fn first_arg(
+        _: &mut crate::parser::MacroExprHelper<'_>,
+        _: &mut Option<crate::IdedExpr>,
+        args: &mut Vec<crate::IdedExpr>,
+    ) -> Result<Option<crate::IdedExpr>, crate::ParseError> {
+        Ok(Some(args.remove(0)))
+    }
+
+    #[test]
+    fn a_macro_expands_only_the_calls_of_its_style_and_argument_count() {
+        use crate::common::ast::Expr;
+
+        let mut env = Env::default();
+        env.add_macro(Macro::receiver("f", 1, first_arg)).unwrap();
+        let expanded = env.parser().parse("m.f(1)").unwrap();
+        assert!(matches!(expanded.expr, Expr::Literal(_)), "{expanded:?}");
+        for source in ["m.f()", "m.f(1, 2)", "f(1)"] {
+            let as_written = env.parser().parse(source).unwrap();
+            assert!(
+                matches!(as_written.expr, Expr::Call(_)),
+                "{source}: {as_written:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_macro_for_the_calls_of_another_is_a_duplicate() {
+        let mut env = Env::stdlib();
+        assert_eq!(
+            env.add_macro(Macro::receiver("exists", 2, first_arg)),
+            Err(DeclarationError::duplicate_macro("exists")),
+            "the standard `exists` expands those"
+        );
+        // Called globally, or with another argument count, it's another call.
+        assert_eq!(env.add_macro(Macro::global("exists", 2, first_arg)), Ok(()));
+        assert_eq!(
+            env.add_macro(Macro::receiver("exists", 3, first_arg)),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_macro(Macro::receiver("exists", 3, first_arg)),
+            Err(DeclarationError::duplicate_macro("exists"))
+        );
+        // For any number of arguments, it's yet other calls, once.
+        assert_eq!(
+            env.add_macro(Macro::receiver_var_arg("exists", first_arg)),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_macro(Macro::receiver_var_arg("exists", first_arg)),
+            Err(DeclarationError::duplicate_macro("exists"))
+        );
+        assert_eq!(
+            env.add_macro(Macro::global_var_arg("exists", first_arg)),
+            Ok(())
+        );
+    }
+
+    /// Declines `f(x)` after popping `x`, or `mem::take`-ing it.
+    fn takes_then_declines(
+        _: &mut crate::parser::MacroExprHelper<'_>,
+        _: &mut Option<crate::IdedExpr>,
+        args: &mut Vec<crate::IdedExpr>,
+    ) -> Result<Option<crate::IdedExpr>, crate::ParseError> {
+        match args[0].expr {
+            crate::common::ast::Expr::Literal(_) => drop(args.pop()),
+            _ => drop(std::mem::take(&mut args[0])),
+        }
+        Ok(None)
+    }
+
+    #[test]
+    fn declining_a_call_after_taking_from_it_is_an_error() {
+        let mut env = Env::stdlib();
+        env.add_macro(Macro::global("f", 1, takes_then_declines))
+            .unwrap();
+        for source in ["f(1)", "f(a)"] {
+            let errors = env.parser().parse(source).unwrap_err().errors;
+            let messages: Vec<_> = errors.iter().map(|e| e.msg.as_str()).collect();
+            assert_eq!(
+                messages,
+                ["macro 'f' declined the call after taking from it"],
+                "{source}"
+            );
+        }
+    }
+
+    fn declines(
+        _: &mut crate::parser::MacroExprHelper<'_>,
+        _: &mut Option<crate::IdedExpr>,
+        _: &mut Vec<crate::IdedExpr>,
+    ) -> Result<Option<crate::IdedExpr>, crate::ParseError> {
+        Ok(None)
+    }
+
+    /// The parser leaves a default node for an argument it failed to expand:
+    /// that isn't something a declining macro took.
+    #[test]
+    fn declining_a_call_with_a_broken_argument_reports_only_that_argument() {
+        let mut env = Env::stdlib();
+        env.add_macro(Macro::global("f", 1, declines)).unwrap();
+        let errors = env.parser().parse("f(has(1))").unwrap_err().errors;
+        let messages: Vec<_> = errors.iter().map(|e| e.msg.as_str()).collect();
+        assert_eq!(messages, ["invalid argument to has() macro"]);
     }
 
     #[test]

@@ -26,7 +26,7 @@ use std::ops::Deref;
 /// ```
 /// use cel::common::types::Type;
 /// use cel::common::value::{StaticVal, Val};
-/// use cel::{Context, Env, Program, Value};
+/// use cel::{Context, Env, Value};
 /// use std::any::Any;
 /// use std::sync::Arc;
 ///
@@ -56,10 +56,10 @@ use std::ops::Deref;
 ///
 /// let mut env = Env::stdlib();
 /// env.add_type(IP.to_owned()).unwrap();
+/// let program = env.compile("type(addr) == ip").unwrap();
 /// let mut context = Context::with_env(Arc::new(env));
 /// context.add_variable_as_val("addr", Box::new(Ip(0x7f000001)));
 ///
-/// let program = Program::compile("type(addr) == ip").unwrap();
 /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
 /// ```
 pub trait Val: Debug + Send + Sync {

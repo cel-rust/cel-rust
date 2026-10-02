@@ -291,17 +291,18 @@ pub(crate) trait FromContext<'a, 'context, 'call> {
 /// # Using `This`
 /// ```
 /// # use std::sync::Arc;
-/// # use cel::{Program, Context};
+/// # use cel::{Context, Env};
 /// use cel::extractors::This;
-/// # let mut context = Context::default();
+/// # let env = Arc::new(Env::stdlib());
+/// # let mut context = Context::with_env(Arc::clone(&env));
 /// # context.add_function("hasPrefix", has_prefix).unwrap();
 ///
 /// /// Notice how `This` refers to the target value when called as a method,
 /// /// but the first argument when called as a function.
 /// let program1 = "'foobar'.hasPrefix('foo') == true";
 /// let program2 = "hasPrefix('foobar', 'foo') == true";
-/// # let program1 = Program::compile(program1).unwrap();
-/// # let program2 = Program::compile(program2).unwrap();
+/// # let program1 = env.compile(program1).unwrap();
+/// # let program2 = env.compile(program2).unwrap();
 /// # let value = program1.execute(&context).unwrap();
 /// # assert_eq!(value, true.into());
 /// # let value = program2.execute(&context).unwrap();

@@ -347,6 +347,11 @@ pub enum DeclarationError {
     /// not an identifier, or several separated by dots.
     #[error("Invalid container name '{name}': not an identifier, or several separated by dots")]
     InvalidContainerName { name: String },
+    /// A macro could not be added because one for the same function, called
+    /// the same way (globally or on a target) with as many arguments, is
+    /// already added.
+    #[error("Cannot add macro '{function}': one for the same call style and argument count is already added")]
+    DuplicateMacro { function: String },
 }
 
 impl DeclarationError {
@@ -380,6 +385,12 @@ impl DeclarationError {
             name: name.to_string(),
         }
     }
+
+    pub fn duplicate_macro(function: &str) -> Self {
+        DeclarationError::DuplicateMacro {
+            function: function.to_string(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -389,8 +400,32 @@ pub struct Program {
 }
 
 impl Program {
+    /// Compiles `source` for the standard environment, expanding its macros
+    /// (`has`, `all`, `exists`, `exists_one`, `map` and `filter`): the same as
+    /// [`Env::compile`] on [`Env::stdlib`], without building an `Env`.
+    ///
+    /// Don't use it for a program executed with an [`Env`] that extends the
+    /// standard one, whether with [`Env::add_extension`] or otherwise, e.g.
+    /// with [`Env::add_macro`]: the program would miss what that `Env` adds to
+    /// compiling, such as its macros. Compile with that `Env` instead:
+    ///
+    /// ```
+    /// use cel::{extensions, Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_extension(extensions::strings).unwrap();
+    /// let env = Arc::new(env);
+    /// let program = env.compile("'TacoCat'.lowerAscii()").unwrap();
+    /// let context = Context::with_env(env);
+    /// assert_eq!(program.execute(&context), Ok(Value::from("tacocat")));
+    /// ```
     pub fn compile(source: &str) -> Result<Program, ParseErrors> {
-        let parser = Parser::default();
+        Program::parse_with(Parser::default(), source)
+    }
+
+    /// Parses `source` into a program with `parser`, and the macros it expands.
+    pub(crate) fn parse_with(parser: Parser, source: &str) -> Result<Program, ParseErrors> {
         parser
             .parse_with_source_info(source)
             .map(|(expression, source_info)| Program {
@@ -404,8 +439,8 @@ impl Program {
     ///
     /// # Example
     /// ```rust
-    /// # use cel::Program;
-    /// let program = Program::compile("a.b").unwrap();
+    /// # use cel::Env;
+    /// let program = Env::stdlib().compile("a.b").unwrap();
     /// let root = program.expression();
     /// assert_eq!(program.source_info().offset_for(root.id), Some((1, 1)));
     /// ```
@@ -421,8 +456,8 @@ impl Program {
     ///
     /// # Example
     /// ```rust
-    /// # use cel::Program;
-    /// let program = Program::compile("size(foo) > 0").unwrap();
+    /// # use cel::Env;
+    /// let program = Env::stdlib().compile("size(foo) > 0").unwrap();
     /// let references = program.references();
     ///
     /// assert!(references.has_function("size"));
