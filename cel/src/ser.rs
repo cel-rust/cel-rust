@@ -25,15 +25,17 @@ pub struct KeySerializer;
 /// # Examples
 ///
 /// ```
-/// use cel::{Context, Duration, Program};
+/// use cel::{Context, Duration, Env};
 /// use serde::Serialize;
+/// use std::sync::Arc;
 ///
 /// #[derive(Serialize)]
 /// struct MyStruct {
 ///     dur: Duration,
 /// }
 ///
-/// let mut context = Context::default();
+/// let env = Arc::new(Env::stdlib());
+/// let mut context = Context::with_env(Arc::clone(&env));
 ///
 /// // MyStruct will be implicitly serialized into the CEL appropriate types
 /// context
@@ -45,7 +47,7 @@ pub struct KeySerializer;
 ///     )
 ///     .unwrap();
 ///
-/// let program = Program::compile("foo.dur == duration('2h')").unwrap();
+/// let program = env.compile("foo.dur == duration('2h')").unwrap();
 /// let value = program.execute(&context).unwrap();
 /// assert_eq!(value, true.into());
 /// ```
@@ -112,15 +114,17 @@ impl ser::Serialize for Duration {
 /// # Examples
 ///
 /// ```
-/// use cel::{Context, Timestamp, Program};
+/// use cel::{Context, Env, Timestamp};
 /// use serde::Serialize;
+/// use std::sync::Arc;
 ///
 /// #[derive(Serialize)]
 /// struct MyStruct {
 ///     ts: Timestamp,
 /// }
 ///
-/// let mut context = Context::default();
+/// let env = Arc::new(Env::stdlib());
+/// let mut context = Context::with_env(Arc::clone(&env));
 ///
 /// // MyStruct will be implicitly serialized into the CEL appropriate types
 /// context
@@ -134,7 +138,7 @@ impl ser::Serialize for Duration {
 ///     )
 ///     .unwrap();
 ///
-/// let program = Program::compile("foo.ts == timestamp('2025-01-01T00:00:00Z')").unwrap();
+/// let program = env.compile("foo.ts == timestamp('2025-01-01T00:00:00Z')").unwrap();
 /// let value = program.execute(&context).unwrap();
 /// assert_eq!(value, true.into());
 /// ```
