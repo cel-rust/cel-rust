@@ -16,7 +16,8 @@ use crate::parser::gen::{
     RelationContextAttrs, SelectContext, SelectContextAttrs, StartContext, StartContextAttrs,
     StringContext, UintContext,
 };
-use crate::parser::{gen, macros, parse};
+use crate::parser::macros::Macros;
+use crate::parser::{gen, parse};
 use antlr4rust::common_token_stream::CommonTokenStream;
 use antlr4rust::error_listener::ErrorListener;
 use antlr4rust::error_strategy::{DefaultErrorStrategy, ErrorStrategy};
@@ -36,18 +37,30 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
+/// What a [`Macro`](crate::parser::Macro)'s expander builds its expression
+/// with, for the call being expanded.
 pub struct MacroExprHelper<'a> {
     pub(crate) helper: &'a mut ParserHelper,
     pub(crate) id: u64,
 }
 
 impl MacroExprHelper<'_> {
+    /// A node for `expr`, with an id of its own, placed in the source where
+    /// the expanded call is.
     pub fn next_expr(&mut self, expr: Expr) -> IdedExpr {
         self.helper.next_expr_for(self.id, expr)
     }
 
-    pub(crate) fn pos_for(&self, id: u64) -> Option<(isize, isize)> {
-        self.helper.source_info.pos_for(id)
+    /// An error for the expression `expr_id`, positioned where that expression
+    /// is in the source.
+    pub fn new_error(&self, expr_id: u64, msg: impl Into<String>) -> ParseError {
+        ParseError {
+            source: None,
+            pos: self.helper.source_info.pos_for(expr_id).unwrap_or_default(),
+            msg: msg.into(),
+            expr_id: 0,
+            source_info: None,
+        }
     }
 }
 
@@ -103,6 +116,7 @@ pub struct Parser {
     ast: ast::Ast,
     helper: ParserHelper,
     errors: Vec<ParseError>,
+    macros: Arc<Macros>,
     max_recursion_depth: u16,
     error_recovery_limit: u32,
     enable_optional_syntax: bool,
@@ -117,11 +131,18 @@ impl Parser {
             },
             helper: ParserHelper::default(),
             errors: Vec::default(),
+            macros: Macros::standard(),
             max_recursion_depth: 96,
             error_recovery_limit: 30,
             enable_optional_syntax: false,
             enable_ident_escape_syntax: false,
         }
+    }
+
+    /// Expands `macros` instead of the standard ones.
+    pub(crate) fn with_macros(mut self, macros: Arc<Macros>) -> Self {
+        self.macros = macros;
+        self
     }
 
     pub fn max_recursion_depth(mut self, max: u16) -> Self {
@@ -187,26 +208,7 @@ impl Parser {
         func_name: String,
         args: Vec<IdedExpr>,
     ) -> IdedExpr {
-        match macros::find_expander(&func_name, None, &args) {
-            None => IdedExpr {
-                id,
-                expr: Expr::Call(CallExpr {
-                    target: None,
-                    func_name,
-                    args,
-                }),
-            },
-            Some(expander) => {
-                let mut helper = MacroExprHelper {
-                    helper: &mut self.helper,
-                    id,
-                };
-                match expander(&mut helper, None, args) {
-                    Ok(expr) => expr,
-                    Err(err) => self.report_parse_error(None, err),
-                }
-            }
-        }
+        self.call_or_macro(id, func_name, None, args)
     }
 
     fn receiver_call_or_macro(
@@ -216,25 +218,36 @@ impl Parser {
         target: IdedExpr,
         args: Vec<IdedExpr>,
     ) -> IdedExpr {
-        match macros::find_expander(&func_name, Some(&target), &args) {
-            None => IdedExpr {
+        self.call_or_macro(id, func_name, Some(target), args)
+    }
+
+    /// The expansion of the macro matching the call, if any and if it doesn't
+    /// decline it; the call as written otherwise.
+    fn call_or_macro(
+        &mut self,
+        id: u64,
+        func_name: String,
+        mut target: Option<IdedExpr>,
+        mut args: Vec<IdedExpr>,
+    ) -> IdedExpr {
+        if let Some(m) = self.macros.find(&func_name, target.as_ref(), &args) {
+            let mut helper = MacroExprHelper {
+                helper: &mut self.helper,
                 id,
-                expr: Expr::Call(CallExpr {
-                    target: Some(Box::new(target)),
-                    func_name,
-                    args,
-                }),
-            },
-            Some(expander) => {
-                let mut helper = MacroExprHelper {
-                    helper: &mut self.helper,
-                    id,
-                };
-                match expander(&mut helper, Some(target), args) {
-                    Ok(expr) => expr,
-                    Err(err) => self.report_parse_error(None, err),
-                }
+            };
+            match m.expand(&mut helper, &mut target, &mut args) {
+                Ok(Some(expr)) => return expr,
+                Ok(None) => {}
+                Err(err) => return self.report_parse_error(None, err),
             }
+        }
+        IdedExpr {
+            id,
+            expr: Expr::Call(CallExpr {
+                target: target.map(Box::new),
+                func_name,
+                args,
+            }),
         }
     }
 

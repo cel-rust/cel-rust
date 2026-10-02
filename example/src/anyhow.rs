@@ -1,4 +1,4 @@
-use cel::Program;
+use cel::Env;
 
 /// This example demonstrates that compilation errors can be reported with anyhow.
 fn main() {
@@ -16,6 +16,6 @@ fn main() {
 }
 
 fn evaluate() -> anyhow::Result<()> {
-    Program::compile("1 @ 1")?;
+    Env::stdlib().compile("1 @ 1")?;
     unreachable!()
 }
