@@ -254,7 +254,6 @@ impl<'p, 'v> Context<'p, 'v> {
     }
 
     /// The struct type `name` names under the container.
-    #[cfg(feature = "structs")]
     pub(crate) fn find_struct(&self, name: &str) -> Option<&dyn crate::StructType> {
         let types = self.env().types();
         self.env()

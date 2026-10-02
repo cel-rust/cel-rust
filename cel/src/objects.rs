@@ -573,7 +573,6 @@ pub enum Value {
     #[cfg(feature = "chrono")]
     Timestamp(chrono::DateTime<chrono::FixedOffset>),
     Opaque(Arc<dyn Opaque>),
-    #[cfg(feature = "structs")]
     Struct(Arc<CelStruct<'static>>),
     Null,
 }
@@ -596,7 +595,6 @@ impl Debug for Value {
             Value::Timestamp(t) => write!(f, "Timestamp({:?})", t),
             Value::Opaque(o) => write!(f, "Opaque<{}>({:?})", o.runtime_type_name(), o.as_debug()),
             Value::Null => write!(f, "Null"),
-            #[cfg(feature = "structs")]
             Value::Struct(s) => write!(f, "{} {{}}", s.name()),
         }
     }
@@ -617,7 +615,6 @@ pub enum ValueType {
     Timestamp,
     Opaque,
     Null,
-    #[cfg(feature = "structs")]
     Struct,
 }
 
@@ -637,7 +634,6 @@ impl Display for ValueType {
             ValueType::Duration => write!(f, "duration"),
             ValueType::Timestamp => write!(f, "timestamp"),
             ValueType::Null => write!(f, "null"),
-            #[cfg(feature = "structs")]
             ValueType::Struct => write!(f, "struct"),
         }
     }
@@ -661,7 +657,6 @@ impl Value {
             #[cfg(feature = "chrono")]
             Value::Timestamp(_) => ValueType::Timestamp,
             Value::Null => ValueType::Null,
-            #[cfg(feature = "structs")]
             Value::Struct(_) => ValueType::Struct,
         }
     }
@@ -944,11 +939,8 @@ impl<'b, 'v> TryFrom<&'b (dyn Val + 'v)> for Value {
                 },
             })),
             _ => {
-                #[cfg(feature = "structs")]
-                {
-                    if let Some(v) = v.downcast_ref::<CelStruct>() {
-                        return Ok(Value::Struct(Arc::new(v.to_static()?)));
-                    }
+                if let Some(v) = v.downcast_ref::<CelStruct>() {
+                    return Ok(Value::Struct(Arc::new(v.to_static()?)));
                 }
                 if let Some(opaque) = v.downcast_ref::<OpaqueVal>() {
                     Ok(Value::Opaque(opaque.val.clone()))
@@ -999,7 +991,6 @@ impl TryFrom<Value> for Box<dyn Val> {
                 };
                 Ok(v)
             }
-            #[cfg(feature = "structs")]
             Value::Struct(s) => Ok(Arc::try_unwrap(s)
                 .map(|s| Box::new(s) as Box<dyn Val>)
                 .unwrap_or_else(|arc| arc.clone_as_boxed())),
@@ -1513,36 +1504,27 @@ impl Value {
             }
             Expr::Struct(strct) => {
                 let name = strct.type_name.clone();
-                #[cfg(not(feature = "structs"))]
-                {
-                    Err(ExecutionError::InternalError(format!(
-                        "Found struct {name}, feature not enabled!"
-                    )))
-                }
-                #[cfg(feature = "structs")]
-                {
-                    let struct_type =
-                        ctx.find_struct(&name)
-                            .ok_or(ExecutionError::UnexpectedType {
-                                got: name.to_owned(),
-                                want: "known struct".to_owned(),
-                            })?;
-                    let mut fields = std::collections::BTreeMap::new();
-                    for entry in &strct.entries {
-                        match &entry.expr {
-                            EntryExpr::StructField(expr) => {
-                                let f = expr.field.clone();
-                                fields.insert(f, Value::resolve_val(&expr.value, ctx)?);
-                            }
-                            EntryExpr::MapEntry(entry) => {
-                                return Err(ExecutionError::InternalError(format!(
-                                    "Expected struct_field_expr, got {entry:?}"
-                                )))
-                            }
+                let struct_type = ctx
+                    .find_struct(&name)
+                    .ok_or(ExecutionError::UnexpectedType {
+                        got: name.to_owned(),
+                        want: "known struct".to_owned(),
+                    })?;
+                let mut fields = std::collections::BTreeMap::new();
+                for entry in &strct.entries {
+                    match &entry.expr {
+                        EntryExpr::StructField(expr) => {
+                            let f = expr.field.clone();
+                            fields.insert(f, Value::resolve_val(&expr.value, ctx)?);
+                        }
+                        EntryExpr::MapEntry(entry) => {
+                            return Err(ExecutionError::InternalError(format!(
+                                "Expected struct_field_expr, got {entry:?}"
+                            )))
                         }
                     }
-                    Ok(CowVal::Owned(struct_type.new_value(fields)?))
                 }
+                Ok(CowVal::Owned(struct_type.new_value(fields)?))
             }
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
         }
@@ -4032,7 +4014,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "structs")]
     mod structs {
         use std::sync::Arc;
 

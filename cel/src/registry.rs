@@ -1,8 +1,6 @@
 use crate::common::types::Type;
-#[cfg(feature = "structs")]
 use crate::common::value::{CowVal, Val};
 use crate::DeclarationError;
-#[cfg(feature = "structs")]
 use crate::ExecutionError;
 use std::collections::BTreeMap;
 use std::fmt::{Debug, Formatter};
@@ -11,7 +9,6 @@ use std::fmt::{Debug, Formatter};
 ///
 /// [`StructDef`](crate::StructDef) is one; implementing this trait lets
 /// a struct literal construct any other [`Val`], e.g. a Rust type of your own.
-#[cfg(feature = "structs")]
 pub trait StructType: Send + Sync {
     /// The struct's type: its name is the one struct literals construct it
     /// by, and the one it is registered under.
@@ -33,14 +30,13 @@ pub trait StructType: Send + Sync {
 /// [`Env::add_type`](crate::Env::add_type).
 ///
 /// Anything that converts into one can be registered: a [`Type`], which
-/// expressions can then name, or, with the `structs` feature, a `StructType`,
-/// which they can also construct.
+/// expressions can then name, or a [`StructType`], which they can also
+/// construct.
 pub enum TypeDecl {
     /// A type expressions can name: `type(x) == my.pkg.Ip`.
     Type(Type),
     /// A struct type, which expressions can also construct:
     /// `acme.Account{id: 1}`.
-    #[cfg(feature = "structs")]
     Struct(Box<dyn StructType>),
 }
 
@@ -50,7 +46,6 @@ impl From<Type> for TypeDecl {
     }
 }
 
-#[cfg(feature = "structs")]
 impl<T: StructType + 'static> From<T> for TypeDecl {
     fn from(s: T) -> Self {
         TypeDecl::Struct(Box::new(s))
@@ -64,23 +59,20 @@ impl<T: StructType + 'static> From<T> for TypeDecl {
 /// the environment's libraries register their types, e.g. the standard
 /// library registers `int` and `optional_type`.
 ///
-/// A struct type, registered as a `StructType` with the `structs` feature,
-/// can also be constructed. Types are registered with
-/// [`Env::add_type`](crate::Env::add_type).
+/// A struct type, registered as a [`StructType`], can also be constructed.
+/// Types are registered with [`Env::add_type`](crate::Env::add_type).
 #[derive(Default)]
 pub struct TypeRegistry {
     types: BTreeMap<String, Type>,
-    #[cfg(feature = "structs")]
     structs: BTreeMap<String, Box<dyn StructType>>,
 }
 
 impl Debug for TypeRegistry {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut debug = f.debug_struct("TypeRegistry");
-        debug.field("types", &self.types);
-        #[cfg(feature = "structs")]
-        debug.field("structs", &self.structs.keys());
-        debug.finish()
+        f.debug_struct("TypeRegistry")
+            .field("types", &self.types)
+            .field("structs", &self.structs.keys())
+            .finish()
     }
 }
 
@@ -108,7 +100,6 @@ impl TypeRegistry {
     pub(crate) fn register(&mut self, decl: impl Into<TypeDecl>) -> Result<(), DeclarationError> {
         match decl.into() {
             TypeDecl::Type(t) => self.register_type(t),
-            #[cfg(feature = "structs")]
             TypeDecl::Struct(s) => self.register_struct(s),
         }
     }
@@ -128,12 +119,10 @@ impl TypeRegistry {
     }
 
     /// Finds the struct type registered under `name`.
-    #[cfg(feature = "structs")]
     pub fn find_struct(&self, name: &str) -> Option<&dyn StructType> {
         self.structs.get(name).map(Box::as_ref)
     }
 
-    #[cfg(feature = "structs")]
     fn register_struct(&mut self, s: Box<dyn StructType>) -> Result<(), DeclarationError> {
         let name = s.get_type().name();
         if self.structs.contains_key(name) {
@@ -230,7 +219,6 @@ mod tests {
         }
     }
 
-    #[cfg(feature = "structs")]
     mod structs {
         use super::super::*;
         use crate::common::types::{Kind, INT_TYPE};

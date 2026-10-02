@@ -5,7 +5,7 @@
 # features only. That misses most of this workspace's actual coverage:
 #
 # - The `cel` crate's default features are `["regex", "chrono"]`; the
-#   `parser_pratt`, `structs`, and `json` features are off by default, so
+#   `parser_pratt` and `json` features are off by default, so
 #   code behind them (notably the whole hand-written parser in
 #   `cel/src/parser/pratt_parser.rs`) was never compiled into the mutated
 #   build, and every mutation in it was trivially "missed".

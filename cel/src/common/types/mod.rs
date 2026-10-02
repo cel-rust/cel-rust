@@ -14,7 +14,6 @@ pub(crate) mod map;
 pub(crate) mod null;
 pub(crate) mod optional;
 pub(crate) mod string;
-#[cfg(feature = "structs")]
 pub(crate) mod r#struct;
 #[cfg(feature = "chrono")]
 pub(crate) mod timestamp;
@@ -37,7 +36,6 @@ pub use map::DefaultMap as CelMap;
 pub use map::Key as CelMapKey;
 pub use null::Null as CelNull;
 pub use optional::Optional as CelOptional;
-#[cfg(feature = "structs")]
 pub use r#struct::Struct as CelStruct;
 pub use string::String as CelString;
 #[cfg(feature = "chrono")]
@@ -323,7 +321,6 @@ impl Type {
     }
 
     /// Creates a new struct type with the given name.
-    #[cfg(feature = "structs")]
     pub const fn new_struct_type(name: &'static str) -> Type {
         Type {
             kind: Kind::Struct,
@@ -334,7 +331,6 @@ impl Type {
     }
 
     /// Creates a new struct type with the given owned name.
-    #[cfg(feature = "structs")]
     pub const fn new_struct(name: String) -> Type {
         Type {
             kind: Kind::Struct,
@@ -379,7 +375,6 @@ impl<'v> Builtin<'v> {
             Builtin::List(l) => Box::new(l),
             Builtin::Map(m) => Box::new(m),
             Builtin::Optional(o) => Box::new(o),
-            #[cfg(feature = "structs")]
             Builtin::Struct(s) => Box::new(s),
         }
     }

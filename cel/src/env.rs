@@ -7,7 +7,6 @@ use crate::common::{
 use crate::container::Container;
 use crate::registry::{TypeDecl, TypeRegistry};
 use crate::DeclarationError;
-#[cfg(feature = "structs")]
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
@@ -25,8 +24,6 @@ use std::collections::{
 /// You can define custom struct types that can be instantiated from CEL expressions.
 ///
 /// ```
-/// #[cfg(feature = "structs")]
-/// {
 /// use cel::{Env, StructDef, common::types, common::types::CelString};
 ///
 /// let mut env = Env::stdlib();
@@ -35,7 +32,6 @@ use std::collections::{
 ///         .add_field("some_field".to_owned(), types::STRING_TYPE)
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
 /// ).unwrap();
-/// }
 /// ```
 ///
 /// ## Function Overloads
@@ -231,8 +227,8 @@ impl Env {
     /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     ///
-    /// With the `structs` feature, registering a `StructType`, e.g. a
-    /// `StructDef`, also lets struct literals construct it:
+    /// Registering a `StructType`, e.g. a `StructDef`, also lets struct
+    /// literals construct it:
     /// `cel.MyStruct{some_field: 'value'}`.
     ///
     /// # Errors
@@ -364,14 +360,12 @@ impl Env {
 ///         .add_field_with_default("with_default".to_owned(), Box::new(CelString::from("default_value")))
 /// ).unwrap();
 /// ```
-#[cfg(feature = "structs")]
 pub struct StructDef {
     r#type: Type,
     fields: BTreeMap<String, Type>,
     defaults: BTreeMap<String, Box<dyn Val>>,
 }
 
-#[cfg(feature = "structs")]
 impl StructDef {
     /// Creates a new struct definition with the given name.
     ///
@@ -462,7 +456,6 @@ impl StructDef {
     }
 }
 
-#[cfg(feature = "structs")]
 impl StructType for StructDef {
     fn get_type(&self) -> &Type {
         &self.r#type
