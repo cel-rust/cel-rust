@@ -23,7 +23,7 @@ const MAX_PRECISION: usize = 100;
 pub(super) fn format<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     match args.as_slice() {
         [this, list] => {
-            let this = super::string_arg(this.as_ref())?;
+            let this = super::arg::<CelString>(this.as_ref())?;
             let mut items = super::iterable(list.as_ref())?.iter();
             let mut args = Vec::new();
             while let Some(item) = items.next() {

@@ -44,6 +44,8 @@ pub fn run_test(simple_test_textproto: &str) {
         .expect("We need that extension to register");
     env.add_extension(cel::extensions::encoders)
         .expect("We need that extension to register");
+    env.add_extension(cel::extensions::lists)
+        .expect("We need that extension to register");
     let mut context = Context::with_env(std::sync::Arc::new(env));
 
     if !test.bindings.is_empty() {
