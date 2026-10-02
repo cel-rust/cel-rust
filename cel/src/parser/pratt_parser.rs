@@ -1473,8 +1473,8 @@ impl<'a> PrattParserWorker<'a> {
         &mut self,
         id: u64,
         func_name: &str,
-        target: Option<IdedExpr>,
-        args: Vec<IdedExpr>,
+        mut target: Option<IdedExpr>,
+        mut args: Vec<IdedExpr>,
     ) -> Option<IdedExpr> {
         if let Some(m) = self.macros.find(func_name, target.as_ref(), &args) {
             if self.helper.next_id as usize > self.max_expression_node_count {
@@ -1495,7 +1495,7 @@ impl<'a> PrattParserWorker<'a> {
                 helper: &mut self.helper,
                 id,
             };
-            match m.expand(&mut macro_helper, target, args) {
+            match m.expand(&mut macro_helper, &mut target, &mut args) {
                 Ok(expr) => Some(expr),
                 Err(err) => {
                     self.errors.push(err);

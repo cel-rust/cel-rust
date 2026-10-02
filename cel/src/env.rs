@@ -144,7 +144,7 @@ impl Env {
     ///
     /// // `implies(a, b)` is parsed as `!a || b`: true whenever `a` is false,
     /// // whatever `b` evaluates to.
-    /// let implies = Macro::global("implies", 2, |helper, _target, mut args| {
+    /// let implies = Macro::global("implies", 2, |helper, _target, args| {
     ///     let b = args.pop().unwrap();
     ///     let a = args.pop().unwrap();
     ///     let not_a = helper.next_expr(Expr::Call(CallExpr {
@@ -596,8 +596,8 @@ mod tests {
 
     fn first_arg(
         _: &mut crate::parser::MacroExprHelper<'_>,
-        _: Option<crate::IdedExpr>,
-        mut args: Vec<crate::IdedExpr>,
+        _: &mut Option<crate::IdedExpr>,
+        args: &mut Vec<crate::IdedExpr>,
     ) -> Result<crate::IdedExpr, crate::ParseError> {
         Ok(args.remove(0))
     }
