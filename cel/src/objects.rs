@@ -1348,7 +1348,7 @@ impl Value {
                             .map(|a| Value::resolve_val(a, ctx))
                             .collect();
                         let name = ctx.resolve_function(&call.func_name);
-                        call_function(ctx, name, &call.func_name, args?)
+                        call_function(ctx, &name, &call.func_name, args?)
                     }
                     Some(target_expr) => {
                         let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
@@ -1521,12 +1521,12 @@ impl Value {
                 }
                 #[cfg(feature = "structs")]
                 {
-                    let struct_type = ctx.env().types().find_struct(&name).ok_or(
-                        ExecutionError::UnexpectedType {
-                            got: name.to_owned(),
-                            want: "known struct".to_owned(),
-                        },
-                    )?;
+                    let struct_type =
+                        ctx.find_struct(&name)
+                            .ok_or(ExecutionError::UnexpectedType {
+                                got: name.to_owned(),
+                                want: "known struct".to_owned(),
+                            })?;
                     let mut fields = std::collections::BTreeMap::new();
                     for entry in &strct.entries {
                         match &entry.expr {
@@ -3248,6 +3248,131 @@ mod tests {
             context.add_function("a.g", |i: i64| i + 2).unwrap();
             assert_eq!(execute(&context, ".f(1)"), Ok(Value::Int(2)));
             assert_eq!(execute(&context, ".a.g(1)"), Ok(Value::Int(3)));
+        }
+    }
+
+    mod containers {
+        use crate::common::types::Type;
+        use crate::{Context, Env, ExecutionError, Program, Value};
+        use std::sync::Arc;
+
+        fn execute(context: &Context, expr: &str) -> Result<Value, ExecutionError> {
+            Program::compile(expr).unwrap().execute(context)
+        }
+
+        fn context_in(container: &str) -> Context<'static, 'static> {
+            let mut env = Env::stdlib();
+            env.set_container(container).unwrap();
+            Context::with_env(Arc::new(env))
+        }
+
+        /// The issue's own scenario (cel-rust#358): in container `x`, `y`
+        /// resolves to `x.y` before the plain `y`.
+        #[test]
+        fn an_identifier_resolves_under_the_container_first() {
+            let mut context = context_in("x");
+            context.add_variable_from_value("x.y", true);
+            context.add_variable_from_value("y", "false");
+            assert_eq!(execute(&context, "y"), Ok(Value::Bool(true)));
+        }
+
+        #[test]
+        fn an_identifier_falls_back_to_the_plain_name() {
+            let mut context = context_in("x");
+            context.add_variable_from_value("y", "plain");
+            assert_eq!(execute(&context, "y"), Ok("plain".into()));
+        }
+
+        /// For container `a.b.c` and name `R.s`, candidates are tried most
+        /// specific first: `a.b.c.R.s`, `a.b.R.s`, `a.R.s`, then `R.s`.
+        #[test]
+        fn a_qualified_identifier_tries_every_container_prefix() {
+            let mut context = context_in("a.b.c");
+            context.add_variable_from_value("a.R.s", "found");
+            assert_eq!(execute(&context, "R.s"), Ok("found".into()));
+        }
+
+        /// The longest-prefix rule still applies within a container: for
+        /// `y.z` in container `x`, `x.y.z`, `y.z`, `x.y` + `.z`, `y` + `.z`.
+        #[test]
+        fn the_longest_prefix_rule_combines_with_the_container() {
+            let mut context = context_in("x");
+            context.add_variable_from_value("x.y", std::collections::HashMap::from([("z", 1)]));
+            assert_eq!(execute(&context, "y.z"), Ok(Value::Int(1)));
+        }
+
+        #[test]
+        fn a_struct_type_name_resolves_under_the_container() {
+            let mut env = Env::stdlib();
+            env.set_container("x").unwrap();
+            env.add_type(Type::new_opaque_type("x.y.Ip")).unwrap();
+            let context = Context::with_env(Arc::new(env));
+            assert_eq!(
+                execute(&context, "type(y.Ip) == type"),
+                Ok(Value::Bool(true))
+            );
+        }
+
+        /// Each candidate is tried whole, variable then type, before the next.
+        #[test]
+        fn a_more_specific_type_candidate_wins_over_a_less_specific_variable() {
+            let mut env = Env::stdlib();
+            env.set_container("x").unwrap();
+            env.add_type(Type::new_opaque_type("x.y")).unwrap();
+            let mut context = Context::with_env(Arc::new(env));
+            context.add_variable_from_value("y", "plain-var");
+            assert_eq!(execute(&context, "type(y) == type"), Ok(Value::Bool(true)));
+        }
+
+        #[test]
+        fn a_macro_variable_shadows_the_container() {
+            let mut context = context_in("x");
+            context.add_variable_from_value("x.y", 42);
+            assert_eq!(execute(&context, "[0].exists(y, y == 0)"), Ok(true.into()));
+        }
+
+        #[test]
+        fn a_dotted_variable_of_an_inner_scope_resolves_under_the_container() {
+            let root = context_in("x");
+            let mut child = root.new_inner_scope();
+            child.add_variable_from_value("x.a.b", 7);
+            child.add_variable_from_value("a.c", 8);
+            assert_eq!(execute(&child, "a.b"), Ok(Value::Int(7)));
+            assert_eq!(execute(&child, "a.c"), Ok(Value::Int(8)));
+        }
+
+        #[test]
+        fn a_function_name_resolves_under_the_container() {
+            let mut context = context_in("x");
+            context.add_function("x.f", |i: i64| i + 1).unwrap();
+            assert_eq!(execute(&context, "f(1)"), Ok(Value::Int(2)));
+        }
+
+        #[test]
+        fn a_qualified_function_call_resolves_under_the_container() {
+            let mut context = context_in("x");
+            context.add_function("x.a.f", |i: i64| i + 1).unwrap();
+            assert_eq!(execute(&context, "a.f(1)"), Ok(Value::Int(2)));
+        }
+
+        /// A leading `.` is absolute: it skips the container entirely.
+        #[test]
+        fn a_leading_dot_is_absolute_and_skips_the_container() {
+            let mut context = context_in("x");
+            context.add_variable_from_value("x.y", true);
+            context.add_variable_from_value("y", "plain");
+            assert_eq!(execute(&context, ".y"), Ok("plain".into()));
+        }
+
+        #[test]
+        fn no_container_means_only_the_plain_name() {
+            let context = Context::default();
+            assert_eq!(
+                execute(&context, "y"),
+                Err(ExecutionError::UndeclaredReference(Arc::new(
+                    "y".to_string()
+                )))
+            );
         }
     }
 

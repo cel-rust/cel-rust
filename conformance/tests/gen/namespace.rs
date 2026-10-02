@@ -37,7 +37,6 @@ mod namespace {
     use dedent::dedent;
 
     // Test: self_eval_container_lookup
-    #[should_panic]
     #[test]
     fn self_eval_container_lookup() {
         run_test(&dedent!(
@@ -66,7 +65,6 @@ mod namespace {
     }
 
     // Test: self_eval_container_lookup_unchecked
-    #[should_panic]
     #[test]
     fn self_eval_container_lookup_unchecked() {
         run_test(&dedent!(
@@ -103,7 +101,6 @@ mod namespace_shadowing {
     use dedent::dedent;
 
     // Test: basic
-    #[should_panic]
     #[test]
     fn basic() {
         run_test(&dedent!(

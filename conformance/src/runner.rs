@@ -37,14 +37,10 @@ pub fn run_test(simple_test_textproto: &str) {
         .expect("Failed to compile CEL expression");
 
     // Build context with bindings.
-    let env = Env::stdlib();
+    let mut env = Env::stdlib();
+    env.set_container(&test.container)
+        .expect("Invalid container name in conformance test");
     let mut context = Context::with_env(std::sync::Arc::new(env));
-
-    // Add container if specified (simplified - just note it).
-    if !test.container.is_empty() {
-        // Container support requires features not available in current cel crate.
-        // Tests using containers will likely fail.
-    }
 
     if !test.bindings.is_empty() {
         for (key, expr_value) in &test.bindings {

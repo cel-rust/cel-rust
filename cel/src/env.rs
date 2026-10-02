@@ -4,6 +4,7 @@ use crate::common::{
     types::{self, Type},
     value::CowVal,
 };
+use crate::container::Container;
 use crate::registry::{TypeDecl, TypeRegistry};
 use crate::DeclarationError;
 #[cfg(feature = "structs")]
@@ -57,6 +58,7 @@ pub struct Env {
     namespaces: BTreeSet<String>,
     types: TypeRegistry,
     error_on_duplicate_map_keys: bool,
+    container: Container,
 }
 
 impl Default for Env {
@@ -66,6 +68,7 @@ impl Default for Env {
             namespaces: BTreeSet::new(),
             types: TypeRegistry::default(),
             error_on_duplicate_map_keys: true,
+            container: Container::default(),
         }
     }
 }
@@ -241,6 +244,46 @@ impl Env {
     /// and so is registering a struct type whose type was registered alone.
     pub fn add_type(&mut self, t: impl Into<TypeDecl>) -> Result<(), DeclarationError> {
         self.types.register(t)
+    }
+
+    /// Sets the container names are resolved against: with container `x`, an
+    /// identifier, qualified identifier, struct type name or function name
+    /// `y` also resolves to `x.y`, ahead of the plain `y`. In container `a.b`,
+    /// `y` is tried as `a.b.y`, `a.y`, then `y`; a leading dot, as in `.y`,
+    /// makes the name absolute, so only `y` is tried.
+    ///
+    /// Each call replaces the container; an empty name clears it.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Program, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.set_container("x").unwrap();
+    /// let mut context = Context::with_env(Arc::new(env));
+    /// context.add_variable_from_value("x.y", true);
+    ///
+    /// let program = Program::compile("y").unwrap();
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::InvalidContainerName`] if `name` is
+    /// neither empty nor an identifier, or several separated by dots; a
+    /// leading dot is rejected.
+    pub fn set_container(&mut self, name: &str) -> Result<(), DeclarationError> {
+        self.container = Container::new(name)?;
+        Ok(())
+    }
+
+    /// The name of the container, empty if none is set.
+    pub fn container_name(&self) -> &str {
+        self.container.name()
+    }
+
+    pub(crate) fn container(&self) -> &Container {
+        &self.container
     }
 
     /// The types registered with the environment.
@@ -419,6 +462,30 @@ mod tests {
     #[test]
     fn test_env_default() {
         let _: Arc<dyn Send + Sync> = Arc::new(Env::default());
+    }
+
+    #[test]
+    fn an_empty_container_name_clears_the_container() {
+        use crate::{Context, Program, Value};
+
+        let program = Program::compile("y").unwrap();
+        let run = |env: &Arc<Env>| {
+            let mut context = Context::with_env(env.clone());
+            context.add_variable_from_value("x.y", true);
+            program.execute(&context)
+        };
+
+        let mut env = Arc::new(Env::stdlib());
+        assert_eq!(env.container_name(), "");
+        let env_mut = Arc::get_mut(&mut env).unwrap();
+        env_mut.set_container("x").unwrap();
+        assert!(env_mut.set_container(".x").is_err());
+        assert_eq!(env.container_name(), "x", "a failed call changes nothing");
+        assert_eq!(run(&env), Ok(Value::Bool(true)));
+
+        Arc::get_mut(&mut env).unwrap().set_container("").unwrap();
+        assert_eq!(env.container_name(), "");
+        assert!(run(&env).is_err(), "`y` no longer means `x.y`");
     }
 
     #[test]
