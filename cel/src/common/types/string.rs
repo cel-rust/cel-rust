@@ -294,30 +294,42 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     )
     .expect("Must be unique id");
     crate::add_overload!(env, fn string_from_int: (CelInt) -> String,
-        name = "string", id = "int64_to_string");
+        name = "string", id = "int64_to_string")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn string_from_uint: (CelUInt) -> String,
-        name = "string", id = "uint64_to_string");
+        name = "string", id = "uint64_to_string")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn string_from_double: (CelDouble) -> String,
-        name = "string", id = "double_to_string");
+        name = "string", id = "double_to_string")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn string_from_bytes: (CelBytes) -> Result<String>,
-        name = "string", id = "bytes_to_string");
+        name = "string", id = "bytes_to_string")
+    .expect("Must be unique id");
 
     #[cfg(feature = "chrono")]
     {
         crate::add_overload!(env, fn string_from_timestamp: (CelTimestamp) -> String,
-            name = "string", id = "timestamp_to_string");
+            name = "string", id = "timestamp_to_string")
+        .expect("Must be unique id");
         crate::add_overload!(env, fn string_from_duration: (CelDuration) -> String,
-            name = "string", id = "duration_to_string");
+            name = "string", id = "duration_to_string")
+        .expect("Must be unique id");
     }
 
-    crate::add_member_overload!(env, fn contains: (String, String) -> CelBool);
-    crate::add_member_overload!(env, fn ends_with: (String, String) -> CelBool);
-    crate::add_overload!(env, fn size: (String) -> CelInt, id = "size_string");
+    crate::add_member_overload!(env, fn contains: (String, String) -> CelBool)
+        .expect("Must be unique id");
+    crate::add_member_overload!(env, fn ends_with: (String, String) -> CelBool)
+        .expect("Must be unique id");
+    crate::add_overload!(env, fn size: (String) -> CelInt, id = "size_string")
+        .expect("Must be unique id");
     crate::add_member_overload!(env, fn size: (String) -> CelInt,
-        id = "string_size");
-    crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool);
+        id = "string_size")
+    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool)
+        .expect("Must be unique id");
     #[cfg(feature = "regex")]
-    crate::add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>);
+    crate::add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>)
+        .expect("Must be unique id");
 }
 
 #[cfg(test)]

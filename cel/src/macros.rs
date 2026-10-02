@@ -181,7 +181,7 @@ macro_rules! __overload_result {
 /// ```ignore
 /// fn matches(this: &CelString<'_>, re: &CelString<'_>) -> Result<CelBool, ExecutionError> { … }
 ///
-/// add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>);
+/// add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>)?;
 /// // → registers CEL name "matches", overload id "string.matches(string)".
 /// ```
 ///
@@ -193,7 +193,7 @@ macro_rules! __overload_result {
 ///
 /// ```ignore
 /// add_member_overload!(env, fn regex_matches: (String, String) -> Result<CelBool>,
-///     name = "matches", id = "matches_regex");
+///     name = "matches", id = "matches_regex")?;
 /// ```
 ///
 /// `receiver = <Type expr>` supplies the receiver's CEL type instead of taking
@@ -207,7 +207,7 @@ macro_rules! __overload_result {
 /// ```ignore
 /// // `fn strip_version(this: &CelStruct<'v>) -> Result<CelString<'v>, _>`
 /// add_member_overload!(env, fn strip_version: (CelStruct) -> Result<CelString>,
-///     receiver = Type::new_struct_type("HttpRequest"), name = "stripVersion");
+///     receiver = Type::new_struct_type("HttpRequest"), name = "stripVersion")?;
 /// // → CEL name "stripVersion", overload id "HttpRequest.stripVersion()".
 /// ```
 ///
@@ -226,27 +226,14 @@ macro_rules! __overload_result {
 /// cel::add_member_overload!(env, fn len: (CelString) -> CelString);
 /// ```
 ///
-/// # Panics
+/// # Errors
 ///
-/// If the `Env` already declares an overload of that name with the same id,
-/// or the same signature. Use [`try_add_member_overload!`] to get the
-/// [`DeclarationError`](crate::DeclarationError) back instead.
-#[macro_export]
-macro_rules! add_member_overload {
-    ($($input:tt)*) => {
-        ::std::result::Result::expect(
-            $crate::try_add_member_overload!($($input)*),
-            "Must be unique id",
-        )
-    };
-}
-
-/// Like [`add_member_overload!`], but evaluates to the
-/// `Result<(), DeclarationError>` of the registration instead of panicking,
-/// e.g. when an extension library registers an overload the `Env` already
-/// declares.
-///
-/// Takes the same input as [`add_member_overload!`].
+/// Evaluates to the `Result<(), DeclarationError>` of the registration, and
+/// fails with
+/// [`DeclarationError::DuplicateOverload`](crate::DeclarationError::DuplicateOverload)
+/// if the `Env` already declares an overload of that name with the same id,
+/// or the same signature - e.g. when an extension library registers an
+/// overload the `Env` already declares:
 ///
 /// ```
 /// use cel::common::types::{CelBool, CelString};
@@ -257,7 +244,7 @@ macro_rules! add_member_overload {
 /// }
 ///
 /// fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-///     cel::try_add_member_overload!(env, fn is_empty: (CelString) -> CelBool)?;
+///     cel::add_member_overload!(env, fn is_empty: (CelString) -> CelBool)?;
 ///     Ok(())
 /// }
 ///
@@ -269,7 +256,7 @@ macro_rules! add_member_overload {
 /// );
 /// ```
 #[macro_export]
-macro_rules! try_add_member_overload {
+macro_rules! add_member_overload {
     // The four result shapes, most specific first: `$ret:ty` would otherwise
     // swallow `&T` and `Result<T>` whole. `Result`'s error type is always
     // `ExecutionError`, so spelling it out is optional.
@@ -307,7 +294,7 @@ macro_rules! try_add_member_overload {
     };
 }
 
-/// The body behind [`try_add_member_overload!`], with the result shape resolved
+/// The body behind [`add_member_overload!`], with the result shape resolved
 /// to one of [`__overload_result!`]'s tags. Evaluates to the registration's
 /// `Result`. Not for direct use.
 #[doc(hidden)]
@@ -481,25 +468,13 @@ macro_rules! __overload_receiver_override {
 /// Either may be overridden via trailing `name = "..."` / `id = "..."`
 /// key-value args, in either order.
 ///
-/// # Panics
+/// # Errors
 ///
-/// If the `Env` already declares an overload of that name with the same id,
-/// or the same signature. Use [`try_add_overload!`] to get the
-/// [`DeclarationError`](crate::DeclarationError) back instead.
-#[macro_export]
-macro_rules! add_overload {
-    ($($input:tt)*) => {
-        ::std::result::Result::expect(
-            $crate::try_add_overload!($($input)*),
-            "Must be unique id",
-        )
-    };
-}
-
-/// Like [`add_overload!`], but evaluates to the `Result<(), DeclarationError>`
-/// of the registration instead of panicking.
-///
-/// Takes the same input as [`add_overload!`].
+/// Evaluates to the `Result<(), DeclarationError>` of the registration, and
+/// fails with
+/// [`DeclarationError::DuplicateOverload`](crate::DeclarationError::DuplicateOverload)
+/// if the `Env` already declares an overload of that name with the same id,
+/// or the same signature:
 ///
 /// ```
 /// use cel::common::types::{CelInt, CelString};
@@ -511,14 +486,14 @@ macro_rules! add_overload {
 ///
 /// let mut env = Env::stdlib();
 /// assert_eq!(
-///     cel::try_add_overload!(env, fn size: (CelString) -> CelInt, id = "size_string"),
+///     cel::add_overload!(env, fn size: (CelString) -> CelInt, id = "size_string"),
 ///     Err(DeclarationError::duplicate_overload("size", "size_string")),
 /// );
 /// ```
 #[macro_export]
-macro_rules! try_add_overload {
+macro_rules! add_overload {
     // The four result shapes, most specific first - see
-    // `try_add_member_overload!`.
+    // `add_member_overload!`.
     (
         $env:expr,
         fn $fn:ident : ( $($arg:ty),* $(,)? ) -> Result<&$ret:ty $(, $err:ty)?>
@@ -549,7 +524,7 @@ macro_rules! try_add_overload {
     };
 }
 
-/// The body behind [`try_add_overload!`], with the result shape resolved to one
+/// The body behind [`add_overload!`], with the result shape resolved to one
 /// of [`__overload_result!`]'s tags. Handles the zero-argument case too.
 /// Evaluates to the registration's `Result`. Not for direct use.
 #[doc(hidden)]
@@ -712,7 +687,7 @@ mod tests {
     #[test]
     fn add_overload_default_name_snake_to_camel() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ends_with: (CelString, CelString) -> CelBool);
+        crate::add_overload!(env, fn ends_with: (CelString, CelString) -> CelBool).unwrap();
         assert!(name_registered(&env, "endsWith", 2));
         assert!(!name_registered(&env, "ends_with", 2));
     }
@@ -720,14 +695,14 @@ mod tests {
     #[test]
     fn add_overload_default_name_single_word_unchanged() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping: (CelString) -> CelInt);
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt).unwrap();
         assert!(name_registered(&env, "ping", 1));
     }
 
     #[test]
     fn add_member_overload_default_name_snake_to_camel() {
         let mut env = Env::default();
-        crate::add_member_overload!(env, fn ends_with: (CelString, CelString) -> CelBool);
+        crate::add_member_overload!(env, fn ends_with: (CelString, CelString) -> CelBool).unwrap();
         assert!(member_name_registered(&env, "endsWith", 2));
         assert!(!member_name_registered(&env, "ends_with", 2));
     }
@@ -737,7 +712,7 @@ mod tests {
         // With the camelCase default, `fn ends_with` yields id
         // `"string.endsWith(string)"` without a `name = ...` override.
         let mut env = Env::default();
-        crate::add_member_overload!(env, fn ends_with: (CelString, CelString) -> CelBool);
+        crate::add_member_overload!(env, fn ends_with: (CelString, CelString) -> CelBool).unwrap();
         assert!(env
             .add_member_overload(
                 "endsWith",
@@ -754,7 +729,7 @@ mod tests {
     #[test]
     fn add_overload_default_id_matches_cel_cpp_one_arg() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping: (CelString) -> CelInt);
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt).unwrap();
         // Expected cel-cpp signature: `ping(string)`
         assert!(
             env.add_overload("ping", "ping(string)", vec![types::STRING_TYPE], noop)
@@ -766,7 +741,7 @@ mod tests {
     #[test]
     fn add_overload_default_id_matches_cel_cpp_two_args() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping2: (CelString, CelString) -> CelInt);
+        crate::add_overload!(env, fn ping2: (CelString, CelString) -> CelInt).unwrap();
         // Expected cel-cpp signature: `ping2(string,string)`
         assert!(env
             .add_overload(
@@ -781,7 +756,7 @@ mod tests {
     #[test]
     fn add_overload_default_id_matches_cel_cpp_zero_args() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping0: () -> CelInt);
+        crate::add_overload!(env, fn ping0: () -> CelInt).unwrap();
         // Expected cel-cpp signature: `ping0()`
         assert!(env.add_overload("ping0", "ping0()", vec![], noop).is_err());
     }
@@ -790,7 +765,7 @@ mod tests {
     fn add_overload_id_default_uses_resolved_name_override() {
         let mut env = Env::default();
         // name override changes the id default's function-name portion.
-        crate::add_overload!(env, fn ping: (CelString) -> CelInt, name = "renamed");
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt, name = "renamed").unwrap();
         assert!(
             env.add_overload("renamed", "renamed(string)", vec![types::STRING_TYPE], noop)
                 .is_err(),
@@ -807,7 +782,7 @@ mod tests {
     #[test]
     fn add_overload_explicit_id_wins_over_default() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping: (CelString) -> CelInt, id = "explicit");
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt, id = "explicit").unwrap();
         assert!(env
             .add_overload("ping", "explicit", vec![types::STRING_TYPE], noop)
             .is_err());
@@ -826,7 +801,7 @@ mod tests {
     #[test]
     fn a_plain_value_is_wrapped_as_owned() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping: (CelString) -> CelInt);
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt).unwrap();
         let out = call(&env, "ping");
         assert!(out.is_owned());
         assert_eq!(out.downcast_ref::<CelInt>(), Some(&CelInt::from(0)));
@@ -835,7 +810,7 @@ mod tests {
     #[test]
     fn a_result_value_is_wrapped_as_owned() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn fallible: (CelString) -> Result<CelInt>);
+        crate::add_overload!(env, fn fallible: (CelString) -> Result<CelInt>).unwrap();
         let out = call(&env, "fallible");
         assert!(out.is_owned());
         assert_eq!(out.downcast_ref::<CelInt>(), Some(&CelInt::from(0)));
@@ -845,7 +820,8 @@ mod tests {
     #[test]
     fn a_result_shape_accepts_an_explicit_error_type() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn fallible: (CelString) -> Result<CelInt, ExecutionError>);
+        crate::add_overload!(env, fn fallible: (CelString) -> Result<CelInt, ExecutionError>)
+            .unwrap();
         assert_eq!(
             call(&env, "fallible").downcast_ref::<CelInt>(),
             Some(&CelInt::from(0))
@@ -855,7 +831,7 @@ mod tests {
     #[test]
     fn a_reference_is_kept_as_a_borrow() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn borrows: (CelString) -> &CelBool);
+        crate::add_overload!(env, fn borrows: (CelString) -> &CelBool).unwrap();
         let out = call(&env, "borrows");
         assert!(out.is_borrowed(), "a `&T` result should not be boxed");
         assert_eq!(out.downcast_ref::<CelBool>(), Some(&CelBool::TRUE));
@@ -864,7 +840,7 @@ mod tests {
     #[test]
     fn a_result_reference_is_kept_as_a_borrow() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn fallible_borrows: (CelString) -> Result<&CelBool>);
+        crate::add_overload!(env, fn fallible_borrows: (CelString) -> Result<&CelBool>).unwrap();
         let out = call(&env, "fallibleBorrows");
         assert!(out.is_borrowed(), "a `&T` result should not be boxed");
         assert_eq!(out.downcast_ref::<CelBool>(), Some(&CelBool::TRUE));
@@ -877,7 +853,7 @@ mod tests {
             Err(ExecutionError::function_error("boom", "nope"))
         }
         let mut env = Env::default();
-        crate::add_overload!(env, fn boom: (CelString) -> Result<CelInt>);
+        crate::add_overload!(env, fn boom: (CelString) -> Result<CelInt>).unwrap();
         let wrapper = env.find_overload("boom", &[string_arg()]).unwrap();
         assert_eq!(
             wrapper(vec![string_arg()]).err(),
@@ -897,7 +873,8 @@ mod tests {
 
         let mut env = Env::default();
         crate::add_member_overload!(env, fn ping: (CelString) -> CelInt,
-            receiver = Type::new_opaque_type("HttpRequest"));
+            receiver = Type::new_opaque_type("HttpRequest"))
+        .unwrap();
         // Default id reads from the overridden receiver, not from `string`.
         assert!(env
             .add_member_overload(
@@ -921,7 +898,8 @@ mod tests {
 
         let mut env = Env::default();
         crate::add_member_overload!(env, fn ping: (CelString) -> CelInt,
-            receiver = Type::new_opaque_type("Req"), id = "explicit");
+            receiver = Type::new_opaque_type("Req"), id = "explicit")
+        .unwrap();
         assert!(env
             .add_member_overload(
                 "ping",
@@ -947,7 +925,7 @@ mod tests {
         }
 
         let mut env = Env::default();
-        crate::add_member_overload!(env, fn on_struct: (CelStruct) -> CelInt);
+        crate::add_member_overload!(env, fn on_struct: (CelStruct) -> CelInt).unwrap();
     }
 
     /// ... and with it, the same fn registers fine.
@@ -962,7 +940,8 @@ mod tests {
 
         let mut env = Env::default();
         crate::add_member_overload!(env, fn on_struct: (CelStruct) -> CelInt,
-            receiver = Type::new_struct_type("HttpRequest"), name = "onStruct");
+            receiver = Type::new_struct_type("HttpRequest"), name = "onStruct")
+        .unwrap();
         assert!(env
             .add_member_overload(
                 "onStruct",
@@ -991,7 +970,7 @@ mod tests {
     #[test]
     fn wrapper_reports_an_owned_argument_of_the_wrong_type() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping: (CelString) -> CelInt);
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt).unwrap();
         let wrapper = env.find_overload("ping", &[string_arg()]).unwrap();
 
         let int: Box<dyn Val> = Box::new(CelInt::from(1));
@@ -1007,7 +986,7 @@ mod tests {
     #[test]
     fn wrapper_reports_a_borrowed_argument_of_the_wrong_type() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping: (CelString) -> CelInt);
+        crate::add_overload!(env, fn ping: (CelString) -> CelInt).unwrap();
         let wrapper = env.find_overload("ping", &[string_arg()]).unwrap();
 
         let int = CelInt::from(1);
@@ -1024,7 +1003,7 @@ mod tests {
     fn wrapper_reports_the_wanted_type_of_the_argument_that_is_wrong() {
         // the second of two arguments: `want` is the type of *that* parameter
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping2: (CelString, CelString) -> CelInt);
+        crate::add_overload!(env, fn ping2: (CelString, CelString) -> CelInt).unwrap();
         let wrapper = env
             .find_overload("ping2", &[string_arg(), string_arg()])
             .unwrap();
@@ -1042,7 +1021,7 @@ mod tests {
     #[test]
     fn wrapper_reports_missing_arguments_against_the_arity() {
         let mut env = Env::default();
-        crate::add_overload!(env, fn ping2: (CelString, CelString) -> CelInt);
+        crate::add_overload!(env, fn ping2: (CelString, CelString) -> CelInt).unwrap();
         let wrapper = env
             .find_overload("ping2", &[string_arg(), string_arg()])
             .unwrap();
@@ -1060,7 +1039,7 @@ mod tests {
     #[test]
     fn member_wrapper_reports_errors_the_same_way() {
         let mut env = Env::default();
-        crate::add_member_overload!(env, fn ping2: (CelString, CelString) -> CelInt);
+        crate::add_member_overload!(env, fn ping2: (CelString, CelString) -> CelInt).unwrap();
         let wrapper = env
             .find_member_overload("ping2", &[string_arg(), string_arg()])
             .unwrap();
@@ -1084,7 +1063,7 @@ mod tests {
     #[test]
     fn add_member_overload_default_id_matches_cel_cpp_no_extra_args() {
         let mut env = Env::default();
-        crate::add_member_overload!(env, fn ping: (CelString) -> CelInt);
+        crate::add_member_overload!(env, fn ping: (CelString) -> CelInt).unwrap();
         // Expected cel-cpp signature: `string.ping()`
         assert!(env
             .add_member_overload("ping", "string.ping()", types::STRING_TYPE, vec![], noop)
@@ -1094,7 +1073,7 @@ mod tests {
     #[test]
     fn add_member_overload_default_id_matches_cel_cpp_one_extra_arg() {
         let mut env = Env::default();
-        crate::add_member_overload!(env, fn ping2: (CelString, CelString) -> CelInt);
+        crate::add_member_overload!(env, fn ping2: (CelString, CelString) -> CelInt).unwrap();
         // Expected cel-cpp signature: `string.ping2(string)`
         assert!(env
             .add_member_overload(
@@ -1111,7 +1090,8 @@ mod tests {
     fn add_member_overload_id_default_uses_resolved_name_override() {
         let mut env = Env::default();
         crate::add_member_overload!(env, fn ping2_bool: (CelString, CelString) -> CelBool,
-            name = "endsWith");
+            name = "endsWith")
+        .unwrap();
         // Expected cel-cpp signature: `string.endsWith(string)`
         assert!(env
             .add_member_overload(
@@ -1127,7 +1107,7 @@ mod tests {
     #[test]
     fn add_member_overload_explicit_id_wins_over_default() {
         let mut env = Env::default();
-        crate::add_member_overload!(env, fn ping: (CelString) -> CelInt, id = "explicit");
+        crate::add_member_overload!(env, fn ping: (CelString) -> CelInt, id = "explicit").unwrap();
         assert!(env
             .add_member_overload("ping", "explicit", types::STRING_TYPE, vec![], noop)
             .is_err());

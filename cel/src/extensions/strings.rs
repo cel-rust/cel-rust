@@ -9,12 +9,12 @@ use crate::{DeclarationError, Env, ExecutionError};
 
 /// Registers the strings extension's overloads on `env`.
 pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    crate::try_add_member_overload!(env, fn char_at: (CelString, CelInt) -> Result<CelString>)?;
-    crate::try_add_member_overload!(env, fn index_of: (CelString, CelString) -> CelInt)?;
-    crate::try_add_member_overload!(env, fn index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
+    crate::add_member_overload!(env, fn char_at: (CelString, CelInt) -> Result<CelString>)?;
+    crate::add_member_overload!(env, fn index_of: (CelString, CelString) -> CelInt)?;
+    crate::add_member_overload!(env, fn index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
         name = "indexOf")?;
-    crate::try_add_member_overload!(env, fn last_index_of: (CelString, CelString) -> CelInt)?;
-    crate::try_add_member_overload!(env, fn last_index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
+    crate::add_member_overload!(env, fn last_index_of: (CelString, CelString) -> CelInt)?;
+    crate::add_member_overload!(env, fn last_index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
         name = "lastIndexOf")?;
     // Registered by hand, as the macro would downcast the receiver to a
     // `CelList`: `join` takes any `list`, like the stdlib's list overloads.
@@ -26,17 +26,17 @@ pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
         vec![STRING_TYPE],
         join_sep,
     )?;
-    crate::try_add_member_overload!(env, fn lower_ascii: (CelString) -> CelString)?;
-    crate::try_add_member_overload!(env, fn upper_ascii: (CelString) -> CelString)?;
-    crate::try_add_member_overload!(env, fn trim: (CelString) -> CelString)?;
-    crate::try_add_member_overload!(env, fn replace: (CelString, CelString, CelString) -> CelString)?;
-    crate::try_add_member_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> CelString,
+    crate::add_member_overload!(env, fn lower_ascii: (CelString) -> CelString)?;
+    crate::add_member_overload!(env, fn upper_ascii: (CelString) -> CelString)?;
+    crate::add_member_overload!(env, fn trim: (CelString) -> CelString)?;
+    crate::add_member_overload!(env, fn replace: (CelString, CelString, CelString) -> CelString)?;
+    crate::add_member_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> CelString,
         name = "replace")?;
-    crate::try_add_member_overload!(env, fn split: (CelString, CelString) -> CelList)?;
-    crate::try_add_member_overload!(env, fn split_n: (CelString, CelString, CelInt) -> CelList,
+    crate::add_member_overload!(env, fn split: (CelString, CelString) -> CelList)?;
+    crate::add_member_overload!(env, fn split_n: (CelString, CelString, CelInt) -> CelList,
         name = "split")?;
-    crate::try_add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>)?;
-    crate::try_add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
+    crate::add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>)?;
+    crate::add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
         name = "substring")?;
     Ok(())
 }
