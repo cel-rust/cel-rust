@@ -20,10 +20,11 @@ type Expander = dyn Fn(
 /// A parse-time rewrite of a call into another expression.
 ///
 /// A macro matches a call on the function's name, on whether it is called on a
-/// target (`x.f(..)`) or globally (`f(..)`), and on its argument count. The
-/// parser then hands the call's target and arguments to the macro's expander,
-/// and the `Some` expression it returns replaces the call in the parsed
-/// expression:
+/// target (`x.f(..)`) or globally (`f(..)`), and on its argument count, unless
+/// it is for any number of arguments: a macro for the call's exact argument
+/// count wins over one for any number. The parser then hands the call's target
+/// and arguments to the macro's expander, and the `Some` expression it returns
+/// replaces the call in the parsed expression:
 ///
 /// - the target is `None` for a global call, and the `x` of `x.f(..)` for a
 ///   receiver call;
@@ -34,7 +35,8 @@ type Expander = dyn Fn(
 /// - `Ok(None)` declines the call, which stays as written, as when no macro
 ///   matches it: e.g. for `cel.bind(..)`, a `bind` on any other target. The
 ///   expander must decline before taking anything from the target or the
-///   arguments, or the parse fails;
+///   arguments, or the parse fails. A macro for any number of arguments isn't
+///   tried for a call that one for its exact argument count declined;
 /// - an `Err`, best made with [`MacroExprHelper::new_error`], fails the parse
 ///   with that error.
 ///
@@ -45,8 +47,15 @@ type Expander = dyn Fn(
 pub struct Macro {
     function: String,
     receiver_style: bool,
-    arg_count: usize,
+    arity: Arity,
     expander: Arc<Expander>,
+}
+
+/// How many arguments the calls a macro is for have.
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Arity {
+    Exactly(usize),
+    Any,
 }
 
 impl Macro {
@@ -63,12 +72,12 @@ impl Macro {
             + Sync
             + 'static,
     ) -> Self {
-        Self {
-            function: function.into(),
-            receiver_style: false,
-            arg_count,
-            expander: Arc::new(expander),
-        }
+        Self::new(
+            function,
+            false,
+            Arity::Exactly(arg_count),
+            Arc::new(expander),
+        )
     }
 
     /// A macro for the receiver call `target.function(..)` with `arg_count`
@@ -85,11 +94,57 @@ impl Macro {
             + Sync
             + 'static,
     ) -> Self {
+        Self::new(
+            function,
+            true,
+            Arity::Exactly(arg_count),
+            Arc::new(expander),
+        )
+    }
+
+    /// A macro for the global call `function(..)` with any number of
+    /// arguments, none included.
+    pub fn global_var_arg(
+        function: impl Into<String>,
+        expander: impl Fn(
+                &mut MacroExprHelper<'_>,
+                &mut Option<IdedExpr>,
+                &mut Vec<IdedExpr>,
+            ) -> Result<Option<IdedExpr>, ParseError>
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        Self::new(function, false, Arity::Any, Arc::new(expander))
+    }
+
+    /// A macro for the receiver call `target.function(..)` with any number of
+    /// arguments, none included, the target not counted.
+    pub fn receiver_var_arg(
+        function: impl Into<String>,
+        expander: impl Fn(
+                &mut MacroExprHelper<'_>,
+                &mut Option<IdedExpr>,
+                &mut Vec<IdedExpr>,
+            ) -> Result<Option<IdedExpr>, ParseError>
+            + Send
+            + Sync
+            + 'static,
+    ) -> Self {
+        Self::new(function, true, Arity::Any, Arc::new(expander))
+    }
+
+    fn new(
+        function: impl Into<String>,
+        receiver_style: bool,
+        arity: Arity,
+        expander: Arc<Expander>,
+    ) -> Self {
         Self {
             function: function.into(),
-            receiver_style: true,
-            arg_count,
-            expander: Arc::new(expander),
+            receiver_style,
+            arity,
+            expander,
         }
     }
 
@@ -115,10 +170,11 @@ impl Macro {
         Ok(expansion)
     }
 
-    /// Whether this macro is for a call with `arg_count` arguments, on a
-    /// target when `receiver_style`.
-    fn matches(&self, receiver_style: bool, arg_count: usize) -> bool {
-        self.receiver_style == receiver_style && self.arg_count == arg_count
+    /// Whether this macro is for the calls with `arity` arguments, on a target
+    /// when `receiver_style`: two macros of a function for the same calls are
+    /// duplicates.
+    fn matches(&self, receiver_style: bool, arity: Arity) -> bool {
+        self.receiver_style == receiver_style && self.arity == arity
     }
 }
 
@@ -127,7 +183,7 @@ impl fmt::Debug for Macro {
         f.debug_struct("Macro")
             .field("function", &self.function)
             .field("receiver_style", &self.receiver_style)
-            .field("arg_count", &self.arg_count)
+            .field("arity", &self.arity)
             .finish_non_exhaustive()
     }
 }
@@ -200,17 +256,22 @@ impl Macros {
     }
 
     /// The macro matching the call `function(args)`, or `target.function(args)`
-    /// when there is a target.
+    /// when there is a target: the one for its exact argument count, else the
+    /// one for any number of arguments.
     pub(crate) fn find(
         &self,
         function: &str,
         target: Option<&IdedExpr>,
         args: &[IdedExpr],
     ) -> Option<&Macro> {
-        self.by_function
-            .get(function)?
-            .iter()
-            .find(|m| m.matches(target.is_some(), args.len()))
+        let same_function = self.by_function.get(function)?;
+        [Arity::Exactly(args.len()), Arity::Any]
+            .into_iter()
+            .find_map(|arity| {
+                same_function
+                    .iter()
+                    .find(|m| m.matches(target.is_some(), arity))
+            })
     }
 
     /// Adds `m`, unless a macro for the same calls is already there.
@@ -218,7 +279,7 @@ impl Macros {
         let same_function = self.by_function.entry(m.function.clone()).or_default();
         if same_function
             .iter()
-            .any(|other| other.matches(m.receiver_style, m.arg_count))
+            .any(|other| other.matches(m.receiver_style, m.arity))
         {
             return Err(DeclarationError::duplicate_macro(&m.function));
         }
