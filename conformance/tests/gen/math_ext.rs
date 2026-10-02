@@ -10,7 +10,6 @@ mod greatest_int_result {
     use dedent::dedent;
 
     // Test: unary_negative
-    #[should_panic]
     #[test]
     fn unary_negative() {
         run_test(&dedent!(
@@ -24,7 +23,6 @@ mod greatest_int_result {
     }
 
     // Test: unary_positive
-    #[should_panic]
     #[test]
     fn unary_positive() {
         run_test(&dedent!(
@@ -38,7 +36,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_same_args
-    #[should_panic]
     #[test]
     fn binary_same_args() {
         run_test(&dedent!(
@@ -52,7 +49,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_with_decimal
-    #[should_panic]
     #[test]
     fn binary_with_decimal() {
         run_test(&dedent!(
@@ -63,7 +59,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_with_uint
-    #[should_panic]
     #[test]
     fn binary_with_uint() {
         run_test(&dedent!(
@@ -74,7 +69,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_first_arg_greater
-    #[should_panic]
     #[test]
     fn binary_first_arg_greater() {
         run_test(&dedent!(
@@ -88,7 +82,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_second_arg_greater
-    #[should_panic]
     #[test]
     fn binary_second_arg_greater() {
         run_test(&dedent!(
@@ -102,7 +95,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_first_arg_int_max
-    #[should_panic]
     #[test]
     fn binary_first_arg_int_max() {
         run_test(&dedent!(
@@ -116,7 +108,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_second_arg_int_max
-    #[should_panic]
     #[test]
     fn binary_second_arg_int_max() {
         run_test(&dedent!(
@@ -130,7 +121,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_first_arg_int_min
-    #[should_panic]
     #[test]
     fn binary_first_arg_int_min() {
         run_test(&dedent!(
@@ -144,7 +134,6 @@ mod greatest_int_result {
     }
 
     // Test: binary_second_arg_int_min
-    #[should_panic]
     #[test]
     fn binary_second_arg_int_min() {
         run_test(&dedent!(
@@ -158,7 +147,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_same_args
-    #[should_panic]
     #[test]
     fn ternary_same_args() {
         run_test(&dedent!(
@@ -169,7 +157,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_with_decimal
-    #[should_panic]
     #[test]
     fn ternary_with_decimal() {
         run_test(&dedent!(
@@ -180,7 +167,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_with_uint
-    #[should_panic]
     #[test]
     fn ternary_with_uint() {
         run_test(&dedent!(
@@ -191,7 +177,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_first_arg_greatest
-    #[should_panic]
     #[test]
     fn ternary_first_arg_greatest() {
         run_test(&dedent!(
@@ -202,7 +187,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_third_arg_greatest
-    #[should_panic]
     #[test]
     fn ternary_third_arg_greatest() {
         run_test(&dedent!(
@@ -213,7 +197,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_with_negatives
-    #[should_panic]
     #[test]
     fn ternary_with_negatives() {
         run_test(&dedent!(
@@ -224,7 +207,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_int_max
-    #[should_panic]
     #[test]
     fn ternary_int_max() {
         run_test(&dedent!(
@@ -235,7 +217,6 @@ mod greatest_int_result {
     }
 
     // Test: ternary_int_min
-    #[should_panic]
     #[test]
     fn ternary_int_min() {
         run_test(&dedent!(
@@ -246,7 +227,6 @@ mod greatest_int_result {
     }
 
     // Test: quaternary_mixed
-    #[should_panic]
     #[test]
     fn quaternary_mixed() {
         run_test(&dedent!(
@@ -257,7 +237,6 @@ mod greatest_int_result {
     }
 
     // Test: quaternary_mixed_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_array() {
         run_test(&dedent!(
@@ -268,7 +247,6 @@ mod greatest_int_result {
     }
 
     // Test: quaternary_mixed_dyn_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_dyn_array() {
         run_test(&dedent!(
@@ -285,7 +263,6 @@ mod greatest_double_result {
     use dedent::dedent;
 
     // Test: unary_negative
-    #[should_panic]
     #[test]
     fn unary_negative() {
         run_test(&dedent!(
@@ -299,7 +276,6 @@ mod greatest_double_result {
     }
 
     // Test: unary_positive
-    #[should_panic]
     #[test]
     fn unary_positive() {
         run_test(&dedent!(
@@ -313,7 +289,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_same_args
-    #[should_panic]
     #[test]
     fn binary_same_args() {
         run_test(&dedent!(
@@ -327,7 +302,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_with_int
-    #[should_panic]
     #[test]
     fn binary_with_int() {
         run_test(&dedent!(
@@ -338,7 +312,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_with_uint
-    #[should_panic]
     #[test]
     fn binary_with_uint() {
         run_test(&dedent!(
@@ -349,7 +322,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_first_arg_greater
-    #[should_panic]
     #[test]
     fn binary_first_arg_greater() {
         run_test(&dedent!(
@@ -363,7 +335,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_second_arg_greater
-    #[should_panic]
     #[test]
     fn binary_second_arg_greater() {
         run_test(&dedent!(
@@ -377,7 +348,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_first_arg_double_max
-    #[should_panic]
     #[test]
     fn binary_first_arg_double_max() {
         run_test(&dedent!(
@@ -391,7 +361,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_second_arg_double_max
-    #[should_panic]
     #[test]
     fn binary_second_arg_double_max() {
         run_test(&dedent!(
@@ -405,7 +374,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_first_arg_double_min
-    #[should_panic]
     #[test]
     fn binary_first_arg_double_min() {
         run_test(&dedent!(
@@ -419,7 +387,6 @@ mod greatest_double_result {
     }
 
     // Test: binary_second_arg_double_min
-    #[should_panic]
     #[test]
     fn binary_second_arg_double_min() {
         run_test(&dedent!(
@@ -433,7 +400,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_same_args
-    #[should_panic]
     #[test]
     fn ternary_same_args() {
         run_test(&dedent!(
@@ -444,7 +410,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_with_int
-    #[should_panic]
     #[test]
     fn ternary_with_int() {
         run_test(&dedent!(
@@ -455,7 +420,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_with_uint
-    #[should_panic]
     #[test]
     fn ternary_with_uint() {
         run_test(&dedent!(
@@ -466,7 +430,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_first_arg_greatest
-    #[should_panic]
     #[test]
     fn ternary_first_arg_greatest() {
         run_test(&dedent!(
@@ -477,7 +440,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_third_arg_greatest
-    #[should_panic]
     #[test]
     fn ternary_third_arg_greatest() {
         run_test(&dedent!(
@@ -488,7 +450,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_with_negatives
-    #[should_panic]
     #[test]
     fn ternary_with_negatives() {
         run_test(&dedent!(
@@ -499,7 +460,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_double_max
-    #[should_panic]
     #[test]
     fn ternary_double_max() {
         run_test(&dedent!(
@@ -510,7 +470,6 @@ mod greatest_double_result {
     }
 
     // Test: ternary_double_min
-    #[should_panic]
     #[test]
     fn ternary_double_min() {
         run_test(&dedent!(
@@ -521,7 +480,6 @@ mod greatest_double_result {
     }
 
     // Test: quaternary_mixed
-    #[should_panic]
     #[test]
     fn quaternary_mixed() {
         run_test(&dedent!(
@@ -532,7 +490,6 @@ mod greatest_double_result {
     }
 
     // Test: quaternary_mixed_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_array() {
         run_test(&dedent!(
@@ -543,7 +500,6 @@ mod greatest_double_result {
     }
 
     // Test: quaternary_mixed_dyn_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_dyn_array() {
         run_test(&dedent!(
@@ -560,7 +516,6 @@ mod greatest_uint_result {
     use dedent::dedent;
 
     // Test: unary
-    #[should_panic]
     #[test]
     fn unary() {
         run_test(&dedent!(
@@ -574,7 +529,6 @@ mod greatest_uint_result {
     }
 
     // Test: binary_same_args
-    #[should_panic]
     #[test]
     fn binary_same_args() {
         run_test(&dedent!(
@@ -588,7 +542,6 @@ mod greatest_uint_result {
     }
 
     // Test: binary_with_decimal
-    #[should_panic]
     #[test]
     fn binary_with_decimal() {
         run_test(&dedent!(
@@ -599,7 +552,6 @@ mod greatest_uint_result {
     }
 
     // Test: binary_with_int
-    #[should_panic]
     #[test]
     fn binary_with_int() {
         run_test(&dedent!(
@@ -610,7 +562,6 @@ mod greatest_uint_result {
     }
 
     // Test: binary_first_arg_greater
-    #[should_panic]
     #[test]
     fn binary_first_arg_greater() {
         run_test(&dedent!(
@@ -624,7 +575,6 @@ mod greatest_uint_result {
     }
 
     // Test: binary_second_arg_greater
-    #[should_panic]
     #[test]
     fn binary_second_arg_greater() {
         run_test(&dedent!(
@@ -638,7 +588,6 @@ mod greatest_uint_result {
     }
 
     // Test: binary_first_arg_uint_max
-    #[should_panic]
     #[test]
     fn binary_first_arg_uint_max() {
         run_test(&dedent!(
@@ -652,7 +601,6 @@ mod greatest_uint_result {
     }
 
     // Test: binary_second_arg_uint_max
-    #[should_panic]
     #[test]
     fn binary_second_arg_uint_max() {
         run_test(&dedent!(
@@ -666,7 +614,6 @@ mod greatest_uint_result {
     }
 
     // Test: ternary_same_args
-    #[should_panic]
     #[test]
     fn ternary_same_args() {
         run_test(&dedent!(
@@ -677,7 +624,6 @@ mod greatest_uint_result {
     }
 
     // Test: ternary_with_decimal
-    #[should_panic]
     #[test]
     fn ternary_with_decimal() {
         run_test(&dedent!(
@@ -688,7 +634,6 @@ mod greatest_uint_result {
     }
 
     // Test: ternary_with_int
-    #[should_panic]
     #[test]
     fn ternary_with_int() {
         run_test(&dedent!(
@@ -699,7 +644,6 @@ mod greatest_uint_result {
     }
 
     // Test: ternary_first_arg_greatest
-    #[should_panic]
     #[test]
     fn ternary_first_arg_greatest() {
         run_test(&dedent!(
@@ -710,7 +654,6 @@ mod greatest_uint_result {
     }
 
     // Test: ternary_third_arg_greatest
-    #[should_panic]
     #[test]
     fn ternary_third_arg_greatest() {
         run_test(&dedent!(
@@ -721,7 +664,6 @@ mod greatest_uint_result {
     }
 
     // Test: ternary_int_max
-    #[should_panic]
     #[test]
     fn ternary_int_max() {
         run_test(&dedent!(
@@ -732,7 +674,6 @@ mod greatest_uint_result {
     }
 
     // Test: quaternary_mixed
-    #[should_panic]
     #[test]
     fn quaternary_mixed() {
         run_test(&dedent!(
@@ -743,7 +684,6 @@ mod greatest_uint_result {
     }
 
     // Test: quaternary_mixed_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_array() {
         run_test(&dedent!(
@@ -754,7 +694,6 @@ mod greatest_uint_result {
     }
 
     // Test: quaternary_mixed_dyn_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_dyn_array() {
         run_test(&dedent!(
@@ -771,7 +710,6 @@ mod least_int_result {
     use dedent::dedent;
 
     // Test: unary_negative
-    #[should_panic]
     #[test]
     fn unary_negative() {
         run_test(&dedent!(
@@ -785,7 +723,6 @@ mod least_int_result {
     }
 
     // Test: unary_positive
-    #[should_panic]
     #[test]
     fn unary_positive() {
         run_test(&dedent!(
@@ -799,7 +736,6 @@ mod least_int_result {
     }
 
     // Test: binary_same_args
-    #[should_panic]
     #[test]
     fn binary_same_args() {
         run_test(&dedent!(
@@ -813,7 +749,6 @@ mod least_int_result {
     }
 
     // Test: binary_with_decimal
-    #[should_panic]
     #[test]
     fn binary_with_decimal() {
         run_test(&dedent!(
@@ -824,7 +759,6 @@ mod least_int_result {
     }
 
     // Test: binary_with_uint
-    #[should_panic]
     #[test]
     fn binary_with_uint() {
         run_test(&dedent!(
@@ -835,7 +769,6 @@ mod least_int_result {
     }
 
     // Test: binary_first_arg_least
-    #[should_panic]
     #[test]
     fn binary_first_arg_least() {
         run_test(&dedent!(
@@ -849,7 +782,6 @@ mod least_int_result {
     }
 
     // Test: binary_second_arg_least
-    #[should_panic]
     #[test]
     fn binary_second_arg_least() {
         run_test(&dedent!(
@@ -863,7 +795,6 @@ mod least_int_result {
     }
 
     // Test: binary_first_arg_int_max
-    #[should_panic]
     #[test]
     fn binary_first_arg_int_max() {
         run_test(&dedent!(
@@ -877,7 +808,6 @@ mod least_int_result {
     }
 
     // Test: binary_second_arg_int_max
-    #[should_panic]
     #[test]
     fn binary_second_arg_int_max() {
         run_test(&dedent!(
@@ -891,7 +821,6 @@ mod least_int_result {
     }
 
     // Test: binary_first_arg_int_min
-    #[should_panic]
     #[test]
     fn binary_first_arg_int_min() {
         run_test(&dedent!(
@@ -905,7 +834,6 @@ mod least_int_result {
     }
 
     // Test: binary_second_arg_int_min
-    #[should_panic]
     #[test]
     fn binary_second_arg_int_min() {
         run_test(&dedent!(
@@ -919,7 +847,6 @@ mod least_int_result {
     }
 
     // Test: ternary_same_args
-    #[should_panic]
     #[test]
     fn ternary_same_args() {
         run_test(&dedent!(
@@ -930,7 +857,6 @@ mod least_int_result {
     }
 
     // Test: ternary_with_decimal
-    #[should_panic]
     #[test]
     fn ternary_with_decimal() {
         run_test(&dedent!(
@@ -941,7 +867,6 @@ mod least_int_result {
     }
 
     // Test: ternary_with_uint
-    #[should_panic]
     #[test]
     fn ternary_with_uint() {
         run_test(&dedent!(
@@ -952,7 +877,6 @@ mod least_int_result {
     }
 
     // Test: ternary_first_arg_least
-    #[should_panic]
     #[test]
     fn ternary_first_arg_least() {
         run_test(&dedent!(
@@ -963,7 +887,6 @@ mod least_int_result {
     }
 
     // Test: ternary_third_arg_least
-    #[should_panic]
     #[test]
     fn ternary_third_arg_least() {
         run_test(&dedent!(
@@ -974,7 +897,6 @@ mod least_int_result {
     }
 
     // Test: ternary_with_negatives
-    #[should_panic]
     #[test]
     fn ternary_with_negatives() {
         run_test(&dedent!(
@@ -985,7 +907,6 @@ mod least_int_result {
     }
 
     // Test: ternary_int_max
-    #[should_panic]
     #[test]
     fn ternary_int_max() {
         run_test(&dedent!(
@@ -996,7 +917,6 @@ mod least_int_result {
     }
 
     // Test: ternary_int_min
-    #[should_panic]
     #[test]
     fn ternary_int_min() {
         run_test(&dedent!(
@@ -1007,7 +927,6 @@ mod least_int_result {
     }
 
     // Test: quaternary_mixed
-    #[should_panic]
     #[test]
     fn quaternary_mixed() {
         run_test(&dedent!(
@@ -1018,7 +937,6 @@ mod least_int_result {
     }
 
     // Test: quaternary_mixed_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_array() {
         run_test(&dedent!(
@@ -1029,7 +947,6 @@ mod least_int_result {
     }
 
     // Test: quaternary_mixed_dyn_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_dyn_array() {
         run_test(&dedent!(
@@ -1046,7 +963,6 @@ mod least_double_result {
     use dedent::dedent;
 
     // Test: unary_negative
-    #[should_panic]
     #[test]
     fn unary_negative() {
         run_test(&dedent!(
@@ -1060,7 +976,6 @@ mod least_double_result {
     }
 
     // Test: unary_positive
-    #[should_panic]
     #[test]
     fn unary_positive() {
         run_test(&dedent!(
@@ -1074,7 +989,6 @@ mod least_double_result {
     }
 
     // Test: binary_same_args
-    #[should_panic]
     #[test]
     fn binary_same_args() {
         run_test(&dedent!(
@@ -1088,7 +1002,6 @@ mod least_double_result {
     }
 
     // Test: binary_with_int
-    #[should_panic]
     #[test]
     fn binary_with_int() {
         run_test(&dedent!(
@@ -1099,7 +1012,6 @@ mod least_double_result {
     }
 
     // Test: binary_with_uint
-    #[should_panic]
     #[test]
     fn binary_with_uint() {
         run_test(&dedent!(
@@ -1110,7 +1022,6 @@ mod least_double_result {
     }
 
     // Test: binary_first_arg_least
-    #[should_panic]
     #[test]
     fn binary_first_arg_least() {
         run_test(&dedent!(
@@ -1124,7 +1035,6 @@ mod least_double_result {
     }
 
     // Test: binary_second_arg_least
-    #[should_panic]
     #[test]
     fn binary_second_arg_least() {
         run_test(&dedent!(
@@ -1138,7 +1048,6 @@ mod least_double_result {
     }
 
     // Test: binary_first_arg_double_max
-    #[should_panic]
     #[test]
     fn binary_first_arg_double_max() {
         run_test(&dedent!(
@@ -1152,7 +1061,6 @@ mod least_double_result {
     }
 
     // Test: binary_second_arg_double_max
-    #[should_panic]
     #[test]
     fn binary_second_arg_double_max() {
         run_test(&dedent!(
@@ -1166,7 +1074,6 @@ mod least_double_result {
     }
 
     // Test: binary_first_arg_double_min
-    #[should_panic]
     #[test]
     fn binary_first_arg_double_min() {
         run_test(&dedent!(
@@ -1180,7 +1087,6 @@ mod least_double_result {
     }
 
     // Test: binary_second_arg_double_min
-    #[should_panic]
     #[test]
     fn binary_second_arg_double_min() {
         run_test(&dedent!(
@@ -1194,7 +1100,6 @@ mod least_double_result {
     }
 
     // Test: ternary_same_args
-    #[should_panic]
     #[test]
     fn ternary_same_args() {
         run_test(&dedent!(
@@ -1205,7 +1110,6 @@ mod least_double_result {
     }
 
     // Test: ternary_with_int
-    #[should_panic]
     #[test]
     fn ternary_with_int() {
         run_test(&dedent!(
@@ -1216,7 +1120,6 @@ mod least_double_result {
     }
 
     // Test: ternary_with_uint
-    #[should_panic]
     #[test]
     fn ternary_with_uint() {
         run_test(&dedent!(
@@ -1227,7 +1130,6 @@ mod least_double_result {
     }
 
     // Test: ternary_first_arg_least
-    #[should_panic]
     #[test]
     fn ternary_first_arg_least() {
         run_test(&dedent!(
@@ -1238,7 +1140,6 @@ mod least_double_result {
     }
 
     // Test: ternary_third_arg_least
-    #[should_panic]
     #[test]
     fn ternary_third_arg_least() {
         run_test(&dedent!(
@@ -1249,7 +1150,6 @@ mod least_double_result {
     }
 
     // Test: ternary_with_negatives
-    #[should_panic]
     #[test]
     fn ternary_with_negatives() {
         run_test(&dedent!(
@@ -1260,7 +1160,6 @@ mod least_double_result {
     }
 
     // Test: ternary_double_max
-    #[should_panic]
     #[test]
     fn ternary_double_max() {
         run_test(&dedent!(
@@ -1271,7 +1170,6 @@ mod least_double_result {
     }
 
     // Test: ternary_double_min
-    #[should_panic]
     #[test]
     fn ternary_double_min() {
         run_test(&dedent!(
@@ -1282,7 +1180,6 @@ mod least_double_result {
     }
 
     // Test: quaternary_mixed
-    #[should_panic]
     #[test]
     fn quaternary_mixed() {
         run_test(&dedent!(
@@ -1293,7 +1190,6 @@ mod least_double_result {
     }
 
     // Test: quaternary_mixed_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_array() {
         run_test(&dedent!(
@@ -1304,7 +1200,6 @@ mod least_double_result {
     }
 
     // Test: quaternary_mixed_dyn_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_dyn_array() {
         run_test(&dedent!(
@@ -1321,7 +1216,6 @@ mod least_uint_result {
     use dedent::dedent;
 
     // Test: unary
-    #[should_panic]
     #[test]
     fn unary() {
         run_test(&dedent!(
@@ -1335,7 +1229,6 @@ mod least_uint_result {
     }
 
     // Test: binary_same_args
-    #[should_panic]
     #[test]
     fn binary_same_args() {
         run_test(&dedent!(
@@ -1349,7 +1242,6 @@ mod least_uint_result {
     }
 
     // Test: binary_with_decimal
-    #[should_panic]
     #[test]
     fn binary_with_decimal() {
         run_test(&dedent!(
@@ -1360,7 +1252,6 @@ mod least_uint_result {
     }
 
     // Test: binary_with_int
-    #[should_panic]
     #[test]
     fn binary_with_int() {
         run_test(&dedent!(
@@ -1371,7 +1262,6 @@ mod least_uint_result {
     }
 
     // Test: binary_first_arg_least
-    #[should_panic]
     #[test]
     fn binary_first_arg_least() {
         run_test(&dedent!(
@@ -1385,7 +1275,6 @@ mod least_uint_result {
     }
 
     // Test: binary_second_arg_least
-    #[should_panic]
     #[test]
     fn binary_second_arg_least() {
         run_test(&dedent!(
@@ -1399,7 +1288,6 @@ mod least_uint_result {
     }
 
     // Test: binary_first_arg_uint_max
-    #[should_panic]
     #[test]
     fn binary_first_arg_uint_max() {
         run_test(&dedent!(
@@ -1413,7 +1301,6 @@ mod least_uint_result {
     }
 
     // Test: binary_second_arg_uint_max
-    #[should_panic]
     #[test]
     fn binary_second_arg_uint_max() {
         run_test(&dedent!(
@@ -1427,7 +1314,6 @@ mod least_uint_result {
     }
 
     // Test: ternary_same_args
-    #[should_panic]
     #[test]
     fn ternary_same_args() {
         run_test(&dedent!(
@@ -1438,7 +1324,6 @@ mod least_uint_result {
     }
 
     // Test: ternary_with_decimal
-    #[should_panic]
     #[test]
     fn ternary_with_decimal() {
         run_test(&dedent!(
@@ -1449,7 +1334,6 @@ mod least_uint_result {
     }
 
     // Test: ternary_with_int
-    #[should_panic]
     #[test]
     fn ternary_with_int() {
         run_test(&dedent!(
@@ -1460,7 +1344,6 @@ mod least_uint_result {
     }
 
     // Test: ternary_first_arg_least
-    #[should_panic]
     #[test]
     fn ternary_first_arg_least() {
         run_test(&dedent!(
@@ -1471,7 +1354,6 @@ mod least_uint_result {
     }
 
     // Test: ternary_third_arg_least
-    #[should_panic]
     #[test]
     fn ternary_third_arg_least() {
         run_test(&dedent!(
@@ -1482,7 +1364,6 @@ mod least_uint_result {
     }
 
     // Test: ternary_uint_max
-    #[should_panic]
     #[test]
     fn ternary_uint_max() {
         run_test(&dedent!(
@@ -1493,7 +1374,6 @@ mod least_uint_result {
     }
 
     // Test: quaternary_mixed
-    #[should_panic]
     #[test]
     fn quaternary_mixed() {
         run_test(&dedent!(
@@ -1504,7 +1384,6 @@ mod least_uint_result {
     }
 
     // Test: quaternary_mixed_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_array() {
         run_test(&dedent!(
@@ -1515,7 +1394,6 @@ mod least_uint_result {
     }
 
     // Test: quaternary_mixed_dyn_array
-    #[should_panic]
     #[test]
     fn quaternary_mixed_dyn_array() {
         run_test(&dedent!(

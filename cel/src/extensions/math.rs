@@ -1,13 +1,17 @@
-//! The math extension library: functions in the `math` namespace, following
-//! cel-go's `ext.Math()`.
-//!
-//! The `math.greatest` and `math.least` macros are not provided yet: they
-//! take any number of arguments.
+//! The math extension library: functions and macros in the `math` namespace,
+//! following cel-go's `ext.Math()`.
 
-use crate::common::types::{CelBool, CelDouble, CelInt, CelUInt};
-use crate::{DeclarationError, Env, ExecutionError};
+use crate::common::ast::{CallExpr, Expr, IdedExpr, ListExpr, LiteralValue};
+use crate::common::functions::Function;
+use crate::common::types::{
+    CelBool, CelDouble, CelInt, CelUInt, Kind, Type, DOUBLE_TYPE, INT_TYPE, LIST_TYPE, UINT_TYPE,
+};
+use crate::common::value::{CowVal, Val};
+use crate::parser::{Macro, MacroExprHelper};
+use crate::{DeclarationError, Env, ExecutionError, ParseError};
+use std::cmp::Ordering;
 
-/// Registers the math extension's overloads on `env`.
+/// Registers the math extension's overloads and macros on `env`.
 pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
     crate::add_overload!(env, fn ceil: (CelDouble) -> CelDouble, name = "math.ceil")?;
     crate::add_overload!(env, fn floor: (CelDouble) -> CelDouble, name = "math.floor")?;
@@ -41,7 +45,157 @@ pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
     crate::add_overload!(env, fn sqrt_double: (CelDouble) -> CelDouble, name = "math.sqrt")?;
     crate::add_overload!(env, fn sqrt_int: (CelInt) -> CelDouble, name = "math.sqrt")?;
     crate::add_overload!(env, fn sqrt_uint: (CelUInt) -> CelDouble, name = "math.sqrt")?;
+    extreme_overloads(env, "math.@max", max)?;
+    extreme_overloads(env, "math.@min", min)?;
+    env.add_macro(Macro::receiver_var_arg(
+        "greatest",
+        |helper, target, args| extreme(helper, target, args, "greatest", "math.@max"),
+    ))?;
+    env.add_macro(Macro::receiver_var_arg("least", |helper, target, args| {
+        extreme(helper, target, args, "least", "math.@min")
+    }))?;
     Ok(())
+}
+
+/// `math.greatest(..)` or `math.least(..)`, the `macro_name`: a call of
+/// `function` on the one argument, the two arguments, or a list of the
+/// arguments when there are more. Declines any target but `math`.
+fn extreme(
+    helper: &mut MacroExprHelper<'_>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
+    macro_name: &str,
+    function: &str,
+) -> Result<Option<IdedExpr>, ParseError> {
+    let Some(target) = target
+        .as_ref()
+        .filter(|t| matches!(&t.expr, Expr::Ident(namespace) if namespace == "math"))
+    else {
+        return Ok(None);
+    };
+    let invalid = match args.as_slice() {
+        [] => Some((target.id, "requires at least one argument")),
+        [arg] if !is_numeric_list(arg) && !may_be_numeric(arg) => {
+            Some((arg.id, "invalid single argument value"))
+        }
+        [_] => None,
+        args => args
+            .iter()
+            .find(|arg| !may_be_numeric(arg))
+            .map(|arg| (arg.id, "simple literal arguments must be numeric")),
+    };
+    if let Some((id, message)) = invalid {
+        return Err(helper.new_error(id, format!("math.{macro_name}() {message}")));
+    }
+    let mut args = std::mem::take(args);
+    if args.len() > 2 {
+        args = vec![helper.next_expr(Expr::List(ListExpr::new(args)))];
+    }
+    Ok(Some(helper.next_expr(Expr::Call(CallExpr {
+        func_name: function.to_owned(),
+        target: None,
+        args,
+    }))))
+}
+
+/// Whether `arg` can be a number: a numeric literal, or anything but another
+/// literal, a list, a map or a message.
+fn may_be_numeric(arg: &IdedExpr) -> bool {
+    match &arg.expr {
+        Expr::Literal(literal) => matches!(
+            literal,
+            LiteralValue::Int(_) | LiteralValue::UInt(_) | LiteralValue::Double(_)
+        ),
+        Expr::List(_) | Expr::Map(_) | Expr::Struct(_) => false,
+        _ => true,
+    }
+}
+
+/// Whether `arg` is a list literal of things that can be numbers, not empty.
+fn is_numeric_list(arg: &IdedExpr) -> bool {
+    matches!(&arg.expr, Expr::List(list)
+        if !list.elements.is_empty() && list.elements.iter().all(may_be_numeric))
+}
+
+/// Registers `f` as `name`'s overloads: for a number, two numbers, and a list.
+fn extreme_overloads(env: &mut Env, name: &str, f: Function) -> Result<(), DeclarationError> {
+    const NUMBERS: [Type; 3] = [INT_TYPE, UINT_TYPE, DOUBLE_TYPE];
+    for t in &NUMBERS {
+        env.add_overload(
+            name,
+            &format!("{name}({})", t.name()),
+            vec![t.to_owned()],
+            f,
+        )?;
+    }
+    for a in &NUMBERS {
+        for b in &NUMBERS {
+            let id = format!("{name}({},{})", a.name(), b.name());
+            env.add_overload(name, &id, vec![a.to_owned(), b.to_owned()], f)?;
+        }
+    }
+    env.add_overload(name, &format!("{name}(list)"), vec![LIST_TYPE], f)
+}
+
+fn max<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    extreme_of("math.@max", Ordering::Greater, args)
+}
+
+fn min<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    extreme_of("math.@min", Ordering::Less, args)
+}
+
+/// The greatest or least of the numbers, as `wanted` says: of the two
+/// arguments, or of the elements of the one when it's a list. The first of
+/// equal ones wins, keeping its type.
+fn extreme_of<'b, 'v>(
+    function: &str,
+    wanted: Ordering,
+    mut args: Vec<CowVal<'b, 'v>>,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    match (args.pop(), args.pop()) {
+        (Some(second), Some(first)) => Ok(
+            if compare(first.as_ref(), second.as_ref())? == wanted.reverse() {
+                second
+            } else {
+                first
+            },
+        ),
+        (Some(arg), None) => {
+            let Some(list) = arg.as_ref().as_iterable() else {
+                return Ok(arg);
+            };
+            let mut items = list.iter();
+            let mut extreme = items.next().ok_or_else(|| {
+                ExecutionError::function_error(function, "the list must not be empty")
+            })?;
+            number(function, extreme)?;
+            while let Some(item) = items.next() {
+                if compare(extreme, number(function, item)?)? == wanted.reverse() {
+                    extreme = item;
+                }
+            }
+            Ok(CowVal::Owned(extreme.clone_as_boxed()))
+        }
+        _ => Err(ExecutionError::invalid_argument_count(1, 0)),
+    }
+}
+
+/// `val`, if it's a number: no `function` overload takes anything else.
+fn number<'b, 'v>(
+    function: &str,
+    val: &'b (dyn Val + 'v),
+) -> Result<&'b (dyn Val + 'v), ExecutionError> {
+    match val.get_type().kind() {
+        Kind::Int | Kind::UInt | Kind::Double => Ok(val),
+        _ => Err(ExecutionError::overload_for_values(function, [val], false)),
+    }
+}
+
+fn compare(lhs: &dyn Val, rhs: &dyn Val) -> Result<Ordering, ExecutionError> {
+    lhs.as_comparer()
+        .ok_or_else(|| ExecutionError::values_not_comparable(lhs, rhs))?
+        .compare(rhs)
 }
 
 fn ceil(x: &CelDouble) -> CelDouble {
@@ -332,5 +486,64 @@ mod tests {
         let mut context = Context::with_env(Arc::new(env));
         context.add_variable_from_value("math", Value::Int(0));
         assert_eq!(program.execute(&context), Ok(Value::Int(1)));
+    }
+
+    #[test]
+    fn greatest_and_least_take_any_number_of_numbers() {
+        assert_eval("math.greatest(1)", 1);
+        assert_eval("math.greatest(1u, 2u)", 2u64);
+        assert_eval("math.greatest(-42.0, -21.5, -100.0)", -21.5);
+        assert_eval("math.least([-42.0, -21.5, -100.0])", -100.0);
+    }
+
+    #[test]
+    fn greatest_and_least_keep_the_first_of_equal_numbers() {
+        assert_eval("math.greatest(1, 1.0)", 1);
+        assert_eval("math.least(1.0, 1u)", 1.0);
+        assert_eval("math.greatest([1u, 1, 1.0])", 1u64);
+        assert_eval("math.least(2, 1u, 1, 3.0)", 1u64);
+    }
+
+    fn parse_errors(expr: &str) -> Vec<String> {
+        let mut env = Env::stdlib();
+        env.add_extension(crate::extensions::math).unwrap();
+        match env.compile(expr) {
+            Ok(program) => panic!("{expr}: expected a parse error, got {program:?}"),
+            Err(errors) => errors.errors.into_iter().map(|e| e.msg).collect(),
+        }
+    }
+
+    #[test]
+    fn greatest_and_least_reject_what_cant_be_numbers() {
+        assert_eq!(
+            parse_errors("math.greatest()"),
+            ["math.greatest() requires at least one argument"]
+        );
+        for expr in ["math.least('a')", "math.least([])", "math.least([1, 'a'])"] {
+            assert_eq!(
+                parse_errors(expr),
+                ["math.least() invalid single argument value"],
+                "{expr}"
+            );
+        }
+        assert_eq!(
+            parse_errors("math.greatest(1, [2])"),
+            ["math.greatest() simple literal arguments must be numeric"]
+        );
+        assert_error("math.greatest(dyn([]))", "the list must not be empty");
+        assert_no_overload("math.least(dyn(['a']))");
+        assert_no_overload("math.least([1, dyn('a')])");
+        assert_no_overload("math.greatest(dyn('a'), 1)");
+    }
+
+    #[test]
+    fn greatest_and_least_are_only_macros_on_math() {
+        let mut env = Env::stdlib();
+        env.add_extension(crate::extensions::math).unwrap();
+        let expr = env.parser().parse("m.greatest()").unwrap();
+        assert!(
+            matches!(&expr.expr, crate::common::ast::Expr::Call(call) if call.func_name == "greatest"),
+            "{expr:?}"
+        );
     }
 }
