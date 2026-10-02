@@ -9,7 +9,11 @@ use std::sync::{Arc, LazyLock};
 
 /// Rewrites a matched call, given its target (for a receiver call) and its
 /// arguments, into the expression that replaces it.
-type Expander = dyn Fn(&mut MacroExprHelper<'_>, Option<IdedExpr>, Vec<IdedExpr>) -> Result<IdedExpr, ParseError>
+type Expander = dyn Fn(
+        &mut MacroExprHelper<'_>,
+        &mut Option<IdedExpr>,
+        &mut Vec<IdedExpr>,
+    ) -> Result<IdedExpr, ParseError>
     + Send
     + Sync;
 
@@ -22,6 +26,8 @@ type Expander = dyn Fn(&mut MacroExprHelper<'_>, Option<IdedExpr>, Vec<IdedExpr>
 ///
 /// - the target is `None` for a global call, and the `x` of `x.f(..)` for a
 ///   receiver call;
+/// - the target and arguments are lent: the expander takes what it uses out
+///   of them, e.g. with `args.pop()` or `target.take()`;
 /// - new nodes are made with [`MacroExprHelper::next_expr`], so each gets its
 ///   own id and the call's place in the source;
 /// - an `Err`, best made with [`MacroExprHelper::new_error`], fails the parse
@@ -45,8 +51,8 @@ impl Macro {
         arg_count: usize,
         expander: impl Fn(
                 &mut MacroExprHelper<'_>,
-                Option<IdedExpr>,
-                Vec<IdedExpr>,
+                &mut Option<IdedExpr>,
+                &mut Vec<IdedExpr>,
             ) -> Result<IdedExpr, ParseError>
             + Send
             + Sync
@@ -67,8 +73,8 @@ impl Macro {
         arg_count: usize,
         expander: impl Fn(
                 &mut MacroExprHelper<'_>,
-                Option<IdedExpr>,
-                Vec<IdedExpr>,
+                &mut Option<IdedExpr>,
+                &mut Vec<IdedExpr>,
             ) -> Result<IdedExpr, ParseError>
             + Send
             + Sync
@@ -85,8 +91,8 @@ impl Macro {
     pub(crate) fn expand(
         &self,
         helper: &mut MacroExprHelper<'_>,
-        target: Option<IdedExpr>,
-        args: Vec<IdedExpr>,
+        target: &mut Option<IdedExpr>,
+        args: &mut Vec<IdedExpr>,
     ) -> Result<IdedExpr, ParseError> {
         (self.expander)(helper, target, args)
     }
@@ -180,8 +186,8 @@ impl FromIterator<Macro> for Macros {
 
 fn has_macro_expander(
     helper: &mut MacroExprHelper,
-    target: Option<IdedExpr>,
-    mut args: Vec<IdedExpr>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
 ) -> Result<IdedExpr, ParseError> {
     if target.is_some() {
         unreachable!("Got a target when expecting `None`!")
@@ -202,8 +208,8 @@ fn has_macro_expander(
 
 fn exists_macro_expander(
     helper: &mut MacroExprHelper,
-    target: Option<IdedExpr>,
-    mut args: Vec<IdedExpr>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
 ) -> Result<IdedExpr, ParseError> {
     if target.is_none() {
         unreachable!("Expected a target, but got `None`!")
@@ -240,7 +246,7 @@ fn exists_macro_expander(
 
     Ok(
         helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.unwrap(),
+            iter_range: target.take().unwrap(),
             iter_var: v,
             iter_var2: None,
             accu_var: result_binding,
@@ -253,8 +259,8 @@ fn exists_macro_expander(
 }
 fn all_macro_expander(
     helper: &mut MacroExprHelper,
-    target: Option<IdedExpr>,
-    mut args: Vec<IdedExpr>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
 ) -> Result<IdedExpr, ParseError> {
     if target.is_none() {
         unreachable!("Expected a target, but got `None`!")
@@ -286,7 +292,7 @@ fn all_macro_expander(
 
     Ok(
         helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.unwrap(),
+            iter_range: target.take().unwrap(),
             iter_var: v,
             iter_var2: None,
             accu_var: result_binding,
@@ -300,8 +306,8 @@ fn all_macro_expander(
 
 fn exists_one_macro_expander(
     helper: &mut MacroExprHelper,
-    target: Option<IdedExpr>,
-    mut args: Vec<IdedExpr>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
 ) -> Result<IdedExpr, ParseError> {
     if target.is_none() {
         unreachable!("Expected a target, but got `None`!")
@@ -344,7 +350,7 @@ fn exists_one_macro_expander(
 
     Ok(
         helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.unwrap(),
+            iter_range: target.take().unwrap(),
             iter_var: v,
             iter_var2: None,
             accu_var: result_binding,
@@ -358,8 +364,8 @@ fn exists_one_macro_expander(
 
 fn map_macro_expander(
     helper: &mut MacroExprHelper,
-    target: Option<IdedExpr>,
-    mut args: Vec<IdedExpr>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
 ) -> Result<IdedExpr, ParseError> {
     if target.is_none() {
         unreachable!("Expected a target, but got `None`!")
@@ -403,7 +409,7 @@ fn map_macro_expander(
 
     Ok(
         helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.unwrap(),
+            iter_range: target.take().unwrap(),
             iter_var: v,
             iter_var2: None,
             accu_var: result_binding,
@@ -417,8 +423,8 @@ fn map_macro_expander(
 
 fn filter_macro_expander(
     helper: &mut MacroExprHelper,
-    target: Option<IdedExpr>,
-    mut args: Vec<IdedExpr>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
 ) -> Result<IdedExpr, ParseError> {
     if target.is_none() {
         unreachable!("Expected a target, but got `None`!")
@@ -456,7 +462,7 @@ fn filter_macro_expander(
 
     Ok(
         helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.unwrap(),
+            iter_range: target.take().unwrap(),
             iter_var: v,
             iter_var2: None,
             accu_var: result_binding,

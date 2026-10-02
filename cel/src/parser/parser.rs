@@ -208,26 +208,7 @@ impl Parser {
         func_name: String,
         args: Vec<IdedExpr>,
     ) -> IdedExpr {
-        match self.macros.find(&func_name, None, &args) {
-            None => IdedExpr {
-                id,
-                expr: Expr::Call(CallExpr {
-                    target: None,
-                    func_name,
-                    args,
-                }),
-            },
-            Some(m) => {
-                let mut helper = MacroExprHelper {
-                    helper: &mut self.helper,
-                    id,
-                };
-                match m.expand(&mut helper, None, args) {
-                    Ok(expr) => expr,
-                    Err(err) => self.report_parse_error(None, err),
-                }
-            }
-        }
+        self.call_or_macro(id, func_name, None, args)
     }
 
     fn receiver_call_or_macro(
@@ -237,25 +218,35 @@ impl Parser {
         target: IdedExpr,
         args: Vec<IdedExpr>,
     ) -> IdedExpr {
-        match self.macros.find(&func_name, Some(&target), &args) {
-            None => IdedExpr {
+        self.call_or_macro(id, func_name, Some(target), args)
+    }
+
+    /// The expansion of the macro matching the call, if any; the call as
+    /// written otherwise.
+    fn call_or_macro(
+        &mut self,
+        id: u64,
+        func_name: String,
+        mut target: Option<IdedExpr>,
+        mut args: Vec<IdedExpr>,
+    ) -> IdedExpr {
+        if let Some(m) = self.macros.find(&func_name, target.as_ref(), &args) {
+            let mut helper = MacroExprHelper {
+                helper: &mut self.helper,
                 id,
-                expr: Expr::Call(CallExpr {
-                    target: Some(Box::new(target)),
-                    func_name,
-                    args,
-                }),
-            },
-            Some(m) => {
-                let mut helper = MacroExprHelper {
-                    helper: &mut self.helper,
-                    id,
-                };
-                match m.expand(&mut helper, Some(target), args) {
-                    Ok(expr) => expr,
-                    Err(err) => self.report_parse_error(None, err),
-                }
-            }
+            };
+            return match m.expand(&mut helper, &mut target, &mut args) {
+                Ok(expr) => expr,
+                Err(err) => self.report_parse_error(None, err),
+            };
+        }
+        IdedExpr {
+            id,
+            expr: Expr::Call(CallExpr {
+                target: target.map(Box::new),
+                func_name,
+                args,
+            }),
         }
     }
 

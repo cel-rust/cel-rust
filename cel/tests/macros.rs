@@ -11,8 +11,8 @@ use cel::{Context, Env, IdedExpr, ParseError, Value};
 /// `result` are ever evaluated.
 fn bind(
     helper: &mut MacroExprHelper<'_>,
-    _target: Option<IdedExpr>,
-    mut args: Vec<IdedExpr>,
+    _target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
 ) -> Result<IdedExpr, ParseError> {
     let result = args.pop().unwrap();
     let init = args.pop().unwrap();
