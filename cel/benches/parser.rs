@@ -175,6 +175,7 @@ fn bench_categories() -> Vec<BenchCategory> {
 fn new_antlr_parser() -> Parser {
     Parser::default()
         .enable_optional_syntax(true)
+        .enable_ident_escape_syntax(true)
         .max_recursion_depth(512)
 }
 
