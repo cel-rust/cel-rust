@@ -1,8 +1,12 @@
 //! The strings extension library: member functions on `string` (and
-//! `list(string).join`), following cel-go's `ext.Strings()`.
+//! `list(string).join`), and `strings.quote`, following cel-go's
+//! `ext.Strings()`.
 //!
 //! Indices are in code points, not bytes, as in the rest of CEL.
 
+mod format;
+
+use crate::common::traits::Iterable;
 use crate::common::types::{CelInt, CelList, CelString, LIST_TYPE, STRING_TYPE};
 use crate::common::value::{CowVal, Val};
 use crate::{DeclarationError, Env, ExecutionError};
@@ -38,6 +42,16 @@ pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
     crate::add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>)?;
     crate::add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
         name = "substring")?;
+    // By hand, as `join` is: `format` takes any `list`.
+    env.add_member_overload(
+        "format",
+        "string.format(list)",
+        STRING_TYPE,
+        vec![LIST_TYPE],
+        format::format,
+    )?;
+    crate::add_overload!(env, fn quote: (CelString) -> CelString, name = "strings.quote")?;
+    crate::add_member_overload!(env, fn reverse: (CelString) -> CelString)?;
     Ok(())
 }
 
@@ -159,18 +173,20 @@ fn join_sep<'b, 'v>(args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, Executi
 
 /// Concatenates the strings of any iterable `list`, `sep` between each.
 fn join_with<'b, 'v>(list: &dyn Val, sep: &str) -> Result<CowVal<'b, 'v>, ExecutionError> {
-    let mut items = list
-        .as_iterable()
-        .ok_or_else(|| ExecutionError::UnexpectedType {
-            got: list.get_type().name().to_owned(),
-            want: "iterable".to_owned(),
-        })?
-        .iter();
+    let mut items = iterable(list)?.iter();
     let mut parts = Vec::new();
     while let Some(item) = items.next() {
         parts.push(string_arg(item)?.inner());
     }
     Ok(CowVal::owned(CelString::from(parts.join(sep))))
+}
+
+fn iterable<'b, 'v>(list: &'b (dyn Val + 'v)) -> Result<&'b (dyn Iterable + 'v), ExecutionError> {
+    list.as_iterable()
+        .ok_or_else(|| ExecutionError::UnexpectedType {
+            got: list.get_type().name().to_owned(),
+            want: "iterable".to_owned(),
+        })
 }
 
 fn string_arg<'b, 'v>(val: &'b (dyn Val + 'v)) -> Result<&'b CelString<'v>, ExecutionError> {
@@ -284,6 +300,34 @@ fn substring_range(
         .take((end - start) as usize)
         .collect::<String>()
         .into())
+}
+
+/// `this` as a double-quoted CEL string literal: the characters CEL escapes
+/// are escaped.
+fn quote(this: &CelString<'_>) -> CelString<'static> {
+    let mut quoted = String::with_capacity(this.len() + 2);
+    quoted.push('"');
+    for c in this.chars() {
+        match c {
+            '\x07' => quoted.push_str("\\a"),
+            '\x08' => quoted.push_str("\\b"),
+            '\x0c' => quoted.push_str("\\f"),
+            '\n' => quoted.push_str("\\n"),
+            '\r' => quoted.push_str("\\r"),
+            '\t' => quoted.push_str("\\t"),
+            '\x0b' => quoted.push_str("\\v"),
+            '\\' => quoted.push_str("\\\\"),
+            '"' => quoted.push_str("\\\""),
+            c => quoted.push(c),
+        }
+    }
+    quoted.push('"');
+    quoted.into()
+}
+
+/// Reverses the code points of `this`.
+fn reverse(this: &CelString<'_>) -> CelString<'static> {
+    this.chars().rev().collect::<String>().into()
 }
 
 #[cfg(test)]
@@ -513,6 +557,145 @@ mod tests {
         assert_error(
             "'tacocat'.substring(4, 3)",
             "invalid substring range. start: 4, end: 3",
+        );
+    }
+
+    #[test]
+    fn quote() {
+        assert_eval("strings.quote('verbatim')", "\"verbatim\"");
+        assert_eval("strings.quote('')", "\"\"");
+        assert_eval(
+            r#"strings.quote("\a\b\f\n\r\t\v\\\"")"#,
+            r#""\a\b\f\n\r\t\v\\\"""#,
+        );
+        assert_eval("strings.quote('ta©o©αT')", "\"ta©o©αT\"");
+    }
+
+    #[test]
+    fn reverse() {
+        assert_eval("''.reverse()", "");
+        assert_eval("'gums'.reverse()", "smug");
+        assert_eval("'Ta©oCαt'.reverse()", "tαCo©aT");
+    }
+
+    #[test]
+    fn format_substitutes_in_order() {
+        assert_eval("'no substitution'.format([])", "no substitution");
+        assert_eval("'%% and %%'.format([])", "% and %");
+        assert_eval("'%%%s%%'.format(['text'])", "%text%");
+        assert_eval("'%s, %d'.format(['a', 1, 'ignored'])", "a, 1");
+        assert_eval("'©%sα'.format(['T'])", "©Tα");
+    }
+
+    #[test]
+    fn format_strings() {
+        assert_eval("'%s'.format([null])", "null");
+        assert_eval("'%s %s'.format([true, false])", "true false");
+        assert_eval("'%s %s %s'.format([-1, 2u, 2.5])", "-1 2 2.5");
+        assert_eval("'%s'.format([1e21])", "1000000000000000000000");
+        assert_eval("'%s'.format([b'xyz'])", "xyz");
+        assert_eval("'%s'.format([b'\\xff\\xfe!'])", "\u{fffd}!");
+        assert_eval("'%s'.format([type('')])", "string");
+        assert_eval(
+            "'%s'.format([timestamp('2023-02-03T23:31:20.5+01:00')])",
+            "2023-02-03T22:31:20.5Z",
+        );
+        assert_eval("'%s'.format([duration('1h45m47.25s')])", "6347.25s");
+        assert_eval("'%s'.format([duration('-1.5s')])", "-1.5s");
+        assert_eval(
+            "'%s'.format([[1, 'a', [double('NaN')], {}]])",
+            "[1, a, [NaN], {}]",
+        );
+        assert_eval(
+            "'%s'.format([{'b': 2, 1: [], true: -1.0}])",
+            "{1: [], b: 2, true: -1}",
+        );
+    }
+
+    #[test]
+    fn format_numbers() {
+        assert_eval("'%d %d %d'.format([-12, 12u, 1.5])", "-12 12 1.5");
+        assert_eval(
+            "'%f %.0f %.2f'.format([2, 2.5, -1.005])",
+            "2.000000 2 -1.00",
+        );
+        assert_eval("'%.1f'.format([double('-Infinity')])", "-Infinity");
+        assert_eval("'%e'.format([1052.032911275])", "1.052033e+03");
+        assert_eval("'%.1e %.0e'.format([-0.000314, 3u])", "-3.1e-04 3e+00");
+        assert_eval("'%e'.format([1e100])", "1.000000e+100");
+        assert_eval("'%e'.format([double('NaN')])", "NaN");
+        assert_eval("'%b %b %b'.format([-5, 5u, true])", "-101 101 1");
+        assert_eval("'%o %o'.format([-8, 8u])", "-10 10");
+        assert_eval("'%x %X'.format([-255, 255u])", "-ff FF");
+        assert_eval("'%x %X'.format(['Hi!', b'\\x0a\\xff'])", "486921 0AFF");
+    }
+
+    #[test]
+    fn format_errors() {
+        assert_error("'%d %d'.format([1])", "index 1 out of range");
+        assert_error("'%'.format([])", "index 0 out of range");
+        assert_error("'%'.format([1])", "unexpected end of string");
+        assert_error(
+            "'%a'.format([1])",
+            "could not parse formatting clause: unrecognized formatting clause \"a\"",
+        );
+        assert_error(
+            "'%.f'.format([1])",
+            "could not parse formatting clause: error while parsing precision: \
+             error while converting precision to integer: cannot parse integer from empty string",
+        );
+        assert_error(
+            "'%d'.format(['1'])",
+            "error during formatting: decimal clause can only be used on ints, uints, and doubles, \
+             was given string",
+        );
+        assert_error(
+            "'%f'.format([null])",
+            "error during formatting: fixed-point clause can only be used on ints, uints, and \
+             doubles, was given null_type",
+        );
+        assert_error(
+            "'%e'.format([true])",
+            "error during formatting: scientific clause can only be used on ints, uints, and \
+             doubles, was given bool",
+        );
+        assert_error(
+            "'%b'.format([1.0])",
+            "error during formatting: only ints, uints, and bools can be formatted as binary, \
+             was given double",
+        );
+        assert_error(
+            "'%x'.format([[]])",
+            "error during formatting: only ints, uints, bytes, and strings can be formatted as \
+             hex, was given list",
+        );
+        assert_error(
+            "'%o'.format([duration('1s')])",
+            "error during formatting: octal clause can only be used on ints and uints, was \
+             given google.protobuf.Duration",
+        );
+        assert_error(
+            "'%s'.format([[optional.none()]])",
+            "error during formatting: string clause can only be used on strings, bools, bytes, \
+             ints, doubles, maps, lists, types, durations, and timestamps, was given \
+             optional_type",
+        );
+    }
+
+    #[test]
+    fn format_any_list() {
+        let mut ctx = context();
+        ctx.add_variable_as_val(
+            "names",
+            Box::new(OtherList(vec!["hello".into(), "mellow".into()])),
+        );
+        assert_eq!(
+            eval_in(&ctx, "'%s %s'.format(names)"),
+            Ok("hello mellow".into())
+        );
+        assert_eq!(
+            eval_in(&ctx, "'%s'.format([names])"),
+            Ok("[hello, mellow]".into())
         );
     }
 }
