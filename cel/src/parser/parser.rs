@@ -135,6 +135,12 @@ impl Parser {
         }
     }
 
+    /// Expands `macros` instead of the standard ones.
+    pub(crate) fn with_macros(mut self, macros: Arc<Macros>) -> Self {
+        self.macros = macros;
+        self
+    }
+
     pub fn max_recursion_depth(mut self, max: u16) -> Self {
         self.max_recursion_depth = if max == u16::MAX { max } else { max + 1 };
         self

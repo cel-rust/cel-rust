@@ -5,6 +5,7 @@ use crate::common::{
     value::CowVal,
 };
 use crate::container::Container;
+use crate::parser::{Macros, Parser};
 use crate::registry::{TypeDecl, TypeRegistry};
 use crate::DeclarationError;
 #[cfg(feature = "structs")]
@@ -13,6 +14,7 @@ use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
     BTreeMap, BTreeSet,
 };
+use std::sync::Arc;
 
 /// An environment for the CEL execution.
 ///
@@ -57,6 +59,7 @@ pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
     namespaces: BTreeSet<String>,
     types: TypeRegistry,
+    macros: Arc<Macros>,
     error_on_duplicate_map_keys: bool,
     container: Container,
 }
@@ -67,6 +70,7 @@ impl Default for Env {
             functions: BTreeMap::new(),
             namespaces: BTreeSet::new(),
             types: TypeRegistry::default(),
+            macros: Arc::default(),
             error_on_duplicate_map_keys: true,
             container: Container::default(),
         }
@@ -98,7 +102,27 @@ impl Env {
             types::duration::stdlib(&mut env);
             types::timestamp::stdlib(&mut env);
         }
+        env.macros = Macros::standard();
         env
+    }
+
+    /// Returns a parser that expands the macros of this environment.
+    ///
+    /// [`Env::stdlib`] has the standard macros (`has`, `all`, `exists`,
+    /// `exists_one`, `map` and `filter`); an [`Env::default`] has none, so its
+    /// parser leaves such calls as they are written.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value};
+    ///
+    /// let env = Env::stdlib();
+    /// let expr = env.parser().parse("[1, 2, 3].exists(x, x > 2)").unwrap();
+    /// assert_eq!(Value::resolve(&expr, &Context::default()), Ok(Value::Bool(true)));
+    /// ```
+    pub fn parser(&self) -> Parser {
+        Parser::new().with_macros(Arc::clone(&self.macros))
     }
 
     /// Adds a global function overload to the environment.
@@ -509,6 +533,20 @@ mod tests {
         Arc::get_mut(&mut env).unwrap().set_container("").unwrap();
         assert_eq!(env.container_name(), "");
         assert!(run(&env).is_err(), "`y` no longer means `x.y`");
+    }
+
+    #[test]
+    fn its_parser_expands_the_macros_of_the_env_only() {
+        use crate::common::ast::Expr;
+
+        let source = "[1].exists(x, x > 0)";
+        let expanded = Env::stdlib().parser().parse(source).unwrap();
+        assert!(
+            matches!(expanded.expr, Expr::Comprehension(_)),
+            "{expanded:?}"
+        );
+        let as_written = Env::default().parser().parse(source).unwrap();
+        assert!(matches!(as_written.expr, Expr::Call(_)), "{as_written:?}");
     }
 
     #[test]
