@@ -1496,7 +1496,7 @@ impl<'a> PrattParserWorker<'a> {
                 id,
             };
             match m.expand(&mut macro_helper, &mut target, &mut args) {
-                Ok(expr) => Some(expr),
+                Ok(expansion) => expansion,
                 Err(err) => {
                     self.errors.push(err);
                     Some(IdedExpr::default())

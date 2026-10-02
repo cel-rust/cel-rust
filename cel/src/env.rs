@@ -152,11 +152,11 @@ impl Env {
     ///         target: None,
     ///         args: vec![a],
     ///     }));
-    ///     Ok(helper.next_expr(Expr::Call(CallExpr {
+    ///     Ok(Some(helper.next_expr(Expr::Call(CallExpr {
     ///         func_name: operators::LOGICAL_OR.to_string(),
     ///         target: None,
     ///         args: vec![not_a, b],
-    ///     })))
+    ///     }))))
     /// });
     ///
     /// let mut env = Env::stdlib();
@@ -598,8 +598,8 @@ mod tests {
         _: &mut crate::parser::MacroExprHelper<'_>,
         _: &mut Option<crate::IdedExpr>,
         args: &mut Vec<crate::IdedExpr>,
-    ) -> Result<crate::IdedExpr, crate::ParseError> {
-        Ok(args.remove(0))
+    ) -> Result<Option<crate::IdedExpr>, crate::ParseError> {
+        Ok(Some(args.remove(0)))
     }
 
     #[test]
@@ -620,6 +620,54 @@ mod tests {
             env.add_macro(Macro::receiver("exists", 3, first_arg)),
             Err(DeclarationError::duplicate_macro("exists"))
         );
+    }
+
+    /// Declines `f(x)` after popping `x`, or `mem::take`-ing it.
+    fn takes_then_declines(
+        _: &mut crate::parser::MacroExprHelper<'_>,
+        _: &mut Option<crate::IdedExpr>,
+        args: &mut Vec<crate::IdedExpr>,
+    ) -> Result<Option<crate::IdedExpr>, crate::ParseError> {
+        match args[0].expr {
+            crate::common::ast::Expr::Literal(_) => drop(args.pop()),
+            _ => drop(std::mem::take(&mut args[0])),
+        }
+        Ok(None)
+    }
+
+    #[test]
+    fn declining_a_call_after_taking_from_it_is_an_error() {
+        let mut env = Env::stdlib();
+        env.add_macro(Macro::global("f", 1, takes_then_declines))
+            .unwrap();
+        for source in ["f(1)", "f(a)"] {
+            let errors = env.parser().parse(source).unwrap_err().errors;
+            let messages: Vec<_> = errors.iter().map(|e| e.msg.as_str()).collect();
+            assert_eq!(
+                messages,
+                ["macro 'f' declined the call after taking from it"],
+                "{source}"
+            );
+        }
+    }
+
+    fn declines(
+        _: &mut crate::parser::MacroExprHelper<'_>,
+        _: &mut Option<crate::IdedExpr>,
+        _: &mut Vec<crate::IdedExpr>,
+    ) -> Result<Option<crate::IdedExpr>, crate::ParseError> {
+        Ok(None)
+    }
+
+    /// The parser leaves a default node for an argument it failed to expand:
+    /// that isn't something a declining macro took.
+    #[test]
+    fn declining_a_call_with_a_broken_argument_reports_only_that_argument() {
+        let mut env = Env::stdlib();
+        env.add_macro(Macro::global("f", 1, declines)).unwrap();
+        let errors = env.parser().parse("f(has(1))").unwrap_err().errors;
+        let messages: Vec<_> = errors.iter().map(|e| e.msg.as_str()).collect();
+        assert_eq!(messages, ["invalid argument to has() macro"]);
     }
 
     #[test]
