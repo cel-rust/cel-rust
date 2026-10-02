@@ -13,7 +13,7 @@ fn bind(
     helper: &mut MacroExprHelper<'_>,
     _target: &mut Option<IdedExpr>,
     args: &mut Vec<IdedExpr>,
-) -> Result<IdedExpr, ParseError> {
+) -> Result<Option<IdedExpr>, ParseError> {
     let result = args.pop().unwrap();
     let init = args.pop().unwrap();
     let name = args.pop().unwrap();
@@ -23,8 +23,8 @@ fn bind(
     let iter_range = helper.next_expr(Expr::List(ListExpr::new(vec![])));
     let loop_cond = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
     let loop_step = helper.next_expr(Expr::Ident(var.clone()));
-    Ok(
-        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+    Ok(Some(helper.next_expr(Expr::Comprehension(Box::new(
+        ComprehensionExpr {
             iter_range,
             iter_var: "#unused".to_string(),
             iter_var2: None,
@@ -33,8 +33,21 @@ fn bind(
             loop_cond,
             loop_step,
             result,
-        }))),
-    )
+        },
+    )))))
+}
+
+/// `cel.bind(..)`: `bind` on the `cel` namespace only, as cel-go's
+/// `ext/bindings.go` declines any other target.
+fn cel_bind(
+    helper: &mut MacroExprHelper<'_>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
+) -> Result<Option<IdedExpr>, ParseError> {
+    match target.as_ref().map(|t| &t.expr) {
+        Some(Expr::Ident(namespace)) if namespace == "cel" => bind(helper, target, args),
+        _ => Ok(None),
+    }
 }
 
 #[test]
@@ -44,4 +57,16 @@ fn a_macro_added_to_the_env_expands_the_calls_it_matches() {
     let expr = env.parser().parse("bind(x, 2, x * x)").unwrap();
     let context = Context::with_env(Arc::new(env));
     assert_eq!(Value::resolve(&expr, &context), Ok(Value::Int(4)));
+}
+
+#[test]
+fn a_macro_leaves_the_calls_it_declines_as_written() {
+    let mut env = Env::stdlib();
+    env.add_macro(Macro::receiver("bind", 3, cel_bind)).unwrap();
+    let declined = env.parser().parse("m.bind(x, 2, x * x)").unwrap();
+    let without_macro = Env::stdlib().parser().parse("m.bind(x, 2, x * x)").unwrap();
+    assert_eq!(declined, without_macro);
+    let expanded = env.parser().parse("cel.bind(x, 2, x * x)").unwrap();
+    let context = Context::with_env(Arc::new(env));
+    assert_eq!(Value::resolve(&expanded, &context), Ok(Value::Int(4)));
 }

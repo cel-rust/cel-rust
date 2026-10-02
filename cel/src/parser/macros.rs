@@ -13,7 +13,7 @@ type Expander = dyn Fn(
         &mut MacroExprHelper<'_>,
         &mut Option<IdedExpr>,
         &mut Vec<IdedExpr>,
-    ) -> Result<IdedExpr, ParseError>
+    ) -> Result<Option<IdedExpr>, ParseError>
     + Send
     + Sync;
 
@@ -22,7 +22,8 @@ type Expander = dyn Fn(
 /// A macro matches a call on the function's name, on whether it is called on a
 /// target (`x.f(..)`) or globally (`f(..)`), and on its argument count. The
 /// parser then hands the call's target and arguments to the macro's expander,
-/// and what it returns replaces the call in the parsed expression:
+/// and the `Some` expression it returns replaces the call in the parsed
+/// expression:
 ///
 /// - the target is `None` for a global call, and the `x` of `x.f(..)` for a
 ///   receiver call;
@@ -30,6 +31,10 @@ type Expander = dyn Fn(
 ///   of them, e.g. with `args.pop()` or `target.take()`;
 /// - new nodes are made with [`MacroExprHelper::next_expr`], so each gets its
 ///   own id and the call's place in the source;
+/// - `Ok(None)` declines the call, which stays as written, as when no macro
+///   matches it: e.g. for `cel.bind(..)`, a `bind` on any other target. The
+///   expander must decline before taking anything from the target or the
+///   arguments, or the parse fails;
 /// - an `Err`, best made with [`MacroExprHelper::new_error`], fails the parse
 ///   with that error.
 ///
@@ -53,7 +58,7 @@ impl Macro {
                 &mut MacroExprHelper<'_>,
                 &mut Option<IdedExpr>,
                 &mut Vec<IdedExpr>,
-            ) -> Result<IdedExpr, ParseError>
+            ) -> Result<Option<IdedExpr>, ParseError>
             + Send
             + Sync
             + 'static,
@@ -75,7 +80,7 @@ impl Macro {
                 &mut MacroExprHelper<'_>,
                 &mut Option<IdedExpr>,
                 &mut Vec<IdedExpr>,
-            ) -> Result<IdedExpr, ParseError>
+            ) -> Result<Option<IdedExpr>, ParseError>
             + Send
             + Sync
             + 'static,
@@ -88,13 +93,26 @@ impl Macro {
         }
     }
 
+    /// The expansion of the call whose `target` and `args` are lent, or `None`
+    /// when the expander declines it, leaving them as they were.
     pub(crate) fn expand(
         &self,
         helper: &mut MacroExprHelper<'_>,
         target: &mut Option<IdedExpr>,
         args: &mut Vec<IdedExpr>,
-    ) -> Result<IdedExpr, ParseError> {
-        (self.expander)(helper, target, args)
+    ) -> Result<Option<IdedExpr>, ParseError> {
+        let lent = shape(target, args);
+        let expansion = (self.expander)(helper, target, args)?;
+        if expansion.is_none() && shape(target, args) != lent {
+            return Err(helper.new_error(
+                helper.id,
+                format!(
+                    "macro '{}' declined the call after taking from it",
+                    self.function
+                ),
+            ));
+        }
+        Ok(expansion)
     }
 
     /// Whether this macro is for a call with `arg_count` arguments, on a
@@ -120,19 +138,54 @@ pub(crate) struct Macros {
     by_function: BTreeMap<String, Vec<Macro>>,
 }
 
+/// What an expander can take out of a call's lent parts: the target, some
+/// arguments, or the contents of either, which leaves a default node behind.
+/// Default nodes are counted rather than ruled out, as the parser leaves one
+/// for an argument it could not parse.
+fn shape(target: &Option<IdedExpr>, args: &[IdedExpr]) -> (bool, usize, usize) {
+    let defaults = target
+        .iter()
+        .chain(args)
+        .filter(|e| e.id == 0 && matches!(e.expr, Expr::Unspecified))
+        .count();
+    (target.is_some(), args.len(), defaults)
+}
+
+/// A built-in expander, which never declines the call it matched.
+type BuiltIn = fn(
+    &mut MacroExprHelper<'_>,
+    &mut Option<IdedExpr>,
+    &mut Vec<IdedExpr>,
+) -> Result<IdedExpr, ParseError>;
+
+/// The expander of a built-in macro.
+fn expanding(
+    expander: BuiltIn,
+) -> impl Fn(
+    &mut MacroExprHelper<'_>,
+    &mut Option<IdedExpr>,
+    &mut Vec<IdedExpr>,
+) -> Result<Option<IdedExpr>, ParseError> {
+    move |helper, target, args| expander(helper, target, args).map(Some)
+}
+
 /// The macros of the CEL standard library, built once and shared by every
 /// parser and [`Env`](crate::Env) that expands them.
 static STANDARD: LazyLock<Arc<Macros>> = LazyLock::new(|| {
     Arc::new(
         [
-            Macro::global(operators::HAS, 1, has_macro_expander),
-            Macro::receiver(operators::EXISTS, 2, exists_macro_expander),
-            Macro::receiver(operators::ALL, 2, all_macro_expander),
-            Macro::receiver(operators::EXISTS_ONE, 2, exists_one_macro_expander),
-            Macro::receiver("existsOne", 2, exists_one_macro_expander),
-            Macro::receiver(operators::MAP, 2, map_macro_expander),
-            Macro::receiver(operators::MAP, 3, map_macro_expander),
-            Macro::receiver(operators::FILTER, 2, filter_macro_expander),
+            Macro::global(operators::HAS, 1, expanding(has_macro_expander)),
+            Macro::receiver(operators::EXISTS, 2, expanding(exists_macro_expander)),
+            Macro::receiver(operators::ALL, 2, expanding(all_macro_expander)),
+            Macro::receiver(
+                operators::EXISTS_ONE,
+                2,
+                expanding(exists_one_macro_expander),
+            ),
+            Macro::receiver("existsOne", 2, expanding(exists_one_macro_expander)),
+            Macro::receiver(operators::MAP, 2, expanding(map_macro_expander)),
+            Macro::receiver(operators::MAP, 3, expanding(map_macro_expander)),
+            Macro::receiver(operators::FILTER, 2, expanding(filter_macro_expander)),
         ]
         .into_iter()
         .collect(),

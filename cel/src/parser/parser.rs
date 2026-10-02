@@ -221,8 +221,8 @@ impl Parser {
         self.call_or_macro(id, func_name, Some(target), args)
     }
 
-    /// The expansion of the macro matching the call, if any; the call as
-    /// written otherwise.
+    /// The expansion of the macro matching the call, if any and if it doesn't
+    /// decline it; the call as written otherwise.
     fn call_or_macro(
         &mut self,
         id: u64,
@@ -235,10 +235,11 @@ impl Parser {
                 helper: &mut self.helper,
                 id,
             };
-            return match m.expand(&mut helper, &mut target, &mut args) {
-                Ok(expr) => expr,
-                Err(err) => self.report_parse_error(None, err),
-            };
+            match m.expand(&mut helper, &mut target, &mut args) {
+                Ok(Some(expr)) => return expr,
+                Ok(None) => {}
+                Err(err) => return self.report_parse_error(None, err),
+            }
         }
         IdedExpr {
             id,
