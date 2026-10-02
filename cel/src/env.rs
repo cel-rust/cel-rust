@@ -226,8 +226,9 @@ impl Env {
     ///
     /// Fails with [`DeclarationError::DuplicateMacro`] if a macro for the same
     /// function, called the same way (globally or on a target) with as many
-    /// arguments, is already added: the standard ones of [`Env::stdlib`]
-    /// included.
+    /// arguments, or with any number of them, is already added: the standard
+    /// ones of [`Env::stdlib`] included. A macro for any number of arguments
+    /// and one for an exact number coexist: the latter wins for its calls.
     ///
     /// # Example
     ///
@@ -697,6 +698,23 @@ mod tests {
     }
 
     #[test]
+    fn a_macro_expands_only_the_calls_of_its_style_and_argument_count() {
+        use crate::common::ast::Expr;
+
+        let mut env = Env::default();
+        env.add_macro(Macro::receiver("f", 1, first_arg)).unwrap();
+        let expanded = env.parser().parse("m.f(1)").unwrap();
+        assert!(matches!(expanded.expr, Expr::Literal(_)), "{expanded:?}");
+        for source in ["m.f()", "m.f(1, 2)", "f(1)"] {
+            let as_written = env.parser().parse(source).unwrap();
+            assert!(
+                matches!(as_written.expr, Expr::Call(_)),
+                "{source}: {as_written:?}"
+            );
+        }
+    }
+
+    #[test]
     fn a_macro_for_the_calls_of_another_is_a_duplicate() {
         let mut env = Env::stdlib();
         assert_eq!(
@@ -713,6 +731,19 @@ mod tests {
         assert_eq!(
             env.add_macro(Macro::receiver("exists", 3, first_arg)),
             Err(DeclarationError::duplicate_macro("exists"))
+        );
+        // For any number of arguments, it's yet other calls, once.
+        assert_eq!(
+            env.add_macro(Macro::receiver_var_arg("exists", first_arg)),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_macro(Macro::receiver_var_arg("exists", first_arg)),
+            Err(DeclarationError::duplicate_macro("exists"))
+        );
+        assert_eq!(
+            env.add_macro(Macro::global_var_arg("exists", first_arg)),
+            Ok(())
         );
     }
 
