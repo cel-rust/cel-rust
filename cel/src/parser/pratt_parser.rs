@@ -2,7 +2,8 @@ use crate::common::ast::{
     operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, LiteralValue,
     MapEntryExpr, MapExpr, SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
-use crate::parser::{macros, MacroExprHelper, ParseError, ParseErrors, ParserHelper};
+use crate::parser::macros::Macros;
+use crate::parser::{MacroExprHelper, ParseError, ParseErrors, ParserHelper};
 use std::mem;
 use std::sync::Arc;
 
@@ -1132,7 +1133,7 @@ impl PrattLogicManager {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct PrattParser {
     pub max_recursion_depth: u16,
     pub error_recovery_limit: u32,
@@ -1142,6 +1143,7 @@ pub struct PrattParser {
     pub enable_variadic_operator_asts: bool,
     pub enable_ident_escape_syntax: bool,
     pub populate_macro_calls: bool,
+    macros: Arc<Macros>,
 }
 
 impl Default for PrattParser {
@@ -1155,6 +1157,7 @@ impl Default for PrattParser {
             enable_variadic_operator_asts: false,
             enable_ident_escape_syntax: false,
             populate_macro_calls: false,
+            macros: Macros::standard(),
         }
     }
 }
@@ -1215,6 +1218,7 @@ struct PrattParserWorker<'a> {
     length: usize,
     helper: ParserHelper,
     errors: Vec<ParseError>,
+    macros: Arc<Macros>,
     lexer: Lexer<'a>,
     curr_tok: Token,
     peek_tok: Token,
@@ -1239,6 +1243,7 @@ impl<'a> PrattParserWorker<'a> {
             length: source.len(),
             helper,
             errors: Vec::new(),
+            macros: parser.macros,
             lexer: Lexer::new(source),
             curr_tok: Token::default(),
             peek_tok: Token::default(),
@@ -1471,7 +1476,7 @@ impl<'a> PrattParserWorker<'a> {
         target: Option<IdedExpr>,
         args: Vec<IdedExpr>,
     ) -> Option<IdedExpr> {
-        if let Some(expander) = macros::find_expander(func_name, target.as_ref(), &args) {
+        if let Some(m) = self.macros.find(func_name, target.as_ref(), &args) {
             if self.helper.next_id as usize > self.max_expression_node_count {
                 let pos = self.helper.source_info.pos_for(id).unwrap_or((1, 1));
                 self.errors.push(ParseError {
@@ -1490,7 +1495,7 @@ impl<'a> PrattParserWorker<'a> {
                 helper: &mut self.helper,
                 id,
             };
-            match expander(&mut macro_helper, target, args) {
+            match m.expand(&mut macro_helper, target, args) {
                 Ok(expr) => Some(expr),
                 Err(err) => {
                     self.errors.push(err);
