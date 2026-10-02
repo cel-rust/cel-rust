@@ -357,53 +357,73 @@ fn int_from_timestamp(this: &Timestamp) -> CelInt {
 pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(super::TIMESTAMP_TYPE).expect("Must be unique");
     crate::add_overload!(env, fn timestamp_from_string: (CelString) -> Result<Timestamp>,
-        name = "timestamp", id = "string_to_timestamp");
+        name = "timestamp", id = "string_to_timestamp")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn timestamp_from_timestamp: (Timestamp) -> Timestamp,
-        name = "timestamp", id = "timestamp_to_timestamp");
+        name = "timestamp", id = "timestamp_to_timestamp")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn timestamp_from_int: (CelInt) -> Result<Timestamp>,
-        name = "timestamp", id = "int64_to_timestamp");
+        name = "timestamp", id = "int64_to_timestamp")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn int_from_timestamp: (Timestamp) -> CelInt,
-        name = "int", id = "timestamp_to_int64");
+        name = "int", id = "timestamp_to_int64")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_full_year: (Timestamp) -> CelInt,
-        id = "timestamp_to_year");
+        id = "timestamp_to_year")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_month: (Timestamp) -> CelInt,
-        id = "timestamp_to_month");
+        id = "timestamp_to_month")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_day_of_year: (Timestamp) -> CelInt,
-        id = "timestamp_to_day_of_year");
+        id = "timestamp_to_day_of_year")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_day_of_month: (Timestamp) -> CelInt,
-        id = "timestamp_to_day_of_month");
+        id = "timestamp_to_day_of_month")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_date: (Timestamp) -> CelInt,
-        id = "timestamp_to_day_of_month_1_based");
+        id = "timestamp_to_day_of_month_1_based")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_day_of_week: (Timestamp) -> CelInt,
-        id = "timestamp_to_day_of_week");
+        id = "timestamp_to_day_of_week")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_hours: (Timestamp) -> CelInt,
-        id = "timestamp_to_hours");
+        id = "timestamp_to_hours")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_minutes: (Timestamp) -> CelInt,
-        id = "timestamp_to_minutes");
+        id = "timestamp_to_minutes")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_seconds: (Timestamp) -> CelInt,
-        id = "timestamp_to_seconds");
+        id = "timestamp_to_seconds")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_milliseconds: (Timestamp) -> CelInt,
-        id = "timestamp_to_millis");
+        id = "timestamp_to_millis")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_full_year_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getFullYear", id = "timestamp_to_year_with_tz");
+        name = "getFullYear", id = "timestamp_to_year_with_tz")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_month_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getMonth", id = "timestamp_to_month_with_tz");
+        name = "getMonth", id = "timestamp_to_month_with_tz")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_day_of_year_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getDayOfYear", id = "timestamp_to_day_of_year_with_tz");
+        name = "getDayOfYear", id = "timestamp_to_day_of_year_with_tz").expect("Must be unique id");
     crate::add_member_overload!(env, fn get_day_of_month_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getDayOfMonth", id = "timestamp_to_day_of_month_with_tz");
+        name = "getDayOfMonth", id = "timestamp_to_day_of_month_with_tz").expect("Must be unique id");
     crate::add_member_overload!(env, fn get_date_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getDate", id = "timestamp_to_day_of_month_1_based_with_tz");
+        name = "getDate", id = "timestamp_to_day_of_month_1_based_with_tz")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_day_of_week_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getDayOfWeek", id = "timestamp_to_day_of_week_with_tz");
+        name = "getDayOfWeek", id = "timestamp_to_day_of_week_with_tz").expect("Must be unique id");
     crate::add_member_overload!(env, fn get_hours_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getHours", id = "timestamp_to_hours_with_tz");
+        name = "getHours", id = "timestamp_to_hours_with_tz")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_minutes_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getMinutes", id = "timestamp_to_minutes_with_tz");
+        name = "getMinutes", id = "timestamp_to_minutes_with_tz")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_seconds_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getSeconds", id = "timestamp_to_seconds_tz");
+        name = "getSeconds", id = "timestamp_to_seconds_tz")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_milliseconds_tz: (Timestamp, CelString) -> Result<CelInt>,
-        name = "getMilliseconds", id = "timestamp_to_milliseconds_with_tz");
+        name = "getMilliseconds", id = "timestamp_to_milliseconds_with_tz").expect("Must be unique id");
 }
 
 #[cfg(test)]

@@ -10,7 +10,6 @@ mod char_at {
     use dedent::dedent;
 
     // Test: middle_index
-    #[should_panic]
     #[test]
     fn middle_index() {
         run_test(&dedent!(
@@ -24,7 +23,6 @@ mod char_at {
     }
 
     // Test: end_index
-    #[should_panic]
     #[test]
     fn end_index() {
         run_test(&dedent!(
@@ -38,7 +36,6 @@ mod char_at {
     }
 
     // Test: multiple
-    #[should_panic]
     #[test]
     fn multiple() {
         run_test(&dedent!(
@@ -55,7 +52,6 @@ mod index_of {
     use dedent::dedent;
 
     // Test: empty_index
-    #[should_panic]
     #[test]
     fn empty_index() {
         run_test(&dedent!(
@@ -69,7 +65,6 @@ mod index_of {
     }
 
     // Test: string_index
-    #[should_panic]
     #[test]
     fn string_index() {
         run_test(&dedent!(
@@ -83,7 +78,6 @@ mod index_of {
     }
 
     // Test: nomatch
-    #[should_panic]
     #[test]
     fn nomatch() {
         run_test(&dedent!(
@@ -94,7 +88,6 @@ mod index_of {
     }
 
     // Test: empty_index
-    #[should_panic]
     #[test]
     fn empty_index_1() {
         run_test(&dedent!(
@@ -105,7 +98,6 @@ mod index_of {
     }
 
     // Test: char_index
-    #[should_panic]
     #[test]
     fn char_index() {
         run_test(&dedent!(
@@ -116,7 +108,6 @@ mod index_of {
     }
 
     // Test: string_index
-    #[should_panic]
     #[test]
     fn string_index_1() {
         run_test(&dedent!(
@@ -127,7 +118,6 @@ mod index_of {
     }
 
     // Test: unicode_char
-    #[should_panic]
     #[test]
     fn unicode_char() {
         run_test(&dedent!(
@@ -138,7 +128,6 @@ mod index_of {
     }
 
     // Test: unicode_char_index
-    #[should_panic]
     #[test]
     fn unicode_char_index() {
         run_test(&dedent!(
@@ -149,7 +138,6 @@ mod index_of {
     }
 
     // Test: unicode_string_index
-    #[should_panic]
     #[test]
     fn unicode_string_index() {
         run_test(&dedent!(
@@ -160,7 +148,6 @@ mod index_of {
     }
 
     // Test: unicode_string_nomatch_index
-    #[should_panic]
     #[test]
     fn unicode_string_nomatch_index() {
         run_test(&dedent!(
@@ -171,7 +158,6 @@ mod index_of {
     }
 
     // Test: char_index
-    #[should_panic]
     #[test]
     fn char_index_1() {
         run_test(&dedent!(
@@ -182,7 +168,6 @@ mod index_of {
     }
 
     // Test: string_with_space_fullmatch
-    #[should_panic]
     #[test]
     fn string_with_space_fullmatch() {
         run_test(&dedent!(
@@ -193,7 +178,6 @@ mod index_of {
     }
 
     // Test: string_with_space_index
-    #[should_panic]
     #[test]
     fn string_with_space_index() {
         run_test(&dedent!(
@@ -204,7 +188,6 @@ mod index_of {
     }
 
     // Test: string_nomatch_index
-    #[should_panic]
     #[test]
     fn string_nomatch_index() {
         run_test(&dedent!(
@@ -221,7 +204,6 @@ mod last_index_of {
     use dedent::dedent;
 
     // Test: empty_string
-    #[should_panic]
     #[test]
     fn empty_string() {
         run_test(&dedent!(
@@ -232,7 +214,6 @@ mod last_index_of {
     }
 
     // Test: empty_argument
-    #[should_panic]
     #[test]
     fn empty_argument() {
         run_test(&dedent!(
@@ -243,7 +224,6 @@ mod last_index_of {
     }
 
     // Test: string
-    #[should_panic]
     #[test]
     fn string() {
         run_test(&dedent!(
@@ -254,7 +234,6 @@ mod last_index_of {
     }
 
     // Test: string_nomatch
-    #[should_panic]
     #[test]
     fn string_nomatch() {
         run_test(&dedent!(
@@ -265,7 +244,6 @@ mod last_index_of {
     }
 
     // Test: empty_index
-    #[should_panic]
     #[test]
     fn empty_index() {
         run_test(&dedent!(
@@ -276,7 +254,6 @@ mod last_index_of {
     }
 
     // Test: char_index
-    #[should_panic]
     #[test]
     fn char_index() {
         run_test(&dedent!(
@@ -287,7 +264,6 @@ mod last_index_of {
     }
 
     // Test: unicode_char
-    #[should_panic]
     #[test]
     fn unicode_char() {
         run_test(&dedent!(
@@ -298,7 +274,6 @@ mod last_index_of {
     }
 
     // Test: unicode_char_index
-    #[should_panic]
     #[test]
     fn unicode_char_index() {
         run_test(&dedent!(
@@ -309,7 +284,6 @@ mod last_index_of {
     }
 
     // Test: unicode_string_index
-    #[should_panic]
     #[test]
     fn unicode_string_index() {
         run_test(&dedent!(
@@ -320,7 +294,6 @@ mod last_index_of {
     }
 
     // Test: string_with_space_string_index
-    #[should_panic]
     #[test]
     fn string_with_space_string_index() {
         run_test(&dedent!(
@@ -331,7 +304,6 @@ mod last_index_of {
     }
 
     // Test: string_with_space_string_nomatch
-    #[should_panic]
     #[test]
     fn string_with_space_string_nomatch() {
         run_test(&dedent!(
@@ -342,7 +314,6 @@ mod last_index_of {
     }
 
     // Test: string_with_space_string_with_space_nomatch
-    #[should_panic]
     #[test]
     fn string_with_space_string_with_space_nomatch() {
         run_test(&dedent!(
@@ -353,7 +324,6 @@ mod last_index_of {
     }
 
     // Test: string_with_space_fullmatch
-    #[should_panic]
     #[test]
     fn string_with_space_fullmatch() {
         run_test(&dedent!(
@@ -364,7 +334,6 @@ mod last_index_of {
     }
 
     // Test: repeated_string
-    #[should_panic]
     #[test]
     fn repeated_string() {
         run_test(&dedent!(
@@ -381,7 +350,6 @@ mod ascii_casing {
     use dedent::dedent;
 
     // Test: lowerascii
-    #[should_panic]
     #[test]
     fn lowerascii() {
         run_test(&dedent!(
@@ -392,7 +360,6 @@ mod ascii_casing {
     }
 
     // Test: lowerascii_unicode
-    #[should_panic]
     #[test]
     fn lowerascii_unicode() {
         run_test(&dedent!(
@@ -403,7 +370,6 @@ mod ascii_casing {
     }
 
     // Test: lowerascii_unicode_with_space
-    #[should_panic]
     #[test]
     fn lowerascii_unicode_with_space() {
         run_test(&dedent!(
@@ -414,7 +380,6 @@ mod ascii_casing {
     }
 
     // Test: upperascii
-    #[should_panic]
     #[test]
     fn upperascii() {
         run_test(&dedent!(
@@ -425,7 +390,6 @@ mod ascii_casing {
     }
 
     // Test: upperascii_unicode
-    #[should_panic]
     #[test]
     fn upperascii_unicode() {
         run_test(&dedent!(
@@ -436,7 +400,6 @@ mod ascii_casing {
     }
 
     // Test: upperascii_unicode_with_space
-    #[should_panic]
     #[test]
     fn upperascii_unicode_with_space() {
         run_test(&dedent!(
@@ -453,7 +416,6 @@ mod replace {
     use dedent::dedent;
 
     // Test: no_placeholder
-    #[should_panic]
     #[test]
     fn no_placeholder() {
         run_test(&dedent!(
@@ -464,7 +426,6 @@ mod replace {
     }
 
     // Test: basic
-    #[should_panic]
     #[test]
     fn basic() {
         run_test(&dedent!(
@@ -475,7 +436,6 @@ mod replace {
     }
 
     // Test: chained
-    #[should_panic]
     #[test]
     fn chained() {
         run_test(&dedent!(
@@ -486,7 +446,6 @@ mod replace {
     }
 
     // Test: unicode
-    #[should_panic]
     #[test]
     fn unicode() {
         run_test(&dedent!(
@@ -503,7 +462,6 @@ mod split {
     use dedent::dedent;
 
     // Test: empty
-    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -514,7 +472,6 @@ mod split {
     }
 
     // Test: zero_limit
-    #[should_panic]
     #[test]
     fn zero_limit() {
         run_test(&dedent!(
@@ -525,7 +482,6 @@ mod split {
     }
 
     // Test: one_limit
-    #[should_panic]
     #[test]
     fn one_limit() {
         run_test(&dedent!(
@@ -536,7 +492,6 @@ mod split {
     }
 
     // Test: unicode_negative_limit
-    #[should_panic]
     #[test]
     fn unicode_negative_limit() {
         run_test(&dedent!(
@@ -553,7 +508,6 @@ mod substring {
     use dedent::dedent;
 
     // Test: start
-    #[should_panic]
     #[test]
     fn start() {
         run_test(&dedent!(
@@ -564,7 +518,6 @@ mod substring {
     }
 
     // Test: start_with_max_length
-    #[should_panic]
     #[test]
     fn start_with_max_length() {
         run_test(&dedent!(
@@ -575,7 +528,6 @@ mod substring {
     }
 
     // Test: start_and_end
-    #[should_panic]
     #[test]
     fn start_and_end() {
         run_test(&dedent!(
@@ -586,7 +538,6 @@ mod substring {
     }
 
     // Test: start_and_end_equal_value
-    #[should_panic]
     #[test]
     fn start_and_end_equal_value() {
         run_test(&dedent!(
@@ -597,7 +548,6 @@ mod substring {
     }
 
     // Test: unicode_start_and_end
-    #[should_panic]
     #[test]
     fn unicode_start_and_end() {
         run_test(&dedent!(
@@ -608,7 +558,6 @@ mod substring {
     }
 
     // Test: unicode_start_and_end_equal_value
-    #[should_panic]
     #[test]
     fn unicode_start_and_end_equal_value() {
         run_test(&dedent!(
@@ -625,7 +574,6 @@ mod trim {
     use dedent::dedent;
 
     // Test: blank_spaces_escaped_chars
-    #[should_panic]
     #[test]
     fn blank_spaces_escaped_chars() {
         run_test(&dedent!(
@@ -636,7 +584,6 @@ mod trim {
     }
 
     // Test: unicode_space_chars_1
-    #[should_panic]
     #[test]
     fn unicode_space_chars_1() {
         run_test(&dedent!(
@@ -647,7 +594,6 @@ mod trim {
     }
 
     // Test: unicode_space_chars_2
-    #[should_panic]
     #[test]
     fn unicode_space_chars_2() {
         run_test(&dedent!(
@@ -658,7 +604,6 @@ mod trim {
     }
 
     // Test: unicode_space_chars_3
-    #[should_panic]
     #[test]
     fn unicode_space_chars_3() {
         run_test(&dedent!(
@@ -669,7 +614,6 @@ mod trim {
     }
 
     // Test: unicode_no_trim
-    #[should_panic]
     #[test]
     fn unicode_no_trim() {
         run_test(&dedent!(
@@ -686,7 +630,6 @@ mod join {
     use dedent::dedent;
 
     // Test: empty_separator
-    #[should_panic]
     #[test]
     fn empty_separator() {
         run_test(&dedent!(
@@ -697,7 +640,6 @@ mod join {
     }
 
     // Test: dash_separator
-    #[should_panic]
     #[test]
     fn dash_separator() {
         run_test(&dedent!(
@@ -708,7 +650,6 @@ mod join {
     }
 
     // Test: empty_string_empty_separator
-    #[should_panic]
     #[test]
     fn empty_string_empty_separator() {
         run_test(&dedent!(
@@ -719,7 +660,6 @@ mod join {
     }
 
     // Test: empty_string_dash_separator
-    #[should_panic]
     #[test]
     fn empty_string_dash_separator() {
         run_test(&dedent!(

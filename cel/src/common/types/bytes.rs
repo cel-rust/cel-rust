@@ -239,9 +239,11 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         super::noop,
     )
     .expect("Must be unique id");
-    crate::add_overload!(env, fn size: (Bytes) -> CelInt, id = "size_bytes");
+    crate::add_overload!(env, fn size: (Bytes) -> CelInt, id = "size_bytes")
+        .expect("Must be unique id");
     crate::add_member_overload!(env, fn size: (Bytes) -> CelInt,
-        id = "bytes_size");
+        id = "bytes_size")
+    .expect("Must be unique id");
 }
 
 fn size(this: &Bytes<'_>) -> CelInt {

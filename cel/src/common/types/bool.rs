@@ -138,9 +138,11 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(crate::common::types::BOOL_TYPE)
         .expect("Must be unique");
     crate::add_overload!(env, fn bool_from_bool: (Bool) -> Bool,
-        name = "bool", id = "bool_to_bool");
+        name = "bool", id = "bool_to_bool")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn bool_from_string: (CelString) -> Result<Bool>,
-        name = "bool", id = "string_to_bool");
+        name = "bool", id = "string_to_bool")
+    .expect("Must be unique id");
 }
 
 #[cfg(test)]

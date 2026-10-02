@@ -230,14 +230,20 @@ fn duration_from_duration(this: &Duration) -> Duration {
 pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(super::DURATION_TYPE).expect("Must be unique");
     crate::add_overload!(env, fn duration_from_string: (CelString) -> Result<Duration>,
-        name = "duration", id = "string_to_duration");
+        name = "duration", id = "string_to_duration")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn duration_from_duration: (Duration) -> Duration,
-        name = "duration", id = "duration_to_duration");
-    crate::add_member_overload!(env, fn get_hours: (Duration) -> CelInt, id = "duration_to_hours");
+        name = "duration", id = "duration_to_duration")
+    .expect("Must be unique id");
+    crate::add_member_overload!(env, fn get_hours: (Duration) -> CelInt, id = "duration_to_hours")
+        .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_minutes: (Duration) -> CelInt,
-        id = "duration_to_minutes");
+        id = "duration_to_minutes")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_seconds: (Duration) -> CelInt,
-        id = "duration_to_seconds");
+        id = "duration_to_seconds")
+    .expect("Must be unique id");
     crate::add_member_overload!(env, fn get_milliseconds: (Duration) -> CelInt,
-        id = "duration_to_millis");
+        id = "duration_to_millis")
+    .expect("Must be unique id");
 }

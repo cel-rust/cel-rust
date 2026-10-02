@@ -310,13 +310,17 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(crate::common::types::UINT_TYPE)
         .expect("Must be unique");
     crate::add_overload!(env, fn uint_from_uint: (UInt) -> UInt,
-        name = "uint", id = "uint64_to_uint64");
+        name = "uint", id = "uint64_to_uint64")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn uint_from_int: (CelInt) -> Result<UInt>,
-        name = "uint", id = "int64_to_uint64");
+        name = "uint", id = "int64_to_uint64")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn uint_from_double: (CelDouble) -> Result<UInt>,
-        name = "uint", id = "double_to_uint64");
+        name = "uint", id = "double_to_uint64")
+    .expect("Must be unique id");
     crate::add_overload!(env, fn uint_from_string: (CelString) -> Result<UInt>,
-        name = "uint", id = "string_to_uint64");
+        name = "uint", id = "string_to_uint64")
+    .expect("Must be unique id");
 }
 
 #[cfg(test)]

@@ -28,6 +28,7 @@ pub mod common;
 mod container;
 pub mod context;
 mod env;
+pub mod extensions;
 pub mod parser;
 
 pub use common::ast::IdedExpr;

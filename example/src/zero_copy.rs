@@ -156,7 +156,8 @@ fn strip_version<'v>(this: &CelStruct<'v>) -> Result<CelString<'v>, ExecutionErr
 fn env() -> Arc<Env> {
     let mut env = Env::default();
     cel::add_member_overload!(env, fn strip_version: (CelStruct) -> Result<CelString>,
-        receiver = Type::new_struct_type(REQUEST_TYPE), name = "stripVersion");
+        receiver = Type::new_struct_type(REQUEST_TYPE), name = "stripVersion")
+    .expect("Must be unique id");
     Arc::new(env)
 }
 
