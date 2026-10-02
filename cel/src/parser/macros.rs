@@ -2,6 +2,7 @@ use crate::common::ast::{
     operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr, LiteralValue,
 };
 use crate::parser::{MacroExprHelper, ParseError};
+use crate::DeclarationError;
 use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, LazyLock};
@@ -15,9 +16,22 @@ type Expander = dyn Fn(&mut MacroExprHelper<'_>, Option<IdedExpr>, Vec<IdedExpr>
 /// A parse-time rewrite of a call into another expression.
 ///
 /// A macro matches a call on the function's name, on whether it is called on a
-/// target (`x.f(..)`) or globally (`f(..)`), and on its argument count.
+/// target (`x.f(..)`) or globally (`f(..)`), and on its argument count. The
+/// parser then hands the call's target and arguments to the macro's expander,
+/// and what it returns replaces the call in the parsed expression:
+///
+/// - the target is `None` for a global call, and the `x` of `x.f(..)` for a
+///   receiver call;
+/// - new nodes are made with [`MacroExprHelper::next_expr`], so each gets its
+///   own id and the call's place in the source;
+/// - an `Err`, best made with [`MacroExprHelper::new_error`], fails the parse
+///   with that error.
+///
+/// Macros are added to an [`Env`](crate::Env) with
+/// [`Env::add_macro`](crate::Env::add_macro), and expanded by the parser it
+/// builds with [`Env::parser`](crate::Env::parser).
 #[derive(Clone)]
-pub(crate) struct Macro {
+pub struct Macro {
     function: String,
     receiver_style: bool,
     arg_count: usize,
@@ -26,7 +40,7 @@ pub(crate) struct Macro {
 
 impl Macro {
     /// A macro for the global call `function(..)` with `arg_count` arguments.
-    pub(crate) fn global(
+    pub fn global(
         function: impl Into<String>,
         arg_count: usize,
         expander: impl Fn(
@@ -48,7 +62,7 @@ impl Macro {
 
     /// A macro for the receiver call `target.function(..)` with `arg_count`
     /// arguments, the target not counted.
-    pub(crate) fn receiver(
+    pub fn receiver(
         function: impl Into<String>,
         arg_count: usize,
         expander: impl Fn(
@@ -75,6 +89,12 @@ impl Macro {
         args: Vec<IdedExpr>,
     ) -> Result<IdedExpr, ParseError> {
         (self.expander)(helper, target, args)
+    }
+
+    /// Whether this macro is for a call with `arg_count` arguments, on a
+    /// target when `receiver_style`.
+    fn matches(&self, receiver_style: bool, arg_count: usize) -> bool {
+        self.receiver_style == receiver_style && self.arg_count == arg_count
     }
 }
 
@@ -131,7 +151,20 @@ impl Macros {
         self.by_function
             .get(function)?
             .iter()
-            .find(|m| m.receiver_style == target.is_some() && m.arg_count == args.len())
+            .find(|m| m.matches(target.is_some(), args.len()))
+    }
+
+    /// Adds `m`, unless a macro for the same calls is already there.
+    pub(crate) fn add(&mut self, m: Macro) -> Result<(), DeclarationError> {
+        let same_function = self.by_function.entry(m.function.clone()).or_default();
+        if same_function
+            .iter()
+            .any(|other| other.matches(m.receiver_style, m.arg_count))
+        {
+            return Err(DeclarationError::duplicate_macro(&m.function));
+        }
+        same_function.push(m);
+        Ok(())
     }
 }
 
