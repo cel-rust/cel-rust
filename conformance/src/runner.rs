@@ -6,7 +6,6 @@
 
 use cel::context::Context;
 use cel::objects::Value as CelValue;
-use cel::parser::Parser;
 use cel::{Env, Value};
 
 use crate::proto::cel::expr::conformance::test::{simple_test::ResultMatcher, SimpleTest};
@@ -26,17 +25,6 @@ pub fn run_test(simple_test_textproto: &str) {
         "Type checking not available (check_only test)"
     );
 
-    // Use the parser directly so we can enable optional syntax (`.?`,
-    // `[?…]`, `{?k: v}`) and backtick-escaped identifiers (`` `foo.bar` ``),
-    // which `Program::compile` leaves off by default. Matches cel-go's own
-    // conformance runner (`conformance/conformance_test.go:87,95`).
-    let program = Parser::default()
-        .enable_optional_syntax(true)
-        .enable_ident_escape_syntax(true)
-        .parse(&test.expr)
-        .expect("Failed to compile CEL expression");
-
-    // Build context with bindings.
     let mut env = Env::stdlib();
     env.set_container(&test.container)
         .expect("Invalid container name in conformance test");
@@ -44,6 +32,21 @@ pub fn run_test(simple_test_textproto: &str) {
         .expect("We need that extension to register");
     env.add_extension(cel::extensions::encoders)
         .expect("We need that extension to register");
+    env.add_extension(cel::extensions::lists)
+        .expect("We need that extension to register");
+
+    // Parse with the env's parser, so the extensions' macros are expanded,
+    // with optional syntax (`.?`, `[?…]`, `{?k: v}`) and backtick-escaped
+    // identifiers (`` `foo.bar` ``) enabled. Matches cel-go's own conformance
+    // runner (`conformance/conformance_test.go:87,95`).
+    let program = env
+        .parser()
+        .enable_optional_syntax(true)
+        .enable_ident_escape_syntax(true)
+        .parse(&test.expr)
+        .expect("Failed to compile CEL expression");
+
+    // Build context with bindings.
     let mut context = Context::with_env(std::sync::Arc::new(env));
 
     if !test.bindings.is_empty() {

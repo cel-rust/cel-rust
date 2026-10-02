@@ -415,7 +415,9 @@ fn exists_one_macro_expander(
     )
 }
 
-fn map_macro_expander(
+/// Expands `target.map(v, f)`, or `target.map(v, p, f)`: also the key list of
+/// the lists extension's `sortBy`.
+pub(crate) fn map_macro_expander(
     helper: &mut MacroExprHelper,
     target: &mut Option<IdedExpr>,
     args: &mut Vec<IdedExpr>,

@@ -11,7 +11,6 @@ mod slice {
     use dedent::dedent;
 
     // Test: sublist
-    #[should_panic]
     #[test]
     fn sublist() {
         run_test(&dedent!(
@@ -22,7 +21,6 @@ mod slice {
     }
 
     // Test: full
-    #[should_panic]
     #[test]
     fn full() {
         run_test(&dedent!(
@@ -33,7 +31,6 @@ mod slice {
     }
 
     // Test: empty_start
-    #[should_panic]
     #[test]
     fn empty_start() {
         run_test(&dedent!(
@@ -44,7 +41,6 @@ mod slice {
     }
 
     // Test: empty_middle
-    #[should_panic]
     #[test]
     fn empty_middle() {
         run_test(&dedent!(
@@ -55,7 +51,6 @@ mod slice {
     }
 
     // Test: empty_end
-    #[should_panic]
     #[test]
     fn empty_end() {
         run_test(&dedent!(
@@ -133,7 +128,6 @@ mod flatten {
     use dedent::dedent;
 
     // Test: default_depth
-    #[should_panic]
     #[test]
     fn default_depth() {
         run_test(&dedent!(
@@ -144,7 +138,6 @@ mod flatten {
     }
 
     // Test: default_depth_nested
-    #[should_panic]
     #[test]
     fn default_depth_nested() {
         run_test(&dedent!(
@@ -155,7 +148,6 @@ mod flatten {
     }
 
     // Test: empty_sublists
-    #[should_panic]
     #[test]
     fn empty_sublists() {
         run_test(&dedent!(
@@ -166,7 +158,6 @@ mod flatten {
     }
 
     // Test: depth_two
-    #[should_panic]
     #[test]
     fn depth_two() {
         run_test(&dedent!(
@@ -177,7 +168,6 @@ mod flatten {
     }
 
     // Test: depth_zero
-    #[should_panic]
     #[test]
     fn depth_zero() {
         run_test(&dedent!(
@@ -188,7 +178,6 @@ mod flatten {
     }
 
     // Test: empty_list
-    #[should_panic]
     #[test]
     fn empty_list() {
         run_test(&dedent!(
@@ -199,7 +188,6 @@ mod flatten {
     }
 
     // Test: already_flat
-    #[should_panic]
     #[test]
     fn already_flat() {
         run_test(&dedent!(
@@ -232,7 +220,6 @@ mod distinct {
     use dedent::dedent;
 
     // Test: ints
-    #[should_panic]
     #[test]
     fn ints() {
         run_test(&dedent!(
@@ -243,7 +230,6 @@ mod distinct {
     }
 
     // Test: strings
-    #[should_panic]
     #[test]
     fn strings() {
         run_test(&dedent!(
@@ -254,7 +240,6 @@ mod distinct {
     }
 
     // Test: heterogeneous
-    #[should_panic]
     #[test]
     fn heterogeneous() {
         run_test(&dedent!(
@@ -265,7 +250,6 @@ mod distinct {
     }
 
     // Test: empty
-    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -276,7 +260,6 @@ mod distinct {
     }
 
     // Test: single_element
-    #[should_panic]
     #[test]
     fn single_element() {
         run_test(&dedent!(
@@ -287,7 +270,6 @@ mod distinct {
     }
 
     // Test: uints
-    #[should_panic]
     #[test]
     fn uints() {
         run_test(&dedent!(
@@ -298,7 +280,6 @@ mod distinct {
     }
 
     // Test: bools
-    #[should_panic]
     #[test]
     fn bools() {
         run_test(&dedent!(
@@ -316,7 +297,6 @@ mod range {
     use dedent::dedent;
 
     // Test: positive
-    #[should_panic]
     #[test]
     fn positive() {
         run_test(&dedent!(
@@ -327,7 +307,6 @@ mod range {
     }
 
     // Test: zero
-    #[should_panic]
     #[test]
     fn zero() {
         run_test(&dedent!(
@@ -338,7 +317,6 @@ mod range {
     }
 
     // Test: single
-    #[should_panic]
     #[test]
     fn single() {
         run_test(&dedent!(
@@ -388,7 +366,6 @@ mod reverse {
     use dedent::dedent;
 
     // Test: integers
-    #[should_panic]
     #[test]
     fn integers() {
         run_test(&dedent!(
@@ -399,7 +376,6 @@ mod reverse {
     }
 
     // Test: strings
-    #[should_panic]
     #[test]
     fn strings() {
         run_test(&dedent!(
@@ -410,7 +386,6 @@ mod reverse {
     }
 
     // Test: empty
-    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -421,7 +396,6 @@ mod reverse {
     }
 
     // Test: single
-    #[should_panic]
     #[test]
     fn single() {
         run_test(&dedent!(
@@ -432,7 +406,6 @@ mod reverse {
     }
 
     // Test: double_reverse
-    #[should_panic]
     #[test]
     fn double_reverse() {
         run_test(&dedent!(
@@ -450,7 +423,6 @@ mod sort {
     use dedent::dedent;
 
     // Test: integers
-    #[should_panic]
     #[test]
     fn integers() {
         run_test(&dedent!(
@@ -461,7 +433,6 @@ mod sort {
     }
 
     // Test: uints
-    #[should_panic]
     #[test]
     fn uints() {
         run_test(&dedent!(
@@ -472,7 +443,6 @@ mod sort {
     }
 
     // Test: doubles
-    #[should_panic]
     #[test]
     fn doubles() {
         run_test(&dedent!(
@@ -483,7 +453,6 @@ mod sort {
     }
 
     // Test: strings
-    #[should_panic]
     #[test]
     fn strings() {
         run_test(&dedent!(
@@ -494,7 +463,6 @@ mod sort {
     }
 
     // Test: bytes
-    #[should_panic]
     #[test]
     fn bytes() {
         run_test(&dedent!(
@@ -505,7 +473,6 @@ mod sort {
     }
 
     // Test: bools
-    #[should_panic]
     #[test]
     fn bools() {
         run_test(&dedent!(
@@ -516,7 +483,6 @@ mod sort {
     }
 
     // Test: durations
-    #[should_panic]
     #[test]
     fn durations() {
         run_test(&dedent!(
@@ -527,7 +493,6 @@ mod sort {
     }
 
     // Test: timestamps
-    #[should_panic]
     #[test]
     fn timestamps() {
         run_test(&dedent!(
@@ -538,7 +503,6 @@ mod sort {
     }
 
     // Test: empty
-    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -549,7 +513,6 @@ mod sort {
     }
 
     // Test: single
-    #[should_panic]
     #[test]
     fn single() {
         run_test(&dedent!(
@@ -597,7 +560,6 @@ mod sortby {
     use dedent::dedent;
 
     // Test: number_key
-    #[should_panic]
     #[test]
     fn number_key() {
         run_test(&dedent!(
@@ -608,7 +570,6 @@ mod sortby {
     }
 
     // Test: identity_key
-    #[should_panic]
     #[test]
     fn identity_key() {
         run_test(&dedent!(
@@ -619,7 +580,6 @@ mod sortby {
     }
 
     // Test: string_key
-    #[should_panic]
     #[test]
     fn string_key() {
         run_test(&dedent!(
@@ -630,7 +590,6 @@ mod sortby {
     }
 
     // Test: empty
-    #[should_panic]
     #[test]
     fn empty() {
         run_test(&dedent!(
@@ -641,7 +600,6 @@ mod sortby {
     }
 
     // Test: single
-    #[should_panic]
     #[test]
     fn single() {
         run_test(&dedent!(
