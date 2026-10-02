@@ -396,8 +396,18 @@ pub struct Program {
 }
 
 impl Program {
+    /// Compiles `source`, expanding the standard macros (`has`, `all`,
+    /// `exists`, `exists_one`, `map` and `filter`): the same as
+    /// [`Env::compile`] on [`Env::stdlib`], without building an `Env`.
+    ///
+    /// The macros an `Env` has besides those, added with [`Env::add_macro`]
+    /// or by an extension, are only expanded by [`Env::compile`].
     pub fn compile(source: &str) -> Result<Program, ParseErrors> {
-        let parser = Parser::default();
+        Program::parse_with(Parser::default(), source)
+    }
+
+    /// Parses `source` into a program with `parser`, and the macros it expands.
+    pub(crate) fn parse_with(parser: Parser, source: &str) -> Result<Program, ParseErrors> {
         parser
             .parse_with_source_info(source)
             .map(|(expression, source_info)| Program {

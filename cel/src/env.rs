@@ -7,8 +7,8 @@ use crate::common::{
 use crate::container::Container;
 use crate::parser::{Macro, Macros, Parser};
 use crate::registry::{TypeDecl, TypeRegistry};
-use crate::DeclarationError;
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
+use crate::{DeclarationError, ParseErrors, Program};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
     BTreeMap, BTreeSet,
@@ -121,8 +121,35 @@ impl Env {
         Parser::new().with_macros(Arc::clone(&self.macros))
     }
 
-    /// Adds a macro, expanded by the parsers this environment builds with
-    /// [`Env::parser`].
+    /// Compiles `source` into a [`Program`], expanding the macros of this
+    /// environment: the standard ones of [`Env::stdlib`], and those added with
+    /// [`Env::add_macro`], by extensions included.
+    ///
+    /// Macros are expanded while compiling: the program doesn't depend on the
+    /// environment afterwards.
+    ///
+    /// # Errors
+    ///
+    /// Fails with the [`ParseErrors`] of `source`, a macro's included.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let env = Env::stdlib();
+    /// let program = env.compile("[1, 2, 3].exists(x, x > 2)").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+    /// ```
+    pub fn compile(&self, source: &str) -> Result<Program, ParseErrors> {
+        Program::parse_with(self.parser(), source)
+    }
+
+    /// Adds a macro, expanded by the programs this environment compiles with
+    /// [`Env::compile`], and by the parsers it builds with [`Env::parser`];
+    /// [`Program::compile`] only expands the standard ones.
     ///
     /// # Errors
     ///
@@ -137,6 +164,7 @@ impl Env {
     /// use cel::common::ast::{operators, CallExpr, Expr};
     /// use cel::parser::Macro;
     /// use cel::{Context, Env, Value};
+    /// use std::sync::Arc;
     ///
     /// // `implies(a, b)` is parsed as `!a || b`: true whenever `a` is false,
     /// // whatever `b` evaluates to.
@@ -157,8 +185,9 @@ impl Env {
     ///
     /// let mut env = Env::stdlib();
     /// env.add_macro(implies).unwrap();
-    /// let expr = env.parser().parse("implies(false, 1 / 0 == 1)").unwrap();
-    /// assert_eq!(Value::resolve(&expr, &Context::default()), Ok(Value::Bool(true)));
+    /// let program = env.compile("implies(false, 1 / 0 == 1)").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     pub fn add_macro(&mut self, m: Macro) -> Result<(), DeclarationError> {
         // The standard macros are shared by every `Env::stdlib()` and default
@@ -357,17 +386,18 @@ impl Env {
     }
 
     /// Adds an extension library, such as [`extensions::strings`], by
-    /// handing it this environment to register its types and overloads on.
+    /// handing it this environment to register its types, overloads and
+    /// macros on. Compile with [`Env::compile`] for the macros to be expanded.
     ///
     /// ```
-    /// use cel::{extensions, Context, Env, Program, Value};
+    /// use cel::{extensions, Context, Env, Value};
     /// use std::sync::Arc;
     ///
     /// let mut env = Env::stdlib();
     /// env.add_extension(extensions::strings);
+    /// let program = env.compile("'TacoCat'.lowerAscii()").unwrap();
     /// let context = Context::with_env(Arc::new(env));
     ///
-    /// let program = Program::compile("'TacoCat'.lowerAscii()").unwrap();
     /// assert_eq!(program.execute(&context), Ok(Value::from("tacocat")));
     /// ```
     ///
