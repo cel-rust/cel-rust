@@ -4,10 +4,6 @@
 //!
 //! ## Optional Features
 //!
-//! - `structs`: Enables support for custom struct types. This allows you to define
-//!   struct definitions using [`StructDef`], or any other `StructType`, and add
-//!   them to your [`Env`]. Custom structs can then be instantiated and accessed
-//!   within CEL expressions.
 //! - `chrono`: Enables support for `duration` and `timestamp` types using the `chrono` crate (and `chrono-tz` for
 //!   IANA time zone arguments).
 //! - `regex`: Enables support for regular expressions.
@@ -50,9 +46,7 @@ pub use ser::{Duration, Timestamp};
 
 pub use env::Env;
 mod registry;
-#[cfg(feature = "structs")]
 pub use env::StructDef;
-#[cfg(feature = "structs")]
 pub use registry::StructType;
 pub use registry::{TypeDecl, TypeRegistry};
 

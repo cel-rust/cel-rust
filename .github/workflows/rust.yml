@@ -32,7 +32,6 @@ jobs:
           cargo test -p cel --verbose --features json
           cargo test -p cel --verbose --features regex
           cargo test -p cel --verbose --features chrono
-          cargo test -p cel --verbose --features structs
   conformance:
     name: Conformance
     runs-on: ubuntu-latest

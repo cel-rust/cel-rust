@@ -77,7 +77,6 @@ body:
       options:
         - label: regex
         - label: chrono
-        - label: structs
         - label: json
         - label: bytes
         - label: parser_pratt (experimental hand-written parser)

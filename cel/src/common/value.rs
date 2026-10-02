@@ -2,7 +2,6 @@ use crate::common::traits::{
     Adder, Comparer, Container, Divider, Indexer, Iterable, Modder, Multiplier, Negator, Sizer,
     Subtractor, Zeroer,
 };
-#[cfg(feature = "structs")]
 use crate::common::types::CelStruct;
 use crate::common::types::{CelBytes, CelList, CelMap, CelOptional, CelString, Type};
 use std::any::Any;
@@ -235,7 +234,6 @@ pub enum BuiltinRef<'b, 'v> {
     List(&'b CelList<'v>),
     Map(&'b CelMap<'v>),
     Optional(&'b CelOptional<'v>),
-    #[cfg(feature = "structs")]
     Struct(&'b CelStruct<'v>),
     Other,
 }
@@ -249,7 +247,6 @@ pub enum Builtin<'v> {
     List(CelList<'v>),
     Map(CelMap<'v>),
     Optional(CelOptional<'v>),
-    #[cfg(feature = "structs")]
     Struct(CelStruct<'v>),
 }
 
@@ -276,7 +273,6 @@ builtin_from_val! {
     CelOptional => Optional,
 }
 
-#[cfg(feature = "structs")]
 builtin_from_val! {
     CelStruct => Struct,
 }

@@ -28,7 +28,7 @@
 //!   vector, so nothing reached through them lives long enough to be returned as a
 //!   borrow. Written by hand, it reads `ftx.this` at `'context` and can.
 //!
-//! Run with `cargo run -p example --bin example-no-copy --features structs`.
+//! Run with `cargo run -p example --bin example-no-copy`.
 use cel::common::ast::{Expr, LiteralValue};
 use cel::common::types::{CelMap, CelMapKey, CelString, CelStruct, Type};
 use cel::common::value::{CowVal, Val};

@@ -865,8 +865,7 @@ mod tests {
 
     /// The override, not `<Receiver as Val>::cel_type()`, supplies the receiver
     /// type - and the id default is built from it. Registration only: the Rust
-    /// receiver stays `CelString`, and the CEL type is an opaque one, so the
-    /// test needs no `structs` feature.
+    /// receiver stays `CelString`, and the CEL type is an opaque one.
     #[test]
     fn a_receiver_override_supplies_the_type_and_drives_the_id() {
         use crate::common::types::Type;
@@ -915,7 +914,6 @@ mod tests {
     /// type, so without the override the default is reached and panics rather
     /// than inventing a type.
     #[test]
-    #[cfg(feature = "structs")]
     #[should_panic(expected = "no static `Val::cel_type()`")]
     fn a_struct_receiver_without_the_override_panics() {
         use crate::common::types::CelStruct;
@@ -930,7 +928,6 @@ mod tests {
 
     /// ... and with it, the same fn registers fine.
     #[test]
-    #[cfg(feature = "structs")]
     fn a_struct_receiver_registers_with_the_override() {
         use crate::common::types::{CelStruct, Type};
 
