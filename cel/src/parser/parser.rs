@@ -37,19 +37,23 @@ use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::Arc;
 
+/// What a [`Macro`](crate::parser::Macro)'s expander builds its expression
+/// with, for the call being expanded.
 pub struct MacroExprHelper<'a> {
     pub(crate) helper: &'a mut ParserHelper,
     pub(crate) id: u64,
 }
 
 impl MacroExprHelper<'_> {
+    /// A node for `expr`, with an id of its own, placed in the source where
+    /// the expanded call is.
     pub fn next_expr(&mut self, expr: Expr) -> IdedExpr {
         self.helper.next_expr_for(self.id, expr)
     }
 
     /// An error for the expression `expr_id`, positioned where that expression
     /// is in the source.
-    pub(crate) fn new_error(&self, expr_id: u64, msg: impl Into<String>) -> ParseError {
+    pub fn new_error(&self, expr_id: u64, msg: impl Into<String>) -> ParseError {
         ParseError {
             source: None,
             pos: self.helper.source_info.pos_for(expr_id).unwrap_or_default(),

@@ -5,7 +5,7 @@ use crate::common::{
     value::CowVal,
 };
 use crate::container::Container;
-use crate::parser::{Macros, Parser};
+use crate::parser::{Macro, Macros, Parser};
 use crate::registry::{TypeDecl, TypeRegistry};
 use crate::DeclarationError;
 #[cfg(feature = "structs")]
@@ -123,6 +123,51 @@ impl Env {
     /// ```
     pub fn parser(&self) -> Parser {
         Parser::new().with_macros(Arc::clone(&self.macros))
+    }
+
+    /// Adds a macro, expanded by the parsers this environment builds with
+    /// [`Env::parser`].
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::DuplicateMacro`] if a macro for the same
+    /// function, called the same way (globally or on a target) with as many
+    /// arguments, is already added: the standard ones of [`Env::stdlib`]
+    /// included.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::common::ast::{operators, CallExpr, Expr};
+    /// use cel::parser::Macro;
+    /// use cel::{Context, Env, Value};
+    ///
+    /// // `implies(a, b)` is parsed as `!a || b`: true whenever `a` is false,
+    /// // whatever `b` evaluates to.
+    /// let implies = Macro::global("implies", 2, |helper, _target, mut args| {
+    ///     let b = args.pop().unwrap();
+    ///     let a = args.pop().unwrap();
+    ///     let not_a = helper.next_expr(Expr::Call(CallExpr {
+    ///         func_name: operators::LOGICAL_NOT.to_string(),
+    ///         target: None,
+    ///         args: vec![a],
+    ///     }));
+    ///     Ok(helper.next_expr(Expr::Call(CallExpr {
+    ///         func_name: operators::LOGICAL_OR.to_string(),
+    ///         target: None,
+    ///         args: vec![not_a, b],
+    ///     })))
+    /// });
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_macro(implies).unwrap();
+    /// let expr = env.parser().parse("implies(false, 1 / 0 == 1)").unwrap();
+    /// assert_eq!(Value::resolve(&expr, &Context::default()), Ok(Value::Bool(true)));
+    /// ```
+    pub fn add_macro(&mut self, m: Macro) -> Result<(), DeclarationError> {
+        // The standard macros are shared by every `Env::stdlib()` and default
+        // parser: the first macro added copies them for this environment.
+        Arc::make_mut(&mut self.macros).add(m)
     }
 
     /// Adds a global function overload to the environment.
@@ -547,6 +592,34 @@ mod tests {
         );
         let as_written = Env::default().parser().parse(source).unwrap();
         assert!(matches!(as_written.expr, Expr::Call(_)), "{as_written:?}");
+    }
+
+    fn first_arg(
+        _: &mut crate::parser::MacroExprHelper<'_>,
+        _: Option<crate::IdedExpr>,
+        mut args: Vec<crate::IdedExpr>,
+    ) -> Result<crate::IdedExpr, crate::ParseError> {
+        Ok(args.remove(0))
+    }
+
+    #[test]
+    fn a_macro_for_the_calls_of_another_is_a_duplicate() {
+        let mut env = Env::stdlib();
+        assert_eq!(
+            env.add_macro(Macro::receiver("exists", 2, first_arg)),
+            Err(DeclarationError::duplicate_macro("exists")),
+            "the standard `exists` expands those"
+        );
+        // Called globally, or with another argument count, it's another call.
+        assert_eq!(env.add_macro(Macro::global("exists", 2, first_arg)), Ok(()));
+        assert_eq!(
+            env.add_macro(Macro::receiver("exists", 3, first_arg)),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_macro(Macro::receiver("exists", 3, first_arg)),
+            Err(DeclarationError::duplicate_macro("exists"))
+        );
     }
 
     #[test]

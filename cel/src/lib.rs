@@ -347,6 +347,11 @@ pub enum DeclarationError {
     /// not an identifier, or several separated by dots.
     #[error("Invalid container name '{name}': not an identifier, or several separated by dots")]
     InvalidContainerName { name: String },
+    /// A macro could not be added because one for the same function, called
+    /// the same way (globally or on a target) with as many arguments, is
+    /// already added.
+    #[error("Cannot add macro '{function}': one for the same call style and argument count is already added")]
+    DuplicateMacro { function: String },
 }
 
 impl DeclarationError {
@@ -378,6 +383,12 @@ impl DeclarationError {
     pub fn invalid_container_name(name: &str) -> Self {
         DeclarationError::InvalidContainerName {
             name: name.to_string(),
+        }
+    }
+
+    pub fn duplicate_macro(function: &str) -> Self {
+        DeclarationError::DuplicateMacro {
+            function: function.to_string(),
         }
     }
 }
