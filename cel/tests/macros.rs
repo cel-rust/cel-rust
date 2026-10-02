@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use cel::common::ast::{ComprehensionExpr, Expr, ListExpr, LiteralValue};
 use cel::parser::{Macro, MacroExprHelper};
-use cel::{Context, Env, IdedExpr, ParseError, Value};
+use cel::{Context, Env, IdedExpr, ParseError, Program, Value};
 
 /// `bind(var, init, expr)` evaluates `expr` with `var` bound to `init`.
 ///
@@ -69,4 +69,25 @@ fn a_macro_leaves_the_calls_it_declines_as_written() {
     let expanded = env.parser().parse("cel.bind(x, 2, x * x)").unwrap();
     let context = Context::with_env(Arc::new(env));
     assert_eq!(Value::resolve(&expanded, &context), Ok(Value::Int(4)));
+}
+
+/// The flow of extensions: add to an `Env`, compile with it, run with it.
+#[test]
+fn a_program_compiled_by_the_env_expands_its_macros() {
+    let mut env = Env::stdlib();
+    env.add_macro(Macro::global("first", 2, |_, _, args| {
+        Ok(Some(args.remove(0)))
+    }))
+    .unwrap();
+    let program = env.compile("first(1, 2)").unwrap();
+    let context = Context::with_env(Arc::new(env));
+    assert_eq!(program.execute(&context), Ok(Value::Int(1)));
+}
+
+#[test]
+fn program_compile_expands_the_macros_of_the_standard_env() {
+    let source = "[1, 2].exists(x, x > 1) && has(a.b)";
+    let program = Program::compile(source).unwrap();
+    let with_env = Env::stdlib().compile(source).unwrap();
+    assert_eq!(program.expression(), with_env.expression());
 }
