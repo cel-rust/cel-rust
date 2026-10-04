@@ -11,14 +11,23 @@ pub(crate) fn out_of_range(d: &chrono::Duration) -> bool {
     d.num_nanoseconds().is_none()
 }
 
+/// A CEL `google.protobuf.Duration`, of type
+/// [`DURATION_TYPE`](super::DURATION_TYPE): a [`chrono::Duration`].
+///
+/// It adds to and subtracts from another `duration`, and adds to a
+/// `timestamp`. A `duration` must fit in an `i64` count of nanoseconds, as in
+/// cel-go, so an operation whose result doesn't fails. It only compares, and
+/// is only equal, to another `duration`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Duration(chrono::Duration);
 
 impl Duration {
+    /// The [`chrono::Duration`].
     pub fn into_inner(self) -> chrono::Duration {
         self.0
     }
 
+    /// A reference to the [`chrono::Duration`].
     pub fn inner(&self) -> &chrono::Duration {
         &self.0
     }

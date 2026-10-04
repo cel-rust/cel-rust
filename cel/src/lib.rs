@@ -2,6 +2,9 @@
 //!
 //! A parser and interpreter for the Common Expression Language (CEL) in Rust.
 //!
+//! [`common`] explains CEL's type system: how values, types, operators and functions fit together,
+//! and how to add types of your own.
+//!
 //! ## Optional Features
 //!
 //! - `chrono`: Enables support for `duration` and `timestamp` types using the `chrono` crate (and `chrono-tz` for

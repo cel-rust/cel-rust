@@ -6,20 +6,32 @@ use std::any::Any;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
+/// A CEL `bool`, of type [`BOOL_TYPE`](super::BOOL_TYPE).
+///
+/// It orders `false` before `true`, and is only equal to a `bool`. `!`, `&&`,
+/// `||` and the condition of `? :` take one; it has no [`Negator`], so `-true`
+/// is an error.
+///
+/// [`Negator`]: crate::common::traits::Negator
 pub struct Bool(bool);
 
 impl Bool {
+    /// `true`.
     pub const TRUE: Bool = Bool(true);
+    /// `false`.
     pub const FALSE: Bool = Bool(false);
 
+    /// `!self`.
     pub fn negate(&self) -> Self {
         Self(!self.0)
     }
 
+    /// The `bool`.
     pub fn into_inner(self) -> bool {
         self.0
     }
 
+    /// A reference to the `bool`.
     pub fn inner(&self) -> &bool {
         &self.0
     }

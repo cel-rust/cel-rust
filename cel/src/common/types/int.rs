@@ -8,13 +8,21 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
+/// A CEL `int`, of type [`INT_TYPE`](super::INT_TYPE): an `i64`.
+///
+/// Arithmetic takes another `int`, and fails on overflow, on division by zero
+/// and on remainder by zero; `-` negates it, and fails on overflow too.
+/// Comparisons and equality also take a `uint` or a `double`, and compare
+/// numerically: `1 == 1u`, and `1 < 1.5`.
 pub struct Int(i64);
 
 impl Int {
+    /// The `i64`.
     pub fn into_inner(self) -> i64 {
         self.0
     }
 
+    /// A reference to the `i64`.
     pub fn inner(&self) -> &i64 {
         &self.0
     }

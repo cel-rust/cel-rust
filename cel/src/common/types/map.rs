@@ -12,14 +12,26 @@ use std::ops::Deref;
 use std::sync::Arc;
 
 /// A CEL map whose keys and values may borrow data for `'v`.
+///
+/// Of type [`MAP_TYPE`](super::MAP_TYPE), `map(dyn, dyn)`, whatever its
+/// entries. Keys are [`CelMapKey`](super::CelMapKey)s: `bool`, `int`, `uint`
+/// or `string` values; values can be of any type. It supports `in` (a key),
+/// `[k]` and `.f` (the value at a key, `f` being a string key), `size()`, and
+/// the comprehensions, which iterate over its keys in no particular order.
+/// Two maps are equal when they have the same keys, with equal values.
+///
+/// Numeric keys are looked up by numeric value, as the spec requires:
+/// `{1u: 'one'}[1]` and `{1: 'one'}[1.0]` both find `'one'`.
 #[derive(Debug, Default)]
 pub struct DefaultMap<'v>(HashMap<Key<'v>, Box<dyn Val + 'v>>);
 
 impl<'v> DefaultMap<'v> {
+    /// The entries.
     pub fn into_inner(self) -> HashMap<Key<'v>, Box<dyn Val + 'v>> {
         self.0
     }
 
+    /// The entries, borrowed from `self`.
     pub fn inner(&self) -> &HashMap<Key<'v>, Box<dyn Val + 'v>> {
         &self.0
     }
@@ -285,11 +297,18 @@ impl<'v> From<HashMap<Key<'v>, Box<dyn Val + 'v>>> for DefaultMap<'v> {
 }
 
 /// A map key. A string key may borrow its bytes for `'v`.
+///
+/// CEL only allows these four types as map keys; a map literal with a key of
+/// another type is an error.
 #[derive(Debug, Eq, Clone)]
 pub enum Key<'v> {
+    /// A `bool` key.
     Bool(CelBool),
+    /// An `int` key.
     Int(CelInt),
+    /// A `string` key.
     String(CelString<'v>),
+    /// A `uint` key.
     UInt(CelUInt),
 }
 
@@ -318,6 +337,7 @@ impl Ord for Key<'_> {
 }
 
 impl<'v> Key<'v> {
+    /// The key as a value, e.g. to iterate over a map's keys.
     pub fn inner<'b>(&'b self) -> &'b (dyn Val + 'v) {
         match self {
             Key::Bool(b) => b,

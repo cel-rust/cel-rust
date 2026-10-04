@@ -13,6 +13,18 @@ use crate::{
 ///
 /// A struct has a type and a set of field values, which may borrow data
 /// for `'v`.
+///
+/// Its type is a struct type of its own name, of [`Kind::Struct`]: unlike the
+/// other built-in values, a `Struct` has no static
+/// [`cel_type`](Val::cel_type). `.f` and `[f]` read the field `f`, and
+/// `has(.f)` tests for it. Two structs are equal when they are of the same
+/// type, with equal fields.
+///
+/// A struct literal such as `acme.User{name: 'alex'}` makes one, when its type
+/// is registered with [`Env::add_type`](crate::Env::add_type), e.g. as a
+/// [`StructDef`](crate::StructDef).
+///
+/// [`Kind::Struct`]: super::Kind::Struct
 #[derive(Debug, Eq, PartialEq)]
 pub struct Struct<'v> {
     r#type: Type,
