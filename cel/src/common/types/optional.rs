@@ -59,7 +59,7 @@ impl<'v> Val for Optional<'v> {
     {
         match &self.0 {
             None => Box::new(Optional(None)),
-            Some(val) => val.clone_as_boxed(),
+            Some(val) => Box::new(Optional(Some(OptionalInternal::Box(val.clone_as_boxed())))),
         }
     }
 

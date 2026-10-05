@@ -4012,6 +4012,23 @@ mod tests {
                 }))
             );
         }
+
+        /// A comprehension binds a copy of each element to its variable: a copy
+        /// of an optional is an optional, not the value it holds.
+        #[test]
+        fn a_comprehension_binds_an_optional_element_as_an_optional() {
+            let expr = Parser::default()
+                .enable_optional_syntax(true)
+                .parse("[optional.of(1), optional.none()].map(x, x.hasValue())")
+                .expect("Must parse");
+            assert_eq!(
+                Value::resolve(&expr, &Context::default()),
+                Ok(Value::List(Arc::new(vec![
+                    Value::Bool(true),
+                    Value::Bool(false)
+                ])))
+            );
+        }
     }
 
     mod structs {
