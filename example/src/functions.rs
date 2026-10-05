@@ -1,12 +1,15 @@
 #![allow(clippy::too_many_arguments)]
 use cel::extractors::This;
-use cel::{Context, ExecutionError, FunctionContext, Program, ResolveResult, Value};
+use cel::{Context, Env, ExecutionError, FunctionContext, ResolveResult, Value};
 use chrono::{DateTime, Duration, FixedOffset};
 use std::sync::Arc;
 
 fn main() {
-    let program = Program::compile("add(2, 3) == 5 && ''.isEmpty() && fail()").unwrap();
-    let mut context = Context::default();
+    let env = Arc::new(Env::stdlib());
+    let program = env
+        .compile("add(2, 3) == 5 && ''.isEmpty() && fail()")
+        .unwrap();
+    let mut context = Context::with_env(env);
 
     // Add functions using closures
     context.add_function("add", |a: i64, b: i64| a + b).unwrap();

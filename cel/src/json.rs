@@ -25,10 +25,12 @@ impl Value {
     ///
     /// # Example
     /// ```
-    /// use cel::{Context, Program};
+    /// use cel::{Context, Env};
+    /// use std::sync::Arc;
     ///
-    /// let program = Program::compile("null").unwrap();
-    /// let value = program.execute(&Context::default()).unwrap();
+    /// let env = Arc::new(Env::stdlib());
+    /// let program = env.compile("null").unwrap();
+    /// let value = program.execute(&Context::with_env(env)).unwrap();
     /// let result = value.json().unwrap();
     ///
     /// assert_eq!(result, serde_json::Value::Null);

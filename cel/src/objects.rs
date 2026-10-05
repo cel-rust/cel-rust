@@ -365,7 +365,7 @@ where
 /// use std::sync::Arc;
 /// use cel::common::types::Type;
 /// use cel::objects::{Opaque, Value};
-/// use cel::{Context, Env, Program};
+/// use cel::{Context, Env};
 ///
 /// #[derive(Eq, PartialEq)]
 /// struct MyId(u64);
@@ -386,10 +386,10 @@ where
 /// // Registering its type lets expressions name it.
 /// let mut env = Env::stdlib();
 /// env.add_type(Type::new_opaque_type("example.MyId")).unwrap();
+/// let program = env.compile("type(id) == example.MyId").unwrap();
 /// let mut context = Context::with_env(Arc::new(env));
 /// context.add_variable_from_value("id", a);
 ///
-/// let program = Program::compile("type(id) == example.MyId").unwrap();
 /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
 /// ```
 pub trait Opaque: Any + OpaqueEq + AsDebug + Send + Sync {

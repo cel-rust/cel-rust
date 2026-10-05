@@ -33,11 +33,13 @@ cargo add cel
 Create and execute a simple CEL expression:
 
 ```rust
-use cel::{Context, Program};
+use cel::{Context, Env};
+use std::sync::Arc;
 
 fn main() {
-    let program = Program::compile("add(2, 3) == 5").unwrap();
-    let mut context = Context::default();
+    let env = Arc::new(Env::stdlib());
+    let program = env.compile("add(2, 3) == 5").unwrap();
+    let mut context = Context::with_env(env);
     context.add_function("add", |a: i64, b: i64| a + b).unwrap();
     let value = program.execute(&context).unwrap();
     assert_eq!(value, true.into());
