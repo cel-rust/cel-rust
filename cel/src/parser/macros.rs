@@ -5,7 +5,11 @@ use crate::parser::{MacroExprHelper, ParseError};
 use crate::DeclarationError;
 use std::collections::BTreeMap;
 use std::fmt;
+use std::mem;
 use std::sync::{Arc, LazyLock};
+
+const TARGET: &str = "@target";
+const UNUSED: &str = "#unused";
 
 /// Rewrites a matched call, given its target (for a receiver call) and its
 /// arguments, into the expression that replaces it.
@@ -588,6 +592,102 @@ fn filter_macro_expander(
             result,
         }))),
     )
+}
+
+/// The macros of the optional library: `optMap` and `optFlatMap`.
+pub(crate) fn optional() -> [Macro; 2] {
+    [
+        Macro::receiver(
+            "optMap",
+            2,
+            expanding(|h, t, a| opt_expander(h, t, a, true)),
+        ),
+        Macro::receiver(
+            "optFlatMap",
+            2,
+            expanding(|h, t, a| opt_expander(h, t, a, false)),
+        ),
+    ]
+}
+
+/// `t.optMap(v, e)` is `t.hasValue() ? optional.of(<e with v = t.value()>) :
+/// optional.none()`, and `t.optFlatMap(v, e)` is the same without the
+/// `optional.of`. A target that isn't an identifier is bound to `@target`
+/// first, so it is evaluated once.
+fn opt_expander(
+    helper: &mut MacroExprHelper,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
+    wrap: bool,
+) -> Result<IdedExpr, ParseError> {
+    let target = target.take().expect("a receiver macro has a target");
+    let [var, mapping] =
+        <[IdedExpr; 2]>::try_from(mem::take(args)).expect("the macro matched two arguments");
+    let var = extract_ident(var, helper)?;
+
+    let (name, bound) = match &target.expr {
+        Expr::Ident(name) => (name.clone(), None),
+        _ => (TARGET.to_string(), Some(target)),
+    };
+    let ident = |helper: &mut MacroExprHelper| helper.next_expr(Expr::Ident(name.clone()));
+
+    let receiver = ident(helper);
+    let has_value = member_call(helper, receiver, "hasValue");
+    let receiver = ident(helper);
+    let value = member_call(helper, receiver, "value");
+    let mapped = bind(helper, &var, value, mapping);
+    let some = if wrap {
+        optional_call(helper, "of", vec![mapped])
+    } else {
+        mapped
+    };
+    let none = optional_call(helper, "none", vec![]);
+    let result = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::CONDITIONAL.to_string(),
+        target: None,
+        args: vec![has_value, some, none],
+    }));
+
+    Ok(match bound {
+        Some(target) => bind(helper, TARGET, target, result),
+        None => result,
+    })
+}
+
+/// `var` bound to `init` in `result`: a comprehension over no elements, whose
+/// accumulator is `var`.
+fn bind(helper: &mut MacroExprHelper, var: &str, init: IdedExpr, result: IdedExpr) -> IdedExpr {
+    let iter_range = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
+    let loop_cond = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
+    let loop_step = helper.next_expr(Expr::Ident(var.to_string()));
+    helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+        iter_range,
+        iter_var: UNUSED.to_string(),
+        iter_var2: None,
+        accu_var: var.to_string(),
+        accu_init: init,
+        loop_cond,
+        loop_step,
+        result,
+    })))
+}
+
+fn member_call(helper: &mut MacroExprHelper, target: IdedExpr, func_name: &str) -> IdedExpr {
+    helper.next_expr(Expr::Call(CallExpr {
+        func_name: func_name.to_string(),
+        target: Some(Box::new(target)),
+        args: vec![],
+    }))
+}
+
+/// `optional.<func_name>(<args>)`.
+fn optional_call(helper: &mut MacroExprHelper, func_name: &str, args: Vec<IdedExpr>) -> IdedExpr {
+    let namespace = helper.next_expr(Expr::Ident("optional".to_string()));
+    helper.next_expr(Expr::Call(CallExpr {
+        func_name: func_name.to_string(),
+        target: Some(Box::new(namespace)),
+        args,
+    }))
 }
 
 fn extract_ident(expr: IdedExpr, helper: &mut MacroExprHelper) -> Result<String, ParseError> {

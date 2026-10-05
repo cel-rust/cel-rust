@@ -1,6 +1,7 @@
 use crate::common::traits::Zeroer;
 use crate::common::types::{self, CelBool, Type, OPTIONAL_TYPE};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
+use crate::parser::optional_macros;
 use crate::ExecutionError;
 use std::sync::Arc;
 
@@ -327,6 +328,9 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         optional_or_value,
     )
     .expect("Must be unique");
+    for m in optional_macros() {
+        env.add_macro(m).expect("Must be unique");
+    }
 }
 
 #[cfg(test)]
