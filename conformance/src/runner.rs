@@ -34,6 +34,8 @@ pub fn run_test(simple_test_textproto: &str) {
         .expect("We need that extension to register");
     env.add_extension(cel::extensions::lists)
         .expect("We need that extension to register");
+    env.add_extension(cel::extensions::math)
+        .expect("We need that extension to register");
 
     // Parse with the env's parser, so the extensions' macros are expanded,
     // with optional syntax (`.?`, `[?…]`, `{?k: v}`) and backtick-escaped

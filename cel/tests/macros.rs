@@ -71,6 +71,59 @@ fn a_macro_leaves_the_calls_it_declines_as_written() {
     assert_eq!(Value::resolve(&expanded, &context), Ok(Value::Int(4)));
 }
 
+/// `count(..)`: how many arguments the call has.
+#[allow(clippy::ptr_arg)] // The signature of an expander.
+fn count(
+    helper: &mut MacroExprHelper<'_>,
+    _target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
+) -> Result<Option<IdedExpr>, ParseError> {
+    let count = LiteralValue::Int((args.len() as i64).into());
+    Ok(Some(helper.next_expr(Expr::Literal(count))))
+}
+
+#[test]
+fn a_var_arg_macro_expands_calls_with_any_number_of_arguments() {
+    let mut env = Env::stdlib();
+    env.add_macro(Macro::receiver_var_arg("count", count))
+        .unwrap();
+    env.add_macro(Macro::global_var_arg("count", count))
+        .unwrap();
+    let program = env
+        .compile("[m.count(), m.count(a), m.count(a, b, c), count(), count(a, b)]")
+        .unwrap();
+    let context = Context::with_env(Arc::new(env));
+    assert_eq!(
+        program.execute(&context),
+        Ok(Value::List(Arc::new(vec![
+            Value::Int(0),
+            Value::Int(1),
+            Value::Int(3),
+            Value::Int(0),
+            Value::Int(2),
+        ])))
+    );
+}
+
+#[test]
+fn a_macro_for_the_exact_argument_count_wins_over_a_var_arg_one() {
+    let mut env = Env::stdlib();
+    env.add_macro(Macro::global_var_arg("count", count))
+        .unwrap();
+    env.add_macro(Macro::global("count", 2, |helper, _, _| {
+        Ok(Some(
+            helper.next_expr(Expr::Literal(LiteralValue::Int((-2).into()))),
+        ))
+    }))
+    .unwrap();
+    let program = env.compile("[count(a), count(a, b)]").unwrap();
+    let context = Context::with_env(Arc::new(env));
+    assert_eq!(
+        program.execute(&context),
+        Ok(Value::List(Arc::new(vec![Value::Int(1), Value::Int(-2)])))
+    );
+}
+
 /// The flow of extensions: add to an `Env`, compile with it, run with it.
 #[test]
 fn a_program_compiled_by_the_env_expands_its_macros() {
