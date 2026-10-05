@@ -487,16 +487,9 @@ network_ext::ipv6::is_link_local_unicast_false
 network_ext::ipv6::is_link_local_unicast_true
 network_ext::ipv6::is_loopback_true
 network_ext::ipv6::is_unspecified_true
-optionals::optionals::empty_map_optflatmap_hasvalue
 optionals::optionals::empty_struct_optindex_hasvalue
 optionals::optionals::has_optional_ofnonzerovalue_struct_optional_ofnonzerovalue_map_optindex_field
-optionals::optionals::map_empty_submap_optflatmap_hasvalue
-optionals::optionals::map_optindex_optflatmap_optional_ofnonzerovalue_hasvalue
-optionals::optionals::map_submap_optflatmap_value
-optionals::optionals::map_submap_subkey_optflatmap_value
-optionals::optionals::none_optmap_hasvalue
 optionals::optionals::optional_empty_struct_optindex_hasvalue
-optionals::optionals::optional_of_optmap_value
 optionals::optionals::optional_ofnonzerovalue_struct_optional_ofnonzerovalue_map_optindex_field
 optionals::optionals::optional_struct_optindex_index_value
 optionals::optionals::optional_struct_optindex_value
