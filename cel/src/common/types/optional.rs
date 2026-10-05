@@ -5,6 +5,16 @@ use crate::ExecutionError;
 use std::sync::Arc;
 
 /// A CEL optional whose value may borrow data for `'v`.
+///
+/// Of type [`OPTIONAL_TYPE`](super::OPTIONAL_TYPE), `optional_type`, whatever
+/// its value: `optional.of(x)` holds `x`, `optional.none()` holds nothing. It
+/// supports no operator of its own; its methods, `hasValue()`, `value()`,
+/// `orValue()`, `or()` and the like, are overloads of the standard library,
+/// registered while the environment supports optional values, as it does by
+/// default: see [`Env::with_optional_support`](crate::Env::with_optional_support).
+/// Selecting a field of an optional, or indexing one, applies to the value it
+/// holds, and yields another optional. Two optionals are equal when both are
+/// empty, or both hold equal values.
 #[derive(Debug)]
 pub struct Optional<'v>(Option<OptionalInternal<'v>>);
 
@@ -79,14 +89,18 @@ impl<'v> Val for Optional<'v> {
 }
 
 impl<'v> Optional<'v> {
+    /// `optional.none()`, which holds no value.
     pub fn none() -> Self {
         Optional(None)
     }
 
+    /// `optional.of(val)`.
     pub fn of(val: Box<dyn Val + 'v>) -> Self {
         Optional(Some(OptionalInternal::Box(val)))
     }
 
+    /// An optional of `f` applied to the value, or `optional.none()` if this
+    /// holds none.
     pub fn map(&self, f: impl FnOnce(&(dyn Val + 'v)) -> Box<dyn Val + 'v>) -> Self {
         self.0
             .as_ref()
@@ -94,10 +108,12 @@ impl<'v> Optional<'v> {
             .unwrap_or(Optional(None))
     }
 
+    /// The value, if there is one.
     pub fn option<'b>(&'b self) -> Option<&'b (dyn Val + 'v)> {
         self.0.as_ref().map(OptionalInternal::as_val)
     }
 
+    /// The value, if there is one; the same as [`option`](Self::option).
     pub fn inner<'b>(&'b self) -> Option<&'b (dyn Val + 'v)> {
         self.option()
     }

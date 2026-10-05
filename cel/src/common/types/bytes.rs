@@ -9,6 +9,11 @@ use std::sync::Arc;
 use traits::{Adder, Comparer};
 
 /// CEL bytes. Owns the buffer, or borrows it for `'a`.
+///
+/// Of type [`BYTES_TYPE`](super::BYTES_TYPE). `+` concatenates it with other
+/// `bytes`, into new bytes; it only compares, and is only equal, to other
+/// `bytes`, byte by byte. [`From`] a `&[u8]` borrows it, [`From`] a `Vec<u8>`
+/// owns it.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Bytes<'a>(Cow<'a, [u8]>);
 
@@ -18,6 +23,7 @@ impl<'a> Bytes<'a> {
         self.0.into_owned()
     }
 
+    /// The bytes, borrowed from `self`.
     pub fn inner(&self) -> &[u8] {
         &self.0
     }

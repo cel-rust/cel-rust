@@ -11,6 +11,12 @@ use std::string::String as StdString;
 use std::sync::Arc;
 
 /// A CEL string. Owns its bytes, or borrows them for `'a`.
+///
+/// Of type [`STRING_TYPE`](super::STRING_TYPE). `+` concatenates it with
+/// another `string`, into a new string; it only compares, and is only equal,
+/// to another `string`, by code point. `size()` counts code points.
+/// [`From`] a `&str` borrows it, [`From`] a [`String`](std::string::String)
+/// owns it.
 #[derive(Clone, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
 pub struct String<'a>(Cow<'a, str>);
 
@@ -20,6 +26,7 @@ impl<'a> String<'a> {
         self.0.into_owned()
     }
 
+    /// The string, borrowed from `self`.
     pub fn inner(&self) -> &str {
         &self.0
     }

@@ -3,6 +3,9 @@ use crate::common::types::Type;
 use crate::common::value::{StaticVal, Val};
 use std::any::Any;
 
+/// CEL's `null`, of type [`NULL_TYPE`](super::NULL_TYPE), `null_type`.
+///
+/// It is only equal to `null`, and supports no operator.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct Null;
 

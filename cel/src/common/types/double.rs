@@ -7,13 +7,22 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
+/// A CEL `double`, of type [`DOUBLE_TYPE`](super::DOUBLE_TYPE): an `f64`.
+///
+/// Arithmetic takes another `double`, and follows IEEE 754: dividing by zero
+/// yields an infinity, nothing overflows. It has no `%`. Comparisons and
+/// equality also take an `int` or a `uint`, and compare numerically:
+/// `1.0 == 1`. A `NaN` equals nothing, itself included, and ordering it is
+/// an error.
 pub struct Double(f64);
 
 impl Double {
+    /// The `f64`.
     pub fn into_inner(self) -> f64 {
         self.0
     }
 
+    /// A reference to the `f64`.
     pub fn inner(&self) -> &f64 {
         &self.0
     }

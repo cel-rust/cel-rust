@@ -9,14 +9,24 @@ use std::cmp::Ordering;
 use std::ops::{Add, Sub};
 use std::sync::LazyLock;
 
+/// A CEL `google.protobuf.Timestamp`, of type
+/// [`TIMESTAMP_TYPE`](super::TIMESTAMP_TYPE): a [`chrono::DateTime`] with a
+/// fixed offset.
+///
+/// A `duration` adds to and subtracts from it, and subtracting another
+/// `timestamp` yields a `duration`. A `timestamp` must lie between years 1
+/// and 9999, as the spec requires, so an operation whose result doesn't
+/// fails. It only compares, and is only equal, to another `timestamp`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Timestamp(chrono::DateTime<chrono::FixedOffset>);
 
 impl Timestamp {
+    /// The [`chrono::DateTime`].
     pub fn into_inner(self) -> chrono::DateTime<chrono::FixedOffset> {
         self.0
     }
 
+    /// A reference to the [`chrono::DateTime`].
     pub fn inner(&self) -> &chrono::DateTime<chrono::FixedOffset> {
         &self.0
     }

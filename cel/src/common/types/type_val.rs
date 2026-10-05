@@ -6,24 +6,33 @@ use std::borrow::Cow;
 
 static TYPE_TYPE: Type = Type::simple_type(Kind::Type, "type");
 
+/// A CEL type value, of type [`TYPE_TYPE`](super::TYPE_TYPE): what `int`
+/// evaluates to, and what `type(x)` returns.
+///
+/// It only holds the name of the type it stands for, and two type values are
+/// equal when their names are, so `type(1) == int`. A [`Type`] converts into
+/// the type value standing for it with [`From`].
 #[derive(Clone, Debug)]
 pub struct CelType {
     name: Cow<'static, str>,
 }
 
 impl CelType {
+    /// The type value of the type named `name`, without allocating.
     pub const fn new_static(name: &'static str) -> Self {
         Self {
             name: Cow::Borrowed(name),
         }
     }
 
+    /// The type value of the type named `name`.
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: Cow::Owned(name.into()),
         }
     }
 
+    /// The name of the type this stands for, e.g. `int`.
     pub fn name(&self) -> &str {
         &self.name
     }

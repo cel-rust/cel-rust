@@ -7,13 +7,23 @@ use std::cmp::Ordering;
 use std::ops::Deref;
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord)]
+/// A CEL `uint`, of type [`UINT_TYPE`](super::UINT_TYPE): a `u64`.
+///
+/// Arithmetic takes another `uint`, and fails on overflow, underflow, division
+/// by zero and remainder by zero. It has no [`Negator`]: `-1u` is an error.
+/// Comparisons and equality also take an `int` or a `double`, and compare
+/// numerically: `1u == 1`, and `1u > -1`.
+///
+/// [`Negator`]: crate::common::traits::Negator
 pub struct UInt(u64);
 
 impl UInt {
+    /// The `u64`.
     pub fn into_inner(self) -> u64 {
         self.0
     }
 
+    /// A reference to the `u64`.
     pub fn inner(&self) -> &u64 {
         &self.0
     }

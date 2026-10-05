@@ -7,14 +7,23 @@ use crate::ExecutionError;
 use std::ops::Deref;
 
 /// A CEL list whose elements may borrow data for `'v`.
+///
+/// Of type [`LIST_TYPE`](super::LIST_TYPE), `list(dyn)`, whatever its
+/// elements, which can be values of any type. It supports `+` with any
+/// [`Iterable`] on the right, `in` (an element [equals](Val::equals) the
+/// value), `[i]` with an `int`, `uint` or whole `double` index, `size()`, and
+/// the comprehensions, which iterate over its elements in order. Two lists
+/// are equal when their elements are, pairwise.
 #[derive(Debug, Default)]
 pub struct DefaultList<'v>(Vec<Box<dyn Val + 'v>>);
 
 impl<'v> DefaultList<'v> {
+    /// The elements.
     pub fn into_inner(self) -> Vec<Box<dyn Val + 'v>> {
         self.0
     }
 
+    /// The elements, borrowed from `self`.
     pub fn inner(&self) -> &[Box<dyn Val + 'v>] {
         &self.0
     }
