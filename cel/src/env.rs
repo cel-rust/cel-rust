@@ -57,6 +57,7 @@ pub struct Env {
     types: TypeRegistry,
     macros: Arc<Macros>,
     error_on_duplicate_map_keys: bool,
+    optional: bool,
     container: Container,
 }
 
@@ -68,6 +69,7 @@ impl Default for Env {
             types: TypeRegistry::default(),
             macros: Arc::default(),
             error_on_duplicate_map_keys: true,
+            optional: true,
             container: Container::default(),
         }
     }
@@ -79,27 +81,94 @@ impl Env {
     /// This environment contains all the standard functions and types as defined by the
     /// CEL specification.
     pub fn stdlib() -> Env {
-        let mut env = Env::default();
-        types::bool::stdlib(&mut env);
-        types::bytes::stdlib(&mut env);
-        types::double::stdlib(&mut env);
-        types::r#dyn::stdlib(&mut env);
-        types::int::stdlib(&mut env);
-        types::list::stdlib(&mut env);
-        types::map::stdlib(&mut env);
-        types::null::stdlib(&mut env);
-        types::optional::stdlib(&mut env);
-        types::string::stdlib(&mut env);
-        types::type_val::stdlib(&mut env);
-        types::uint::stdlib(&mut env);
+        Env {
+            macros: Macros::standard(),
+            ..Default::default()
+        }
+        .with_stdlib()
+    }
+
+    /// Registers the standard types and functions, as defined by the CEL
+    /// specification, on this environment and returns it.
+    ///
+    /// Unlike [`Env::stdlib`], it adds no macros: on an [`Env::default`],
+    /// `has`, `all`, `exists`, `exists_one`, `map` and `filter` are left as
+    /// the calls they are written as.
+    ///
+    /// The `duration` and `timestamp` types and functions need the `chrono`
+    /// feature; the `optional` ones are only registered while this
+    /// environment supports optional values, as it does by default: see
+    /// [`Env::with_optional_support`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if one of the standard overloads is already declared, as when
+    /// called on an [`Env::stdlib`] or twice, or if another type is already
+    /// registered under one of the standard types' names.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let env = Env::default().with_stdlib();
+    /// let program = env.compile("size('abc') == 3").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+    /// ```
+    pub fn with_stdlib(mut self) -> Self {
+        types::bool::stdlib(&mut self);
+        types::bytes::stdlib(&mut self);
+        types::double::stdlib(&mut self);
+        types::r#dyn::stdlib(&mut self);
+        types::int::stdlib(&mut self);
+        types::list::stdlib(&mut self);
+        types::map::stdlib(&mut self);
+        types::null::stdlib(&mut self);
+        if self.optional {
+            types::optional::stdlib(&mut self);
+        }
+        types::string::stdlib(&mut self);
+        types::type_val::stdlib(&mut self);
+        types::uint::stdlib(&mut self);
 
         #[cfg(feature = "chrono")]
         {
-            types::duration::stdlib(&mut env);
-            types::timestamp::stdlib(&mut env);
+            types::duration::stdlib(&mut self);
+            types::timestamp::stdlib(&mut self);
         }
-        env.macros = Macros::standard();
-        env
+        self
+    }
+
+    /// Sets whether this environment supports optional values, as it does by
+    /// default, and returns it.
+    ///
+    /// Without, the parsers it builds with [`Env::parser`], and so
+    /// [`Env::compile`], reject the optional syntax (`a.?b`, `a[?b]`, `[?a]`
+    /// and `{?k: v}`) as unsupported, and [`Env::with_stdlib`] leaves out the
+    /// `optional` library (`optional.of`, `optional.none`, `hasValue`, ...).
+    ///
+    /// That library is registered when [`Env::with_stdlib`] runs: disable
+    /// support before calling it. On an [`Env::stdlib`], or after
+    /// [`Env::with_stdlib`], this only disables the syntax.
+    ///
+    /// # Example
+    ///
+    /// ```
+    /// use cel::{Context, Env};
+    /// use std::sync::Arc;
+    ///
+    /// let env = Env::default().with_optional_support(false).with_stdlib();
+    /// assert!(env.compile("{'a': 1}.?a").is_err());
+    ///
+    /// let program = env.compile("optional.of(1).hasValue()").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert!(program.execute(&context).is_err());
+    /// ```
+    pub fn with_optional_support(mut self, optional: bool) -> Self {
+        self.optional = optional;
+        self
     }
 
     /// Returns a parser that expands the macros of this environment.
@@ -118,7 +187,9 @@ impl Env {
     /// assert_eq!(Value::resolve(&expr, &Context::default()), Ok(Value::Bool(true)));
     /// ```
     pub fn parser(&self) -> Parser {
-        Parser::new().with_macros(Arc::clone(&self.macros))
+        Parser::new()
+            .enable_optional_syntax(self.optional)
+            .with_macros(Arc::clone(&self.macros))
     }
 
     /// Compiles `source` into a [`Program`], expanding the macros of this
