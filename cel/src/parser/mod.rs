@@ -15,7 +15,7 @@ mod parser;
 pub mod pratt_parser;
 
 pub use macros::Macro;
-pub(crate) use macros::Macros;
+pub(crate) use macros::{map_macro_expander, Macros};
 pub use parser::*;
 #[cfg(feature = "parser_pratt")]
 #[doc(hidden)]
