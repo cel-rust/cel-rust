@@ -1101,24 +1101,14 @@ impl Value {
                             };
 
                             let index = Self::resolve_val(&call.args[1], ctx)?;
-                            let overload_error = ExecutionError::overload_for_values(
-                                &call.func_name,
-                                [value.as_ref(), index.as_ref()],
-                                false,
-                            );
-                            let result = match value {
-                                CowVal::Borrowed(val) => val
-                                    .as_indexer()
-                                    .ok_or_else(|| overload_error.clone())?
-                                    .get(index.as_ref())
-                                    .map_err(|error| error.with_overload_context(overload_error)),
-                                CowVal::Owned(val) => val
-                                    .into_indexer()
-                                    .ok_or_else(|| overload_error.clone())?
-                                    .steal(index.as_ref())
-                                    .map(CowVal::Owned)
-                                    .map_err(|error| error.with_overload_context(overload_error)),
-                            };
+                            let result =
+                                index_into(value, index.as_ref(), &call.func_name, |value| {
+                                    ExecutionError::overload_for_values(
+                                        &call.func_name,
+                                        [value, index.as_ref()],
+                                        false,
+                                    )
+                                });
                             return if is_optional {
                                 Ok(CowVal::owned(match result {
                                     Ok(val) => CelOptional::of(val.into_owned()),
@@ -2836,6 +2826,20 @@ mod tests {
                     execute(Box::new(Fields(t)), "has(v.missing)"),
                     Ok(Value::Bool(false)),
                     "{kind:?}"
+                );
+            }
+        }
+
+        /// `v['path']` reads the field `v.path` does, also on a value nothing
+        /// else holds, such as an element moved out of a list.
+        #[test]
+        fn a_value_with_fields_is_indexed_by_field_name() {
+            let request = || Box::new(Fields(Type::simple_type(Kind::Unspecified, "acme.Request")));
+            for expr in ["v['path']", "[v][0].path", "[v][0]['path']"] {
+                assert_eq!(
+                    execute(request(), expr),
+                    Ok(Value::from("/users/42")),
+                    "{expr}"
                 );
             }
         }
