@@ -633,6 +633,8 @@ mod tests {
     fn test_matches() {
         let tests = vec![
             ("string", "'foobar'.matches('^[a-zA-Z]*$') == true"),
+            ("global", "matches('foobar', '^[a-zA-Z]*$') == true"),
+            ("global no match", "matches('foo1', '^[a-zA-Z]*$') == false"),
             (
                 "map",
                 "{'1': 'abc', '2': 'def', '3': 'ghi'}.all(key, key.matches('^[a-zA-Z]*$')) == false",
@@ -660,6 +662,13 @@ mod tests {
                     message: "'(foo' not a valid regex:\nregex parse error:\n    (foo\n    ^\nerror: unclosed group".to_string()
                 }
             )
+        );
+        assert_eq!(
+            test_script("matches('foobar', '(foo')", None),
+            Err(crate::ExecutionError::FunctionError {
+                function: "matches".to_string(),
+                message: "'(foo' not a valid regex:\nregex parse error:\n    (foo\n    ^\nerror: unclosed group".to_string()
+            })
         );
     }
 

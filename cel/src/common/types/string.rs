@@ -335,8 +335,13 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     crate::add_member_overload!(env, fn starts_with: (String, String) -> CelBool)
         .expect("Must be unique id");
     #[cfg(feature = "regex")]
-    crate::add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>)
+    {
+        crate::add_overload!(env, fn matches: (String, String) -> Result<CelBool>,
+            id = "matches")
         .expect("Must be unique id");
+        crate::add_member_overload!(env, fn matches: (String, String) -> Result<CelBool>)
+            .expect("Must be unique id");
+    }
 }
 
 #[cfg(test)]
