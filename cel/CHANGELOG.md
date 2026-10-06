@@ -7,6 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0](https://github.com/cel-rust/cel-rust/compare/v0.14.5...v0.15.0) - 2026-10-06
+
+### Added
+
+- *(optional)* add the optMap and optFlatMap macros
+- *(extensions)* `math.greatest` & `.least` added
+- *(macros)* support var-arg macros, exact argument counts winning over them
+- *(extensions)* Math extension added - modulo `greatest`/`least`
+- *(extensions)* Lists extension added
+- *(extensions)* encoders, `base64.encode`/`base64.decode`
+- *(structs)* [**breaking**] Always enabled, `structs` feature removed
+- *(extensions)* Seam in `Env` & strings v1
+- *(typing)* resolve names against an Env container
+- *(stdlib)* add the missing timestamp overloads
+- *(stdlib)* add the timezone-argument timestamp selectors
+- *(stdlib)* add the bool() conversion overloads
+- *(ux)* Changed macros to be smarter
+- *(macros)* smarted defaults to overload macros
+- *(macros)* new `add_overload!` convenience macro
+- *(macros)* new `add_member_overload!` convenience macro
+- *(typing)* Unified `structs` & 'regular types' on `TypeRegistry`'s API
+- *(typing)* [**breaking**] struct types registered through the `TypeRegistry`
+- *(typing)* resolve qualified identifiers, most specific first
+- *(typing)* type registry on Env, replacing `CelType::for_ident`
+- *(Val)* Added `as_borrowed` to String & Bytes
+- *(val)* [**breaking**] `VariableResolver` uses `Cow<dyn Val>`
+- *(val)* `Context::add_function` supports `Val`
+- *(Val)* [**breaking**] Deleted all previously unused `Value` based fns
+- *(parser)* expose SourceInfo on the success path ([#315](https://github.com/cel-rust/cel-rust/pull/315))
+
+### Fixed
+
+- *(index)* `[]` falls back to `as_indexer` on owned values, as `.f` does
+- *(macros)* Now are always failable
+- *(extensions)* strings, join accepts any `Iteratable` of `CelString`
+- *(extensions)* strings, deal with boundaries properly
+- *(comprehension)* absorb errors that a later boolean element overrides
+- *(stdlib)* register int(timestamp) with the chrono-gated timestamp overloads
+- *(size)* count code points, not bytes, for string size
+- *(has)* test presence on the value's `Indexer`, not its `Kind` ([#357](https://github.com/cel-rust/cel-rust/pull/357))
+- *(map)* [**breaking**] reject a map literal that repeats a key ([#302](https://github.com/cel-rust/cel-rust/pull/302))
+- *(errors)* report missing overload context ([#313](https://github.com/cel-rust/cel-rust/pull/313))
+
+### Other
+
+- Merge pull request #404 from taekop/fix/global-matches
+- Merge pull request #403 from taekop/fix/string-from-bool
+- *(optional)* Move macros together with all other fns
+- *(Val)* Doc'ed all types
+- Merge pull request #385 from alexsnaps/macros_custom
+- Merge pull request #396 from alexsnaps/indexer-fix
+- Merge pull request #390 from alexsnaps/ext-strings
+- *(macros)* Added `try_add_overload` and member variant
+- *(extensions)* Allow for failure in registration
+- Merge pull request #384 from taekop/fix/name-shadowing
+- Merge pull request #379 from taekop/fix/all-error-shortcircuit
+- Merge pull request #373 from doxxx93/doxxx93/timestamp-range
+- Merge pull request #375 from taekop/fix/bytes-invalid-utf8
+- Merge pull request #372 from taekop/fix/conversions-timestamp
+- *(Val)* `cel_type` no blanket impl. anymore
+- *(stdlib)* got rid of explicit `name` in overload macros
+- *(Val)* Folded `CelValType` into `Val`
+- Merge pull request #359 from alexsnaps/antlr4rust
+- *(typing)* cel-go's qualified function precedence, behind a namespace check
+- *(bench)* added a bench for testing fn resolution
+- *(TypeRegistry)* Updated to reflect the impact
+- *(typing)* be pessimist about qualified fn again
+- *(typing)* resolve functions before dispatch
+- *(typing)* resolve qualified function names at any depth
+- *(typing)* type names resolved by interpreter
+- Merge pull request #361 from doxxx93/doxxx93/unary-negate
+- Merge pull request #364 from taekop/fix/duration-range
+- Merge pull request #363 from taekop/fix/string-size-unicode
+- Err on possible conflict when using `Context::add_function` ([#353](https://github.com/cel-rust/cel-rust/pull/353))
+- *(no-copy)* [**breaking**] Added `CowVal` to trace both lifetimes vorrow and value
+- *(val)* `FunctionContext` uses `Val`
+- *(pratt)* Added test coverage for unescaping
+- *(map)* Added mutable `List` used in `map`
+
 ## [0.14.5](https://github.com/cel-rust/cel-rust/compare/v0.14.4...v0.14.5) - 2026-09-07
 
 ### Added
