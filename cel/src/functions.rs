@@ -667,6 +667,8 @@ mod tests {
     fn test_string() {
         [
             ("string", "string('foo') == 'foo'"),
+            ("bool true", "string(true) == 'true'"),
+            ("bool false", "string(false) == 'false'"),
             ("int", "string(10) == '10'"),
             ("float", "string(10.5) == '10.5'"),
             ("bytes", "string(b'foo') == 'foo'"),

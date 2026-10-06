@@ -258,6 +258,10 @@ fn matches(this: &String<'_>, re: &String<'_>) -> Result<CelBool, ExecutionError
     }
 }
 
+fn string_from_bool(this: &CelBool) -> String<'static> {
+    String::from(this.to_string())
+}
+
 fn string_from_int(this: &CelInt) -> String<'static> {
     String::from(this.to_string())
 }
@@ -299,6 +303,9 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         vec![super::STRING_TYPE],
         super::noop,
     )
+    .expect("Must be unique id");
+    crate::add_overload!(env, fn string_from_bool: (CelBool) -> String,
+        name = "string", id = "bool_to_string")
     .expect("Must be unique id");
     crate::add_overload!(env, fn string_from_int: (CelInt) -> String,
         name = "string", id = "int64_to_string")
