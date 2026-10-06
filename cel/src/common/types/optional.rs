@@ -1,9 +1,17 @@
+use crate::common::ast::{
+    operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr, LiteralValue,
+};
 use crate::common::traits::Zeroer;
 use crate::common::types::{self, CelBool, Type, OPTIONAL_TYPE};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
-use crate::parser::optional_macros;
+use crate::parser::{Macro, MacroExprHelper, ParseError};
 use crate::ExecutionError;
+use std::mem;
 use std::sync::Arc;
+
+/// The variable `optMap` and `optFlatMap` bind a target that isn't an
+/// identifier to, so that it is evaluated once.
+const TARGET: &str = "@target";
 
 /// A CEL optional whose value may borrow data for `'v`.
 ///
@@ -328,15 +336,108 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
         optional_or_value,
     )
     .expect("Must be unique");
-    for m in optional_macros() {
-        env.add_macro(m).expect("Must be unique");
-    }
+    env.add_macro(Macro::receiver("optMap", 2, |helper, target, args| {
+        opt_map_macro(helper, target, args, true)
+    }))
+    .expect("Must be unique");
+    env.add_macro(Macro::receiver("optFlatMap", 2, |helper, target, args| {
+        opt_map_macro(helper, target, args, false)
+    }))
+    .expect("Must be unique");
+}
+
+/// `t.optMap(v, e)` is `t.hasValue() ? optional.of(<e with v = t.value()>) :
+/// optional.none()`, and `t.optFlatMap(v, e)` is the same without the
+/// `optional.of`, as `wrap` says. A target that isn't an identifier is bound
+/// to `@target` first, so it is evaluated once.
+fn opt_map_macro(
+    helper: &mut MacroExprHelper<'_>,
+    target: &mut Option<IdedExpr>,
+    args: &mut Vec<IdedExpr>,
+    wrap: bool,
+) -> Result<Option<IdedExpr>, ParseError> {
+    let target = target.take().expect("a receiver macro has a target");
+    let [var, mapping] =
+        <[IdedExpr; 2]>::try_from(mem::take(args)).expect("the macro matched two arguments");
+    let Expr::Ident(var) = var.expr else {
+        return Err(helper.new_error(var.id, "argument must be a simple name"));
+    };
+
+    let (name, bound) = match &target.expr {
+        Expr::Ident(name) => (name.clone(), None),
+        _ => (TARGET.to_string(), Some(target)),
+    };
+    let ident = |helper: &mut MacroExprHelper<'_>| helper.next_expr(Expr::Ident(name.clone()));
+
+    let receiver = ident(helper);
+    let has_value = member_call(helper, receiver, "hasValue");
+    let receiver = ident(helper);
+    let value = member_call(helper, receiver, "value");
+    let mapped = bind(helper, &var, value, mapping);
+    let some = if wrap {
+        optional_call(helper, "of", vec![mapped])
+    } else {
+        mapped
+    };
+    let none = optional_call(helper, "none", vec![]);
+    let result = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::CONDITIONAL.to_string(),
+        target: None,
+        args: vec![has_value, some, none],
+    }));
+
+    Ok(Some(match bound {
+        Some(target) => bind(helper, TARGET, target, result),
+        None => result,
+    }))
+}
+
+/// `var` bound to `init` in `result`: a comprehension over no elements, whose
+/// accumulator is `var`.
+fn bind(helper: &mut MacroExprHelper<'_>, var: &str, init: IdedExpr, result: IdedExpr) -> IdedExpr {
+    let iter_range = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
+    let loop_cond = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
+    let loop_step = helper.next_expr(Expr::Ident(var.to_string()));
+    helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+        iter_range,
+        iter_var: "#unused".to_string(),
+        iter_var2: None,
+        accu_var: var.to_string(),
+        accu_init: init,
+        loop_cond,
+        loop_step,
+        result,
+    })))
+}
+
+/// `<target>.<func_name>()`.
+fn member_call(helper: &mut MacroExprHelper<'_>, target: IdedExpr, func_name: &str) -> IdedExpr {
+    helper.next_expr(Expr::Call(CallExpr {
+        func_name: func_name.to_string(),
+        target: Some(Box::new(target)),
+        args: vec![],
+    }))
+}
+
+/// `optional.<func_name>(<args>)`.
+fn optional_call(
+    helper: &mut MacroExprHelper<'_>,
+    func_name: &str,
+    args: Vec<IdedExpr>,
+) -> IdedExpr {
+    let namespace = helper.next_expr(Expr::Ident("optional".to_string()));
+    helper.next_expr(Expr::Call(CallExpr {
+        func_name: func_name.to_string(),
+        target: Some(Box::new(namespace)),
+        args,
+    }))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::common::types::{self, CelInt, CelString};
+    use crate::{Context, Env, Value};
 
     #[test]
     fn is_assignable() {
@@ -440,5 +541,61 @@ mod tests {
         let a = Optional::of(Box::new(CelInt::from(1)));
         let b = CelInt::from(1);
         assert!(!a.equals(&b));
+    }
+
+    fn eval(source: &str) -> Result<Value, String> {
+        let env = Env::stdlib();
+        let expr = env
+            .parser()
+            .enable_optional_syntax(true)
+            .parse(source)
+            .map_err(|e| e.to_string())?;
+        let context = Context::with_env(Arc::new(env));
+        Value::resolve(&expr, &context).map_err(|e| e.to_string())
+    }
+
+    #[test]
+    fn opt_map_and_opt_flat_map_map_the_value_of_an_optional() {
+        for (source, want) in [
+            ("optional.of(42).optMap(y, y + 1).value()", Value::Int(43)),
+            (
+                "optional.none().optMap(y, y + 1).hasValue()",
+                Value::Bool(false),
+            ),
+            ("optional.of(0).optMap(y, y).hasValue()", Value::Bool(true)),
+            (
+                "{'k': {'s': 'v'}}.?k.optFlatMap(k, k.?s).value()",
+                Value::from("v"),
+            ),
+            (
+                "{'k': {}}.?k.optFlatMap(k, k.?s).hasValue()",
+                Value::Bool(false),
+            ),
+            ("{}.?k.optFlatMap(k, k.?s).hasValue()", Value::Bool(false)),
+            (
+                "optional.of(1).optFlatMap(x, optional.ofNonZeroValue(x - 1)).hasValue()",
+                Value::Bool(false),
+            ),
+        ] {
+            assert_eq!(eval(source), Ok(want), "{source}");
+        }
+    }
+
+    #[test]
+    fn opt_map_binds_a_variable_named_as_a_namespace() {
+        let source = "optional.of(3).optMap(optional, optional * 2).value()";
+        assert_eq!(eval(source), Ok(Value::Int(6)));
+    }
+
+    #[test]
+    fn opt_map_needs_a_simple_name() {
+        let err = eval("optional.of(1).optMap(1 + 1, 2)").unwrap_err();
+        assert!(err.contains("argument must be a simple name"), "{err}");
+    }
+
+    #[test]
+    fn opt_map_is_left_as_written_without_the_optional_library() {
+        let expr = Env::default().parser().parse("a.optMap(x, x)").unwrap();
+        assert!(matches!(expr.expr, Expr::Call(call) if call.func_name == "optMap"));
     }
 }
