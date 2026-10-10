@@ -10,7 +10,6 @@ mod bind {
     use dedent::dedent;
 
     // Test: boolean_literal
-    #[should_panic]
     #[test]
     fn boolean_literal() {
         run_test(&dedent!(
@@ -24,7 +23,6 @@ mod bind {
     }
 
     // Test: string_concat
-    #[should_panic]
     #[test]
     fn string_concat() {
         run_test(&dedent!(
@@ -38,7 +36,6 @@ mod bind {
     }
 
     // Test: bind_nested
-    #[should_panic]
     #[test]
     fn bind_nested() {
         run_test(&dedent!(
@@ -52,7 +49,6 @@ mod bind {
     }
 
     // Test: macro_exists
-    #[should_panic]
     #[test]
     fn macro_exists() {
         run_test(&dedent!(
@@ -66,7 +62,6 @@ mod bind {
     }
 
     // Test: macro_not_exists
-    #[should_panic]
     #[test]
     fn macro_not_exists() {
         run_test(&dedent!(
@@ -80,7 +75,6 @@ mod bind {
     }
 
     // Test: shadowing
-    #[should_panic]
     #[test]
     fn shadowing() {
         run_test(&dedent!(
@@ -106,7 +100,6 @@ mod bind {
     }
 
     // Test: shadowing_namespace_resolution
-    #[should_panic]
     #[test]
     fn shadowing_namespace_resolution() {
         run_test(&dedent!(
@@ -133,7 +126,6 @@ mod bind {
     }
 
     // Test: shadowing_namespace_resolution_selector
-    #[should_panic]
     #[test]
     fn shadowing_namespace_resolution_selector() {
         run_test(&dedent!(

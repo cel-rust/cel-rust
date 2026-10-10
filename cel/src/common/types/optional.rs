@@ -1,6 +1,4 @@
-use crate::common::ast::{
-    operators, CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr, LiteralValue,
-};
+use crate::common::ast::{operators, CallExpr, Expr, IdedExpr};
 use crate::common::traits::Zeroer;
 use crate::common::types::{self, CelBool, Type, OPTIONAL_TYPE};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
@@ -373,7 +371,7 @@ fn opt_map_macro(
     let has_value = member_call(helper, receiver, "hasValue");
     let receiver = ident(helper);
     let value = member_call(helper, receiver, "value");
-    let mapped = bind(helper, &var, value, mapping);
+    let mapped = helper.bind(&var, value, mapping);
     let some = if wrap {
         optional_call(helper, "of", vec![mapped])
     } else {
@@ -387,27 +385,9 @@ fn opt_map_macro(
     }));
 
     Ok(Some(match bound {
-        Some(target) => bind(helper, TARGET, target, result),
+        Some(target) => helper.bind(TARGET, target, result),
         None => result,
     }))
-}
-
-/// `var` bound to `init` in `result`: a comprehension over no elements, whose
-/// accumulator is `var`.
-fn bind(helper: &mut MacroExprHelper<'_>, var: &str, init: IdedExpr, result: IdedExpr) -> IdedExpr {
-    let iter_range = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
-    let loop_cond = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
-    let loop_step = helper.next_expr(Expr::Ident(var.to_string()));
-    helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-        iter_range,
-        iter_var: "#unused".to_string(),
-        iter_var2: None,
-        accu_var: var.to_string(),
-        accu_init: init,
-        loop_cond,
-        loop_step,
-        result,
-    })))
 }
 
 /// `<target>.<func_name>()`.
