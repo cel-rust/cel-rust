@@ -1,9 +1,11 @@
+mod bindings;
 #[cfg(feature = "ext_encoders")]
 mod encoders;
 mod lists;
 mod math;
 mod strings;
 
+pub use bindings::extension as bindings;
 #[cfg(feature = "ext_encoders")]
 pub use encoders::extension as encoders;
 pub use lists::extension as lists;

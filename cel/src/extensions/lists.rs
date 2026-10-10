@@ -2,7 +2,7 @@
 //! and the `sortBy` macro, following cel-go's `ext.Lists()`.
 
 use super::{arg, iterable};
-use crate::common::ast::{CallExpr, ComprehensionExpr, Expr, IdedExpr, ListExpr, LiteralValue};
+use crate::common::ast::{CallExpr, Expr, IdedExpr};
 use crate::common::types::{CelInt, CelList, Kind, INT_TYPE, LIST_TYPE};
 use crate::common::value::{CowVal, Val};
 use crate::parser::{map_macro_expander, Macro, MacroExprHelper, ParseError};
@@ -75,22 +75,13 @@ fn sort_by_macro(
         |helper: &mut MacroExprHelper<'_>| helper.next_expr(Expr::Ident(SORT_BY_INPUT.to_owned()));
     let mut mapped = Some(input(helper));
     let keys = map_macro_expander(helper, &mut mapped, args)?;
-    let sorted = Expr::Call(CallExpr {
+    let target = input(helper);
+    let sorted = helper.next_expr(Expr::Call(CallExpr {
         func_name: SORT_BY_KEYS.to_owned(),
-        target: Some(Box::new(input(helper))),
+        target: Some(Box::new(target)),
         args: vec![keys],
-    });
-    let bind = ComprehensionExpr {
-        iter_range: helper.next_expr(Expr::List(ListExpr::new(Vec::new()))),
-        iter_var: "#unused".to_owned(),
-        iter_var2: None,
-        accu_var: SORT_BY_INPUT.to_owned(),
-        accu_init: list,
-        loop_cond: helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into()))),
-        loop_step: input(helper),
-        result: helper.next_expr(sorted),
-    };
-    Ok(Some(helper.next_expr(Expr::Comprehension(Box::new(bind)))))
+    }));
+    Ok(Some(helper.bind(SORT_BY_INPUT, list, sorted)))
 }
 
 /// `args` as the `N` arguments of an overload.

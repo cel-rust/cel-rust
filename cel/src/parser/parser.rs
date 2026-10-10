@@ -1,7 +1,7 @@
 use crate::common::ast;
 use crate::common::ast::{
-    operators, CallExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr, LiteralValue,
-    MapEntryExpr, MapExpr, SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
+    operators, CallExpr, ComprehensionExpr, EntryExpr, Expr, IdedEntryExpr, IdedExpr, ListExpr,
+    LiteralValue, MapEntryExpr, MapExpr, SelectExpr, SourceInfo, StructExpr, StructFieldExpr,
 };
 use crate::parser::gen::{
     BoolFalseContext, BoolTrueContext, BytesContext, CELListener, CELParserContextType,
@@ -49,6 +49,24 @@ impl MacroExprHelper<'_> {
     /// the expanded call is.
     pub fn next_expr(&mut self, expr: Expr) -> IdedExpr {
         self.helper.next_expr_for(self.id, expr)
+    }
+
+    /// `var` bound to `init` in `result`: a comprehension over no elements,
+    /// whose accumulator is `var`, so only `init` and `result` are evaluated.
+    pub(crate) fn bind(&mut self, var: &str, init: IdedExpr, result: IdedExpr) -> IdedExpr {
+        let iter_range = self.next_expr(Expr::List(ListExpr::new(Vec::new())));
+        let loop_cond = self.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
+        let loop_step = self.next_expr(Expr::Ident(var.to_owned()));
+        self.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+            iter_range,
+            iter_var: "#unused".to_owned(),
+            iter_var2: None,
+            accu_var: var.to_owned(),
+            accu_init: init,
+            loop_cond,
+            loop_step,
+            result,
+        })))
     }
 
     /// An error for the expression `expr_id`, positioned where that expression

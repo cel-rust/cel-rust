@@ -28,6 +28,8 @@ pub fn run_test(simple_test_textproto: &str) {
     let mut env = Env::stdlib();
     env.set_container(&test.container)
         .expect("Invalid container name in conformance test");
+    env.add_extension(cel::extensions::bindings)
+        .expect("We need that extension to register");
     env.add_extension(cel::extensions::strings)
         .expect("We need that extension to register");
     env.add_extension(cel::extensions::encoders)

@@ -1,11 +1,3 @@
-bindings_ext::bind::bind_nested
-bindings_ext::bind::boolean_literal
-bindings_ext::bind::macro_exists
-bindings_ext::bind::macro_not_exists
-bindings_ext::bind::shadowing
-bindings_ext::bind::shadowing_namespace_resolution
-bindings_ext::bind::shadowing_namespace_resolution_selector
-bindings_ext::bind::string_concat
 block_ext::basic::adjacent_macros
 block_ext::basic::call
 block_ext::basic::inclusion_list
