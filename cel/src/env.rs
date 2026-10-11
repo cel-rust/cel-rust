@@ -1,6 +1,6 @@
 use crate::common::{
     decls::FunctionDecl,
-    functions::Function,
+    functions::{Function, Op},
     types::{self, Type},
     value::CowVal,
 };
@@ -299,6 +299,59 @@ impl Env {
         args: Vec<types::Type>,
         op: Function,
     ) -> Result<(), DeclarationError> {
+        self.declare_overload(name, id, args, Op::Function(op))
+    }
+
+    /// Adds a global function overload, as [`Env::add_overload`] does, that a
+    /// closure implements: one that can capture, say the settings of the
+    /// [`Library`] declaring it.
+    ///
+    /// Write the closure in the call, as below, or return it from a function
+    /// declared to return `impl for<'b, 'v> Fn(..) -> ..`: one bound to a
+    /// variable first isn't inferred to take arguments of any lifetimes.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value, common::types, common::value::CowVal};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// let factor = 3;
+    /// env.add_overload_with("scale", "scale_int", vec![types::INT_TYPE], move |args| {
+    ///     let val = args[0].downcast_ref::<types::CelInt>().unwrap();
+    ///     Ok(CowVal::owned(types::CelInt::from(val.inner() * factor)))
+    /// }).unwrap();
+    ///
+    /// let program = env.compile("scale(2)").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Int(6)));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Fails as [`Env::add_overload`] does.
+    pub fn add_overload_with<F>(
+        &mut self,
+        name: &str,
+        id: &str,
+        args: Vec<types::Type>,
+        op: F,
+    ) -> Result<(), DeclarationError>
+    where
+        F: for<'b, 'v> Fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError>
+            + Send
+            + Sync
+            + 'static,
+    {
+        self.declare_overload(name, id, args, Op::Closure(Box::new(op)))
+    }
+
+    fn declare_overload(
+        &mut self,
+        name: &str,
+        id: &str,
+        args: Vec<types::Type>,
+        op: Op,
+    ) -> Result<(), DeclarationError> {
         match self.functions.entry(name.to_owned()) {
             Vacant(vacant_entry) => {
                 let mut value = FunctionDecl::new(name);
@@ -322,11 +375,26 @@ impl Env {
     }
 
     /// Finds a global function overload that matches the given name and arguments.
+    ///
+    /// `None` as well when that overload is implemented by a closure, added
+    /// with [`Env::add_overload_with`]: it has no [`Function`] to return.
     pub fn find_overload(&self, name: &str, args: &[CowVal<'_, '_>]) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(false, args),
         }
+    }
+
+    /// The implementation of the overload a call of `name` with `args`
+    /// resolves to: a member overload's if `member_function`, with the target
+    /// as the first of `args`.
+    pub(crate) fn find_op(
+        &self,
+        name: &str,
+        member_function: bool,
+        args: &[CowVal<'_, '_>],
+    ) -> Option<&Op> {
+        self.functions.get(name)?.find_op(member_function, args)
     }
 
     pub(crate) fn has_overload(&self, name: &str) -> bool {
@@ -358,6 +426,7 @@ impl Env {
     ) -> Result<(), DeclarationError> {
         let mut args = args;
         args.insert(0, target);
+        let op = Op::Function(op);
         match self.functions.entry(name.to_owned()) {
             Vacant(vacant_entry) => {
                 let mut value = FunctionDecl::new(name);
@@ -370,18 +439,6 @@ impl Env {
                     .into_mut()
                     .add_overload(id.to_string(), true, args, op)
             }
-        }
-    }
-
-    /// Finds a member function overload that matches the given name and arguments.
-    pub(crate) fn find_member_overload(
-        &self,
-        name: &str,
-        args: &[CowVal<'_, '_>],
-    ) -> Option<Function> {
-        match self.functions.get(name) {
-            None => None,
-            Some(fn_decl) => fn_decl.find_overload(true, args),
         }
     }
 
@@ -1157,6 +1214,90 @@ mod tests {
         assert_eq!(env.add_library(extensions::Strings::default()), Ok(()));
         assert_eq!(env.add_extension(extensions::strings), Ok(()));
         assert!(env.has_member_overload("lowerAscii"));
+    }
+
+    /// A closure holds what it captured, and is called as a function is.
+    #[test]
+    fn an_overload_can_be_a_closure() {
+        use crate::common::types::CelInt;
+        use crate::{Context, Value};
+
+        fn scale(
+            factor: i64,
+        ) -> impl for<'b, 'v> Fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError>
+        {
+            move |args| {
+                let n = args[0].downcast_ref::<CelInt>().unwrap().inner();
+                Ok(CowVal::owned(CelInt::from(n * factor)))
+            }
+        }
+
+        let mut env = Env::stdlib();
+        for (name, factor) in [("twice", 2), ("a.thrice", 3)] {
+            assert_eq!(
+                env.add_overload_with(name, name, vec![types::INT_TYPE], scale(factor)),
+                Ok(())
+            );
+        }
+        assert!(env.has_namespace("a"));
+
+        let env = Arc::new(env);
+        for (expr, expected) in [("twice(4)", 8), ("a.thrice(4)", 12)] {
+            let program = env.compile(expr).unwrap();
+            let context = Context::with_env(env.clone());
+            assert_eq!(program.execute(&context), Ok(Value::Int(expected)));
+        }
+    }
+
+    /// A closure and a function are overloads alike: neither's id, nor
+    /// signature, can be another's.
+    #[test]
+    fn add_overload_with_rejects_a_duplicate_id_or_signature() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload_with("f", "f_int", vec![types::STRING_TYPE], noop),
+            Err(duplicate("f", "f_int"))
+        );
+        assert_eq!(
+            env.add_overload_with("f", "other_id", vec![types::INT_TYPE], noop),
+            Err(duplicate("f", "other_id"))
+        );
+        assert_eq!(
+            env.add_overload_with("f", "f_string", vec![types::STRING_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("f", "f_string", vec![types::BOOL_TYPE], noop),
+            Err(duplicate("f", "f_string"))
+        );
+    }
+
+    /// A closure isn't a [`Function`]: `find_overload` has none to hand out
+    /// for the overload, which a call still resolves to.
+    #[test]
+    fn find_overload_only_finds_the_functions() {
+        use crate::common::types::{CelInt, CelString};
+
+        let mut env = Env::default();
+        env.add_overload("f", "f_int", vec![types::INT_TYPE], noop)
+            .unwrap();
+        env.add_overload_with("f", "f_string", vec![types::STRING_TYPE], noop)
+            .unwrap();
+
+        let int = || vec![CowVal::owned(CelInt::from(1))];
+        let string = || vec![CowVal::owned(CelString::from("a"))];
+        assert!(env.find_overload("f", &int()).is_some());
+        assert!(env.find_overload("f", &string()).is_none());
+        for args in [int, string] {
+            let op = env.find_op("f", false, &args()).unwrap();
+            assert!(op.call(args()).is_ok());
+            assert!(env.find_op("f", true, &args()).is_none());
+        }
+        assert!(env.find_op("g", false, &int()).is_none());
     }
 
     #[test]

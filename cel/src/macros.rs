@@ -680,8 +680,7 @@ mod tests {
         env.find_overload(name, &string_args(arity)).is_some()
     }
     fn member_name_registered(env: &Env, name: &str, arity: usize) -> bool {
-        env.find_member_overload(name, &string_args(arity))
-            .is_some()
+        env.find_op(name, true, &string_args(arity)).is_some()
     }
 
     #[test]
@@ -1038,16 +1037,16 @@ mod tests {
         let mut env = Env::default();
         crate::add_member_overload!(env, fn ping2: (CelString, CelString) -> CelInt).unwrap();
         let wrapper = env
-            .find_member_overload("ping2", &[string_arg(), string_arg()])
+            .find_op("ping2", true, &[string_arg(), string_arg()])
             .unwrap();
 
         assert_eq!(
-            wrapper(vec![string_arg()]).err(),
+            wrapper.call(vec![string_arg()]).err(),
             Some(ExecutionError::invalid_argument_count(2, 1)),
         );
         let int: Box<dyn Val> = Box::new(CelInt::from(1));
         assert_eq!(
-            wrapper(vec![CowVal::Owned(int), string_arg()]).err(),
+            wrapper.call(vec![CowVal::Owned(int), string_arg()]).err(),
             Some(unexpected(
                 types::INT_TYPE.name(),
                 types::STRING_TYPE.name()

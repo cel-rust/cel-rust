@@ -24,8 +24,9 @@ use crate::{DeclarationError, Env, ExecutionError};
 /// adding it again changes nothing.
 ///
 /// A library holds its settings, if it has any, and reads them as it
-/// registers: what it declares can depend on them. An overload itself is a
-/// plain [`fn`](crate::common::functions::Function), which captures nothing.
+/// registers: what it declares can depend on them, and an overload that
+/// needs them when it is called captures them, as a closure added with
+/// [`Env::add_overload_with`]. [`Lists`] does so.
 ///
 /// # Example
 ///

@@ -1349,8 +1349,8 @@ impl Value {
                         }
                         let target = Value::resolve_val(target_expr, ctx)?;
                         args.insert(0, target);
-                        if let Some(op) = ctx.env().find_member_overload(&call.func_name, &args) {
-                            return op(args);
+                        if let Some(op) = ctx.env().find_op(&call.func_name, true, &args) {
+                            return op.call(args);
                         }
                         let func = match ctx.get_function(&call.func_name) {
                             Some(func) => func,
@@ -1746,8 +1746,8 @@ fn call_function<'e, 'p, 'v>(
     ftx_name: &'e str,
     args: Vec<CowVal<'e, 'v>>,
 ) -> Result<CowVal<'e, 'v>, ExecutionError> {
-    if let Some(op) = ctx.env().find_overload(name, &args) {
-        return op(args);
+    if let Some(op) = ctx.env().find_op(name, false, &args) {
+        return op.call(args);
     }
     let func = match ctx.get_function(name) {
         Some(func) => func,
