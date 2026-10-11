@@ -2565,6 +2565,20 @@ mod tests {
         );
     }
 
+    /// As in cel-go, a list is only added to a list: a map is iterable too,
+    /// over its keys, but those aren't appended.
+    #[test]
+    fn test_invalid_add_of_a_map_to_a_list() {
+        test_execution_error(
+            "[1] + {2: 3}",
+            ExecutionError::UnsupportedBinaryOperator(
+                "add",
+                vec![1i64].into(),
+                HashMap::from([(2i64, 3i64)]).into(),
+            ),
+        );
+    }
+
     #[test]
     fn test_invalid_div() {
         test_execution_error(
