@@ -10,7 +10,7 @@ use std::ops::Deref;
 ///
 /// Of type [`LIST_TYPE`](super::LIST_TYPE), `list(dyn)`, whatever its
 /// elements, which can be values of any type. It supports `+` with any
-/// [`Iterable`] on the right, `in` (an element [equals](Val::equals) the
+/// `list` on the right, `in` (an element [equals](Val::equals) the
 /// value), `[i]` with an `int`, `uint` or whole `double` index, `size()`, and
 /// the comprehensions, which iterate over its elements in order. Two lists
 /// are equal when their elements are, pairwise.
@@ -130,8 +130,10 @@ impl<'v> Adder for DefaultList<'v> {
     where
         Self: 'w,
     {
+        // Only a list is added to a list: a map is iterable too, over its keys.
         let mut rhs = rhs
             .as_iterable()
+            .filter(|_| rhs.get_type().kind() == Kind::List)
             .ok_or_else(|| ExecutionError::unsupported_binary_operator("add", self, rhs))?
             .iter();
         let mut list: Vec<Box<dyn Val + 'w>> = self.0.iter().map(|i| i.clone_as_boxed()).collect();
@@ -371,7 +373,7 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 
 #[cfg(test)]
 pub mod tests {
-    use crate::common::traits::Indexer;
+    use crate::common::traits::{self, Adder, Indexer, Iterable};
     use crate::common::types::list::DefaultList;
     use crate::common::types::{self, CelDouble, CelInt, CelString, CelUInt, Type};
     use crate::common::value::{CowVal, Val};
@@ -521,6 +523,62 @@ pub mod tests {
 
     fn box_val<'v, V: Val + 'v>(v: V) -> Box<dyn Val + 'v> {
         Box::new(v)
+    }
+
+    /// `+` takes any `list` on its right, not just a [`DefaultList`]: it
+    /// reaches the elements through [`Iterable`].
+    #[test]
+    fn add_takes_a_list_that_is_not_a_default_list() {
+        #[derive(Debug, Clone)]
+        struct Ints(Vec<CelInt>);
+
+        struct IntsIter<'b>(std::slice::Iter<'b, CelInt>);
+
+        impl<'b, 'v> traits::Iterator<'b, 'v> for IntsIter<'b> {
+            fn next(&mut self) -> Option<&'b (dyn Val + 'v)> {
+                self.0.next().map(|i| i as &dyn Val)
+            }
+        }
+
+        impl Iterable for Ints {
+            fn iter<'b, 'v>(&'b self) -> Box<dyn traits::Iterator<'b, 'v> + 'b>
+            where
+                Self: 'v,
+            {
+                Box::new(IntsIter(self.0.iter()))
+            }
+        }
+
+        impl Val for Ints {
+            fn get_type(&self) -> &Type {
+                &types::LIST_TYPE
+            }
+
+            fn cel_type() -> &'static Type {
+                &types::LIST_TYPE
+            }
+
+            fn as_iterable<'b, 'v>(&'b self) -> Option<&'b (dyn Iterable + 'v)>
+            where
+                Self: 'v,
+            {
+                Some(self)
+            }
+
+            fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                Box::new(self.clone())
+            }
+        }
+
+        let list = DefaultList::from(vec![box_val(CelInt::from(1i64))]);
+        let expected = DefaultList::from(vec![
+            box_val(CelInt::from(1i64)),
+            box_val(CelInt::from(2i64)),
+        ]);
+        assert_eq!(
+            Adder::add(&list, &Ints(vec![CelInt::from(2i64)])),
+            Ok(CowVal::owned(expected))
+        );
     }
 
     #[test]

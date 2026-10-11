@@ -235,9 +235,9 @@ pub trait Divider {
 /// yields its keys, in no particular order. The interpreter clones each
 /// element into the loop variable.
 ///
-/// The `+` of a `list` also takes any `Iterable` on its right. And functions
-/// that take a `list` reach its elements through it: those of the lists
-/// extension, `join` and `format` of the strings extension, and
+/// The `+` of a `list` takes any `list` on its right, and reaches its
+/// elements through it. So do the functions that take a `list`: those of the
+/// lists extension, `join` and `format` of the strings extension, and
 /// `math.greatest` and `math.least` given a list. So any value whose
 /// [type](Val::get_type) is `list` gets them by implementing `Iterable`.
 pub trait Iterable {
