@@ -5,16 +5,79 @@ mod lists;
 mod math;
 mod strings;
 
-pub use bindings::extension as bindings;
+pub use bindings::{extension as bindings, Bindings};
 #[cfg(feature = "ext_encoders")]
-pub use encoders::extension as encoders;
-pub use lists::extension as lists;
-pub use math::extension as math;
-pub use strings::extension as strings;
+pub use encoders::{extension as encoders, Encoders};
+pub use lists::{extension as lists, Lists};
+pub use math::{extension as math, Math};
+pub use strings::{extension as strings, Strings};
 
 use crate::common::traits::Iterable;
 use crate::common::value::{FromVal, Val};
-use crate::ExecutionError;
+use crate::{DeclarationError, Env, ExecutionError};
+
+/// A library of types, overloads and macros, added to an [`Env`] with
+/// [`Env::add_library`]: the extensions of this module, such as [`Strings`],
+/// are libraries.
+///
+/// A library with a [name](Library::name) is added once to an environment:
+/// adding it again changes nothing.
+///
+/// A library holds its settings, if it has any, and reads them as it
+/// registers: what it declares can depend on them. An overload itself is a
+/// plain [`fn`](crate::common::functions::Function), which captures nothing.
+///
+/// # Example
+///
+/// ```
+/// use cel::common::types::{CelBool, CelString};
+/// use cel::{Context, DeclarationError, Env, Library, Value};
+/// use std::sync::Arc;
+///
+/// struct Emptiness;
+///
+/// fn is_empty(this: &CelString<'_>) -> CelBool {
+///     CelBool::from(this.inner().is_empty())
+/// }
+///
+/// impl Library for Emptiness {
+///     fn name(&self) -> Option<&str> {
+///         Some("acme.lib.emptiness")
+///     }
+///
+///     fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+///         cel::add_member_overload!(env, fn is_empty: (CelString) -> CelBool)
+///     }
+/// }
+///
+/// let mut env = Env::stdlib();
+/// assert_eq!(env.add_library(Emptiness), Ok(()));
+/// assert_eq!(env.add_library(Emptiness), Ok(()));
+/// assert!(env.has_library("acme.lib.emptiness"));
+///
+/// let program = env.compile("''.isEmpty()").unwrap();
+/// let context = Context::with_env(Arc::new(env));
+/// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
+/// ```
+pub trait Library {
+    /// The name this library is added under, once: a library of a name
+    /// already added to an [`Env`] is not registered, whatever its settings,
+    /// so the first one added stays. `None`, the default, for a library
+    /// registered every time it is added.
+    ///
+    /// Names are qualified, as cel-go's are: `cel.lib.ext.strings`.
+    fn name(&self) -> Option<&str> {
+        None
+    }
+
+    /// Registers the types, overloads and macros of this library on `env`.
+    ///
+    /// # Errors
+    ///
+    /// Fails with the [`DeclarationError`] of what `env` rejects, e.g. an
+    /// overload it already declares.
+    fn register(&self, env: &mut Env) -> Result<(), DeclarationError>;
+}
 
 /// `list` as an iterable, for an overload that takes any `list`, not just a
 /// `CelList`.

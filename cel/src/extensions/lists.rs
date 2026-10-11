@@ -6,7 +6,7 @@ use crate::common::ast::{CallExpr, Expr, IdedExpr};
 use crate::common::types::{CelInt, CelList, Kind, INT_TYPE, LIST_TYPE};
 use crate::common::value::{CowVal, Val};
 use crate::parser::{map_macro_expander, Macro, MacroExprHelper, ParseError};
-use crate::{DeclarationError, Env, ExecutionError};
+use crate::{DeclarationError, Env, ExecutionError, Library};
 use std::cmp::Ordering;
 
 /// The most elements `lists.range` creates, cel-go's default.
@@ -18,42 +18,58 @@ const SORT_BY_INPUT: &str = "@__sortBy_input__";
 /// The overload `sortBy` expands to: named so that CEL can't call it.
 const SORT_BY_KEYS: &str = "@sortByAssociatedKeys";
 
-/// Registers the lists extension's overloads, and its `sortBy` macro, on
-/// `env`.
+/// Adds the lists extension library to `env`: [`Lists`], with its default
+/// settings.
+pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
+    env.add_library(Lists::default())
+}
+
+/// The lists extension library, `cel.lib.ext.lists`: registers its overloads,
+/// and its `sortBy` macro, on the [`Env`] it is added to.
 ///
 /// `sortBy` is only expanded by [`Env::compile`] and [`Env::parser`], not by
 /// [`Program::compile`](crate::Program::compile).
-pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    // Registered by hand, as the macro would downcast the receiver to a
-    // `CelList`: these take any `list`, like the stdlib's list overloads.
-    env.add_member_overload(
-        "slice",
-        "list.slice(int,int)",
-        LIST_TYPE,
-        vec![INT_TYPE, INT_TYPE],
-        slice,
-    )?;
-    env.add_member_overload("flatten", "list.flatten()", LIST_TYPE, vec![], flatten)?;
-    env.add_member_overload(
-        "flatten",
-        "list.flatten(int)",
-        LIST_TYPE,
-        vec![INT_TYPE],
-        flatten_depth,
-    )?;
-    env.add_member_overload("distinct", "list.distinct()", LIST_TYPE, vec![], distinct)?;
-    env.add_member_overload("reverse", "list.reverse()", LIST_TYPE, vec![], reverse)?;
-    env.add_member_overload("sort", "list.sort()", LIST_TYPE, vec![], sort)?;
-    env.add_member_overload(
-        SORT_BY_KEYS,
-        "list.@sortByAssociatedKeys(list)",
-        LIST_TYPE,
-        vec![LIST_TYPE],
-        sort_by_associated_keys,
-    )?;
-    crate::add_overload!(env, fn range: (CelInt) -> Result<CelList>, name = "lists.range")?;
-    env.add_macro(Macro::receiver("sortBy", 2, sort_by_macro))?;
-    Ok(())
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct Lists {}
+
+impl Library for Lists {
+    fn name(&self) -> Option<&str> {
+        Some("cel.lib.ext.lists")
+    }
+
+    fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+        // Registered by hand, as the macro would downcast the receiver to a
+        // `CelList`: these take any `list`, like the stdlib's list overloads.
+        env.add_member_overload(
+            "slice",
+            "list.slice(int,int)",
+            LIST_TYPE,
+            vec![INT_TYPE, INT_TYPE],
+            slice,
+        )?;
+        env.add_member_overload("flatten", "list.flatten()", LIST_TYPE, vec![], flatten)?;
+        env.add_member_overload(
+            "flatten",
+            "list.flatten(int)",
+            LIST_TYPE,
+            vec![INT_TYPE],
+            flatten_depth,
+        )?;
+        env.add_member_overload("distinct", "list.distinct()", LIST_TYPE, vec![], distinct)?;
+        env.add_member_overload("reverse", "list.reverse()", LIST_TYPE, vec![], reverse)?;
+        env.add_member_overload("sort", "list.sort()", LIST_TYPE, vec![], sort)?;
+        env.add_member_overload(
+            SORT_BY_KEYS,
+            "list.@sortByAssociatedKeys(list)",
+            LIST_TYPE,
+            vec![LIST_TYPE],
+            sort_by_associated_keys,
+        )?;
+        crate::add_overload!(env, fn range: (CelInt) -> Result<CelList>, name = "lists.range")?;
+        env.add_macro(Macro::receiver("sortBy", 2, sort_by_macro))?;
+        Ok(())
+    }
 }
 
 /// Expands `list.sortBy(e, key)`, as cel-go does, into
@@ -315,19 +331,18 @@ fn range(n: &CelInt) -> Result<CelList<'static>, ExecutionError> {
 mod tests {
     use crate::common::types::{CelInt, CelString};
     use crate::extensions::tests::OtherList;
-    use crate::{Context, DeclarationError, Env, ExecutionError, Value};
+    use crate::{Context, Env, ExecutionError, Value};
     use std::sync::Arc;
 
     #[test]
-    fn registering_twice_is_an_error() {
+    fn adding_it_twice_registers_it_once() {
         let mut env = Env::stdlib();
         assert_eq!(env.add_extension(crate::extensions::lists), Ok(()));
+        assert_eq!(env.add_extension(crate::extensions::lists), Ok(()));
+        let ctx = Context::with_env(Arc::new(env));
         assert_eq!(
-            env.add_extension(crate::extensions::lists),
-            Err(DeclarationError::duplicate_overload(
-                "slice",
-                "list.slice(int,int)"
-            ))
+            eval_in(&ctx, "[1, 3, 2].sortBy(e, -e)"),
+            Ok(vec![3, 2, 1].into())
         );
     }
 

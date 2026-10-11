@@ -2,7 +2,7 @@
 //! following cel-go's `ext.Encoders()`.
 
 use crate::common::types::{CelBytes, CelString};
-use crate::{DeclarationError, Env, ExecutionError};
+use crate::{DeclarationError, Env, ExecutionError, Library};
 use base64::alphabet;
 use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use base64::prelude::*;
@@ -17,11 +17,28 @@ const DECODER: GeneralPurpose = GeneralPurpose::new(
         .with_decode_allow_trailing_bits(true),
 );
 
-/// Registers the encoders extension's overloads on `env`.
+/// Adds the encoders extension library to `env`: [`Encoders`], with its default
+/// settings.
 pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    crate::add_overload!(env, fn encode: (CelBytes) -> CelString, name = "base64.encode")?;
-    crate::add_overload!(env, fn decode: (CelString) -> Result<CelBytes>, name = "base64.decode")?;
-    Ok(())
+    env.add_library(Encoders::default())
+}
+
+/// The encoders extension library, `cel.lib.ext.encoders`: registers its
+/// overloads on the [`Env`] it is added to.
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct Encoders {}
+
+impl Library for Encoders {
+    fn name(&self) -> Option<&str> {
+        Some("cel.lib.ext.encoders")
+    }
+
+    fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+        crate::add_overload!(env, fn encode: (CelBytes) -> CelString, name = "base64.encode")?;
+        crate::add_overload!(env, fn decode: (CelString) -> Result<CelBytes>, name = "base64.decode")?;
+        Ok(())
+    }
 }
 
 fn encode(this: &CelBytes<'_>) -> CelString<'static> {
