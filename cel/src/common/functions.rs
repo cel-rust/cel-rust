@@ -29,8 +29,11 @@ pub struct Overload {
 pub type Function = for<'b, 'v> fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError>;
 
 /// A closure implementing an overload, as a [`Function`] does.
-pub(crate) type Closure =
-    dyn for<'b, 'v> Fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> + Send + Sync;
+pub(crate) type Closure = dyn for<'b, 'v> Fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError>
+    + Send
+    + Sync
+    + std::panic::UnwindSafe
+    + std::panic::RefUnwindSafe;
 
 /// The implementation of an overload: a [`Function`], or a closure, which
 /// holds what it captured.

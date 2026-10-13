@@ -340,6 +340,8 @@ impl Env {
         F: for<'b, 'v> Fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError>
             + Send
             + Sync
+            + std::panic::UnwindSafe
+            + std::panic::RefUnwindSafe
             + 'static,
     {
         self.declare_overload(name, id, args, Op::Closure(Box::new(op)))
