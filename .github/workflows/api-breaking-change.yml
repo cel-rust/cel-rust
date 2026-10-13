@@ -1,0 +1,39 @@
+name: API Breaking Change Detection
+
+on:
+  pull_request:
+    branches: ["master"]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  semver-check:
+    name: Semver Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Check for breaking API changes
+        id: semver
+        uses: obi1kenobi/cargo-semver-checks-action@v2
+        with:
+          package: cel
+          feature-group: all-features
+        continue-on-error: true
+
+      - name: Label PR as API-breaking
+        if: steps.semver.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh pr edit "${{ github.event.pull_request.number }}" --add-label "api/bump-version"
+
+      - name: Remove API-breaking label
+        if: steps.semver.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        # Ignore failure: the label may not be present on the PR.
+        run: gh pr edit "${{ github.event.pull_request.number }}" --remove-label "api/bump-version" 2>/dev/null || true
