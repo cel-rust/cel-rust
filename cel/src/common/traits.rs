@@ -200,14 +200,15 @@ pub trait Comparer {
 /// operand.
 ///
 /// A `list` contains the values one of its elements [equals](Val::equals); a
-/// `map` contains its keys.
+/// `map` contains its keys. A value that can't be a key, such as a `list`, is
+/// in no `map`.
 pub trait Container {
     /// Returns whether `value` is in `self`.
     ///
     /// # Errors
     ///
-    /// Fails when `value` can't be looked up in `self`, such as a `list` used
-    /// as a map key.
+    /// Fails when `value` can't be looked up in `self`. The built-in
+    /// containers never do.
     fn contains(&self, _value: &dyn Val) -> Result<bool, ExecutionError>;
 }
 
@@ -355,7 +356,9 @@ pub trait Zeroer {
 ///   succeeds, and `false` if it fails with [`ExecutionError::NoSuchKey`].
 ///   Any other error is the result of `has()`.
 /// * `a.?f` and `a[?i]`, of the optional syntax, yield `optional.of` the value
-///   [`get`](Self::get) returns, and `optional.none()` when it fails.
+///   [`get`](Self::get) returns, and `optional.none()` when it fails with
+///   [`ExecutionError::NoSuchKey`] or [`ExecutionError::IndexOutOfBounds`].
+///   Any other error is the result of the access.
 ///
 /// A struct-like value that reports a missing field with
 /// [`ExecutionError::no_such_key`] therefore supports `has()` with no further

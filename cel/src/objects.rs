@@ -1110,10 +1110,7 @@ impl Value {
                                     )
                                 });
                             return if is_optional {
-                                Ok(CowVal::owned(match result {
-                                    Ok(val) => CelOptional::of(val.into_owned()),
-                                    Err(_) => CelOptional::none(),
-                                }))
+                                into_optional(result)
                             } else {
                                 result
                             };
@@ -1141,13 +1138,9 @@ impl Value {
                                 Unwrapped::NotOptional(v) | Unwrapped::Some(v) => v,
                                 Unwrapped::None => return Ok(CowVal::owned(CelOptional::none())),
                             };
-                            let result = match index_into(target, field, "_?._", |value| {
+                            return into_optional(index_into(target, field, "_?._", |value| {
                                 ExecutionError::overload_for_values("_?._", [value, field], false)
-                            }) {
-                                Ok(v) => CelOptional::of(v.into_owned()),
-                                Err(_) => CelOptional::none(),
-                            };
-                            return Ok(CowVal::owned(result));
+                            }));
                         }
                         // END OF SPECIAL CASES
 
@@ -1806,37 +1799,20 @@ fn select_field<'b, 'v>(
         // `conformance/conformance_test.go:87`).
         Unwrapped::Some(inner) => {
             return if test {
-                let has = inner
-                    .as_indexer()
-                    .ok_or_else(no_such_key)?
-                    .get(&key)
-                    .is_ok();
-                Ok(bool(has))
+                has_field(inner.as_ref(), &key, no_such_key).map(bool)
             } else {
                 // a non-container operand is an error, a missing
                 // key maps to `optional.none()`
                 if inner.as_indexer().is_none() {
                     return Err(no_such_key());
                 }
-                Ok(CowVal::owned(
-                    match index_into(inner, &key, "_._", |_| no_such_key()) {
-                        Ok(v) => CelOptional::of(v.into_owned()),
-                        Err(_) => CelOptional::none(),
-                    },
-                ))
+                into_optional(index_into(inner, &key, "_._", |_| no_such_key()))
             };
         }
     };
 
     if test {
-        let indexer = left
-            .as_indexer()
-            .ok_or_else(|| overload_error(left.as_ref()))?;
-        match indexer.get(&key) {
-            Ok(_) => Ok(bool(true)),
-            Err(ExecutionError::NoSuchKey(_)) => Ok(bool(false)),
-            Err(error) => Err(error.with_lazy_overload_context(|| overload_error(left.as_ref()))),
-        }
+        has_field(left.as_ref(), &key, || overload_error(left.as_ref())).map(bool)
     } else {
         let is_map = left.get_type().kind() == Kind::Map;
         index_into(left, &key, "_._", |value| {
@@ -1846,6 +1822,40 @@ fn select_field<'b, 'v>(
                 overload_error(value)
             }
         })
+    }
+}
+
+/// `has(value.field)`: whether `value` has something at `field`. Only a
+/// missing key says it doesn't: any other failure is the result, reported as
+/// `value` having no overload for the selection. `no_fields` is the error when
+/// `value` can't be indexed at all.
+fn has_field(
+    value: &dyn Val,
+    field: &CelString,
+    no_fields: impl FnOnce() -> ExecutionError,
+) -> Result<bool, ExecutionError> {
+    match value.as_indexer().ok_or_else(no_fields)?.get(field) {
+        Ok(_) => Ok(true),
+        Err(ExecutionError::NoSuchKey(_)) => Ok(false),
+        Err(error) => Err(error.with_lazy_overload_context(|| {
+            ExecutionError::overload_for_values("_._", [value, field], false)
+        })),
+    }
+}
+
+/// The result of an optional access, `a.?b` or `a[?b]`, given that of the
+/// plain one: `optional.none()` when there is nothing at `b`, which a missing
+/// key and an index out of bounds say. Any other failure stays one, as in
+/// cel-go: `a` can't be indexed with `b` at all.
+fn into_optional<'b, 'v>(
+    result: Result<CowVal<'b, 'v>, ExecutionError>,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    match result {
+        Ok(value) => Ok(CowVal::owned(CelOptional::of(value.into_owned()))),
+        Err(ExecutionError::NoSuchKey(_) | ExecutionError::IndexOutOfBounds(_)) => {
+            Ok(CowVal::owned(CelOptional::none()))
+        }
+        Err(error) => Err(error),
     }
 }
 
@@ -2220,6 +2230,21 @@ mod tests {
             "{1: 'a', 1u: 'a'} == {1: 'a', 2u: 'a'} && {1: 'a', 2u: 'a'} != {1: 'a', 1u: 'a'}",
         ] {
             assert_eq!(eval(expr), Ok(true.into()), "{expr}");
+        }
+    }
+
+    /// As in cel-go, a value that can't be a map key is in no map, rather than an error.
+    #[test]
+    fn test_value_that_cannot_be_a_key_is_not_in_a_map() {
+        let context = Context::default();
+        for expr in [
+            "[1] in {1: 2}",
+            "null in {1: 2}",
+            "{1: 2} in {1: 2}",
+            "[1] in {}",
+        ] {
+            let value = Program::compile(expr).unwrap().execute(&context);
+            assert_eq!(value, Ok(false.into()), "{expr}");
         }
     }
 
@@ -4029,6 +4054,55 @@ mod tests {
                     map: Arc::from(HashMap::new())
                 }))
             );
+        }
+
+        /// An optional access is `optional.none()` when there is nothing at
+        /// the key, index or field. As in cel-go, it still fails on a value
+        /// that can't be indexed that way.
+        #[test]
+        fn test_optional_access_of_what_cannot_be_indexed() {
+            let eval = |expr: &str| {
+                let expr = Parser::default()
+                    .enable_optional_syntax(true)
+                    .parse(expr)
+                    .expect("Must parse");
+                Value::resolve(&expr, &Context::default())
+            };
+
+            for expr in [
+                "{'a': 1}.?b",
+                "{1: 2}.?a",
+                "{'a': 1}[?'b']",
+                "{1: 2}[?1.5]",
+                "[1][?5]",
+                "[1][?-1]",
+                "optional.of({'a': 1}).b",
+            ] {
+                assert_eq!(
+                    eval(expr),
+                    Ok(Value::Opaque(Arc::new(OptionalValue::none()))),
+                    "{expr}"
+                );
+            }
+            assert_eq!(eval("has(optional.of({'a': 1}).b)"), Ok(false.into()));
+
+            for (expr, function, types) in [
+                ("[1].?a", "_?._", ["list", "string"]),
+                ("'s'.?a", "_?._", ["string", "string"]),
+                ("[1][?'a']", "_[?_]", ["list", "string"]),
+                ("{1: 2}[?[1]]", "_[?_]", ["map", "list"]),
+                ("{1: 2}[?null]", "_[?_]", ["map", "null_type"]),
+                ("optional.of({1: 2})[[1]]", "_[_]", ["map", "list"]),
+                ("optional.of([1]).a", "_._", ["list", "string"]),
+                ("has(optional.of([1]).a)", "_._", ["list", "string"]),
+            ] {
+                let types = types.map(str::to_owned).to_vec();
+                assert_eq!(
+                    eval(expr),
+                    Err(ExecutionError::no_such_overload(function, types)),
+                    "{expr}"
+                );
+            }
         }
 
         /// A comprehension binds a copy of each element to its variable: a copy

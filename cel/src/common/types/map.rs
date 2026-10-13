@@ -231,13 +231,8 @@ impl<'v> DefaultMap<'v> {
 
 impl Container for DefaultMap<'_> {
     fn contains(&self, key: &dyn Val) -> Result<bool, ExecutionError> {
-        if self.find(key).is_some() {
-            Ok(true)
-        } else if is_lookup_key(key) {
-            Ok(false)
-        } else {
-            Err(unsupported_key(key))
-        }
+        // As in cel-go, a value that can't be a key is not in the map, rather than an error.
+        Ok(self.find(key).is_some())
     }
 }
 
