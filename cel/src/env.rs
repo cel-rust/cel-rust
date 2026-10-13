@@ -1,6 +1,6 @@
 use crate::common::{
     decls::FunctionDecl,
-    functions::Function,
+    functions::{Function, Op},
     types::{self, Type},
     value::CowVal,
 };
@@ -8,7 +8,7 @@ use crate::container::Container;
 use crate::parser::{Macro, Macros, Parser};
 use crate::registry::{TypeDecl, TypeRegistry};
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
-use crate::{DeclarationError, ParseErrors, Program};
+use crate::{DeclarationError, Library, ParseErrors, Program};
 use std::collections::{
     btree_map::Entry::{Occupied, Vacant},
     BTreeMap, BTreeSet,
@@ -59,7 +59,14 @@ pub struct Env {
     error_on_duplicate_map_keys: bool,
     optional: bool,
     container: Container,
+    libraries: BTreeSet<String>,
 }
+
+/// The name the standard library is added under, as in cel-go.
+const STANDARD_LIBRARY: &str = "cel.lib.std";
+
+/// The name the `optional` library is added under, as in cel-go.
+const OPTIONAL_LIBRARY: &str = "cel.lib.optional";
 
 impl Default for Env {
     fn default() -> Self {
@@ -71,6 +78,7 @@ impl Default for Env {
             error_on_duplicate_map_keys: true,
             optional: true,
             container: Container::default(),
+            libraries: BTreeSet::new(),
         }
     }
 }
@@ -100,10 +108,14 @@ impl Env {
     /// environment supports optional values, as it does by default: see
     /// [`Env::with_optional_support`].
     ///
+    /// They are added as the libraries `cel.lib.std` and `cel.lib.optional`,
+    /// see [`Env::has_library`], once each: calling this on an
+    /// [`Env::stdlib`], or twice, registers nothing again.
+    ///
     /// # Panics
     ///
-    /// Panics if one of the standard overloads is already declared, as when
-    /// called on an [`Env::stdlib`] or twice, or if another type is already
+    /// Panics if one of the standard overloads was declared some other way,
+    /// as with [`Env::add_overload`], or if another type is already
     /// registered under one of the standard types' names.
     ///
     /// # Example
@@ -118,25 +130,27 @@ impl Env {
     /// assert_eq!(program.execute(&context), Ok(Value::Bool(true)));
     /// ```
     pub fn with_stdlib(mut self) -> Self {
-        types::bool::stdlib(&mut self);
-        types::bytes::stdlib(&mut self);
-        types::double::stdlib(&mut self);
-        types::r#dyn::stdlib(&mut self);
-        types::int::stdlib(&mut self);
-        types::list::stdlib(&mut self);
-        types::map::stdlib(&mut self);
-        types::null::stdlib(&mut self);
-        if self.optional {
-            types::optional::stdlib(&mut self);
-        }
-        types::string::stdlib(&mut self);
-        types::type_val::stdlib(&mut self);
-        types::uint::stdlib(&mut self);
+        if self.libraries.insert(STANDARD_LIBRARY.to_owned()) {
+            types::bool::stdlib(&mut self);
+            types::bytes::stdlib(&mut self);
+            types::double::stdlib(&mut self);
+            types::r#dyn::stdlib(&mut self);
+            types::int::stdlib(&mut self);
+            types::list::stdlib(&mut self);
+            types::map::stdlib(&mut self);
+            types::null::stdlib(&mut self);
+            types::string::stdlib(&mut self);
+            types::type_val::stdlib(&mut self);
+            types::uint::stdlib(&mut self);
 
-        #[cfg(feature = "chrono")]
-        {
-            types::duration::stdlib(&mut self);
-            types::timestamp::stdlib(&mut self);
+            #[cfg(feature = "chrono")]
+            {
+                types::duration::stdlib(&mut self);
+                types::timestamp::stdlib(&mut self);
+            }
+        }
+        if self.optional && self.libraries.insert(OPTIONAL_LIBRARY.to_owned()) {
+            types::optional::stdlib(&mut self);
         }
         self
     }
@@ -285,6 +299,61 @@ impl Env {
         args: Vec<types::Type>,
         op: Function,
     ) -> Result<(), DeclarationError> {
+        self.declare_overload(name, id, args, Op::Function(op))
+    }
+
+    /// Adds a global function overload, as [`Env::add_overload`] does, that a
+    /// closure implements: one that can capture, say the settings of the
+    /// [`Library`] declaring it.
+    ///
+    /// Write the closure in the call, as below, or return it from a function
+    /// declared to return `impl for<'b, 'v> Fn(..) -> ..`: one bound to a
+    /// variable first isn't inferred to take arguments of any lifetimes.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value, common::types, common::value::CowVal};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// let factor = 3;
+    /// env.add_overload_with("scale", "scale_int", vec![types::INT_TYPE], move |args| {
+    ///     let val = args[0].downcast_ref::<types::CelInt>().unwrap();
+    ///     Ok(CowVal::owned(types::CelInt::from(val.inner() * factor)))
+    /// }).unwrap();
+    ///
+    /// let program = env.compile("scale(2)").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Int(6)));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Fails as [`Env::add_overload`] does.
+    pub fn add_overload_with<F>(
+        &mut self,
+        name: &str,
+        id: &str,
+        args: Vec<types::Type>,
+        op: F,
+    ) -> Result<(), DeclarationError>
+    where
+        F: for<'b, 'v> Fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError>
+            + Send
+            + Sync
+            + std::panic::UnwindSafe
+            + std::panic::RefUnwindSafe
+            + 'static,
+    {
+        self.declare_overload(name, id, args, Op::Closure(Box::new(op)))
+    }
+
+    fn declare_overload(
+        &mut self,
+        name: &str,
+        id: &str,
+        args: Vec<types::Type>,
+        op: Op,
+    ) -> Result<(), DeclarationError> {
         match self.functions.entry(name.to_owned()) {
             Vacant(vacant_entry) => {
                 let mut value = FunctionDecl::new(name);
@@ -308,11 +377,26 @@ impl Env {
     }
 
     /// Finds a global function overload that matches the given name and arguments.
+    ///
+    /// `None` as well when that overload is implemented by a closure, added
+    /// with [`Env::add_overload_with`]: it has no [`Function`] to return.
     pub fn find_overload(&self, name: &str, args: &[CowVal<'_, '_>]) -> Option<Function> {
         match self.functions.get(name) {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(false, args),
         }
+    }
+
+    /// The implementation of the overload a call of `name` with `args`
+    /// resolves to: a member overload's if `member_function`, with the target
+    /// as the first of `args`.
+    pub(crate) fn find_op(
+        &self,
+        name: &str,
+        member_function: bool,
+        args: &[CowVal<'_, '_>],
+    ) -> Option<&Op> {
+        self.functions.get(name)?.find_op(member_function, args)
     }
 
     pub(crate) fn has_overload(&self, name: &str) -> bool {
@@ -344,6 +428,7 @@ impl Env {
     ) -> Result<(), DeclarationError> {
         let mut args = args;
         args.insert(0, target);
+        let op = Op::Function(op);
         match self.functions.entry(name.to_owned()) {
             Vacant(vacant_entry) => {
                 let mut value = FunctionDecl::new(name);
@@ -356,18 +441,6 @@ impl Env {
                     .into_mut()
                     .add_overload(id.to_string(), true, args, op)
             }
-        }
-    }
-
-    /// Finds a member function overload that matches the given name and arguments.
-    pub(crate) fn find_member_overload(
-        &self,
-        name: &str,
-        args: &[CowVal<'_, '_>],
-    ) -> Option<Function> {
-        match self.functions.get(name) {
-            None => None,
-            Some(fn_decl) => fn_decl.find_overload(true, args),
         }
     }
 
@@ -461,6 +534,10 @@ impl Env {
     /// handing it this environment to register its types, overloads and
     /// macros on. Compile with [`Env::compile`] for the macros to be expanded.
     ///
+    /// The extensions of this crate add a [`Library`], with its default
+    /// settings: adding one again changes nothing. To add one with settings
+    /// of its own, see [`Env::add_library`].
+    ///
     /// ```
     /// use cel::{extensions, Context, Env, Value};
     /// use std::sync::Arc;
@@ -479,6 +556,67 @@ impl Env {
         extension: impl FnOnce(&mut Env) -> Result<(), DeclarationError>,
     ) -> Result<(), DeclarationError> {
         extension(self)
+    }
+
+    /// Adds a [`Library`], by handing it this environment to register its
+    /// types, overloads and macros on: this is how to add an extension with
+    /// settings of its own, when [`Env::add_extension`] adds it with its
+    /// default ones.
+    ///
+    /// A library with a [name](Library::name) is added once: adding one of a
+    /// name that [is there already](Env::has_library) changes nothing,
+    /// whatever its settings.
+    ///
+    /// ```
+    /// use cel::{extensions, Env};
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_library(extensions::Strings::default()).unwrap();
+    /// assert!(env.has_library("cel.lib.ext.strings"));
+    /// // The strings library is there already: nothing is registered again.
+    /// env.add_extension(extensions::strings).unwrap();
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Fails with the [`DeclarationError`] the library failed to register
+    /// with, as when this environment already declares one of its overloads.
+    /// What the library registered until then stays, but the library isn't
+    /// added: this environment doesn't [have](Env::has_library) its name.
+    pub fn add_library(&mut self, library: impl Library) -> Result<(), DeclarationError> {
+        let Some(name) = library.name() else {
+            return library.register(self);
+        };
+        // Added before it registers, as in cel-go: a library that is added
+        // again while it registers, by one it adds, is there already.
+        if !self.libraries.insert(name.to_owned()) {
+            return Ok(());
+        }
+        library.register(self).inspect_err(|_| {
+            self.libraries.remove(name);
+        })
+    }
+
+    /// Whether a library of that [name](Library::name) was added to this
+    /// environment. [`Env::with_stdlib`] adds the standard library as
+    /// `cel.lib.std`, and the `optional` one as `cel.lib.optional`.
+    ///
+    /// ```
+    /// use cel::{extensions, Env};
+    ///
+    /// let mut env = Env::stdlib();
+    /// assert!(env.has_library("cel.lib.std"));
+    /// assert!(!env.has_library("cel.lib.ext.strings"));
+    /// env.add_extension(extensions::strings).unwrap();
+    /// assert!(env.has_library("cel.lib.ext.strings"));
+    /// ```
+    pub fn has_library(&self, name: &str) -> bool {
+        self.libraries.contains(name)
+    }
+
+    /// The names of the libraries added to this environment, sorted.
+    pub fn libraries(&self) -> impl Iterator<Item = &str> {
+        self.libraries.iter().map(String::as_str)
     }
 
     /// Sets whether a map literal that repeats a key is an error.
@@ -644,6 +782,7 @@ impl StructType for StructDef {
 mod tests {
     use super::*;
     use crate::common::value::Val;
+    use std::cell::Cell;
     use std::sync::Arc;
 
     #[test]
@@ -851,6 +990,316 @@ mod tests {
 
     fn duplicate(function: &str, id: &str) -> DeclarationError {
         DeclarationError::duplicate_overload(function, id)
+    }
+
+    /// A library, `acme.lib.counted`, that counts the times it registers.
+    struct Counted<'a>(&'a Cell<u32>);
+
+    impl Library for Counted<'_> {
+        fn name(&self) -> Option<&str> {
+            Some("acme.lib.counted")
+        }
+
+        fn register(&self, _: &mut Env) -> Result<(), DeclarationError> {
+            self.0.set(self.0.get() + 1);
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn a_named_library_is_registered_once() {
+        let registered = Cell::new(0);
+        let mut env = Env::default();
+        assert!(!env.has_library("acme.lib.counted"));
+        assert_eq!(env.add_library(Counted(&registered)), Ok(()));
+        assert_eq!(env.add_library(Counted(&registered)), Ok(()));
+        assert_eq!(registered.get(), 1);
+        assert!(env.has_library("acme.lib.counted"));
+        assert!(!env.has_library("acme.lib"));
+    }
+
+    /// A library is its name: another one of an added name isn't registered.
+    #[test]
+    fn a_library_of_an_added_name_is_not_registered() {
+        struct DeclaresF;
+
+        impl Library for DeclaresF {
+            fn name(&self) -> Option<&str> {
+                Some("acme.lib.counted")
+            }
+
+            fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+                env.add_overload("f", "f", vec![], noop)
+            }
+        }
+
+        let registered = Cell::new(0);
+        let mut env = Env::default();
+        assert_eq!(env.add_library(Counted(&registered)), Ok(()));
+        assert_eq!(env.add_library(DeclaresF), Ok(()));
+        assert!(!env.has_overload("f"));
+        assert_eq!(env.libraries().collect::<Vec<_>>(), ["acme.lib.counted"]);
+    }
+
+    #[test]
+    fn a_library_without_a_name_is_registered_every_time() {
+        struct Unnamed<'a>(&'a Cell<u32>);
+
+        impl Library for Unnamed<'_> {
+            fn register(&self, _: &mut Env) -> Result<(), DeclarationError> {
+                self.0.set(self.0.get() + 1);
+                Ok(())
+            }
+        }
+
+        let registered = Cell::new(0);
+        assert_eq!(Unnamed(&registered).name(), None);
+        let mut env = Env::default();
+        for _ in 0..2 {
+            assert_eq!(env.add_library(Unnamed(&registered)), Ok(()));
+        }
+        assert_eq!(registered.get(), 2);
+        assert_eq!(env.libraries().count(), 0);
+    }
+
+    /// An extension is a function, called every time it is added: it is only
+    /// added once when it adds a library.
+    #[test]
+    fn an_extension_is_called_every_time_it_is_added() {
+        fn declares_f(env: &mut Env) -> Result<(), DeclarationError> {
+            env.add_overload("f", "f", vec![], noop)
+        }
+
+        fn adds_a_library(env: &mut Env) -> Result<(), DeclarationError> {
+            struct DeclaresG;
+
+            impl Library for DeclaresG {
+                fn name(&self) -> Option<&str> {
+                    Some("acme.lib.g")
+                }
+
+                fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+                    env.add_overload("g", "g", vec![], noop)
+                }
+            }
+
+            env.add_library(DeclaresG)
+        }
+
+        let mut env = Env::default();
+        assert_eq!(env.add_extension(declares_f), Ok(()));
+        assert_eq!(env.add_extension(declares_f), Err(duplicate("f", "f")));
+        assert_eq!(env.add_extension(adds_a_library), Ok(()));
+        assert_eq!(env.add_extension(adds_a_library), Ok(()));
+        assert!(env.has_overload("g"));
+        assert_eq!(env.libraries().collect::<Vec<_>>(), ["acme.lib.g"]);
+    }
+
+    #[test]
+    fn a_library_that_fails_to_register_is_not_added() {
+        struct Failing<'a>(&'a Cell<u32>);
+
+        impl Library for Failing<'_> {
+            fn name(&self) -> Option<&str> {
+                Some("acme.lib.failing")
+            }
+
+            fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+                self.0.set(self.0.get() + 1);
+                env.set_container("not a container")
+            }
+        }
+
+        let registered = Cell::new(0);
+        let mut env = Env::default();
+        for attempts in 1..=2 {
+            assert_eq!(
+                env.add_library(Failing(&registered)),
+                Err(DeclarationError::invalid_container_name("not a container"))
+            );
+            assert_eq!(registered.get(), attempts);
+            assert!(!env.has_library("acme.lib.failing"));
+        }
+    }
+
+    /// As in cel-go, a library is added before it registers: when a library
+    /// it adds, or itself, adds it again, it is there already.
+    #[test]
+    fn a_library_is_added_by_the_time_it_registers() {
+        struct AddsItself<'a>(&'a Cell<u32>);
+
+        impl Library for AddsItself<'_> {
+            fn name(&self) -> Option<&str> {
+                Some("acme.lib.recursive")
+            }
+
+            fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+                self.0.set(self.0.get() + 1);
+                assert!(env.has_library("acme.lib.recursive"));
+                env.add_library(AddsItself(self.0))
+            }
+        }
+
+        let registered = Cell::new(0);
+        let mut env = Env::default();
+        assert_eq!(env.add_library(AddsItself(&registered)), Ok(()));
+        assert_eq!(registered.get(), 1);
+        assert!(env.has_library("acme.lib.recursive"));
+    }
+
+    #[test]
+    fn the_standard_library_is_added_once() {
+        use crate::{Context, Value};
+
+        assert_eq!(Env::default().libraries().count(), 0);
+        // Registered again, its overloads would be duplicates.
+        for env in [
+            Env::stdlib(),
+            Env::stdlib().with_stdlib(),
+            Env::default().with_stdlib().with_stdlib(),
+        ] {
+            assert_eq!(
+                env.libraries().collect::<Vec<_>>(),
+                ["cel.lib.optional", "cel.lib.std"]
+            );
+            let program = env.compile("optional.of(size('abc')).value()").unwrap();
+            let context = Context::with_env(Arc::new(env));
+            assert_eq!(program.execute(&context), Ok(Value::Int(3)));
+        }
+    }
+
+    /// The `optional` library is one of its own: the standard library adds
+    /// it when optional values are supported, even if only later.
+    #[test]
+    fn the_optional_library_is_added_once_optional_values_are_supported() {
+        let env = Env::default().with_optional_support(false).with_stdlib();
+        assert_eq!(env.libraries().collect::<Vec<_>>(), ["cel.lib.std"]);
+        assert!(!env.has_overload("optional.of"));
+
+        let env = env.with_optional_support(true).with_stdlib().with_stdlib();
+        assert!(env.has_library("cel.lib.optional"));
+        assert!(env.has_overload("optional.of"));
+    }
+
+    /// An extension adds its library, with its default settings.
+    #[test]
+    fn the_extensions_are_added_once_under_the_names_of_cel_go() {
+        use crate::extensions;
+
+        type Extension = fn(&mut Env) -> Result<(), DeclarationError>;
+        let named: &[(&str, Extension)] = &[
+            ("cel.lib.ext.cel.bindings", extensions::bindings),
+            #[cfg(feature = "ext_encoders")]
+            ("cel.lib.ext.encoders", extensions::encoders),
+            ("cel.lib.ext.lists", extensions::lists),
+            ("cel.lib.ext.math", extensions::math),
+            ("cel.lib.ext.strings", extensions::strings),
+        ];
+        let mut env = Env::stdlib();
+        for (name, extension) in named {
+            assert!(!env.has_library(name), "{name}");
+            for _ in 0..2 {
+                assert_eq!(env.add_extension(extension), Ok(()), "{name}");
+            }
+            assert!(env.has_library(name), "{name}");
+        }
+        let names = named.iter().map(|(name, _)| *name);
+        assert_eq!(
+            env.libraries().collect::<Vec<_>>(),
+            names
+                .chain(["cel.lib.optional", "cel.lib.std"])
+                .collect::<Vec<_>>()
+        );
+
+        assert_eq!(env.add_library(extensions::Strings::default()), Ok(()));
+        let mut env = Env::stdlib();
+        assert_eq!(env.add_library(extensions::Strings::default()), Ok(()));
+        assert_eq!(env.add_extension(extensions::strings), Ok(()));
+        assert!(env.has_member_overload("lowerAscii"));
+    }
+
+    /// A closure holds what it captured, and is called as a function is.
+    #[test]
+    fn an_overload_can_be_a_closure() {
+        use crate::common::types::CelInt;
+        use crate::{Context, Value};
+
+        fn scale(
+            factor: i64,
+        ) -> impl for<'b, 'v> Fn(Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError>
+        {
+            move |args| {
+                let n = args[0].downcast_ref::<CelInt>().unwrap().inner();
+                Ok(CowVal::owned(CelInt::from(n * factor)))
+            }
+        }
+
+        let mut env = Env::stdlib();
+        for (name, factor) in [("twice", 2), ("a.thrice", 3)] {
+            assert_eq!(
+                env.add_overload_with(name, name, vec![types::INT_TYPE], scale(factor)),
+                Ok(())
+            );
+        }
+        assert!(env.has_namespace("a"));
+
+        let env = Arc::new(env);
+        for (expr, expected) in [("twice(4)", 8), ("a.thrice(4)", 12)] {
+            let program = env.compile(expr).unwrap();
+            let context = Context::with_env(env.clone());
+            assert_eq!(program.execute(&context), Ok(Value::Int(expected)));
+        }
+    }
+
+    /// A closure and a function are overloads alike: neither's id, nor
+    /// signature, can be another's.
+    #[test]
+    fn add_overload_with_rejects_a_duplicate_id_or_signature() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload_with("f", "f_int", vec![types::STRING_TYPE], noop),
+            Err(duplicate("f", "f_int"))
+        );
+        assert_eq!(
+            env.add_overload_with("f", "other_id", vec![types::INT_TYPE], noop),
+            Err(duplicate("f", "other_id"))
+        );
+        assert_eq!(
+            env.add_overload_with("f", "f_string", vec![types::STRING_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("f", "f_string", vec![types::BOOL_TYPE], noop),
+            Err(duplicate("f", "f_string"))
+        );
+    }
+
+    /// A closure isn't a [`Function`]: `find_overload` has none to hand out
+    /// for the overload, which a call still resolves to.
+    #[test]
+    fn find_overload_only_finds_the_functions() {
+        use crate::common::types::{CelInt, CelString};
+
+        let mut env = Env::default();
+        env.add_overload("f", "f_int", vec![types::INT_TYPE], noop)
+            .unwrap();
+        env.add_overload_with("f", "f_string", vec![types::STRING_TYPE], noop)
+            .unwrap();
+
+        let int = || vec![CowVal::owned(CelInt::from(1))];
+        let string = || vec![CowVal::owned(CelString::from("a"))];
+        assert!(env.find_overload("f", &int()).is_some());
+        assert!(env.find_overload("f", &string()).is_none());
+        for args in [int, string] {
+            let op = env.find_op("f", false, &args()).unwrap();
+            assert!(op.call(args()).is_ok());
+            assert!(env.find_op("f", true, &args()).is_none());
+        }
+        assert!(env.find_op("g", false, &int()).is_none());
     }
 
     #[test]

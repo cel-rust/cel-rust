@@ -3,16 +3,33 @@
 
 use crate::common::ast::{Expr, IdedExpr};
 use crate::parser::{Macro, MacroExprHelper, ParseError};
-use crate::{DeclarationError, Env};
+use crate::{DeclarationError, Env, Library};
 use std::mem;
 
-/// Registers the bindings extension's `cel.bind` macro on `env`.
+/// Adds the bindings extension library to `env`: [`Bindings`], with its
+/// default settings.
+pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
+    env.add_library(Bindings::default())
+}
+
+/// The bindings extension library, `cel.lib.ext.cel.bindings`: registers its
+/// `cel.bind` macro on the [`Env`] it is added to.
 ///
 /// `cel.bind(var, init, expr)` evaluates `expr` with `var` bound to `init`,
 /// which is evaluated once. It is only expanded by [`Env::compile`] and
 /// [`Env::parser`], not by [`Program::compile`](crate::Program::compile).
-pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    env.add_macro(Macro::receiver("bind", 3, bind))
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct Bindings {}
+
+impl Library for Bindings {
+    fn name(&self) -> Option<&str> {
+        Some("cel.lib.ext.cel.bindings")
+    }
+
+    fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+        env.add_macro(Macro::receiver("bind", 3, bind))
+    }
 }
 
 /// `cel.bind(var, init, expr)`: `var` bound to `init` in `expr`. Declines any
@@ -40,7 +57,7 @@ fn bind(
 #[cfg(test)]
 mod tests {
     use crate::common::ast::Expr;
-    use crate::{Context, DeclarationError, Env, Value};
+    use crate::{Context, Env, Value};
     use std::sync::Arc;
 
     fn env() -> Env {
@@ -59,11 +76,13 @@ mod tests {
     }
 
     #[test]
-    fn registering_twice_is_an_error() {
+    fn adding_it_twice_registers_it_once() {
         let mut env = env();
+        assert_eq!(env.add_extension(crate::extensions::bindings), Ok(()));
+        let program = env.compile("cel.bind(a, 1, a + 1)").unwrap();
         assert_eq!(
-            env.add_extension(crate::extensions::bindings),
-            Err(DeclarationError::duplicate_macro("bind"))
+            program.execute(&Context::with_env(Arc::new(env))),
+            Ok(Value::Int(2))
         );
     }
 

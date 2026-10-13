@@ -50,6 +50,7 @@ mod duration;
 pub use ser::{Duration, Timestamp};
 
 pub use env::Env;
+pub use extensions::Library;
 mod registry;
 pub use env::StructDef;
 pub use registry::StructType;

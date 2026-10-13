@@ -6,11 +6,11 @@ use crate::common::ast::{CallExpr, Expr, IdedExpr};
 use crate::common::types::{CelInt, CelList, Kind, INT_TYPE, LIST_TYPE};
 use crate::common::value::{CowVal, Val};
 use crate::parser::{map_macro_expander, Macro, MacroExprHelper, ParseError};
-use crate::{DeclarationError, Env, ExecutionError};
+use crate::{DeclarationError, Env, ExecutionError, Library};
 use std::cmp::Ordering;
 
-/// The most elements `lists.range` creates, cel-go's default.
-const MAX_RANGE_SIZE: i64 = 1_000_000;
+/// The most elements `lists.range` creates by default, as in cel-go.
+const DEFAULT_MAX_RANGE_SIZE: usize = 1_000_000;
 
 /// The variable `sortBy` binds its target to, so that it is evaluated once.
 const SORT_BY_INPUT: &str = "@__sortBy_input__";
@@ -18,42 +18,102 @@ const SORT_BY_INPUT: &str = "@__sortBy_input__";
 /// The overload `sortBy` expands to: named so that CEL can't call it.
 const SORT_BY_KEYS: &str = "@sortByAssociatedKeys";
 
-/// Registers the lists extension's overloads, and its `sortBy` macro, on
-/// `env`.
+/// Adds the lists extension library to `env`: [`Lists`], with its default
+/// settings.
+pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
+    env.add_library(Lists::default())
+}
+
+/// The lists extension library, `cel.lib.ext.lists`: registers its overloads,
+/// and its `sortBy` macro, on the [`Env`] it is added to.
 ///
 /// `sortBy` is only expanded by [`Env::compile`] and [`Env::parser`], not by
 /// [`Program::compile`](crate::Program::compile).
-pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    // Registered by hand, as the macro would downcast the receiver to a
-    // `CelList`: these take any `list`, like the stdlib's list overloads.
-    env.add_member_overload(
-        "slice",
-        "list.slice(int,int)",
-        LIST_TYPE,
-        vec![INT_TYPE, INT_TYPE],
-        slice,
-    )?;
-    env.add_member_overload("flatten", "list.flatten()", LIST_TYPE, vec![], flatten)?;
-    env.add_member_overload(
-        "flatten",
-        "list.flatten(int)",
-        LIST_TYPE,
-        vec![INT_TYPE],
-        flatten_depth,
-    )?;
-    env.add_member_overload("distinct", "list.distinct()", LIST_TYPE, vec![], distinct)?;
-    env.add_member_overload("reverse", "list.reverse()", LIST_TYPE, vec![], reverse)?;
-    env.add_member_overload("sort", "list.sort()", LIST_TYPE, vec![], sort)?;
-    env.add_member_overload(
-        SORT_BY_KEYS,
-        "list.@sortByAssociatedKeys(list)",
-        LIST_TYPE,
-        vec![LIST_TYPE],
-        sort_by_associated_keys,
-    )?;
-    crate::add_overload!(env, fn range: (CelInt) -> Result<CelList>, name = "lists.range")?;
-    env.add_macro(Macro::receiver("sortBy", 2, sort_by_macro))?;
-    Ok(())
+///
+/// [`Env::add_library`] adds one with settings of its own:
+///
+/// ```
+/// use cel::extensions::Lists;
+/// use cel::{Context, Env};
+/// use std::sync::Arc;
+///
+/// let mut env = Env::stdlib();
+/// env.add_library(Lists::default().with_max_range_size(10)).unwrap();
+/// let program = env.compile("lists.range(11)").unwrap();
+/// let context = Context::with_env(Arc::new(env));
+/// assert!(program.execute(&context).is_err());
+/// ```
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct Lists {
+    max_range_size: usize,
+}
+
+impl Default for Lists {
+    fn default() -> Self {
+        Self {
+            max_range_size: DEFAULT_MAX_RANGE_SIZE,
+        }
+    }
+}
+
+impl Lists {
+    /// Sets the most elements `lists.range` creates, 1,000,000 by default:
+    /// asked for more, it fails. No value lifts the limit, as zero does in
+    /// cel-go: with zero, `lists.range` only creates the empty list.
+    pub fn with_max_range_size(mut self, max_range_size: usize) -> Self {
+        self.max_range_size = max_range_size;
+        self
+    }
+}
+
+impl Library for Lists {
+    fn name(&self) -> Option<&str> {
+        Some("cel.lib.ext.lists")
+    }
+
+    fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+        // Registered by hand, as the macro would downcast the receiver to a
+        // `CelList`: these take any `list`, like the stdlib's list overloads.
+        env.add_member_overload(
+            "slice",
+            "list.slice(int,int)",
+            LIST_TYPE,
+            vec![INT_TYPE, INT_TYPE],
+            slice,
+        )?;
+        env.add_member_overload("flatten", "list.flatten()", LIST_TYPE, vec![], flatten)?;
+        env.add_member_overload(
+            "flatten",
+            "list.flatten(int)",
+            LIST_TYPE,
+            vec![INT_TYPE],
+            flatten_depth,
+        )?;
+        env.add_member_overload("distinct", "list.distinct()", LIST_TYPE, vec![], distinct)?;
+        env.add_member_overload("reverse", "list.reverse()", LIST_TYPE, vec![], reverse)?;
+        env.add_member_overload("sort", "list.sort()", LIST_TYPE, vec![], sort)?;
+        env.add_member_overload(
+            SORT_BY_KEYS,
+            "list.@sortByAssociatedKeys(list)",
+            LIST_TYPE,
+            vec![LIST_TYPE],
+            sort_by_associated_keys,
+        )?;
+        // A closure, as it holds the setting: the macro registers a plain `fn`.
+        let max = self.max_range_size;
+        env.add_overload_with(
+            "lists.range",
+            "lists.range(int)",
+            vec![INT_TYPE],
+            move |args| {
+                let [n] = take_args(args)?;
+                Ok(CowVal::owned(range(arg(n.as_ref())?, max)?))
+            },
+        )?;
+        env.add_macro(Macro::receiver("sortBy", 2, sort_by_macro))?;
+        Ok(())
+    }
 }
 
 /// Expands `list.sortBy(e, key)`, as cel-go does, into
@@ -290,8 +350,8 @@ fn compare(a: &dyn Val, b: &dyn Val, function: &str) -> Result<Ordering, Executi
         .compare(b)
 }
 
-/// The ints from `0` up to, but excluding, `n`.
-fn range(n: &CelInt) -> Result<CelList<'static>, ExecutionError> {
+/// The ints from `0` up to, but excluding, `n`: `max` of them at most.
+fn range(n: &CelInt, max: usize) -> Result<CelList<'static>, ExecutionError> {
     let n = *n.inner();
     if n < 0 {
         return Err(ExecutionError::function_error(
@@ -299,10 +359,10 @@ fn range(n: &CelInt) -> Result<CelList<'static>, ExecutionError> {
             format!("size must be non-negative, got {n}"),
         ));
     }
-    if n > MAX_RANGE_SIZE {
+    if n as u64 > max as u64 {
         return Err(ExecutionError::function_error(
             "lists.range",
-            format!("size {n} exceeds maximum allowed ({MAX_RANGE_SIZE})"),
+            format!("size {n} exceeds maximum allowed ({max})"),
         ));
     }
     Ok((0..n)
@@ -315,19 +375,18 @@ fn range(n: &CelInt) -> Result<CelList<'static>, ExecutionError> {
 mod tests {
     use crate::common::types::{CelInt, CelString};
     use crate::extensions::tests::OtherList;
-    use crate::{Context, DeclarationError, Env, ExecutionError, Value};
+    use crate::{Context, Env, ExecutionError, Value};
     use std::sync::Arc;
 
     #[test]
-    fn registering_twice_is_an_error() {
+    fn adding_it_twice_registers_it_once() {
         let mut env = Env::stdlib();
         assert_eq!(env.add_extension(crate::extensions::lists), Ok(()));
+        assert_eq!(env.add_extension(crate::extensions::lists), Ok(()));
+        let ctx = Context::with_env(Arc::new(env));
         assert_eq!(
-            env.add_extension(crate::extensions::lists),
-            Err(DeclarationError::duplicate_overload(
-                "slice",
-                "list.slice(int,int)"
-            ))
+            eval_in(&ctx, "[1, 3, 2].sortBy(e, -e)"),
+            Ok(vec![3, 2, 1].into())
         );
     }
 
@@ -563,6 +622,58 @@ mod tests {
             "lists.range(1000001)",
             "size 1000001 exceeds maximum allowed (1000000)",
         );
+    }
+
+    #[test]
+    fn range_creates_as_many_elements_as_the_library_is_set_to() {
+        use crate::extensions::Lists;
+
+        let mut env = Env::stdlib();
+        assert_eq!(
+            env.add_library(Lists::default().with_max_range_size(3)),
+            Ok(())
+        );
+        let ctx = Context::with_env(Arc::new(env));
+        assert_eq!(eval_in(&ctx, "lists.range(3)"), Ok(vec![0, 1, 2].into()));
+        assert_eq!(
+            eval_in(&ctx, "lists.range(4)"),
+            Err(ExecutionError::function_error(
+                "lists.range",
+                "size 4 exceeds maximum allowed (3)"
+            ))
+        );
+
+        let mut env = Env::stdlib();
+        assert_eq!(
+            env.add_library(Lists::default().with_max_range_size(0)),
+            Ok(())
+        );
+        let ctx = Context::with_env(Arc::new(env));
+        assert_eq!(eval_in(&ctx, "lists.range(0) == []"), Ok(true.into()));
+        assert!(eval_in(&ctx, "lists.range(1)").is_err());
+    }
+
+    /// The library is added once, by its name: other settings, added later,
+    /// change nothing.
+    #[test]
+    fn the_settings_of_the_library_first_added_stay() {
+        use crate::extensions::Lists;
+
+        let mut env = Env::stdlib();
+        env.add_library(Lists::default().with_max_range_size(3))
+            .unwrap();
+        assert_eq!(env.add_extension(crate::extensions::lists), Ok(()));
+        let ctx = Context::with_env(Arc::new(env));
+        assert!(eval_in(&ctx, "lists.range(4)").is_err());
+
+        let mut env = Env::stdlib();
+        env.add_extension(crate::extensions::lists).unwrap();
+        assert_eq!(
+            env.add_library(Lists::default().with_max_range_size(3)),
+            Ok(())
+        );
+        let ctx = Context::with_env(Arc::new(env));
+        assert_eq!(eval_in(&ctx, "size(lists.range(4))"), Ok(4.into()));
     }
 
     #[test]

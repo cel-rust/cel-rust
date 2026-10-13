@@ -6,7 +6,7 @@
 //! `size(string)` and `size(list)`. A call picks the overload by the runtime
 //! [types](crate::common::value::Val::get_type) of its arguments, see
 //! [`FunctionDecl::find_overload`].
-use crate::common::functions::Function;
+use crate::common::functions::{Function, Op};
 use crate::common::types::Type;
 use crate::common::value::{CowVal, Val};
 use crate::DeclarationError;
@@ -36,11 +36,21 @@ impl FunctionDecl {
     /// types each [accept](Type::is_assignable) the argument in its position.
     ///
     /// For a member call, `x.f(y)`, `args` starts with the target `x`.
+    ///
+    /// `None` as well when that overload is implemented by a closure, added
+    /// with [`Env::add_overload_with`](crate::Env::add_overload_with): it has
+    /// no [`Function`] to return.
     pub fn find_overload(
         &self,
         member_function: bool,
         args: &[CowVal<'_, '_>],
     ) -> Option<Function> {
+        self.find_op(member_function, args)?.as_function()
+    }
+
+    /// The implementation of the overload a call with `args` resolves to,
+    /// see [`find_overload`](Self::find_overload).
+    pub(crate) fn find_op(&self, member_function: bool, args: &[CowVal<'_, '_>]) -> Option<&Op> {
         for overload in &self.overloads {
             if overload.member_function == member_function
                 && args.len() == overload.arg_types.len()
@@ -50,7 +60,7 @@ impl FunctionDecl {
                     .enumerate()
                     .all(|(i, t)| t.is_assignable(args[i].as_ref()))
             {
-                return Some(overload.op);
+                return Some(&overload.op);
             }
         }
         None
@@ -67,7 +77,7 @@ impl FunctionDecl {
         id: String,
         member_function: bool,
         arg_types: Vec<Type>,
-        op: Function,
+        op: Op,
     ) -> Result<(), DeclarationError> {
         if self.is_present(&id, member_function, &arg_types) {
             return Err(DeclarationError::duplicate_overload(&self.name, &id));
@@ -103,7 +113,7 @@ pub struct OverloadDecl {
     //result_type: &'a Type<'a>,
     member_function: bool,
     //operand_traits: TraitSet,
-    op: Function,
+    op: Op,
 }
 
 #[allow(dead_code)]

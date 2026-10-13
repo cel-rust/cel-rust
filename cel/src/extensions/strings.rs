@@ -9,50 +9,67 @@ mod format;
 use super::{arg, iterable};
 use crate::common::types::{CelInt, CelList, CelString, LIST_TYPE, STRING_TYPE};
 use crate::common::value::{CowVal, Val};
-use crate::{DeclarationError, Env, ExecutionError};
+use crate::{DeclarationError, Env, ExecutionError, Library};
 
-/// Registers the strings extension's overloads on `env`.
+/// Adds the strings extension library to `env`: [`Strings`], with its default
+/// settings.
 pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    crate::add_member_overload!(env, fn char_at: (CelString, CelInt) -> Result<CelString>)?;
-    crate::add_member_overload!(env, fn index_of: (CelString, CelString) -> CelInt)?;
-    crate::add_member_overload!(env, fn index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
-        name = "indexOf")?;
-    crate::add_member_overload!(env, fn last_index_of: (CelString, CelString) -> CelInt)?;
-    crate::add_member_overload!(env, fn last_index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
-        name = "lastIndexOf")?;
-    // Registered by hand, as the macro would downcast the receiver to a
-    // `CelList`: `join` takes any `list`, like the stdlib's list overloads.
-    env.add_member_overload("join", "list.join()", LIST_TYPE, vec![], join)?;
-    env.add_member_overload(
-        "join",
-        "list.join(string)",
-        LIST_TYPE,
-        vec![STRING_TYPE],
-        join_sep,
-    )?;
-    crate::add_member_overload!(env, fn lower_ascii: (CelString) -> CelString)?;
-    crate::add_member_overload!(env, fn upper_ascii: (CelString) -> CelString)?;
-    crate::add_member_overload!(env, fn trim: (CelString) -> CelString)?;
-    crate::add_member_overload!(env, fn replace: (CelString, CelString, CelString) -> CelString)?;
-    crate::add_member_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> CelString,
-        name = "replace")?;
-    crate::add_member_overload!(env, fn split: (CelString, CelString) -> CelList)?;
-    crate::add_member_overload!(env, fn split_n: (CelString, CelString, CelInt) -> CelList,
-        name = "split")?;
-    crate::add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>)?;
-    crate::add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
-        name = "substring")?;
-    // By hand, as `join` is: `format` takes any `list`.
-    env.add_member_overload(
-        "format",
-        "string.format(list)",
-        STRING_TYPE,
-        vec![LIST_TYPE],
-        format::format,
-    )?;
-    crate::add_overload!(env, fn quote: (CelString) -> CelString, name = "strings.quote")?;
-    crate::add_member_overload!(env, fn reverse: (CelString) -> CelString)?;
-    Ok(())
+    env.add_library(Strings::default())
+}
+
+/// The strings extension library, `cel.lib.ext.strings`: registers its
+/// overloads on the [`Env`] it is added to.
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct Strings {}
+
+impl Library for Strings {
+    fn name(&self) -> Option<&str> {
+        Some("cel.lib.ext.strings")
+    }
+
+    fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+        crate::add_member_overload!(env, fn char_at: (CelString, CelInt) -> Result<CelString>)?;
+        crate::add_member_overload!(env, fn index_of: (CelString, CelString) -> CelInt)?;
+        crate::add_member_overload!(env, fn index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
+            name = "indexOf")?;
+        crate::add_member_overload!(env, fn last_index_of: (CelString, CelString) -> CelInt)?;
+        crate::add_member_overload!(env, fn last_index_of_offset: (CelString, CelString, CelInt) -> Result<CelInt>,
+            name = "lastIndexOf")?;
+        // Registered by hand, as the macro would downcast the receiver to a
+        // `CelList`: `join` takes any `list`, like the stdlib's list overloads.
+        env.add_member_overload("join", "list.join()", LIST_TYPE, vec![], join)?;
+        env.add_member_overload(
+            "join",
+            "list.join(string)",
+            LIST_TYPE,
+            vec![STRING_TYPE],
+            join_sep,
+        )?;
+        crate::add_member_overload!(env, fn lower_ascii: (CelString) -> CelString)?;
+        crate::add_member_overload!(env, fn upper_ascii: (CelString) -> CelString)?;
+        crate::add_member_overload!(env, fn trim: (CelString) -> CelString)?;
+        crate::add_member_overload!(env, fn replace: (CelString, CelString, CelString) -> CelString)?;
+        crate::add_member_overload!(env, fn replace_n: (CelString, CelString, CelString, CelInt) -> CelString,
+            name = "replace")?;
+        crate::add_member_overload!(env, fn split: (CelString, CelString) -> CelList)?;
+        crate::add_member_overload!(env, fn split_n: (CelString, CelString, CelInt) -> CelList,
+            name = "split")?;
+        crate::add_member_overload!(env, fn substring: (CelString, CelInt) -> Result<CelString>)?;
+        crate::add_member_overload!(env, fn substring_range: (CelString, CelInt, CelInt) -> Result<CelString>,
+            name = "substring")?;
+        // By hand, as `join` is: `format` takes any `list`.
+        env.add_member_overload(
+            "format",
+            "string.format(list)",
+            STRING_TYPE,
+            vec![LIST_TYPE],
+            format::format,
+        )?;
+        crate::add_overload!(env, fn quote: (CelString) -> CelString, name = "strings.quote")?;
+        crate::add_member_overload!(env, fn reverse: (CelString) -> CelString)?;
+        Ok(())
+    }
 }
 
 fn out_of_range(function: &str, idx: i64) -> ExecutionError {
@@ -318,19 +335,18 @@ fn reverse(this: &CelString<'_>) -> CelString<'static> {
 mod tests {
     use crate::common::types::CelString;
     use crate::extensions::tests::OtherList;
-    use crate::{Context, DeclarationError, Env, ExecutionError, Program, Value};
+    use crate::{Context, Env, ExecutionError, Program, Value};
     use std::sync::Arc;
 
     #[test]
-    fn registering_twice_is_an_error() {
+    fn adding_it_twice_registers_it_once() {
         let mut env = Env::stdlib();
         assert_eq!(env.add_extension(crate::extensions::strings), Ok(()));
+        assert_eq!(env.add_extension(crate::extensions::strings), Ok(()));
+        let ctx = Context::with_env(Arc::new(env));
         assert_eq!(
-            env.add_extension(crate::extensions::strings),
-            Err(DeclarationError::duplicate_overload(
-                "charAt",
-                "string.charAt(int)"
-            ))
+            eval_in(&ctx, "'TacoCat'.lowerAscii()"),
+            Ok("tacocat".into())
         );
     }
 

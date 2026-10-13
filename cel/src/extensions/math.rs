@@ -8,53 +8,70 @@ use crate::common::types::{
 };
 use crate::common::value::{CowVal, Val};
 use crate::parser::{Macro, MacroExprHelper};
-use crate::{DeclarationError, Env, ExecutionError, ParseError};
+use crate::{DeclarationError, Env, ExecutionError, Library, ParseError};
 use std::cmp::Ordering;
 
-/// Registers the math extension's overloads and macros on `env`.
+/// Adds the math extension library to `env`: [`Math`], with its default
+/// settings.
 pub fn extension(env: &mut Env) -> Result<(), DeclarationError> {
-    crate::add_overload!(env, fn ceil: (CelDouble) -> CelDouble, name = "math.ceil")?;
-    crate::add_overload!(env, fn floor: (CelDouble) -> CelDouble, name = "math.floor")?;
-    crate::add_overload!(env, fn round: (CelDouble) -> CelDouble, name = "math.round")?;
-    crate::add_overload!(env, fn trunc: (CelDouble) -> CelDouble, name = "math.trunc")?;
-    crate::add_overload!(env, fn is_inf: (CelDouble) -> CelBool, name = "math.isInf")?;
-    crate::add_overload!(env, fn is_nan: (CelDouble) -> CelBool, name = "math.isNaN")?;
-    crate::add_overload!(env, fn is_finite: (CelDouble) -> CelBool, name = "math.isFinite")?;
-    crate::add_overload!(env, fn abs_double: (CelDouble) -> CelDouble, name = "math.abs")?;
-    crate::add_overload!(env, fn abs_int: (CelInt) -> Result<CelInt>, name = "math.abs")?;
-    crate::add_overload!(env, fn abs_uint: (CelUInt) -> CelUInt, name = "math.abs")?;
-    crate::add_overload!(env, fn sign_double: (CelDouble) -> CelDouble, name = "math.sign")?;
-    crate::add_overload!(env, fn sign_int: (CelInt) -> CelInt, name = "math.sign")?;
-    crate::add_overload!(env, fn sign_uint: (CelUInt) -> CelUInt, name = "math.sign")?;
-    crate::add_overload!(env, fn bit_and_int: (CelInt, CelInt) -> CelInt, name = "math.bitAnd")?;
-    crate::add_overload!(env, fn bit_and_uint: (CelUInt, CelUInt) -> CelUInt, name = "math.bitAnd")?;
-    crate::add_overload!(env, fn bit_or_int: (CelInt, CelInt) -> CelInt, name = "math.bitOr")?;
-    crate::add_overload!(env, fn bit_or_uint: (CelUInt, CelUInt) -> CelUInt, name = "math.bitOr")?;
-    crate::add_overload!(env, fn bit_xor_int: (CelInt, CelInt) -> CelInt, name = "math.bitXor")?;
-    crate::add_overload!(env, fn bit_xor_uint: (CelUInt, CelUInt) -> CelUInt, name = "math.bitXor")?;
-    crate::add_overload!(env, fn bit_not_int: (CelInt) -> CelInt, name = "math.bitNot")?;
-    crate::add_overload!(env, fn bit_not_uint: (CelUInt) -> CelUInt, name = "math.bitNot")?;
-    crate::add_overload!(env, fn bit_shift_left_int: (CelInt, CelInt) -> Result<CelInt>,
-        name = "math.bitShiftLeft")?;
-    crate::add_overload!(env, fn bit_shift_left_uint: (CelUInt, CelInt) -> Result<CelUInt>,
-        name = "math.bitShiftLeft")?;
-    crate::add_overload!(env, fn bit_shift_right_int: (CelInt, CelInt) -> Result<CelInt>,
-        name = "math.bitShiftRight")?;
-    crate::add_overload!(env, fn bit_shift_right_uint: (CelUInt, CelInt) -> Result<CelUInt>,
-        name = "math.bitShiftRight")?;
-    crate::add_overload!(env, fn sqrt_double: (CelDouble) -> CelDouble, name = "math.sqrt")?;
-    crate::add_overload!(env, fn sqrt_int: (CelInt) -> CelDouble, name = "math.sqrt")?;
-    crate::add_overload!(env, fn sqrt_uint: (CelUInt) -> CelDouble, name = "math.sqrt")?;
-    extreme_overloads(env, "math.@max", max)?;
-    extreme_overloads(env, "math.@min", min)?;
-    env.add_macro(Macro::receiver_var_arg(
-        "greatest",
-        |helper, target, args| extreme(helper, target, args, "greatest", "math.@max"),
-    ))?;
-    env.add_macro(Macro::receiver_var_arg("least", |helper, target, args| {
-        extreme(helper, target, args, "least", "math.@min")
-    }))?;
-    Ok(())
+    env.add_library(Math::default())
+}
+
+/// The math extension library, `cel.lib.ext.math`: registers its overloads
+/// and macros on the [`Env`] it is added to.
+#[derive(Clone, Debug, Default)]
+#[non_exhaustive]
+pub struct Math {}
+
+impl Library for Math {
+    fn name(&self) -> Option<&str> {
+        Some("cel.lib.ext.math")
+    }
+
+    fn register(&self, env: &mut Env) -> Result<(), DeclarationError> {
+        crate::add_overload!(env, fn ceil: (CelDouble) -> CelDouble, name = "math.ceil")?;
+        crate::add_overload!(env, fn floor: (CelDouble) -> CelDouble, name = "math.floor")?;
+        crate::add_overload!(env, fn round: (CelDouble) -> CelDouble, name = "math.round")?;
+        crate::add_overload!(env, fn trunc: (CelDouble) -> CelDouble, name = "math.trunc")?;
+        crate::add_overload!(env, fn is_inf: (CelDouble) -> CelBool, name = "math.isInf")?;
+        crate::add_overload!(env, fn is_nan: (CelDouble) -> CelBool, name = "math.isNaN")?;
+        crate::add_overload!(env, fn is_finite: (CelDouble) -> CelBool, name = "math.isFinite")?;
+        crate::add_overload!(env, fn abs_double: (CelDouble) -> CelDouble, name = "math.abs")?;
+        crate::add_overload!(env, fn abs_int: (CelInt) -> Result<CelInt>, name = "math.abs")?;
+        crate::add_overload!(env, fn abs_uint: (CelUInt) -> CelUInt, name = "math.abs")?;
+        crate::add_overload!(env, fn sign_double: (CelDouble) -> CelDouble, name = "math.sign")?;
+        crate::add_overload!(env, fn sign_int: (CelInt) -> CelInt, name = "math.sign")?;
+        crate::add_overload!(env, fn sign_uint: (CelUInt) -> CelUInt, name = "math.sign")?;
+        crate::add_overload!(env, fn bit_and_int: (CelInt, CelInt) -> CelInt, name = "math.bitAnd")?;
+        crate::add_overload!(env, fn bit_and_uint: (CelUInt, CelUInt) -> CelUInt, name = "math.bitAnd")?;
+        crate::add_overload!(env, fn bit_or_int: (CelInt, CelInt) -> CelInt, name = "math.bitOr")?;
+        crate::add_overload!(env, fn bit_or_uint: (CelUInt, CelUInt) -> CelUInt, name = "math.bitOr")?;
+        crate::add_overload!(env, fn bit_xor_int: (CelInt, CelInt) -> CelInt, name = "math.bitXor")?;
+        crate::add_overload!(env, fn bit_xor_uint: (CelUInt, CelUInt) -> CelUInt, name = "math.bitXor")?;
+        crate::add_overload!(env, fn bit_not_int: (CelInt) -> CelInt, name = "math.bitNot")?;
+        crate::add_overload!(env, fn bit_not_uint: (CelUInt) -> CelUInt, name = "math.bitNot")?;
+        crate::add_overload!(env, fn bit_shift_left_int: (CelInt, CelInt) -> Result<CelInt>,
+            name = "math.bitShiftLeft")?;
+        crate::add_overload!(env, fn bit_shift_left_uint: (CelUInt, CelInt) -> Result<CelUInt>,
+            name = "math.bitShiftLeft")?;
+        crate::add_overload!(env, fn bit_shift_right_int: (CelInt, CelInt) -> Result<CelInt>,
+            name = "math.bitShiftRight")?;
+        crate::add_overload!(env, fn bit_shift_right_uint: (CelUInt, CelInt) -> Result<CelUInt>,
+            name = "math.bitShiftRight")?;
+        crate::add_overload!(env, fn sqrt_double: (CelDouble) -> CelDouble, name = "math.sqrt")?;
+        crate::add_overload!(env, fn sqrt_int: (CelInt) -> CelDouble, name = "math.sqrt")?;
+        crate::add_overload!(env, fn sqrt_uint: (CelUInt) -> CelDouble, name = "math.sqrt")?;
+        extreme_overloads(env, "math.@max", max)?;
+        extreme_overloads(env, "math.@min", min)?;
+        env.add_macro(Macro::receiver_var_arg(
+            "greatest",
+            |helper, target, args| extreme(helper, target, args, "greatest", "math.@max"),
+        ))?;
+        env.add_macro(Macro::receiver_var_arg("least", |helper, target, args| {
+            extreme(helper, target, args, "least", "math.@min")
+        }))?;
+        Ok(())
+    }
 }
 
 /// `math.greatest(..)` or `math.least(..)`, the `macro_name`: a call of
@@ -347,19 +364,20 @@ fn sqrt_uint(x: &CelUInt) -> CelDouble {
 
 #[cfg(test)]
 mod tests {
-    use crate::{Context, DeclarationError, Env, ExecutionError, Value};
+    use crate::{Context, Env, ExecutionError, Value};
     use std::sync::Arc;
 
     #[test]
-    fn registering_twice_is_an_error() {
+    fn adding_it_twice_registers_it_once() {
         let mut env = Env::stdlib();
         assert_eq!(env.add_extension(crate::extensions::math), Ok(()));
+        assert_eq!(env.add_extension(crate::extensions::math), Ok(()));
+        let program = env
+            .compile("math.greatest(1, math.abs(-2))")
+            .expect("This must be valid CEL");
         assert_eq!(
-            env.add_extension(crate::extensions::math),
-            Err(DeclarationError::duplicate_overload(
-                "math.ceil",
-                "math.ceil(double)"
-            ))
+            program.execute(&Context::with_env(Arc::new(env))),
+            Ok(Value::Int(2))
         );
     }
 
