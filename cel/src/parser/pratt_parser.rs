@@ -1354,13 +1354,6 @@ impl<'a> PrattParserWorker<'a> {
         id
     }
 
-    fn next_id_for_offsets(&mut self, start: u32, stop: u32) -> u64 {
-        let id = self.helper.next_id;
-        self.helper.source_info.add_offset(id, start, stop);
-        self.helper.next_id += 1;
-        id
-    }
-
     fn alloc_id(&mut self) -> u64 {
         let id = self.helper.next_id;
         self.helper.next_id += 1;
@@ -1371,6 +1364,13 @@ impl<'a> PrattParserWorker<'a> {
         self.helper
             .source_info
             .add_offset(id, tok.start as u32, tok.end as u32);
+    }
+
+    fn delete_id(&mut self, id: u64) {
+        self.helper.source_info.clear_offset(id);
+        if id + 1 == self.helper.next_id {
+            self.helper.next_id -= 1;
+        }
     }
 
     fn expect(&mut self, kind: TokenKind, msg: &str) -> bool {
@@ -1791,14 +1791,11 @@ impl<'a> PrattParserWorker<'a> {
                     if !can_be_struct_name {
                         return lhs;
                     }
-                    if let Some((start, stop)) = self.helper.source_info.offset_for(lhs.id) {
-                        if let Some(struct_name) = self.extract_struct_name(&lhs) {
-                            let obj_id = self.next_id_for_offsets(start, stop);
-                            lhs = self.parse_struct(obj_id, struct_name);
-                            can_be_struct_name = false;
-                        } else {
-                            return lhs;
-                        }
+                    if let Some(struct_name) = self.extract_struct_name(&lhs) {
+                        let peek = self.peek_tok;
+                        let obj_id = self.next_id(&peek);
+                        lhs = self.parse_struct(obj_id, struct_name);
+                        can_be_struct_name = false;
                     } else {
                         return lhs;
                     }
@@ -1810,8 +1807,12 @@ impl<'a> PrattParserWorker<'a> {
 
     fn extract_struct_name(&mut self, expr: &IdedExpr) -> Option<String> {
         match &expr.expr {
-            Expr::Ident(name) => Some(name.clone()),
+            Expr::Ident(name) => {
+                self.delete_id(expr.id);
+                Some(name.clone())
+            }
             Expr::Select(sel) if !sel.test => {
+                self.delete_id(expr.id);
                 let prefix = self.extract_struct_name(&sel.operand)?;
                 Some(format!("{}.{}", prefix, sel.field))
             }
@@ -3121,24 +3122,24 @@ mod tests {
             },
             TestInfo {
                 i: "foo{ }",
-                p: "foo{}^#2:*expr.Expr_StructExpr#",
+                p: "foo{}^#1:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
             },
             TestInfo {
                 i: "foo{ a:b }",
                 p: "foo{
-    a:b^#4:*expr.Expr_IdentExpr#^#3:*expr.Expr_CreateStruct_Entry#
-}^#2:*expr.Expr_StructExpr#",
+    a:b^#3:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
+}^#1:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
             },
             TestInfo {
                 i: "foo{ a:b, c:d }",
                 p: "foo{
-    a:b^#4:*expr.Expr_IdentExpr#^#3:*expr.Expr_CreateStruct_Entry#,
-    c:d^#6:*expr.Expr_IdentExpr#^#5:*expr.Expr_CreateStruct_Entry#
-}^#2:*expr.Expr_StructExpr#",
+    a:b^#3:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#,
+    c:d^#5:*expr.Expr_IdentExpr#^#4:*expr.Expr_CreateStruct_Entry#
+}^#1:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
             },
@@ -3476,8 +3477,8 @@ ERROR: <input>:1:6: unsupported syntax '?'
             TestInfo {
                 i: "Msg{?field: value}",
                 p: r#"Msg{
-    ?field:value^#4:*expr.Expr_IdentExpr#^#3:*expr.Expr_CreateStruct_Entry#
-}^#2:*expr.Expr_StructExpr#"#,
+    ?field:value^#3:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
+}^#1:*expr.Expr_StructExpr#"#,
                 e: "",
                 enable_optional_syntax: true,
             },
@@ -3624,19 +3625,19 @@ ERROR: <input>:1:3: Syntax error: mismatched input 'x' expecting <EOF>
             },
             TestInfo {
                 i: "import{}",
-                p: "import{}^#2:*expr.Expr_StructExpr#",
+                p: "import{}^#1:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
             },
             TestInfo {
                 i: ".import{}",
-                p: ".import{}^#2:*expr.Expr_StructExpr#",
+                p: ".import{}^#1:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
             },
             TestInfo {
                 i: "import.Foo{}",
-                p: "import.Foo{}^#3:*expr.Expr_StructExpr#",
+                p: "import.Foo{}^#1:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
             },
