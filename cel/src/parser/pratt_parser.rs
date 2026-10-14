@@ -341,39 +341,16 @@ impl<'a> Lexer<'a> {
         }
     }
 
-    fn consume_until_after(&mut self, quote: u8) -> bool {
-        for pos in self.pos..self.length {
-            if self.bytes[pos] == quote {
-                self.pos = pos + 1;
-                return true;
-            }
-        }
-        self.pos = self.length;
-        false
-    }
-
-    fn consume_until_after_triple(&mut self, quote: u8) -> bool {
-        let mut pos = self.pos;
-        while pos + 3 <= self.length {
-            if self.bytes[pos] == quote
-                && self.bytes[pos + 1] == quote
-                && self.bytes[pos + 2] == quote
-            {
-                self.pos = pos + 3;
-                return true;
-            }
-            pos += 1;
-        }
-        self.pos = self.length;
-        false
-    }
-
-    fn consume_until_after_unescaped(&mut self, quote: u8) -> bool {
+    fn consume_until_after(&mut self, quote: u8, is_raw: bool) -> bool {
         let mut pos = self.pos;
         let mut escaped = false;
         while pos < self.length {
             let b = self.bytes[pos];
-            if b == b'\\' {
+            if b == b'\n' || b == b'\r' {
+                self.pos = pos;
+                return false;
+            }
+            if !is_raw && b == b'\\' {
                 escaped = !escaped;
             } else {
                 if b == quote && !escaped {
@@ -388,12 +365,12 @@ impl<'a> Lexer<'a> {
         false
     }
 
-    fn consume_until_after_unescaped_triple(&mut self, quote: u8) -> bool {
+    fn consume_until_after_triple(&mut self, quote: u8, is_raw: bool) -> bool {
         let mut pos = self.pos;
         let mut escaped = false;
         while pos < self.length {
             let b = self.bytes[pos];
-            if b == b'\\' {
+            if !is_raw && b == b'\\' {
                 escaped = !escaped;
             } else {
                 if !escaped
@@ -416,7 +393,7 @@ impl<'a> Lexer<'a> {
     fn consume_quoted_ident(&mut self) -> Token {
         let start = self.pos;
         self.advance(1);
-        if !self.consume_until_after(b'`') {
+        if !self.consume_until_after(b'`', true) {
             return self.set_error(
                 start,
                 self.pos,
@@ -439,12 +416,7 @@ impl<'a> Lexer<'a> {
             && self.bytes[self.pos + 1] == quote
         {
             self.advance(2);
-            let found = if is_raw {
-                self.consume_until_after_triple(quote)
-            } else {
-                self.consume_until_after_unescaped_triple(quote)
-            };
-            if !found {
+            if !self.consume_until_after_triple(quote, is_raw) {
                 let msg = if is_bytes {
                     "unterminated bytes literal"
                 } else {
@@ -459,12 +431,7 @@ impl<'a> Lexer<'a> {
             };
             return self.make_token(kind, start, self.pos);
         }
-        let found = if is_raw {
-            self.consume_until_after(quote)
-        } else {
-            self.consume_until_after_unescaped(quote)
-        };
-        if !found {
+        if !self.consume_until_after(quote, is_raw) {
             let msg = if is_bytes {
                 "unterminated bytes literal"
             } else {
@@ -1267,16 +1234,12 @@ impl<'a> PrattParserWorker<'a> {
         if !self.recursion_limit_exceeded
             && !self.is_recovery_limit_exceeded()
             && self.peek_tok.kind != TokenKind::TokEnd
+            && self.peek_tok.kind != TokenKind::TokError
         {
-            if self.peek_tok.kind != TokenKind::TokError {
-                let peek = self.peek_tok;
-                let text = self.token_text(&peek);
-                let err_msg = format!("Syntax error: mismatched input '{text}' expecting <EOF>");
-                self.report_error(&peek, err_msg);
-            }
-            while self.peek_tok.kind != TokenKind::TokEnd && !self.is_recovery_limit_exceeded() {
-                self.next_token();
-            }
+            let peek = self.peek_tok;
+            let text = self.token_text(&peek);
+            let err_msg = format!("Syntax error: mismatched input '{text}' expecting <EOF>");
+            self.report_error(&peek, err_msg);
         }
         if self.is_recovery_limit_exceeded() {
             let msg = format!(
@@ -3371,10 +3334,7 @@ _?_:_(
 | ^
 ERROR: <input>:1:2: unexpected character
 | *@a | b
-| .^
-ERROR: <input>:1:5: unexpected single '|', expected '||'
-| *@a | b
-| ....^",
+| .^",
                 ..Default::default()
             },
             TestInfo {
@@ -3495,6 +3455,46 @@ ERROR: <input>:1:24: unsupported syntax '?'
                 e: "ERROR: <input>:1:9: unexpected token
 | foo(a,b,)
 | ........^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "'''hello\nworld'''",
+                p: "\"hello\nworld\"^#1:*expr.Constant_StringValue#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "\"\"\"hello\nworld\"\"\"",
+                p: "\"hello\nworld\"^#1:*expr.Constant_StringValue#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "r\"\"\"hello\nworld\"\"\"",
+                p: "\"hello\nworld\"^#1:*expr.Constant_StringValue#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "\"hello\nworld\"",
+                p: "",
+                e: "ERROR: <input>:1:1: unterminated string literal
+| \"hello
+| ^
+ERROR: <input>:2:1: Syntax error: mismatched input 'world' expecting <EOF>
+| world\"
+| ^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "r\"hello\nworld\"",
+                p: "",
+                e: "ERROR: <input>:1:1: unterminated string literal
+| r\"hello
+| ^
+ERROR: <input>:2:1: Syntax error: mismatched input 'world' expecting <EOF>
+| world\"
+| ^",
                 ..Default::default()
             },
         ];
