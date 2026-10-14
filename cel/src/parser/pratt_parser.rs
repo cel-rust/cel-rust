@@ -301,7 +301,7 @@ impl<'a> Lexer<'a> {
     fn consume_whitespace(&mut self) {
         while self.pos < self.length {
             match self.bytes[self.pos] {
-                b'\x0C' | b'\n' | b' ' | b'\r' | b'\x0B' | b'\t' => {
+                b'\x0C' | b'\n' | b' ' | b'\r' | b'\t' => {
                     self.advance(1);
                 }
                 _ => return,
@@ -501,17 +501,6 @@ impl<'a> Lexer<'a> {
                     );
                 }
                 let tok_type = self.consume_integral_suffix();
-                if self.pos < self.length && is_ident_trailing(self.bytes[self.pos]) {
-                    self.advance(1);
-                    return self.set_error(
-                        start,
-                        self.pos,
-                        format!(
-                            "{} literal has unexpected trailing characters",
-                            tok_type.as_str()
-                        ),
-                    );
-                }
                 return self.make_token(tok_type, start, self.pos);
             }
             let _ = self.consume_digits();
@@ -545,17 +534,6 @@ impl<'a> Lexer<'a> {
         } else {
             self.consume_integral_suffix()
         };
-        if self.pos < self.length && is_ident_trailing(self.bytes[self.pos]) {
-            self.advance(1);
-            return self.set_error(
-                start,
-                self.pos,
-                format!(
-                    "{} literal has unexpected trailing characters",
-                    tok_type.as_str()
-                ),
-            );
-        }
         self.make_token(tok_type, start, self.pos)
     }
 
@@ -586,7 +564,7 @@ impl<'a> Lexer<'a> {
         }
         let c = self.bytes[self.pos];
         match c {
-            b'\x0C' | b'\x0B' | b'\t' | b'\r' | b'\n' | b' ' => {
+            b'\x0C' | b'\t' | b'\r' | b'\n' | b' ' => {
                 self.consume_whitespace();
                 self.make_token(TokenKind::TokWhitespace, start, self.pos)
             }
@@ -1322,6 +1300,43 @@ impl<'a> PrattParserWorker<'a> {
         self.curr_tok
     }
 
+    fn scan_next_significant_token(&mut self) -> Token {
+        loop {
+            let tok = self.lexer.lex();
+            if tok.kind == TokenKind::TokWhitespace || tok.kind == TokenKind::TokComment {
+                continue;
+            }
+            return tok;
+        }
+    }
+
+    fn is_struct_creation_ahead(&mut self) -> bool {
+        if self.peek_tok.kind == TokenKind::TokLeftBrace {
+            return true;
+        }
+        if self.peek_tok.kind != TokenKind::TokDot {
+            return false;
+        }
+        let saved_pos = self.lexer.save_position();
+        let mut tok = self.peek_tok;
+        while tok.kind == TokenKind::TokDot {
+            tok = self.scan_next_significant_token();
+            if tok.kind != TokenKind::TokIdent && tok.kind != TokenKind::TokReservedWord {
+                self.lexer.restore_position(saved_pos);
+                return false;
+            }
+            let text = self.token_text(&tok);
+            if text.starts_with('`') {
+                self.lexer.restore_position(saved_pos);
+                return false;
+            }
+            tok = self.scan_next_significant_token();
+        }
+        let res = tok.kind == TokenKind::TokLeftBrace;
+        self.lexer.restore_position(saved_pos);
+        res
+    }
+
     fn token_text(&self, tok: &Token) -> &'a str {
         if tok.start <= self.length && tok.end <= self.length && tok.start <= tok.end {
             &self.source[tok.start..tok.end]
@@ -1502,12 +1517,23 @@ impl<'a> PrattParserWorker<'a> {
         }
     }
 
-    fn normalize_ident(&mut self, tok: &Token, allow_quoted: bool) -> String {
+    fn normalize_ident(
+        &mut self,
+        tok: &Token,
+        allow_quoted: bool,
+        mut is_quoted: Option<&mut bool>,
+    ) -> String {
+        if let Some(q) = is_quoted.as_deref_mut() {
+            *q = false;
+        }
         let text = self.token_text(tok);
         if text.is_empty() {
             return String::new();
         }
         if text.starts_with('`') {
+            if let Some(q) = is_quoted {
+                *q = true;
+            }
             if !allow_quoted {
                 self.report_error(tok, "unexpected quoted identifier".to_string());
                 return String::new();
@@ -1637,11 +1663,25 @@ impl<'a> PrattParserWorker<'a> {
     }
 
     fn parse_selector_chain(&mut self) -> IdedExpr {
-        let lhs = self.parse_unary();
-        self.parse_selector_chain_tail(lhs)
+        let tok = self.peek_tok.kind;
+        if tok == TokenKind::TokExclamation || tok == TokenKind::TokMinus {
+            self.parse_unary_ops()
+        } else {
+            self.parse_member()
+        }
     }
 
-    fn parse_selector_chain_tail(&mut self, mut lhs: IdedExpr) -> IdedExpr {
+    fn parse_member(&mut self) -> IdedExpr {
+        let mut can_be_struct_name = false;
+        let lhs = self.parse_primary(&mut can_be_struct_name);
+        self.parse_selector_chain_tail(lhs, can_be_struct_name)
+    }
+
+    fn parse_selector_chain_tail(
+        &mut self,
+        mut lhs: IdedExpr,
+        mut can_be_struct_name: bool,
+    ) -> IdedExpr {
         loop {
             match self.peek_tok.kind {
                 TokenKind::TokDot => {
@@ -1668,10 +1708,12 @@ impl<'a> PrattParserWorker<'a> {
                         return lhs;
                     }
                     let is_member_call = self.peek_tok.kind == TokenKind::TokLeftParen;
-                    let field = self.normalize_ident(&field_tok, !is_member_call);
+                    let mut is_quoted = false;
+                    let field =
+                        self.normalize_ident(&field_tok, !is_member_call, Some(&mut is_quoted));
                     if optional {
-                        let op_id = self.next_id(&dot_tok);
                         let field_id = self.next_id(&field_tok);
+                        let op_id = self.next_id(&dot_tok);
                         let str_expr = IdedExpr {
                             id: field_id,
                             expr: Expr::Literal(LiteralValue::String(field.into())),
@@ -1684,6 +1726,7 @@ impl<'a> PrattParserWorker<'a> {
                                 args: vec![lhs, str_expr],
                             }),
                         };
+                        can_be_struct_name = false;
                     } else if is_member_call {
                         let lparen = self.next_token();
                         let call_id = self.next_id(&lparen);
@@ -1702,6 +1745,7 @@ impl<'a> PrattParserWorker<'a> {
                                 }),
                             };
                         }
+                        can_be_struct_name = false;
                     } else {
                         let dot_id = self.next_id(&dot_tok);
                         lhs = IdedExpr {
@@ -1712,6 +1756,7 @@ impl<'a> PrattParserWorker<'a> {
                                 test: false,
                             }),
                         };
+                        can_be_struct_name = can_be_struct_name && !is_quoted;
                     }
                 }
                 TokenKind::TokLeftBracket => {
@@ -1722,7 +1767,7 @@ impl<'a> PrattParserWorker<'a> {
                         self.next_token();
                         optional = true;
                         if !self.enable_optional_syntax {
-                            self.report_error(&bracket_tok, "unsupported syntax '?'".to_string());
+                            self.report_error(&bracket_tok, "unsupported syntax '[?'".to_string());
                         }
                     }
                     let index = self.parse_expr();
@@ -1740,12 +1785,17 @@ impl<'a> PrattParserWorker<'a> {
                             args: vec![lhs, index],
                         }),
                     };
+                    can_be_struct_name = false;
                 }
                 TokenKind::TokLeftBrace => {
+                    if !can_be_struct_name {
+                        return lhs;
+                    }
                     if let Some((start, stop)) = self.helper.source_info.offset_for(lhs.id) {
                         if let Some(struct_name) = self.extract_struct_name(&lhs) {
                             let obj_id = self.next_id_for_offsets(start, stop);
                             lhs = self.parse_struct(obj_id, struct_name);
+                            can_be_struct_name = false;
                         } else {
                             return lhs;
                         }
@@ -1790,7 +1840,7 @@ impl<'a> PrattParserWorker<'a> {
                 self.synchronize_on_delimiter();
                 break;
             }
-            let field_name = self.normalize_ident(&field_tok, true);
+            let field_name = self.normalize_ident(&field_tok, true, None);
             let colon_tok = self.peek_tok;
             if !self.expect(TokenKind::TokColon, "expected ':' in struct field") {
                 break;
@@ -1821,74 +1871,70 @@ impl<'a> PrattParserWorker<'a> {
         }
     }
 
-    fn parse_unary(&mut self) -> IdedExpr {
-        let tok = self.peek_tok.kind;
-        if tok == TokenKind::TokExclamation || tok == TokenKind::TokMinus {
-            let first_op = self.next_token();
-            self.parse_unary_ops_chain(first_op)
-        } else {
-            self.parse_primary()
-        }
-    }
-
-    fn parse_unary_ops_chain(&mut self, first_op: Token) -> IdedExpr {
-        struct UnaryOp {
-            token: Token,
-            id: u64,
-        }
-        let mut ops = vec![UnaryOp {
-            token: first_op,
-            id: 0,
-        }];
-        while self.peek_tok.kind == TokenKind::TokExclamation
-            || self.peek_tok.kind == TokenKind::TokMinus
-        {
-            ops.push(UnaryOp {
-                token: self.next_token(),
-                id: 0,
-            });
+    fn parse_unary_ops(&mut self) -> IdedExpr {
+        let first_op = self.next_token();
+        let op_type = first_op.kind;
+        let mut ops = vec![first_op];
+        while self.peek_tok.kind == op_type {
+            ops.push(self.next_token());
         }
 
-        let has_solitary_trailing_minus = !ops.is_empty()
-            && ops[ops.len() - 1].token.kind == TokenKind::TokMinus
-            && (ops.len() == 1 || ops[ops.len() - 2].token.kind != TokenKind::TokMinus);
-
-        let mut write = 0;
-        let mut read = 0;
-        while read < ops.len() {
-            let mut next = read;
-            while next < ops.len() && ops[next].token.kind == ops[read].token.kind {
-                next += 1;
-            }
-            if (next - read) % 2 != 0 {
-                ops.swap(write, read);
-                write += 1;
-            }
-            read = next;
-        }
-        ops.truncate(write);
-
-        for op in &mut ops {
-            let tok = op.token;
-            op.id = self.next_id(&tok);
-        }
-
-        let mut operand = if has_solitary_trailing_minus
+        if op_type == TokenKind::TokMinus
+            && ops.len() == 1
             && (self.peek_tok.kind == TokenKind::TokInt
                 || self.peek_tok.kind == TokenKind::TokFloat)
         {
-            let last_op = ops.pop().expect("expected trailing minus op");
-            let lit = if self.peek_tok.kind == TokenKind::TokInt {
-                self.parse_negative_int_literal(last_op.id)
+            let op_id = self.next_id(&first_op);
+            let mut lhs = if self.peek_tok.kind == TokenKind::TokInt {
+                self.parse_negative_int_literal(op_id)
             } else {
-                self.parse_negative_double_literal(last_op.id)
+                self.parse_negative_double_literal(op_id)
             };
-            self.parse_selector_chain_tail(lit)
-        } else {
-            self.parse_selector_chain()
-        };
+            let tok = self.peek_tok.kind;
+            if tok == TokenKind::TokDot
+                || tok == TokenKind::TokLeftBracket
+                || tok == TokenKind::TokLeftBrace
+            {
+                lhs = self.parse_selector_chain_tail(lhs, false);
+            }
+            return lhs;
+        }
 
-        for op in ops.into_iter().rev() {
+        if ops.len() % 2 == 0 {
+            ops.clear();
+        } else {
+            ops.truncate(1);
+        }
+
+        struct UnaryOpWithId {
+            token: Token,
+            id: u64,
+        }
+        let mut retained_ops = Vec::with_capacity(ops.len());
+        for op in ops {
+            let id = self.next_id(&op);
+            retained_ops.push(UnaryOpWithId { token: op, id });
+        }
+
+        let mut operand =
+            if op_type == TokenKind::TokExclamation && self.peek_tok.kind == TokenKind::TokMinus {
+                let minus_tok = self.next_token();
+                let minus_id = self.next_id(&minus_tok);
+                if self.peek_tok.kind == TokenKind::TokInt {
+                    let lit = self.parse_negative_int_literal(minus_id);
+                    self.parse_selector_chain_tail(lit, false)
+                } else if self.peek_tok.kind == TokenKind::TokFloat {
+                    let lit = self.parse_negative_double_literal(minus_id);
+                    self.parse_selector_chain_tail(lit, false)
+                } else {
+                    self.report_error(&minus_tok, "unexpected '-'".to_string());
+                    self.parse_member()
+                }
+            } else {
+                self.parse_member()
+            };
+
+        for op in retained_ops.into_iter().rev() {
             let op_name = if op.token.kind == TokenKind::TokMinus {
                 operators::NEGATE.to_string()
             } else {
@@ -1952,7 +1998,8 @@ impl<'a> PrattParserWorker<'a> {
         }
     }
 
-    fn parse_primary(&mut self) -> IdedExpr {
+    fn parse_primary(&mut self, can_be_struct_name: &mut bool) -> IdedExpr {
+        *can_be_struct_name = false;
         match self.peek_tok.kind {
             TokenKind::TokLeftParen => {
                 let grouping_count = self.count_grouping_parentheses();
@@ -1997,7 +2044,7 @@ impl<'a> PrattParserWorker<'a> {
             TokenKind::TokLeftBracket => self.parse_list(),
             TokenKind::TokLeftBrace => self.parse_map(),
             TokenKind::TokDot | TokenKind::TokIdent | TokenKind::TokReservedWord => {
-                self.parse_ident_or_call()
+                self.parse_ident_or_call(can_be_struct_name)
             }
             _ => {
                 let bad_tok = self.next_token();
@@ -2107,7 +2154,7 @@ impl<'a> PrattParserWorker<'a> {
         }
     }
 
-    fn parse_ident_or_call(&mut self) -> IdedExpr {
+    fn parse_ident_or_call(&mut self, can_be_struct_name: &mut bool) -> IdedExpr {
         let mut leading_dot = false;
         let first_tok = self.peek_tok;
         if self.peek_tok.kind == TokenKind::TokDot {
@@ -2119,13 +2166,18 @@ impl<'a> PrattParserWorker<'a> {
             if id_tok.kind != TokenKind::TokError {
                 self.report_error(&id_tok, "expected identifier".to_string());
             }
+            *can_be_struct_name = false;
             return IdedExpr {
                 id: self.next_id(&id_tok),
                 expr: Expr::Unspecified,
             };
         }
-        let id_text = self.normalize_ident(&id_tok, false);
-        if id_tok.kind == TokenKind::TokReservedWord && RESERVED_IDS.contains(&id_text.as_str()) {
+        let mut is_quoted = false;
+        let id_text = self.normalize_ident(&id_tok, false, Some(&mut is_quoted));
+        if id_tok.kind == TokenKind::TokReservedWord
+            && RESERVED_IDS.contains(&id_text.as_str())
+            && !self.is_struct_creation_ahead()
+        {
             self.report_error(&id_tok, format!("reserved identifier: {id_text}"));
         }
         let mut name = id_text;
@@ -2136,8 +2188,10 @@ impl<'a> PrattParserWorker<'a> {
             let lparen = self.next_token();
             let call_id = self.next_id(&lparen);
             let args = self.parse_arguments(TokenKind::TokRightParen);
+            *can_be_struct_name = false;
             return self.global_call_or_macro(call_id, name, args);
         }
+        *can_be_struct_name = !is_quoted;
         let target_tok = if leading_dot { first_tok } else { id_tok };
         let id = self.next_id(&target_tok);
         IdedExpr {
@@ -3357,7 +3411,7 @@ ERROR: <input>:1:2: unexpected character
                 e: "ERROR: <input>:1:2: unsupported syntax '.?'
 | a.?b && a[?b]
 | .^
-ERROR: <input>:1:10: unsupported syntax '?'
+ERROR: <input>:1:10: unsupported syntax '[?'
 | a.?b && a[?b]
 | .........^",
                 enable_optional_syntax: false,
@@ -3368,8 +3422,8 @@ ERROR: <input>:1:10: unsupported syntax '?'
     _[?_](
         _?._(
             a^#1:*expr.Expr_IdentExpr#,
-            "b"^#3:*expr.Constant_StringValue#
-        )^#2:*expr.Expr_CallExpr#,
+            "b"^#2:*expr.Constant_StringValue#
+        )^#3:*expr.Expr_CallExpr#,
         0^#5:*expr.Constant_Int64Value#
     )^#4:*expr.Expr_CallExpr#,
     _[?_](
@@ -3518,6 +3572,71 @@ ERROR: <input>:2:1: Syntax error: mismatched input 'world' expecting <EOF>
             TestInfo {
                 i: "!!a",
                 p: "a^#1:*expr.Expr_IdentExpr#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "z\u{b}",
+                p: "",
+                e: "ERROR: <input>:1:2: unexpected character
+| z\u{b}
+| .^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "9in-x",
+                p: "@in(\n    9^#1:*expr.Constant_Int64Value#,\n    -_(\n        x^#4:*expr.Expr_IdentExpr#\n    )^#3:*expr.Expr_CallExpr#\n)^#2:*expr.Expr_CallExpr#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "!-42",
+                p: "!_(\n    -42^#2:*expr.Constant_Int64Value#\n)^#1:*expr.Expr_CallExpr#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "!-x",
+                p: "",
+                e: "ERROR: <input>:1:2: unexpected '-'
+| !-x
+| .^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "-!x",
+                p: "",
+                e: "ERROR: <input>:1:2: unexpected token
+| -!x
+| .^
+ERROR: <input>:1:3: Syntax error: mismatched input 'x' expecting <EOF>
+| -!x
+| ..^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "(a){}",
+                p: "",
+                e: "ERROR: <input>:1:4: Syntax error: mismatched input '{' expecting <EOF>
+| (a){}
+| ...^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "import{}",
+                p: "import{}^#2:*expr.Expr_StructExpr#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: ".import{}",
+                p: ".import{}^#2:*expr.Expr_StructExpr#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "import.Foo{}",
+                p: "import.Foo{}^#3:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
             },
