@@ -1346,6 +1346,18 @@ impl<'a> PrattParserWorker<'a> {
         id
     }
 
+    fn alloc_id(&mut self) -> u64 {
+        let id = self.helper.next_id;
+        self.helper.next_id += 1;
+        id
+    }
+
+    fn set_token_location(&mut self, id: u64, tok: &Token) {
+        self.helper
+            .source_info
+            .add_offset(id, tok.start as u32, tok.end as u32);
+    }
+
     fn expect(&mut self, kind: TokenKind, msg: &str) -> bool {
         if self.peek_tok.kind == kind {
             self.next_token();
@@ -1467,6 +1479,26 @@ impl<'a> PrattParserWorker<'a> {
             }
         } else {
             None
+        }
+    }
+
+    fn global_call_or_macro(
+        &mut self,
+        id: u64,
+        func_name: String,
+        args: Vec<IdedExpr>,
+    ) -> IdedExpr {
+        if let Some(expr) = self.expand_macro(id, &func_name, None, args.clone()) {
+            expr
+        } else {
+            IdedExpr {
+                id,
+                expr: Expr::Call(CallExpr {
+                    target: None,
+                    func_name,
+                    args,
+                }),
+            }
         }
     }
 
@@ -1792,96 +1824,77 @@ impl<'a> PrattParserWorker<'a> {
     fn parse_unary(&mut self) -> IdedExpr {
         let tok = self.peek_tok.kind;
         if tok == TokenKind::TokExclamation || tok == TokenKind::TokMinus {
-            self.parse_unary_ops()
+            let first_op = self.next_token();
+            self.parse_unary_ops_chain(first_op)
         } else {
             self.parse_primary()
         }
     }
 
-    fn parse_unary_ops(&mut self) -> IdedExpr {
-        let op = self.next_token();
-        if self.peek_tok.kind == TokenKind::TokExclamation
-            || self.peek_tok.kind == TokenKind::TokMinus
-        {
-            return self.parse_unary_ops_chain(op);
-        }
-
-        let op_id = self.next_id(&op);
-        if op.kind == TokenKind::TokMinus {
-            if self.peek_tok.kind == TokenKind::TokInt {
-                return self.parse_negative_int_literal(op_id);
-            }
-            if self.peek_tok.kind == TokenKind::TokFloat {
-                return self.parse_negative_double_literal(op_id);
-            }
-            let operand = self.parse_selector_chain();
-            IdedExpr {
-                id: op_id,
-                expr: Expr::Call(CallExpr {
-                    target: None,
-                    func_name: operators::NEGATE.to_string(),
-                    args: vec![operand],
-                }),
-            }
-        } else {
-            let operand = self.parse_selector_chain();
-            IdedExpr {
-                id: op_id,
-                expr: Expr::Call(CallExpr {
-                    target: None,
-                    func_name: operators::LOGICAL_NOT.to_string(),
-                    args: vec![operand],
-                }),
-            }
-        }
-    }
-
     fn parse_unary_ops_chain(&mut self, first_op: Token) -> IdedExpr {
-        struct UnaryOpInfo {
-            kind: TokenKind,
+        struct UnaryOp {
+            token: Token,
             id: u64,
         }
-        let first_id = self.next_id(&first_op);
-        let mut raw_ops = vec![UnaryOpInfo {
-            kind: first_op.kind,
-            id: first_id,
+        let mut ops = vec![UnaryOp {
+            token: first_op,
+            id: 0,
         }];
-
         while self.peek_tok.kind == TokenKind::TokExclamation
             || self.peek_tok.kind == TokenKind::TokMinus
         {
-            let op = self.next_token();
-            let id = self.next_id(&op);
-            raw_ops.push(UnaryOpInfo { kind: op.kind, id });
+            ops.push(UnaryOp {
+                token: self.next_token(),
+                id: 0,
+            });
         }
 
-        let mut ops: Vec<UnaryOpInfo> = Vec::new();
-        for op in raw_ops {
-            if let Some(last) = ops.last() {
-                if last.kind == op.kind {
-                    ops.pop();
-                    continue;
-                }
+        let has_solitary_trailing_minus = !ops.is_empty()
+            && ops[ops.len() - 1].token.kind == TokenKind::TokMinus
+            && (ops.len() == 1 || ops[ops.len() - 2].token.kind != TokenKind::TokMinus);
+
+        let mut write = 0;
+        let mut read = 0;
+        while read < ops.len() {
+            let mut next = read;
+            while next < ops.len() && ops[next].token.kind == ops[read].token.kind {
+                next += 1;
             }
-            ops.push(op);
+            if (next - read) % 2 != 0 {
+                ops.swap(write, read);
+                write += 1;
+            }
+            read = next;
+        }
+        ops.truncate(write);
+
+        for op in &mut ops {
+            let tok = op.token;
+            op.id = self.next_id(&tok);
         }
 
-        let mut operand = self.parse_selector_chain();
+        let mut operand = if has_solitary_trailing_minus
+            && (self.peek_tok.kind == TokenKind::TokInt
+                || self.peek_tok.kind == TokenKind::TokFloat)
+        {
+            let last_op = ops.pop().expect("expected trailing minus op");
+            let lit = if self.peek_tok.kind == TokenKind::TokInt {
+                self.parse_negative_int_literal(last_op.id)
+            } else {
+                self.parse_negative_double_literal(last_op.id)
+            };
+            self.parse_selector_chain_tail(lit)
+        } else {
+            self.parse_selector_chain()
+        };
 
         for op in ops.into_iter().rev() {
-            let func_name = if op.kind == TokenKind::TokMinus {
+            let op_name = if op.token.kind == TokenKind::TokMinus {
                 operators::NEGATE.to_string()
             } else {
                 operators::LOGICAL_NOT.to_string()
             };
-            operand = IdedExpr {
-                id: op.id,
-                expr: Expr::Call(CallExpr {
-                    target: None,
-                    func_name,
-                    args: vec![operand],
-                }),
-            };
+            operand = self.global_call_or_macro(op.id, op_name, vec![operand]);
         }
         operand
     }
@@ -2062,12 +2075,13 @@ impl<'a> PrattParserWorker<'a> {
                     self.report_error(&q, "unsupported syntax '?'".to_string());
                 }
             }
+            let entry_id = self.alloc_id();
             let key = self.parse_expr();
             let colon_tok = self.peek_tok;
             if !self.expect(TokenKind::TokColon, "expected ':' in map entry") {
                 break;
             }
-            let entry_id = self.next_id(&colon_tok);
+            self.set_token_location(entry_id, &colon_tok);
             let val = self.parse_expr();
             entries.push(IdedEntryExpr {
                 id: entry_id,
@@ -2118,22 +2132,14 @@ impl<'a> PrattParserWorker<'a> {
         if leading_dot {
             name = format!(".{name}");
         }
-        let id = self.next_id(&first_tok);
         if self.peek_tok.kind == TokenKind::TokLeftParen {
-            self.next_token();
+            let lparen = self.next_token();
+            let call_id = self.next_id(&lparen);
             let args = self.parse_arguments(TokenKind::TokRightParen);
-            if let Some(expr) = self.expand_macro(id, &name, None, args.clone()) {
-                return expr;
-            }
-            return IdedExpr {
-                id,
-                expr: Expr::Call(CallExpr {
-                    target: None,
-                    func_name: name,
-                    args,
-                }),
-            };
+            return self.global_call_or_macro(call_id, name, args);
         }
+        let target_tok = if leading_dot { first_tok } else { id_tok };
+        let id = self.next_id(&target_tok);
         IdedExpr {
             id,
             expr: Expr::Ident(name),
@@ -3091,8 +3097,8 @@ mod tests {
             TestInfo {
                 i: "{a: b, c: d}",
                 p: "{
-    a^#2:*expr.Expr_IdentExpr#:b^#4:*expr.Expr_IdentExpr#^#3:*expr.Expr_CreateStruct_Entry#,
-    c^#5:*expr.Expr_IdentExpr#:d^#7:*expr.Expr_IdentExpr#^#6:*expr.Expr_CreateStruct_Entry#
+    a^#3:*expr.Expr_IdentExpr#:b^#4:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#,
+    c^#6:*expr.Expr_IdentExpr#:d^#7:*expr.Expr_IdentExpr#^#5:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#",
                 e: "",
                 ..Default::default()
@@ -3377,7 +3383,7 @@ ERROR: <input>:1:10: unsupported syntax '?'
             TestInfo {
                 i: "{?'key': value}",
                 p: r#"{
-    ?"key"^#2:*expr.Constant_StringValue#:value^#4:*expr.Expr_IdentExpr#^#3:*expr.Expr_CreateStruct_Entry#
+    ?"key"^#3:*expr.Constant_StringValue#:value^#4:*expr.Expr_IdentExpr#^#2:*expr.Expr_CreateStruct_Entry#
 }^#1:*expr.Expr_StructExpr#"#,
                 e: "",
                 enable_optional_syntax: true,
@@ -3495,6 +3501,24 @@ ERROR: <input>:2:1: Syntax error: mismatched input 'world' expecting <EOF>
 ERROR: <input>:2:1: Syntax error: mismatched input 'world' expecting <EOF>
 | world\"
 | ^",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "-1.foo",
+                p: "-1^#1:*expr.Constant_Int64Value#.foo^#2:*expr.Expr_SelectExpr#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "-42[0]",
+                p: "_[_](\n    -42^#1:*expr.Constant_Int64Value#,\n    0^#3:*expr.Constant_Int64Value#\n)^#2:*expr.Expr_CallExpr#",
+                e: "",
+                ..Default::default()
+            },
+            TestInfo {
+                i: "!!a",
+                p: "a^#1:*expr.Expr_IdentExpr#",
+                e: "",
                 ..Default::default()
             },
         ];
