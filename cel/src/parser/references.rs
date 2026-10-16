@@ -94,7 +94,7 @@ impl IdedExpr {
         match &self.expr {
             Expr::Unspecified => {}
             Expr::Call(call) => {
-                functions.insert(&call.func_name);
+                functions.insert(without_leading_dot(&call.func_name));
                 if let Some(target) = &call.target {
                     target._references(variables, functions);
                 }
@@ -112,7 +112,7 @@ impl IdedExpr {
             Expr::Ident(name) => {
                 // todo! Might want to make this "smarter" (are we in a comprehension?) and better encode these in const
                 if !name.starts_with('@') {
-                    variables.insert(name);
+                    variables.insert(without_leading_dot(name));
                 }
             }
             Expr::List(list) => {
@@ -152,4 +152,10 @@ impl IdedExpr {
             }
         }
     }
+}
+
+/// The name a leading-dot reference (`.x`, `.f(1)`) is resolved by: the dot
+/// only makes the name absolute, so it is not part of what the caller binds.
+fn without_leading_dot(name: &str) -> &str {
+    name.strip_prefix('.').unwrap_or(name)
 }
