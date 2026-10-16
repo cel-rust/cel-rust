@@ -24,7 +24,7 @@ reqwest = { version = "0.13.3", default-features = false, features = ["blocking"
 thiserror = "1.0"
 chrono = "0.4.44"
 walkdir = "2.5"
-zip = { version = "8.6", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.3", default-features = false, features = ["deflate"] }
 
 [build-dependencies]
 cargo_toml = "0.22.3"
