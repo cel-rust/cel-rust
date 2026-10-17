@@ -204,6 +204,10 @@ impl SourceInfo {
         self.offsets.insert(id, OffsetRange { start, stop });
     }
 
+    pub fn clear_offset(&mut self, id: u64) {
+        self.offsets.remove(&id);
+    }
+
     pub fn offset_for(&self, id: u64) -> Option<(u32, u32)> {
         self.offsets.get(&id).map(|range| (range.start, range.stop))
     }
