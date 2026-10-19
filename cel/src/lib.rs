@@ -548,6 +548,14 @@ mod tests {
     }
 
     #[test]
+    fn references_leading_dot() {
+        let p = Program::compile(".x.a + x.a + .f(1) + f(1)").unwrap();
+        assert_eq!(p.references().variables(), vec!["x"]);
+        assert!(p.references().has_function("f"));
+        assert!(!p.references().has_function(".f"));
+    }
+
+    #[test]
     fn test_execution_errors() {
         let tests = vec![
             (
