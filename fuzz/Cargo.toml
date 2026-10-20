@@ -14,6 +14,7 @@ chrono = "0.4.41"
 
 [dependencies.cel]
 path = "../cel"
+features = ["parser_pratt"]
 
 [[bin]]
 name = "value_binop"
@@ -25,6 +26,13 @@ bench = false
 [[bin]]
 name = "program_compile"
 path = "fuzz_targets/program_compile.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_pratt_parser"
+path = "fuzz_targets/fuzz_pratt_parser.rs"
 test = false
 doc = false
 bench = false
