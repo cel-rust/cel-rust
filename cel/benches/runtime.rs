@@ -29,7 +29,7 @@ const EXPRESSIONS: [(&str, &str); 34] = [
     ("size_map", "{1:2}.size()"),
     ("size_map_2", "size({1:2})"),
     ("member", "foo.bar"),
-    ("map has", "has(foo.bar.baz)"),
+    ("map has", "has(foo.bar)"),
     ("map macro", "[1, 2, 3].map(x, x * 2)"),
     ("filter macro", "[1, 2, 3].filter(x, x > 2)"),
     ("all macro", "[1, 2, 3].all(x, x > 0)"),
@@ -83,6 +83,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
             ctx.add_variable_from_value("foo", HashMap::from([("bar", 1)]));
             ctx.add_variable_from_value("apple", true);
             ctx.add_variable_from_value("a", 1);
+            ctx.add_function("max", cel::functions::max).unwrap();
             ctx.set_variable_resolver(&resolver);
             b.iter(|| Value::resolve_val(&ast, &ctx).expect("Eval failed!"))
         });
