@@ -7,6 +7,7 @@ use crate::common::{
 use crate::container::Container;
 use crate::parser::{Macro, Macros, Parser};
 use crate::registry::{TypeDecl, TypeRegistry};
+use crate::runtime::RuntimeOptions;
 use crate::{common::types::CelStruct, common::value::Val, ExecutionError, StructType};
 use crate::{DeclarationError, Library, ParseErrors, Program};
 use std::collections::{
@@ -56,6 +57,7 @@ pub struct Env {
     namespaces: BTreeSet<String>,
     types: TypeRegistry,
     macros: Arc<Macros>,
+    options: RuntimeOptions,
     error_on_duplicate_map_keys: bool,
     optional: bool,
     container: Container,
@@ -75,6 +77,7 @@ impl Default for Env {
             namespaces: BTreeSet::new(),
             types: TypeRegistry::default(),
             macros: Arc::default(),
+            options: RuntimeOptions::default(),
             error_on_duplicate_map_keys: true,
             optional: true,
             container: Container::default(),
@@ -483,6 +486,25 @@ impl Env {
     /// and so is registering a struct type whose type was registered alone.
     pub fn add_type(&mut self, t: impl Into<TypeDecl>) -> Result<(), DeclarationError> {
         self.types.register(t)
+    }
+
+    /// The runtime policy applied to every evaluation under this environment.
+    pub fn options(&self) -> &RuntimeOptions {
+        &self.options
+    }
+
+    /// Replaces the runtime policy applied to every evaluation under this environment.
+    ///
+    /// # Example
+    /// ```
+    /// use cel::{Env, RuntimeOptions};
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.set_options(RuntimeOptions::default().with_max_iterations(10_000));
+    /// assert_eq!(env.options().max_iterations(), 10_000);
+    /// ```
+    pub fn set_options(&mut self, options: RuntimeOptions) {
+        self.options = options;
     }
 
     /// Sets the container names are resolved against: with container `x`, an
