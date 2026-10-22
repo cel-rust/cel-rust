@@ -1193,6 +1193,7 @@ mod tests {
             ("cel.lib.ext.encoders", extensions::encoders),
             ("cel.lib.ext.lists", extensions::lists),
             ("cel.lib.ext.math", extensions::math),
+            ("cel.lib.ext.network", extensions::network),
             ("cel.lib.ext.strings", extensions::strings),
         ];
         let mut env = Env::stdlib();
