@@ -11,7 +11,6 @@ mod ip_type {
     use dedent::dedent;
 
     // Test: parse_ipv4
-    #[should_panic]
     #[test]
     fn parse_ipv4() {
         run_test(&dedent!(
@@ -40,7 +39,6 @@ mod ip_type {
     }
 
     // Test: is_ip_valid_ipv4
-    #[should_panic]
     #[test]
     fn is_ip_valid_ipv4() {
         run_test(&dedent!(
@@ -53,7 +51,6 @@ mod ip_type {
     }
 
     // Test: is_ip_invalid_ipv4
-    #[should_panic]
     #[test]
     fn is_ip_invalid_ipv4() {
         run_test(&dedent!(
@@ -66,7 +63,6 @@ mod ip_type {
     }
 
     // Test: ip_is_canonical_valid_ipv4
-    #[should_panic]
     #[test]
     fn ip_is_canonical_valid_ipv4() {
         run_test(&dedent!(
@@ -95,7 +91,6 @@ mod ip_type {
     }
 
     // Test: ip_is_canonical_non_canonical_ipv6
-    #[should_panic]
     #[test]
     fn ip_is_canonical_non_canonical_ipv6() {
         run_test(&dedent!(
@@ -108,7 +103,6 @@ mod ip_type {
     }
 
     // Test: parse_ipv6
-    #[should_panic]
     #[test]
     fn parse_ipv6() {
         run_test(&dedent!(
@@ -165,7 +159,6 @@ mod ip_type {
     }
 
     // Test: ip_to_string
-    #[should_panic]
     #[test]
     fn ip_to_string() {
         run_test(&dedent!(
@@ -178,7 +171,6 @@ mod ip_type {
     }
 
     // Test: ip_type
-    #[should_panic]
     #[test]
     fn ip_type() {
         run_test(&dedent!(
@@ -215,7 +207,6 @@ mod ipv4 {
     use dedent::dedent;
 
     // Test: ipv4_family
-    #[should_panic]
     #[test]
     fn ipv4_family() {
         run_test(&dedent!(
@@ -227,7 +218,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_is_unspecified_true
-    #[should_panic]
     #[test]
     fn ipv4_is_unspecified_true() {
         run_test(&dedent!(
@@ -239,7 +229,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_is_unspecified_false
-    #[should_panic]
     #[test]
     fn ipv4_is_unspecified_false() {
         run_test(&dedent!(
@@ -251,7 +240,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_is_loopback_true
-    #[should_panic]
     #[test]
     fn ipv4_is_loopback_true() {
         run_test(&dedent!(
@@ -263,7 +251,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_is_loopback_false
-    #[should_panic]
     #[test]
     fn ipv4_is_loopback_false() {
         run_test(&dedent!(
@@ -275,7 +262,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_is_global_unicast_true
-    #[should_panic]
     #[test]
     fn ipv4_is_global_unicast_true() {
         run_test(&dedent!(
@@ -287,7 +273,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_is_global_unicast_false
-    #[should_panic]
     #[test]
     fn ipv4_is_global_unicast_false() {
         run_test(&dedent!(
@@ -299,7 +284,6 @@ mod ipv4 {
     }
 
     // Test: is_link_local_multicast_true
-    #[should_panic]
     #[test]
     fn is_link_local_multicast_true() {
         run_test(&dedent!(
@@ -311,7 +295,6 @@ mod ipv4 {
     }
 
     // Test: is_link_local_multicast_false
-    #[should_panic]
     #[test]
     fn is_link_local_multicast_false() {
         run_test(&dedent!(
@@ -323,7 +306,6 @@ mod ipv4 {
     }
 
     // Test: is_link_local_unicast_true
-    #[should_panic]
     #[test]
     fn is_link_local_unicast_true() {
         run_test(&dedent!(
@@ -335,7 +317,6 @@ mod ipv4 {
     }
 
     // Test: is_link_local_unicast_false
-    #[should_panic]
     #[test]
     fn is_link_local_unicast_false() {
         run_test(&dedent!(
@@ -347,7 +328,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_equals
-    #[should_panic]
     #[test]
     fn ipv4_equals() {
         run_test(&dedent!(
@@ -359,7 +339,6 @@ mod ipv4 {
     }
 
     // Test: ipv4_not_equals
-    #[should_panic]
     #[test]
     fn ipv4_not_equals() {
         run_test(&dedent!(
@@ -402,7 +381,6 @@ mod ipv6 {
     use dedent::dedent;
 
     // Test: family
-    #[should_panic]
     #[test]
     fn family() {
         run_test(&dedent!(
@@ -414,7 +392,6 @@ mod ipv6 {
     }
 
     // Test: is_unspecified_true
-    #[should_panic]
     #[test]
     fn is_unspecified_true() {
         run_test(&dedent!(
@@ -426,7 +403,6 @@ mod ipv6 {
     }
 
     // Test: is_loopback_true
-    #[should_panic]
     #[test]
     fn is_loopback_true() {
         run_test(&dedent!(
@@ -438,7 +414,6 @@ mod ipv6 {
     }
 
     // Test: is_global_unicast_true
-    #[should_panic]
     #[test]
     fn is_global_unicast_true() {
         run_test(&dedent!(
@@ -450,7 +425,6 @@ mod ipv6 {
     }
 
     // Test: is_global_unicast_false
-    #[should_panic]
     #[test]
     fn is_global_unicast_false() {
         run_test(&dedent!(
@@ -462,7 +436,6 @@ mod ipv6 {
     }
 
     // Test: is_link_local_multicast_true
-    #[should_panic]
     #[test]
     fn is_link_local_multicast_true() {
         run_test(&dedent!(
@@ -474,7 +447,6 @@ mod ipv6 {
     }
 
     // Test: is_link_local_multicast_false
-    #[should_panic]
     #[test]
     fn is_link_local_multicast_false() {
         run_test(&dedent!(
@@ -486,7 +458,6 @@ mod ipv6 {
     }
 
     // Test: is_link_local_unicast_true
-    #[should_panic]
     #[test]
     fn is_link_local_unicast_true() {
         run_test(&dedent!(
@@ -498,7 +469,6 @@ mod ipv6 {
     }
 
     // Test: is_link_local_unicast_false
-    #[should_panic]
     #[test]
     fn is_link_local_unicast_false() {
         run_test(&dedent!(
@@ -510,7 +480,6 @@ mod ipv6 {
     }
 
     // Test: ipv6_equals
-    #[should_panic]
     #[test]
     fn ipv6_equals() {
         run_test(&dedent!(
@@ -522,7 +491,6 @@ mod ipv6 {
     }
 
     // Test: ipv6_not_equals
-    #[should_panic]
     #[test]
     fn ipv6_not_equals() {
         run_test(&dedent!(
@@ -541,7 +509,6 @@ mod cidr {
     use dedent::dedent;
 
     // Test: parse_cidr_ipv4
-    #[should_panic]
     #[test]
     fn parse_cidr_ipv4() {
         run_test(&dedent!(
@@ -598,7 +565,6 @@ mod cidr {
     }
 
     // Test: cidr_equals
-    #[should_panic]
     #[test]
     fn cidr_equals() {
         run_test(&dedent!(
@@ -610,7 +576,6 @@ mod cidr {
     }
 
     // Test: cidr_not_equals
-    #[should_panic]
     #[test]
     fn cidr_not_equals() {
         run_test(&dedent!(
@@ -622,7 +587,6 @@ mod cidr {
     }
 
     // Test: cidr_not_equals_ipv4_ipv6
-    #[should_panic]
     #[test]
     fn cidr_not_equals_ipv4_ipv6() {
         run_test(&dedent!(
@@ -634,7 +598,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_ip_ipv4_object
-    #[should_panic]
     #[test]
     fn cidr_contains_ip_ipv4_object() {
         run_test(&dedent!(
@@ -646,7 +609,6 @@ mod cidr {
     }
 
     // Test: cidr_does_not_contain_ip_ipv4_object
-    #[should_panic]
     #[test]
     fn cidr_does_not_contain_ip_ipv4_object() {
         run_test(&dedent!(
@@ -658,7 +620,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_ip_ipv4_string
-    #[should_panic]
     #[test]
     fn cidr_contains_ip_ipv4_string() {
         run_test(&dedent!(
@@ -670,7 +631,6 @@ mod cidr {
     }
 
     // Test: cidr_does_not_contain_ip_ipv4_string
-    #[should_panic]
     #[test]
     fn cidr_does_not_contain_ip_ipv4_string() {
         run_test(&dedent!(
@@ -682,7 +642,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_cidr_ipv4_object
-    #[should_panic]
     #[test]
     fn cidr_contains_cidr_ipv4_object() {
         run_test(&dedent!(
@@ -694,7 +653,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_cidr_ipv4_object_32
-    #[should_panic]
     #[test]
     fn cidr_contains_cidr_ipv4_object_32() {
         run_test(&dedent!(
@@ -706,7 +664,6 @@ mod cidr {
     }
 
     // Test: cidr_not_contains_cidr_ipv4_object
-    #[should_panic]
     #[test]
     fn cidr_not_contains_cidr_ipv4_object() {
         run_test(&dedent!(
@@ -718,7 +675,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_cidr_ipv4_string
-    #[should_panic]
     #[test]
     fn cidr_contains_cidr_ipv4_string() {
         run_test(&dedent!(
@@ -730,7 +686,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_cidr
-    #[should_panic]
     #[test]
     fn cidr_contains_cidr() {
         run_test(&dedent!(
@@ -742,7 +697,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_cidr_ipv4_exact
-    #[should_panic]
     #[test]
     fn cidr_contains_cidr_ipv4_exact() {
         run_test(&dedent!(
@@ -754,7 +708,6 @@ mod cidr {
     }
 
     // Test: cidr_ipv6_not_contains_ip_ipv4_object
-    #[should_panic]
     #[test]
     fn cidr_ipv6_not_contains_ip_ipv4_object() {
         run_test(&dedent!(
@@ -766,7 +719,6 @@ mod cidr {
     }
 
     // Test: cidr_ipv4_not_contains_ip_ipv6_object
-    #[should_panic]
     #[test]
     fn cidr_ipv4_not_contains_ip_ipv6_object() {
         run_test(&dedent!(
@@ -778,7 +730,6 @@ mod cidr {
     }
 
     // Test: cidr_get_ip_ipv4
-    #[should_panic]
     #[test]
     fn cidr_get_ip_ipv4() {
         run_test(&dedent!(
@@ -790,7 +741,6 @@ mod cidr {
     }
 
     // Test: cidr_masked_ipv4
-    #[should_panic]
     #[test]
     fn cidr_masked_ipv4() {
         run_test(&dedent!(
@@ -802,7 +752,6 @@ mod cidr {
     }
 
     // Test: cidr_prefix_length_ipv4
-    #[should_panic]
     #[test]
     fn cidr_prefix_length_ipv4() {
         run_test(&dedent!(
@@ -814,7 +763,6 @@ mod cidr {
     }
 
     // Test: parse_cidr_ipv6
-    #[should_panic]
     #[test]
     fn parse_cidr_ipv6() {
         run_test(&dedent!(
@@ -826,7 +774,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_ip_ipv6_object
-    #[should_panic]
     #[test]
     fn cidr_contains_ip_ipv6_object() {
         run_test(&dedent!(
@@ -838,7 +785,6 @@ mod cidr {
     }
 
     // Test: cidr_contains_cidr_ipv6_object
-    #[should_panic]
     #[test]
     fn cidr_contains_cidr_ipv6_object() {
         run_test(&dedent!(
@@ -850,7 +796,6 @@ mod cidr {
     }
 
     // Test: cidr_get_ip_ipv6
-    #[should_panic]
     #[test]
     fn cidr_get_ip_ipv6() {
         run_test(&dedent!(
@@ -862,7 +807,6 @@ mod cidr {
     }
 
     // Test: cidr_prefix_length_ipv6
-    #[should_panic]
     #[test]
     fn cidr_prefix_length_ipv6() {
         run_test(&dedent!(
@@ -874,7 +818,6 @@ mod cidr {
     }
 
     // Test: cidr_to_string
-    #[should_panic]
     #[test]
     fn cidr_to_string() {
         run_test(&dedent!(
@@ -887,7 +830,6 @@ mod cidr {
     }
 
     // Test: cidr_type
-    #[should_panic]
     #[test]
     fn cidr_type() {
         run_test(&dedent!(
