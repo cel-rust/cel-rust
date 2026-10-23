@@ -1655,7 +1655,10 @@ impl<'e> AppendStep<'e> {
             _ => None,
         };
 
-        if !is_accu(&comprehension.result)
+        // Like cel-go's isMutableAccuSafe, only optimise accumulators that
+        // cannot be referenced by expressions written in CEL source.
+        if !accu.starts_with('@')
+            || !is_accu(&comprehension.result)
             || !matches!(comprehension.loop_cond.expr, Expr::Literal(_))
         {
             return None;
@@ -2384,6 +2387,57 @@ mod tests {
         assert!(!recognised("[1, 2, 3].all(x, x > 0)"));
         assert!(!recognised("[1, 2, 3].exists(x, x > 2)"));
         assert!(!recognised("[1, 2, 3].exists_one(x, x > 2)"));
+    }
+
+    #[test]
+    fn test_append_step_preserves_custom_macro_accumulator_references() {
+        use crate::common::ast::{ComprehensionExpr, Expr};
+        use crate::parser::Macro;
+
+        let mut env = Env::stdlib();
+        env.add_macro(Macro::global("fold1", 5, |helper, _target, args| {
+            let result = args.pop().unwrap();
+            let loop_step = args.pop().unwrap();
+            let loop_cond = args.pop().unwrap();
+            let accu_init = args.pop().unwrap();
+            let iter_range = args.pop().unwrap();
+            Ok(Some(helper.next_expr(Expr::Comprehension(Box::new(
+                ComprehensionExpr {
+                    iter_range,
+                    iter_var: "x".to_string(),
+                    iter_var2: None,
+                    accu_var: "a".to_string(),
+                    accu_init,
+                    loop_cond,
+                    loop_step,
+                    result,
+                },
+            )))))
+        }))
+        .unwrap();
+        let env = Arc::new(env);
+        let ints = |v: &[i64]| Value::List(Arc::new(v.iter().map(|i| Value::Int(*i)).collect()));
+
+        for outer in [None, Some(99)] {
+            let mut context = Context::with_env(Arc::clone(&env));
+            if let Some(value) = outer {
+                context.add_variable_from_value("a", Value::Int(value));
+            }
+            for cond in ["true", "1 == 1"] {
+                for (step, expected) in [
+                    ("a + [size(a)]", ints(&[0, 1])),
+                    ("size(a) < 1 ? a + [x] : a", ints(&[1])),
+                ] {
+                    let source = format!("fold1([1, 2], [], {cond}, {step}, a)");
+                    let program = env.compile(&source).unwrap();
+                    assert_eq!(
+                        program.execute(&context),
+                        Ok(expected),
+                        "{source}, {outer:?}"
+                    );
+                }
+            }
+        }
     }
 
     /// An element error in `all()` / `exists()` is absorbed by a later element
