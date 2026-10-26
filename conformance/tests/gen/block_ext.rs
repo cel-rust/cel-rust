@@ -10,7 +10,6 @@ mod basic {
     use dedent::dedent;
 
     // Test: int_add
-    #[should_panic]
     #[test]
     fn int_add() {
         run_test(&dedent!(
@@ -24,7 +23,6 @@ mod basic {
     }
 
     // Test: size_1
-    #[should_panic]
     #[test]
     fn size_1() {
         run_test(&dedent!(
@@ -38,7 +36,6 @@ mod basic {
     }
 
     // Test: size_2
-    #[should_panic]
     #[test]
     fn size_2() {
         run_test(&dedent!(
@@ -52,7 +49,6 @@ mod basic {
     }
 
     // Test: size_3
-    #[should_panic]
     #[test]
     fn size_3() {
         run_test(&dedent!(
@@ -66,7 +62,6 @@ mod basic {
     }
 
     // Test: size_4
-    #[should_panic]
     #[test]
     fn size_4() {
         run_test(&dedent!(
@@ -80,7 +75,6 @@ mod basic {
     }
 
     // Test: timestamp
-    #[should_panic]
     #[test]
     fn timestamp() {
         run_test(&dedent!(
@@ -94,7 +88,6 @@ mod basic {
     }
 
     // Test: map_index
-    #[should_panic]
     #[test]
     fn map_index() {
         run_test(&dedent!(
@@ -108,7 +101,6 @@ mod basic {
     }
 
     // Test: nested_map_construction
-    #[should_panic]
     #[test]
     fn nested_map_construction() {
         run_test(&dedent!(
@@ -209,7 +201,6 @@ mod basic {
     }
 
     // Test: nested_list_construction
-    #[should_panic]
     #[test]
     fn nested_list_construction() {
         run_test(&dedent!(
@@ -695,7 +686,6 @@ mod basic {
     }
 
     // Test: multiple_macros_1
-    #[should_panic]
     #[test]
     fn multiple_macros_1() {
         run_test(&dedent!(
@@ -709,7 +699,6 @@ mod basic {
     }
 
     // Test: multiple_macros_2
-    #[should_panic]
     #[test]
     fn multiple_macros_2() {
         run_test(&dedent!(
@@ -736,7 +725,6 @@ mod basic {
     }
 
     // Test: multiple_macros_3
-    #[should_panic]
     #[test]
     fn multiple_macros_3() {
         run_test(&dedent!(
@@ -750,7 +738,6 @@ mod basic {
     }
 
     // Test: nested_macros_1
-    #[should_panic]
     #[test]
     fn nested_macros_1() {
         run_test(&dedent!(
@@ -804,7 +791,6 @@ mod basic {
     }
 
     // Test: nested_macros_2
-    #[should_panic]
     #[test]
     fn nested_macros_2() {
         run_test(&dedent!(
@@ -833,7 +819,6 @@ mod basic {
     }
 
     // Test: adjacent_macros
-    #[should_panic]
     #[test]
     fn adjacent_macros() {
         run_test(&dedent!(
@@ -847,7 +832,6 @@ mod basic {
     }
 
     // Test: macro_shadowed_variable_1
-    #[should_panic]
     #[test]
     fn macro_shadowed_variable_1() {
         run_test(&dedent!(
@@ -873,7 +857,6 @@ mod basic {
     }
 
     // Test: macro_shadowed_variable_2
-    #[should_panic]
     #[test]
     fn macro_shadowed_variable_2() {
         run_test(&dedent!(
@@ -972,7 +955,6 @@ mod basic {
     }
 
     // Test: inclusion_list
-    #[should_panic]
     #[test]
     fn inclusion_list() {
         run_test(&dedent!(
@@ -986,7 +968,6 @@ mod basic {
     }
 
     // Test: inclusion_map
-    #[should_panic]
     #[test]
     fn inclusion_map() {
         run_test(&dedent!(
@@ -1000,7 +981,6 @@ mod basic {
     }
 
     // Test: presence_test
-    #[should_panic]
     #[test]
     fn presence_test() {
         run_test(&dedent!(
@@ -1014,7 +994,6 @@ mod basic {
     }
 
     // Test: presence_test_2
-    #[should_panic]
     #[test]
     fn presence_test_2() {
         run_test(&dedent!(
@@ -1240,7 +1219,6 @@ mod basic {
     }
 
     // Test: optional_list
-    #[should_panic]
     #[test]
     fn optional_list() {
         run_test(&dedent!(
@@ -1266,7 +1244,6 @@ mod basic {
     }
 
     // Test: optional_map
-    #[should_panic]
     #[test]
     fn optional_map() {
         run_test(&dedent!(
@@ -1280,7 +1257,6 @@ mod basic {
     }
 
     // Test: optional_map_chained
-    #[should_panic]
     #[test]
     fn optional_map_chained() {
         run_test(&dedent!(
@@ -1309,7 +1285,6 @@ mod basic {
     }
 
     // Test: call
-    #[should_panic]
     #[test]
     fn call() {
         run_test(&dedent!(

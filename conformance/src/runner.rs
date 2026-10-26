@@ -4,9 +4,11 @@
 //! Type checking is not available, and Struct/Enum types are not supported.
 //! Many tests will fail due to missing features.
 
+use cel::common::ast::{CallExpr, Expr, LiteralValue};
 use cel::context::Context;
 use cel::objects::Value as CelValue;
-use cel::{Env, Value};
+use cel::parser::{Macro, MacroExprHelper, ParseError};
+use cel::{Env, IdedExpr, Value};
 
 use crate::proto::cel::expr::conformance::test::{simple_test::ResultMatcher, SimpleTest};
 use crate::textproto::parse_textproto_to_prost;
@@ -40,6 +42,10 @@ pub fn run_test(simple_test_textproto: &str) {
         .expect("We need that extension to register");
     env.add_extension(cel::extensions::network)
         .expect("We need that extension to register");
+    for m in block_test_macros() {
+        env.add_macro(m)
+            .expect("We need the test macros to register");
+    }
 
     // Parse with the env's parser, so the extensions' macros are expanded,
     // with optional syntax (`.?`, `[?…]`, `{?k: v}`) and backtick-escaped
@@ -164,5 +170,63 @@ fn values_equal(a: &CelValue, b: &CelValue) -> bool {
         (Timestamp(a), Timestamp(b)) => a == b,
         (Duration(a), Duration(b)) => a == b,
         _ => false,
+    }
+}
+
+/// The test-only `cel.block`, `cel.index`, `cel.iterVar` and `cel.accuVar`
+/// macros of `block_ext`, as in cel-go's conformance runner
+/// (`conformance/conformance_test.go`): they spell the internal `cel.@block`
+/// call and the `@indexN`, `@it:N:M` and `@ac:N:M` names it binds.
+fn block_test_macros() -> Vec<Macro> {
+    vec![
+        Macro::receiver("block", 2, |helper, target, args| {
+            if !on_cel(target) {
+                return Ok(None);
+            }
+            if !matches!(args[0].expr, Expr::List(_)) {
+                return Err(helper.new_error(
+                    args[0].id,
+                    "cel.block requires the first arg to be a list literal",
+                ));
+            }
+            let args = std::mem::take(args);
+            Ok(Some(helper.next_expr(Expr::Call(CallExpr {
+                func_name: "cel.@block".to_owned(),
+                target: None,
+                args,
+            }))))
+        }),
+        Macro::receiver("index", 1, |helper, target, args| {
+            if !on_cel(target) {
+                return Ok(None);
+            }
+            let n = int_arg(&args[0], helper)?;
+            Ok(Some(helper.next_expr(Expr::Ident(format!("@index{n}")))))
+        }),
+        Macro::receiver("iterVar", 2, |helper, target, args| {
+            if !on_cel(target) {
+                return Ok(None);
+            }
+            let (n, m) = (int_arg(&args[0], helper)?, int_arg(&args[1], helper)?);
+            Ok(Some(helper.next_expr(Expr::Ident(format!("@it:{n}:{m}")))))
+        }),
+        Macro::receiver("accuVar", 2, |helper, target, args| {
+            if !on_cel(target) {
+                return Ok(None);
+            }
+            let (n, m) = (int_arg(&args[0], helper)?, int_arg(&args[1], helper)?);
+            Ok(Some(helper.next_expr(Expr::Ident(format!("@ac:{n}:{m}")))))
+        }),
+    ]
+}
+
+fn on_cel(target: &Option<IdedExpr>) -> bool {
+    matches!(target.as_ref().map(|t| &t.expr), Some(Expr::Ident(namespace)) if namespace == "cel")
+}
+
+fn int_arg(arg: &IdedExpr, helper: &MacroExprHelper<'_>) -> Result<i64, ParseError> {
+    match &arg.expr {
+        Expr::Literal(LiteralValue::Int(n)) if *n.inner() >= 0 => Ok(*n.inner()),
+        _ => Err(helper.new_error(arg.id, "expected a non-negative int literal")),
     }
 }

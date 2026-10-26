@@ -1273,6 +1273,20 @@ impl Value {
                                 .map(bool)
                                 .map_err(|error| error.with_overload_context(overload_error()));
                         }
+                        crate::extensions::bindings::BLOCK
+                            if ctx.env().has_library(crate::extensions::bindings::NAME) =>
+                        {
+                            let Expr::List(slots) = &call.args[0].expr else {
+                                return Err(ExecutionError::function_error(
+                                    &call.func_name,
+                                    "the slots must be a list",
+                                ));
+                            };
+                            let ctx = ctx.new_block_scope(&slots.elements);
+                            return Ok(CowVal::Owned(
+                                Value::resolve_val(&call.args[1], &ctx)?.into_owned(),
+                            ));
+                        }
                         _ => (),
                     }
                 }
@@ -1368,9 +1382,11 @@ impl Value {
                     }
                 }
             }
-            Expr::Ident(name) => ctx
-                .resolve_ident(name)
-                .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string()))),
+            Expr::Ident(name) => ctx.resolve_ident(name).unwrap_or_else(|| {
+                Err(ExecutionError::UndeclaredReference(Arc::new(
+                    name.to_string(),
+                )))
+            }),
             Expr::Select(select) => {
                 // `has(a.b.c)` tests for `c` on `a.b`: only its operand is a name
                 let name = if select.test {

@@ -1,4 +1,4 @@
-mod bindings;
+pub(crate) mod bindings;
 #[cfg(feature = "ext_encoders")]
 mod encoders;
 mod lists;
