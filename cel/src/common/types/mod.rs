@@ -217,13 +217,22 @@ impl Type {
     /// whatever its elements, and nothing else. What an overload gets called
     /// with is thus not guaranteed to match the parameters it declares.
     pub fn is_assignable(&self, val: &dyn Val) -> bool {
-        match self.kind {
-            Kind::Dyn | Kind::TypeParam => true,
-            _ => {
-                let val_type = val.get_type();
-                self.kind == val_type.kind && self.runtime_type_name == val_type.runtime_type_name
-            }
-        }
+        self.accepts_any_value() || self.has_same_erasure(val.get_type())
+    }
+
+    /// Whether a value could be accepted by both types, as overload parameter
+    /// types: see [`Type::is_assignable`].
+    pub(crate) fn overlaps(&self, other: &Type) -> bool {
+        self.accepts_any_value() || other.accepts_any_value() || self.has_same_erasure(other)
+    }
+
+    fn accepts_any_value(&self) -> bool {
+        matches!(self.kind, Kind::Dyn | Kind::TypeParam)
+    }
+
+    /// Whether the two types are the same once their parameters are erased.
+    fn has_same_erasure(&self, other: &Type) -> bool {
+        self.kind == other.kind && self.runtime_type_name == other.runtime_type_name
     }
 }
 

@@ -291,7 +291,9 @@ impl Env {
     /// # Errors
     ///
     /// Fails with [`DeclarationError::DuplicateOverload`] if an overload of that
-    /// name is already declared with the same id, or with the same signature.
+    /// name is already declared with the same id, or with the same signature, and
+    /// with [`DeclarationError::OverlappingOverload`] if a call could also resolve
+    /// to one already declared.
     pub fn add_overload(
         &mut self,
         name: &str,
@@ -417,7 +419,9 @@ impl Env {
     /// # Errors
     ///
     /// Fails with [`DeclarationError::DuplicateOverload`] if an overload of that
-    /// name is already declared with the same id, or with the same signature.
+    /// name is already declared with the same id, or with the same signature, and
+    /// with [`DeclarationError::OverlappingOverload`] if a call could also resolve
+    /// to one already declared.
     pub fn add_member_overload(
         &mut self,
         name: &str,
@@ -1349,6 +1353,185 @@ mod tests {
             env.add_member_overload("f", "b_f", B, vec![], noop),
             Err(duplicate("f", "b_f"))
         );
+    }
+
+    /// Spec, Functions: "Overloads must have non-overlapping argument types,
+    /// after erasure of all type variables".
+    #[test]
+    fn overloads_whose_argument_types_overlap_are_rejected() {
+        static LIST_OF_INT: [Cow<'static, Type>; 1] = [Cow::Borrowed(&types::INT_TYPE)];
+        static LIST_OF_STRING: [Cow<'static, Type>; 1] = [Cow::Borrowed(&types::STRING_TYPE)];
+        static PARAM_A: Type = A;
+        static LIST_OF_A: [Cow<'static, Type>; 1] = [Cow::Borrowed(&PARAM_A)];
+        static MAP_OF_INT_INT: [Cow<'static, Type>; 2] = [
+            Cow::Borrowed(&types::INT_TYPE),
+            Cow::Borrowed(&types::INT_TYPE),
+        ];
+        const A: Type = Type::new_type_param("A");
+        let list_of_int = || Type::new_list_type(&LIST_OF_INT);
+        let list_of_string = || Type::new_list_type(&LIST_OF_STRING);
+        let list_of_a = || Type::new_list_type(&LIST_OF_A);
+        let map_of_int_int = || Type::new_map_type(&MAP_OF_INT_INT);
+
+        let overlapping: Vec<(Vec<Type>, Vec<Type>)> = vec![
+            (vec![types::DYN_TYPE], vec![types::INT_TYPE]),
+            (vec![A], vec![types::INT_TYPE]),
+            (vec![A], vec![types::DYN_TYPE]),
+            (vec![A], vec![list_of_int()]),
+            (vec![list_of_a()], vec![list_of_int()]),
+            (vec![list_of_int()], vec![list_of_string()]),
+            (vec![types::LIST_TYPE], vec![list_of_a()]),
+            (vec![types::MAP_TYPE], vec![map_of_int_int()]),
+            (vec![types::OPTIONAL_TYPE], vec![A]),
+            (
+                vec![types::INT_TYPE, types::DYN_TYPE],
+                vec![types::DYN_TYPE, types::STRING_TYPE],
+            ),
+        ];
+        for (first, second) in overlapping {
+            let shown = format!("{first:?} / {second:?}");
+            // whichever is declared first
+            for (first, second) in [
+                (
+                    first.iter().map(Type::to_owned).collect::<Vec<_>>(),
+                    second.iter().map(Type::to_owned).collect::<Vec<_>>(),
+                ),
+                (second, first),
+            ] {
+                let mut env = Env::default();
+                assert_eq!(
+                    env.add_overload("f", "first", first, noop),
+                    Ok(()),
+                    "{shown}"
+                );
+                assert_eq!(
+                    env.add_overload("f", "second", second, noop),
+                    Err(DeclarationError::overlapping_overload(
+                        "f", "second", "first"
+                    )),
+                    "{shown}",
+                );
+            }
+        }
+
+        let distinct: Vec<(Vec<Type>, Vec<Type>)> = vec![
+            (vec![types::INT_TYPE], vec![types::STRING_TYPE]),
+            (vec![list_of_a()], vec![types::INT_TYPE]),
+            (vec![list_of_int()], vec![map_of_int_int()]),
+            (vec![types::OPTIONAL_TYPE], vec![types::LIST_TYPE]),
+            (
+                vec![types::DYN_TYPE],
+                vec![types::DYN_TYPE, types::DYN_TYPE],
+            ),
+            (vec![], vec![A]),
+            (
+                vec![types::INT_TYPE, types::DYN_TYPE],
+                vec![types::STRING_TYPE, types::DYN_TYPE],
+            ),
+            (
+                vec![Type::new_opaque_type("a")],
+                vec![Type::new_opaque_type("b")],
+            ),
+        ];
+        for (first, second) in distinct {
+            let shown = format!("{first:?} / {second:?}");
+            let mut env = Env::default();
+            assert_eq!(
+                env.add_overload("f", "first", first, noop),
+                Ok(()),
+                "{shown}"
+            );
+            assert_eq!(
+                env.add_overload("f", "second", second, noop),
+                Ok(()),
+                "{shown}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_overloads_of_the_same_call_style_overlap() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_dyn", vec![types::DYN_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_member_overload("f", "int_f", types::INT_TYPE, vec![], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_member_overload("f", "dyn_f", types::DYN_TYPE, vec![], noop),
+            Err(DeclarationError::overlapping_overload(
+                "f", "dyn_f", "int_f"
+            ))
+        );
+        assert_eq!(
+            env.add_overload("g", "g_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload_with("g", "g_dyn", vec![types::DYN_TYPE], noop),
+            Err(DeclarationError::overlapping_overload(
+                "g", "g_dyn", "g_int"
+            ))
+        );
+    }
+
+    /// A duplicate is reported as such, even when another overload overlaps
+    /// first: only the id, or the signature, needs changing.
+    #[test]
+    fn a_duplicate_is_not_reported_as_an_overlap() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("f", "f_string", vec![types::STRING_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("f", "f_string", vec![types::DYN_TYPE], noop),
+            Err(duplicate("f", "f_string"))
+        );
+        assert_eq!(
+            env.add_overload("f", "f_other", vec![types::STRING_TYPE], noop),
+            Err(duplicate("f", "f_other"))
+        );
+    }
+
+    /// A rejected overload leaves the function as it was.
+    #[test]
+    fn a_rejected_overlap_declares_nothing() {
+        let mut env = Env::stdlib();
+        env.add_overload("f", "f_int", vec![types::INT_TYPE], noop)
+            .unwrap();
+        assert!(env
+            .add_overload("f", "f_dyn", vec![types::DYN_TYPE], noop)
+            .is_err());
+        let env = Arc::new(env);
+        let eval = |source: &str| {
+            let program = env.compile(source).unwrap();
+            program.execute(&Context::with_env(Arc::clone(&env)))
+        };
+        assert_eq!(eval("f(1)"), Ok(crate::Value::Int(1)));
+        assert!(matches!(
+            eval("f('a')"),
+            Err(crate::ExecutionError::NoSuchOverload(_))
+        ));
+    }
+
+    /// What the standard library and the extensions declare doesn't overlap.
+    #[test]
+    fn nothing_declared_by_this_crate_overlaps() {
+        let mut env = Env::stdlib().with_optional_support(true);
+        env.add_extension(crate::extensions::bindings).unwrap();
+        env.add_extension(crate::extensions::encoders).unwrap();
+        env.add_extension(crate::extensions::lists).unwrap();
+        env.add_extension(crate::extensions::math).unwrap();
+        env.add_extension(crate::extensions::network).unwrap();
+        env.add_extension(crate::extensions::strings).unwrap();
     }
 
     /// A closure and a function are overloads alike: neither's id, nor

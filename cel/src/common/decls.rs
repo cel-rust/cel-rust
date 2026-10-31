@@ -30,10 +30,11 @@ impl FunctionDecl {
         }
     }
 
-    /// Finds the overload a call with `args` resolves to: the first one, in
-    /// the order they were declared, that is a member overload if
-    /// `member_function` is, takes as many arguments, and whose parameter
-    /// types each [accept](Type::is_assignable) the argument in its position.
+    /// Finds the overload a call with `args` resolves to: the one that is a
+    /// member overload if `member_function` is, takes as many arguments, and
+    /// whose parameter types each [accept](Type::is_assignable) the argument in
+    /// its position. At most one does, as overloads
+    /// [can't overlap](DeclarationError::OverlappingOverload).
     ///
     /// For a member call, `x.f(y)`, `args` starts with the target `x`.
     ///
@@ -82,6 +83,13 @@ impl FunctionDecl {
         if self.is_present(&id, member_function, &arg_types) {
             return Err(DeclarationError::duplicate_overload(&self.name, &id));
         }
+        if let Some(overlapping) = self.find_overlapping(member_function, &arg_types) {
+            return Err(DeclarationError::overlapping_overload(
+                &self.name,
+                &id,
+                &overlapping.id,
+            ));
+        }
         self.overloads.push(OverloadDecl {
             id,
             arg_types,
@@ -94,18 +102,19 @@ impl FunctionDecl {
     fn is_present(&self, name: &str, member_function: bool, arg_types: &[Type]) -> bool {
         for overload in &self.overloads {
             if overload.id == name
-                || (overload.member_function == member_function
-                    && overload.arg_types.len() == arg_types.len()
-                    && overload
-                        .arg_types
-                        .iter()
-                        .zip(arg_types)
-                        .all(|(declared, arg)| declared.is_equivalent(arg)))
+                || overload.compares(member_function, arg_types, Type::is_equivalent)
             {
                 return true;
             }
         }
         false
+    }
+
+    /// The overload a call could resolve to, as well as one with that signature.
+    fn find_overlapping(&self, member_function: bool, arg_types: &[Type]) -> Option<&OverloadDecl> {
+        self.overloads
+            .iter()
+            .find(|overload| overload.compares(member_function, arg_types, Type::overlaps))
     }
 }
 
@@ -120,6 +129,25 @@ pub struct OverloadDecl {
     member_function: bool,
     //operand_traits: TraitSet,
     op: Op,
+}
+
+impl OverloadDecl {
+    /// Whether the overload is of that call style, takes as many arguments, and
+    /// `compare` holds between its type and `arg_types`' in each position.
+    fn compares(
+        &self,
+        member_function: bool,
+        arg_types: &[Type],
+        compare: fn(&Type, &Type) -> bool,
+    ) -> bool {
+        self.member_function == member_function
+            && self.arg_types.len() == arg_types.len()
+            && self
+                .arg_types
+                .iter()
+                .zip(arg_types)
+                .all(|(declared, arg)| compare(declared, arg))
+    }
 }
 
 #[allow(dead_code)]

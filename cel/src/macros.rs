@@ -233,7 +233,9 @@ macro_rules! __overload_result {
 /// [`DeclarationError::DuplicateOverload`](crate::DeclarationError::DuplicateOverload)
 /// if the `Env` already declares an overload of that name with the same id,
 /// or the same signature - e.g. when an extension library registers an
-/// overload the `Env` already declares:
+/// overload the `Env` already declares - and with
+/// [`DeclarationError::OverlappingOverload`](crate::DeclarationError::OverlappingOverload)
+/// if a call could also resolve to one it declares:
 ///
 /// ```
 /// use cel::common::types::{CelBool, CelString};
@@ -474,7 +476,9 @@ macro_rules! __overload_receiver_override {
 /// fails with
 /// [`DeclarationError::DuplicateOverload`](crate::DeclarationError::DuplicateOverload)
 /// if the `Env` already declares an overload of that name with the same id,
-/// or the same signature:
+/// or the same signature, and with
+/// [`DeclarationError::OverlappingOverload`](crate::DeclarationError::OverlappingOverload)
+/// if a call could also resolve to one it declares:
 ///
 /// ```
 /// use cel::common::types::{CelInt, CelString};

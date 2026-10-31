@@ -334,6 +334,22 @@ pub enum DeclarationError {
     /// in it: `f(A)` and `f(B)` have the same signature.
     #[error("Cannot declare overload '{id}' of '{function}': one with the same id or signature is already declared")]
     DuplicateOverload { function: String, id: String },
+    /// An overload could not be declared for a function because a call could
+    /// also resolve to another of its overloads, of a different signature.
+    ///
+    /// Overloads of a function must have non-overlapping argument types once
+    /// type parameters are erased, as the spec requires, so that a call resolves
+    /// to at most one of them. Two overloads overlap when they are both member
+    /// functions, or neither is, take as many arguments, and could be called with
+    /// the same values: in each position, one of the types is `dyn` or a type
+    /// parameter, or both are of the same kind and name. So `f(dyn)` overlaps
+    /// `f(int)`, and `f(list(int))` overlaps `f(list(string))`.
+    #[error("Cannot declare overload '{id}' of '{function}': its argument types overlap those of overload '{overlapping_id}'")]
+    OverlappingOverload {
+        function: String,
+        id: String,
+        overlapping_id: String,
+    },
     /// A type could not be registered because another type is already
     /// registered under the same name.
     ///
@@ -366,6 +382,14 @@ impl DeclarationError {
         DeclarationError::DuplicateOverload {
             function: function.to_string(),
             id: id.to_string(),
+        }
+    }
+
+    pub fn overlapping_overload(function: &str, id: &str, overlapping_id: &str) -> Self {
+        DeclarationError::OverlappingOverload {
+            function: function.to_string(),
+            id: id.to_string(),
+            overlapping_id: overlapping_id.to_string(),
         }
     }
 
