@@ -35,7 +35,11 @@ impl ExpressionReferences<'_> {
         self.functions.contains(name.as_ref())
     }
 
-    /// Returns a list of all variables referenced in the expression.
+    /// Returns a list of all variables referenced in the expression, which are
+    /// the names to provide when evaluating it: what a comprehension binds, as
+    /// the `map` macro does, isn't one. As it is told apart by name alone, the
+    /// first segment of a namespaced function or a type name is one: `math` in
+    /// `math.abs(a)`, or `int` in `type(a) == int`.
     ///
     /// # Example
     /// ```rust
@@ -43,6 +47,9 @@ impl ExpressionReferences<'_> {
     /// let expression = Parser::new().parse("foo.bar == true").unwrap();
     /// let references = expression.references();
     /// assert_eq!(vec!["foo"], references.variables());
+    ///
+    /// let expression = Parser::new().parse("[1].map(x, x + y)").unwrap();
+    /// assert_eq!(vec!["y"], expression.references().variables());
     /// ```
     pub fn variables(&self) -> Vec<&str> {
         self.variables.iter().copied().collect()
@@ -78,7 +85,7 @@ impl IdedExpr {
     pub fn references(&self) -> ExpressionReferences<'_> {
         let mut variables = HashSet::new();
         let mut functions = HashSet::new();
-        self._references(&mut variables, &mut functions);
+        self._references(&mut variables, &mut functions, &mut Vec::new());
         ExpressionReferences {
             variables,
             functions,
@@ -86,38 +93,47 @@ impl IdedExpr {
     }
 
     /// Internal recursive function to collect all variable and function references in the expression.
+    /// `bound` holds the names the enclosing comprehensions bind: these aren't variables.
     fn _references<'expr>(
         &'expr self,
         variables: &mut HashSet<&'expr str>,
         functions: &mut HashSet<&'expr str>,
+        bound: &mut Vec<&'expr str>,
     ) {
         match &self.expr {
             Expr::Unspecified => {}
             Expr::Call(call) => {
                 functions.insert(without_leading_dot(&call.func_name));
                 if let Some(target) = &call.target {
-                    target._references(variables, functions);
+                    target._references(variables, functions, bound);
                 }
                 for arg in &call.args {
-                    arg._references(variables, functions);
+                    arg._references(variables, functions, bound);
                 }
             }
             Expr::Comprehension(comp) => {
-                comp.iter_range._references(variables, functions);
-                comp.accu_init._references(variables, functions);
-                comp.loop_cond._references(variables, functions);
-                comp.loop_step._references(variables, functions);
-                comp.result._references(variables, functions);
+                comp.iter_range._references(variables, functions, bound);
+                comp.accu_init._references(variables, functions, bound);
+                let outer = bound.len();
+                // The accumulator is in scope of the result, the iteration
+                // variable of the loop only.
+                bound.push(&comp.accu_var);
+                comp.result._references(variables, functions, bound);
+                bound.push(&comp.iter_var);
+                comp.loop_cond._references(variables, functions, bound);
+                comp.loop_step._references(variables, functions, bound);
+                bound.truncate(outer);
             }
             Expr::Ident(name) => {
-                // todo! Might want to make this "smarter" (are we in a comprehension?) and better encode these in const
-                if !name.starts_with('@') {
+                // An absolute name, `.x`, doesn't match a bound one: it skips
+                // the comprehensions' scopes. `@` can't be written in source.
+                if !name.starts_with('@') && !bound.contains(&name.as_str()) {
                     variables.insert(without_leading_dot(name));
                 }
             }
             Expr::List(list) => {
                 for elem in &list.elements {
-                    elem._references(variables, functions);
+                    elem._references(variables, functions, bound);
                 }
             }
             Expr::Literal(_) => {}
@@ -125,27 +141,27 @@ impl IdedExpr {
                 for entry in &map.entries {
                     match &entry.expr {
                         crate::common::ast::EntryExpr::StructField(field) => {
-                            field.value._references(variables, functions);
+                            field.value._references(variables, functions, bound);
                         }
                         crate::common::ast::EntryExpr::MapEntry(map_entry) => {
-                            map_entry.key._references(variables, functions);
-                            map_entry.value._references(variables, functions);
+                            map_entry.key._references(variables, functions, bound);
+                            map_entry.value._references(variables, functions, bound);
                         }
                     }
                 }
             }
             Expr::Select(select) => {
-                select.operand._references(variables, functions);
+                select.operand._references(variables, functions, bound);
             }
             Expr::Struct(struct_expr) => {
                 for entry in &struct_expr.entries {
                     match &entry.expr {
                         crate::common::ast::EntryExpr::StructField(field) => {
-                            field.value._references(variables, functions);
+                            field.value._references(variables, functions, bound);
                         }
                         crate::common::ast::EntryExpr::MapEntry(map_entry) => {
-                            map_entry.key._references(variables, functions);
-                            map_entry.value._references(variables, functions);
+                            map_entry.key._references(variables, functions, bound);
+                            map_entry.value._references(variables, functions, bound);
                         }
                     }
                 }
