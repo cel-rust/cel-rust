@@ -6,7 +6,7 @@ use crate::parser::Expression;
 use crate::{DeclarationError, Env, ExecutionError};
 use std::borrow::Cow;
 use std::collections::BTreeMap;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
 /// Context is a collection of variables and functions that can be used
 /// by the interpreter to resolve expressions.
@@ -47,63 +47,11 @@ pub enum Context<'p, 'v> {
         resolver: Option<&'v dyn VariableResolver>,
         env: Arc<Env>,
     },
-    #[non_exhaustive]
     Child {
         parent: &'p Context<'p, 'v>,
         variables: BTreeMap<String, Box<dyn Val + 'v>>,
         resolver: Option<&'v dyn VariableResolver>,
-        /// The slots of the `cel.@block` this scope is the body of, if any.
-        block: Option<Box<BlockSlots<'p, 'v>>>,
     },
-}
-
-/// The slots of a `cel.@block`, bound as `@index0`, `@index1`, …: each is
-/// evaluated on its first reference, in the block's scope, and its value or
-/// error kept for the rest of the block.
-#[doc(hidden)]
-pub struct BlockSlots<'p, 'v> {
-    slots: &'p [Expression],
-    values: Arc<[Slot<'v>]>,
-    /// The slots from this one on can't be referenced from here: a slot sees
-    /// only the ones before it.
-    visible: usize,
-}
-
-/// A slot's value or error, once it is evaluated.
-type Slot<'v> = OnceLock<Result<Box<dyn Val + 'v>, ExecutionError>>;
-
-impl<'p, 'v> BlockSlots<'p, 'v> {
-    /// Slot `index`, evaluated if need be in a scope over `parent`, the
-    /// block's, that sees only the slots before it.
-    fn get(
-        &self,
-        index: usize,
-        parent: &'p Context<'p, 'v>,
-    ) -> Result<CowVal<'_, 'v>, ExecutionError> {
-        if index >= self.visible {
-            return Err(ExecutionError::function_error(
-                crate::extensions::bindings::BLOCK,
-                format!("@index{index} referenced before its definition"),
-            ));
-        }
-        let value = self.values[index].get_or_init(|| {
-            let scope = Context::Child {
-                parent,
-                variables: Default::default(),
-                resolver: None,
-                block: Some(Box::new(BlockSlots {
-                    slots: self.slots,
-                    values: self.values.clone(),
-                    visible: index,
-                })),
-            };
-            Value::resolve_val(&self.slots[index], &scope).map(CowVal::into_owned)
-        });
-        match value {
-            Ok(value) => Ok(CowVal::Borrowed(value.as_ref())),
-            Err(error) => Err(error.clone()),
-        }
-    }
 }
 
 impl<'p, 'v> Context<'p, 'v> {
@@ -257,29 +205,9 @@ impl<'p, 'v> Context<'p, 'v> {
     /// wins, and within a scope the variable, else the type, of each
     /// container candidate in turn, most specific first. An absolute name
     /// skips the inner scopes.
-    pub(crate) fn resolve_ident(
-        &self,
-        name: &str,
-    ) -> Option<Result<CowVal<'_, 'v>, ExecutionError>> {
-        self.scopes_for(name).find_map(|scope| {
-            scope
-                .own_slot(name)
-                .or_else(|| scope.resolve_own(name, true).map(Ok))
-        })
-    }
-
-    /// The `cel.@block` slot of this scope named `name`, if it has one.
-    fn own_slot(&self, name: &str) -> Option<Result<CowVal<'_, 'v>, ExecutionError>> {
-        let Context::Child {
-            parent,
-            block: Some(block),
-            ..
-        } = self
-        else {
-            return None;
-        };
-        let index: usize = name.strip_prefix("@index")?.parse().ok()?;
-        (index < block.slots.len()).then(|| block.get(index, parent))
+    pub(crate) fn resolve_ident(&self, name: &str) -> Option<CowVal<'_, 'v>> {
+        self.scopes_for(name)
+            .find_map(|scope| scope.resolve_own(name, true))
     }
 
     /// Resolves the qualified name `a.b.c`, given as its segments, to a value
@@ -299,9 +227,6 @@ impl<'p, 'v> Context<'p, 'v> {
             let mut len = name.len();
             for prefix in (1..=segments.len()).rev() {
                 let whole = prefix == segments.len();
-                if let Some(value) = scope.own_slot(&name[..len]) {
-                    return Ok((value?, &segments[prefix..]));
-                }
                 if let Some(value) = scope.resolve_own(&name[..len], whole) {
                     return Ok((value, &segments[prefix..]));
                 }
@@ -452,21 +377,6 @@ impl<'p, 'v> Context<'p, 'v> {
             parent: self,
             variables: Default::default(),
             resolver: None,
-            block: None,
-        }
-    }
-
-    /// An inner scope binding the slots of a `cel.@block`.
-    pub(crate) fn new_block_scope<'b>(&'b self, slots: &'b [Expression]) -> Context<'b, 'v> {
-        Context::Child {
-            parent: self,
-            variables: Default::default(),
-            resolver: None,
-            block: Some(Box::new(BlockSlots {
-                slots,
-                values: slots.iter().map(|_| OnceLock::new()).collect(),
-                visible: slots.len(),
-            })),
         }
     }
 

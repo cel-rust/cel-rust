@@ -10,6 +10,7 @@ use crate::{ExecutionError, Expression, FunctionContext};
 use chrono::TimeZone;
 use std::any::Any;
 use std::borrow::Borrow;
+use std::cell::OnceCell;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::convert::{Infallible, TryFrom, TryInto};
@@ -1023,26 +1024,68 @@ impl Value {
         expr: &'e Expression,
         ctx: &'e Context<'p, 'v>,
     ) -> Result<CowVal<'e, 'v>, ExecutionError> {
+        Self::resolve_in(expr, ctx, None)
+    }
+
+    /// [`Value::resolve_val`], within the slots of `frame`, if any.
+    #[inline(always)]
+    fn resolve_in<'e, 'p, 'v>(
+        expr: &'e Expression,
+        ctx: &'e Context<'p, 'v>,
+        frame: Option<&'e BlockFrame<'e, 'v>>,
+    ) -> Result<CowVal<'e, 'v>, ExecutionError> {
         match &expr.expr {
             Expr::Literal(literal) => Ok(literal.to_val()),
             Expr::Call(call) => {
+                if call.target.is_none()
+                    && call.func_name == crate::extensions::bindings::BLOCK
+                    && ctx.env().has_library(crate::extensions::bindings::NAME)
+                {
+                    let error = |message| {
+                        Err(ExecutionError::function_error(
+                            crate::extensions::bindings::BLOCK,
+                            message,
+                        ))
+                    };
+                    let [slots, body] = call.args.as_slice() else {
+                        return error("expected two arguments");
+                    };
+                    let Expr::List(slots) = &slots.expr else {
+                        return error("the slots must be a list");
+                    };
+                    if !slots.optional_indices.is_empty() {
+                        return error("a slot can't be optional");
+                    }
+                    let values: Vec<Slot<'v>> =
+                        slots.elements.iter().map(|_| OnceCell::new()).collect();
+                    let block = BlockFrame {
+                        slots: &slots.elements,
+                        values: &values,
+                        scope: ctx,
+                        visible: slots.elements.len(),
+                        parent: frame,
+                    };
+                    return Ok(CowVal::Owned(
+                        Value::resolve_in(body, ctx, Some(&block))?.into_owned(),
+                    ));
+                }
                 // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
-                    let cond = Value::resolve_val(&call.args[0], ctx);
+                    let cond = Value::resolve_in(&call.args[0], ctx, frame);
                     return if try_bool(cond)? {
-                        Value::resolve_val(&call.args[1], ctx)
+                        Value::resolve_in(&call.args[1], ctx, frame)
                     } else {
-                        Value::resolve_val(&call.args[2], ctx)
+                        Value::resolve_in(&call.args[2], ctx, frame)
                     };
                 }
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            let left = try_bool(Value::resolve_val(&call.args[0], ctx));
+                            let left = try_bool(Value::resolve_in(&call.args[0], ctx, frame));
                             return if Ok(true) == left {
                                 Ok(bool(true))
                             } else {
-                                let right_value = Value::resolve_val(&call.args[1], ctx)?;
+                                let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
                                 let right =
                                     right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
                                 match (left, right) {
@@ -1057,11 +1100,11 @@ impl Value {
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = try_bool(Value::resolve_val(&call.args[0], ctx));
+                            let left = try_bool(Value::resolve_in(&call.args[0], ctx, frame));
                             return if Ok(false) == left {
                                 Ok(bool(false))
                             } else {
-                                let right_value = Value::resolve_val(&call.args[1], ctx)?;
+                                let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
                                 let right =
                                     right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
                                 match (left, right) {
@@ -1077,19 +1120,19 @@ impl Value {
                         }
                         operators::EQUALS => {
                             return Ok(bool(
-                                Value::resolve_val(&call.args[0], ctx)?
-                                    == Value::resolve_val(&call.args[1], ctx)?,
+                                Value::resolve_in(&call.args[0], ctx, frame)?
+                                    == Value::resolve_in(&call.args[1], ctx, frame)?,
                             ))
                         }
                         operators::NOT_EQUALS => {
                             return Ok(bool(
-                                Value::resolve_val(&call.args[0], ctx)?
-                                    != Value::resolve_val(&call.args[1], ctx)?,
+                                Value::resolve_in(&call.args[0], ctx, frame)?
+                                    != Value::resolve_in(&call.args[1], ctx, frame)?,
                             ))
                         }
                         operators::INDEX | operators::OPT_INDEX => {
                             let mut is_optional = call.func_name == operators::OPT_INDEX;
-                            let value = Value::resolve_val(&call.args[0], ctx)?;
+                            let value = Value::resolve_in(&call.args[0], ctx, frame)?;
 
                             let value = match unwrap_optional(value) {
                                 Unwrapped::NotOptional(value) => value,
@@ -1100,7 +1143,7 @@ impl Value {
                                 Unwrapped::None => return Ok(CowVal::owned(CelOptional::none())),
                             };
 
-                            let index = Self::resolve_val(&call.args[1], ctx)?;
+                            let index = Value::resolve_in(&call.args[1], ctx, frame)?;
                             let result =
                                 index_into(value, index.as_ref(), &call.func_name, |value| {
                                     ExecutionError::overload_for_values(
@@ -1116,8 +1159,8 @@ impl Value {
                             };
                         }
                         operators::OPT_SELECT => {
-                            let operand = Value::resolve_val(&call.args[0], ctx)?;
-                            let field_literal = Value::resolve_val(&call.args[1], ctx)?;
+                            let operand = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let field_literal = Value::resolve_in(&call.args[1], ctx, frame)?;
                             let field = match field_literal.get_type().kind() {
                                 Kind::String => field_literal
                                     .downcast_ref::<CelString>()
@@ -1146,8 +1189,8 @@ impl Value {
 
                         // all below is NOT special in the interpreter
                         operators::ADD => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(CowVal::Owned(
                                 lhs.as_adder()
                                     .ok_or_else(|| {
@@ -1162,8 +1205,8 @@ impl Value {
                             ));
                         }
                         operators::SUBSTRACT => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(CowVal::Owned(
                                 lhs.as_subtractor()
                                     .ok_or_else(|| {
@@ -1178,8 +1221,8 @@ impl Value {
                             ));
                         }
                         operators::DIVIDE => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(CowVal::Owned(
                                 lhs.as_divider()
                                     .ok_or_else(|| {
@@ -1194,8 +1237,8 @@ impl Value {
                             ));
                         }
                         operators::MULTIPLY => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(CowVal::Owned(
                                 lhs.as_multiplier()
                                     .ok_or_else(|| {
@@ -1210,8 +1253,8 @@ impl Value {
                             ));
                         }
                         operators::MODULO => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(CowVal::Owned(
                                 lhs.as_modder()
                                     .ok_or_else(|| {
@@ -1226,40 +1269,40 @@ impl Value {
                             ));
                         }
                         operators::LESS => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(bool(
                                 compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     == Ordering::Less,
                             ));
                         }
                         operators::LESS_EQUALS => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(bool(
                                 compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     != Ordering::Greater,
                             ));
                         }
                         operators::GREATER => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(bool(
                                 compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     == Ordering::Greater,
                             ));
                         }
                         operators::GREATER_EQUALS => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(bool(
                                 compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
                                     != Ordering::Less,
                             ));
                         }
                         operators::IN => {
-                            let lhs = Value::resolve_val(&call.args[0], ctx)?;
-                            let rhs = Value::resolve_val(&call.args[1], ctx)?;
+                            let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
+                            let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             let overload_error = || {
                                 ExecutionError::overload_for_values(
                                     &call.func_name,
@@ -1273,27 +1316,13 @@ impl Value {
                                 .map(bool)
                                 .map_err(|error| error.with_overload_context(overload_error()));
                         }
-                        crate::extensions::bindings::BLOCK
-                            if ctx.env().has_library(crate::extensions::bindings::NAME) =>
-                        {
-                            let Expr::List(slots) = &call.args[0].expr else {
-                                return Err(ExecutionError::function_error(
-                                    &call.func_name,
-                                    "the slots must be a list",
-                                ));
-                            };
-                            let ctx = ctx.new_block_scope(&slots.elements);
-                            return Ok(CowVal::Owned(
-                                Value::resolve_val(&call.args[1], &ctx)?.into_owned(),
-                            ));
-                        }
                         _ => (),
                     }
                 }
                 if call.args.len() == 1 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_NOT => {
-                            let expr = Value::resolve_val(&call.args[0], ctx)?;
+                            let expr = Value::resolve_in(&call.args[0], ctx, frame)?;
                             let overload_error = ExecutionError::overload_for_values(
                                 &call.func_name,
                                 [expr.as_ref()],
@@ -1306,7 +1335,7 @@ impl Value {
                                 .map(|b| bool(b.into_inner()));
                         }
                         operators::NEGATE => {
-                            let val = Value::resolve_val(&call.args[0], ctx)?;
+                            let val = Value::resolve_in(&call.args[0], ctx, frame)?;
                             let overload_error = ExecutionError::overload_for_values(
                                 &call.func_name,
                                 [val.as_ref()],
@@ -1321,7 +1350,8 @@ impl Value {
                         }
                         operators::NOT_STRICTLY_FALSE => {
                             return Ok(bool(
-                                try_bool(Value::resolve_val(&call.args[0], ctx)).unwrap_or(true),
+                                try_bool(Value::resolve_in(&call.args[0], ctx, frame))
+                                    .unwrap_or(true),
                             ));
                         }
                         _ => (),
@@ -1333,7 +1363,7 @@ impl Value {
                         let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
                             .args
                             .iter()
-                            .map(|a| Value::resolve_val(a, ctx))
+                            .map(|a| Value::resolve_in(a, ctx, frame))
                             .collect();
                         let name = ctx.resolve_function(&call.func_name);
                         call_function(ctx, &name, &call.func_name, args?)
@@ -1342,7 +1372,7 @@ impl Value {
                         let args: Result<Vec<CowVal<'e, 'v>>, ExecutionError> = call
                             .args
                             .iter()
-                            .map(|a| Value::resolve_val(a, ctx))
+                            .map(|a| Value::resolve_in(a, ctx, frame))
                             .collect();
                         let mut args = args?;
                         // As in cel-go, a call whose target spells a qualified
@@ -1354,7 +1384,7 @@ impl Value {
                         {
                             return call_function(ctx, &name, &call.func_name, args);
                         }
-                        let target = Value::resolve_val(target_expr, ctx)?;
+                        let target = Value::resolve_in(target_expr, ctx, frame)?;
                         args.insert(0, target);
                         if let Some(op) = ctx.env().find_op(&call.func_name, true, &args) {
                             return op.call(args);
@@ -1382,11 +1412,16 @@ impl Value {
                     }
                 }
             }
-            Expr::Ident(name) => ctx.resolve_ident(name).unwrap_or_else(|| {
-                Err(ExecutionError::UndeclaredReference(Arc::new(
-                    name.to_string(),
-                )))
-            }),
+            Expr::Ident(name) => {
+                if let Some(slot) = frame
+                    .zip(slot_index(name))
+                    .and_then(|(frame, index)| frame.get(index))
+                {
+                    return slot;
+                }
+                ctx.resolve_ident(name)
+                    .ok_or_else(|| ExecutionError::UndeclaredReference(Arc::new(name.to_string())))
+            }
             Expr::Select(select) => {
                 // `has(a.b.c)` tests for `c` on `a.b`: only its operand is a name
                 let name = if select.test {
@@ -1394,8 +1429,14 @@ impl Value {
                 } else {
                     expr.expr.qualified_name_segments()
                 };
+                // A slot isn't in the context: select from it as from any value
+                let name = name.filter(|segments| {
+                    !frame
+                        .zip(slot_index(segments[0]))
+                        .is_some_and(|(frame, index)| frame.has(index))
+                });
                 let Some(name) = name else {
-                    let left = Value::resolve_val(select.operand.deref(), ctx)?;
+                    let left = Value::resolve_in(select.operand.deref(), ctx, frame)?;
                     return select_field(left, &select.field, select.test);
                 };
                 let (mut value, fields) = ctx.resolve_qualified(&name)?;
@@ -1411,7 +1452,7 @@ impl Value {
             Expr::List(list_expr) => {
                 let mut list: Vec<Box<dyn Val + 'v>> = Vec::with_capacity(list_expr.elements.len());
                 for (idx, element) in list_expr.elements.iter().enumerate() {
-                    let value = Value::resolve_val(element, ctx)?;
+                    let value = Value::resolve_in(element, ctx, frame)?;
                     if list_expr.optional_indices.contains(&idx) {
                         match unwrap_optional(value) {
                             Unwrapped::NotOptional(v) | Unwrapped::Some(v) => {
@@ -1433,8 +1474,8 @@ impl Value {
                         EntryExpr::StructField(_) => panic!("WAT?"),
                         EntryExpr::MapEntry(e) => (&e.key, &e.value, e.optional),
                     };
-                    let key: CelMapKey<'v> = Value::resolve_val(k, ctx)?.try_into()?;
-                    let value = Value::resolve_val(v, ctx)?;
+                    let key: CelMapKey<'v> = Value::resolve_in(k, ctx, frame)?.try_into()?;
+                    let value = Value::resolve_in(v, ctx, frame)?;
 
                     // An optional entry holding no value adds nothing, not even its key.
                     let value = if is_optional {
@@ -1456,8 +1497,8 @@ impl Value {
                 Ok(CowVal::owned(CelMap::from(map)))
             }
             Expr::Comprehension(comprehension) => {
-                let accu_init = Value::resolve_val(&comprehension.accu_init, ctx)?;
-                let iter = Value::resolve_val(&comprehension.iter_range, ctx)?;
+                let accu_init = Value::resolve_in(&comprehension.accu_init, ctx, frame)?;
+                let iter = Value::resolve_in(&comprehension.iter_range, ctx, frame)?;
 
                 // Mirror cel-go's optimization (see `folder.ResolveName` in
                 // `cel-go/interpreter/interpretable.go`): when the
@@ -1471,7 +1512,7 @@ impl Value {
                         .downcast_ref::<CelList>()
                         .is_some_and(|list| list.inner().is_empty())
                     {
-                        return step.run(comprehension, &iter, ctx);
+                        return step.run(comprehension, &iter, ctx, frame);
                     }
                 }
 
@@ -1487,18 +1528,18 @@ impl Value {
                     .iter();
                 let mut deferred = DeferredErrors::of(comprehension);
                 while let Some(item) = items.next() {
-                    if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
+                    if !try_bool(Value::resolve_in(&comprehension.loop_cond, &ctx, frame))? {
                         break;
                     }
                     ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
-                    let step = Value::resolve_val(&comprehension.loop_step, &ctx);
+                    let step = Value::resolve_in(&comprehension.loop_step, &ctx, frame);
                     if let Some(accu) = deferred.step(step)? {
                         ctx.add_variable_as_val(&comprehension.accu_var, accu.into_owned());
                     }
                 }
                 deferred.finish()?;
                 Ok(CowVal::Owned(
-                    Value::resolve_val(&comprehension.result, &ctx)?.into_owned(),
+                    Value::resolve_in(&comprehension.result, &ctx, frame)?.into_owned(),
                 ))
             }
             Expr::Struct(strct) => {
@@ -1514,7 +1555,7 @@ impl Value {
                     match &entry.expr {
                         EntryExpr::StructField(expr) => {
                             let f = expr.field.clone();
-                            fields.insert(f, Value::resolve_val(&expr.value, ctx)?);
+                            fields.insert(f, Value::resolve_in(&expr.value, ctx, frame)?);
                         }
                         EntryExpr::MapEntry(entry) => {
                             return Err(ExecutionError::InternalError(format!(
@@ -1527,6 +1568,64 @@ impl Value {
             }
             Expr::Unspecified => panic!("Can't evaluate Unspecified Expr"),
         }
+    }
+}
+
+/// A slot's value or error, once it is evaluated.
+type Slot<'v> = OnceCell<Result<Box<dyn Val + 'v>, ExecutionError>>;
+
+/// The slots of the `cel.@block` being evaluated, bound as `@index0`,
+/// `@index1`, …: each is evaluated on its first reference, in the block's
+/// scope, and its value or error kept for the rest of the block. It is passed
+/// alongside the [`Context`], not kept on it, as a cache of `'v` values would
+/// make `Context` invariant over `'v`.
+#[derive(Clone, Copy)]
+struct BlockFrame<'b, 'v> {
+    slots: &'b [Expression],
+    values: &'b [Slot<'v>],
+    scope: &'b Context<'b, 'v>,
+    /// The slots from this one on can't be referenced from here: a slot sees
+    /// only the ones before it.
+    visible: usize,
+    /// The frame of the enclosing block, which a slot past this block's ones
+    /// is looked up in.
+    parent: Option<&'b BlockFrame<'b, 'v>>,
+}
+
+/// The index of the slot `name` spells, if it spells one.
+fn slot_index(name: &str) -> Option<usize> {
+    name.strip_prefix("@index")?.parse().ok()
+}
+
+impl<'b, 'v> BlockFrame<'b, 'v> {
+    /// Whether this block or an enclosing one has slot `index`.
+    fn has(&self, index: usize) -> bool {
+        index < self.slots.len() || self.parent.is_some_and(|parent| parent.has(index))
+    }
+
+    /// Slot `index`, evaluated if need be, or `None` if no block has it.
+    fn get(&self, index: usize) -> Option<Result<CowVal<'b, 'v>, ExecutionError>> {
+        if index >= self.slots.len() {
+            return self.parent?.get(index);
+        }
+        if index >= self.visible {
+            return Some(Err(ExecutionError::function_error(
+                crate::extensions::bindings::BLOCK,
+                format!("@index{index} referenced before its definition"),
+            )));
+        }
+        let values = self.values;
+        let value = values[index].get_or_init(|| {
+            let view = BlockFrame {
+                visible: index,
+                ..*self
+            };
+            Value::resolve_in(&self.slots[index], self.scope, Some(&view)).map(CowVal::into_owned)
+        });
+        Some(match value {
+            Ok(value) => Ok(CowVal::Borrowed(value.as_ref())),
+            Err(error) => Err(error.clone()),
+        })
     }
 }
 
@@ -1704,6 +1803,7 @@ impl<'e> AppendStep<'e> {
         comprehension: &'e ComprehensionExpr,
         iter: &CowVal<'e, 'v>,
         ctx: &'e Context<'p, 'v>,
+        frame: Option<&BlockFrame<'_, 'v>>,
     ) -> Result<CowVal<'e, 'v>, ExecutionError> {
         let size_hint = iter
             .as_sizer()
@@ -1720,16 +1820,16 @@ impl<'e> AppendStep<'e> {
             })?
             .iter();
         while let Some(item) = items.next() {
-            if !try_bool(Value::resolve_val(&comprehension.loop_cond, &ctx))? {
+            if !try_bool(Value::resolve_in(&comprehension.loop_cond, &ctx, frame))? {
                 break;
             }
             ctx.add_variable_as_val(&comprehension.iter_var, item.clone_as_boxed());
             if let Some(guard) = self.guard {
-                if !try_bool(Value::resolve_val(guard, &ctx))? {
+                if !try_bool(Value::resolve_in(guard, &ctx, frame))? {
                     continue;
                 }
             }
-            accu.extend(Value::resolve_val(self.items, &ctx)?.as_ref())?;
+            accu.extend(Value::resolve_in(self.items, &ctx, frame)?.as_ref())?;
         }
         Ok(CowVal::owned(accu.to_immutable()))
     }
