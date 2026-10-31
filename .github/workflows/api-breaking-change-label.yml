@@ -1,0 +1,38 @@
+name: API Breaking Change Label
+
+on:
+  workflow_run:
+    workflows: ["API Breaking Change Detection"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  label:
+    name: Update API-breaking label
+    if: github.event.workflow_run.event == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      pull-requests: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: semver-result
+          path: result
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Update the label
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          pr="$(cat result/pr)"
+          outcome="$(cat result/outcome)"
+          # Written by a run of the PR's own code: don't trust it.
+          [[ "$pr" =~ ^[0-9]+$ ]] || { echo "invalid PR number"; exit 1; }
+          case "$outcome" in
+            failure) gh pr edit "$pr" --add-label "api/bump-version" ;;
+            success) gh pr edit "$pr" --remove-label "api/bump-version" 2>/dev/null || true ;;
+          esac
