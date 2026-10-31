@@ -369,6 +369,16 @@ pub const OPTIONAL_TYPE: Type = Type {
     trait_mask: 0,
 };
 
+/// `A`, the type parameter of the standard library's generic overloads.
+// A literal rather than `Type::new_type_param`, so that constants can borrow it:
+// on the MSRV, the result of a `const fn` can't be borrowed by one.
+pub(crate) const PARAM_A: Type = Type {
+    kind: Kind::TypeParam,
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("A"),
+    trait_mask: 0,
+};
+
 /// `string`, the type of [`CelString`].
 pub const STRING_TYPE: Type = Type {
     kind: Kind::String,
