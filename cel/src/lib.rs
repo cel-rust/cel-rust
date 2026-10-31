@@ -330,7 +330,8 @@ pub enum DeclarationError {
     ///
     /// An id is unique across all the overloads of a function, member functions
     /// included. A signature is the argument types, together with whether the
-    /// overload is a member function.
+    /// overload is a member function. The result type and the names of type
+    /// parameters take no part in it: `f(A)` and `f(B)` have the same signature.
     #[error("Cannot declare overload '{id}' of '{function}': one with the same id or signature is already declared")]
     DuplicateOverload { function: String, id: String },
     /// A type could not be registered because another type is already
@@ -352,6 +353,24 @@ pub enum DeclarationError {
     /// already added.
     #[error("Cannot add macro '{function}': one for the same call style and argument count is already added")]
     DuplicateMacro { function: String },
+    /// An overload could not be declared for a function because a call could
+    /// also resolve to another of its overloads, of a different signature.
+    ///
+    /// A call must resolve to at most one overload of a function. The spec has
+    /// argument types not overlap once type variables are erased, and dynamic
+    /// dispatch only use the coarse types of values, so type arguments can't tell
+    /// overloads apart either. Two overloads overlap when they are both member
+    /// functions, or neither is, take as many arguments, and could be called with
+    /// the same values: in each position, one of the types is `dyn` or a type
+    /// parameter, or both are of the same kind and name. So `f(dyn)` overlaps
+    /// `f(int)`, and `f(list(int))` overlaps `f(list(string))`, as both accept
+    /// every list.
+    #[error("Cannot declare overload '{id}' of '{function}': its argument types overlap those of overload '{overlapping_id}'")]
+    OverlappingOverload {
+        function: String,
+        id: String,
+        overlapping_id: String,
+    },
 }
 
 impl DeclarationError {
@@ -365,6 +384,14 @@ impl DeclarationError {
         DeclarationError::DuplicateOverload {
             function: function.to_string(),
             id: id.to_string(),
+        }
+    }
+
+    pub fn overlapping_overload(function: &str, id: &str, overlapping_id: &str) -> Self {
+        DeclarationError::OverlappingOverload {
+            function: function.to_string(),
+            id: id.to_string(),
+            overlapping_id: overlapping_id.to_string(),
         }
     }
 

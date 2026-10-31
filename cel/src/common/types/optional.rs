@@ -420,11 +420,13 @@ mod tests {
     use crate::{Context, Env, Value};
 
     #[test]
-    fn is_assignable() {
+    fn is_assignable_from_optionals_only() {
+        assert!(types::OPTIONAL_TYPE.is_assignable(&Optional::none()));
+        assert!(types::OPTIONAL_TYPE.is_assignable(&Optional::of(Box::new(CelInt::from(42)))));
         let s = CelString::from("foo");
-        assert!(types::OPTIONAL_TYPE.is_assignable(&s));
+        assert!(!types::OPTIONAL_TYPE.is_assignable(&s));
         let i = CelInt::from(42);
-        assert!(types::OPTIONAL_TYPE.is_assignable(&i));
+        assert!(!types::OPTIONAL_TYPE.is_assignable(&i));
     }
 
     fn non_optional() -> CowVal<'static, 'static> {

@@ -1,5 +1,5 @@
 use crate::common::{
-    decls::FunctionDecl,
+    decls::{FunctionDecl, Signature},
     functions::{Function, Op},
     types::{self, Type},
     value::CowVal,
@@ -285,21 +285,24 @@ impl Env {
     ///
     /// The name is the function name (e.g., `_==_`, `size`).
     /// The id is the unique identifier for this overload (e.g., `equals_int64`).
-    /// The args are the expected argument types.
+    /// The args are the expected argument types, or a [`Signature`] to also
+    /// declare the result type, which is otherwise `dyn`.
     /// The op is the function implementation.
     ///
     /// # Errors
     ///
     /// Fails with [`DeclarationError::DuplicateOverload`] if an overload of that
-    /// name is already declared with the same id, or with the same signature.
+    /// name is already declared with the same id, or with the same signature, and
+    /// with [`DeclarationError::OverlappingOverload`] if a call could also resolve
+    /// to one already declared.
     pub fn add_overload(
         &mut self,
         name: &str,
         id: &str,
-        args: Vec<types::Type>,
+        args: impl Into<Signature>,
         op: Function,
     ) -> Result<(), DeclarationError> {
-        self.declare_overload(name, id, args, Op::Function(op))
+        self.declare_overload(name, id, args.into(), Op::Function(op))
     }
 
     /// Adds a global function overload, as [`Env::add_overload`] does, that a
@@ -333,7 +336,7 @@ impl Env {
         &mut self,
         name: &str,
         id: &str,
-        args: Vec<types::Type>,
+        args: impl Into<Signature>,
         op: F,
     ) -> Result<(), DeclarationError>
     where
@@ -344,20 +347,20 @@ impl Env {
             + std::panic::RefUnwindSafe
             + 'static,
     {
-        self.declare_overload(name, id, args, Op::Closure(Box::new(op)))
+        self.declare_overload(name, id, args.into(), Op::Closure(Box::new(op)))
     }
 
     fn declare_overload(
         &mut self,
         name: &str,
         id: &str,
-        args: Vec<types::Type>,
+        signature: Signature,
         op: Op,
     ) -> Result<(), DeclarationError> {
         match self.functions.entry(name.to_owned()) {
             Vacant(vacant_entry) => {
                 let mut value = FunctionDecl::new(name);
-                value.add_overload(id.to_string(), false, args, op)?;
+                value.add_overload(id.to_string(), false, signature, op)?;
                 vacant_entry.insert(value);
                 if let Some((namespace, _)) = name.split_once('.') {
                     self.namespaces.insert(namespace.to_owned());
@@ -367,7 +370,7 @@ impl Env {
             Occupied(occupied_entry) => {
                 occupied_entry
                     .into_mut()
-                    .add_overload(id.to_string(), false, args, op)
+                    .add_overload(id.to_string(), false, signature, op)
             }
         }
     }
@@ -385,6 +388,11 @@ impl Env {
             None => None,
             Some(fn_decl) => fn_decl.find_overload(false, args),
         }
+    }
+
+    /// The function of that name, as declared by its overloads, if it has any.
+    pub fn function(&self, name: &str) -> Option<&FunctionDecl> {
+        self.functions.get(name)
     }
 
     /// The implementation of the overload a call of `name` with `args`
@@ -411,35 +419,37 @@ impl Env {
     /// The name is the function name.
     /// The id is the unique identifier for this overload.
     /// The target is the type of the receiver.
-    /// The args are the expected argument types (excluding the receiver).
+    /// The args are the expected argument types (excluding the receiver), or a
+    /// [`Signature`] to also declare the result type, which is otherwise `dyn`.
     /// The op is the function implementation.
     ///
     /// # Errors
     ///
     /// Fails with [`DeclarationError::DuplicateOverload`] if an overload of that
-    /// name is already declared with the same id, or with the same signature.
+    /// name is already declared with the same id, or with the same signature, and
+    /// with [`DeclarationError::OverlappingOverload`] if a call could also resolve
+    /// to one already declared.
     pub fn add_member_overload(
         &mut self,
         name: &str,
         id: &str,
         target: Type,
-        args: Vec<types::Type>,
+        args: impl Into<Signature>,
         op: Function,
     ) -> Result<(), DeclarationError> {
-        let mut args = args;
-        args.insert(0, target);
+        let signature = args.into().with_receiver(target);
         let op = Op::Function(op);
         match self.functions.entry(name.to_owned()) {
             Vacant(vacant_entry) => {
                 let mut value = FunctionDecl::new(name);
-                value.add_overload(id.to_string(), true, args, op)?;
+                value.add_overload(id.to_string(), true, signature, op)?;
                 vacant_entry.insert(value);
                 Ok(())
             }
             Occupied(occupied_entry) => {
                 occupied_entry
                     .into_mut()
-                    .add_overload(id.to_string(), true, args, op)
+                    .add_overload(id.to_string(), true, signature, op)
             }
         }
     }
@@ -781,7 +791,10 @@ impl StructType for StructDef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::types::Type;
     use crate::common::value::Val;
+    use crate::Context;
+    use std::borrow::Cow;
     use std::cell::Cell;
     use std::sync::Arc;
 
@@ -1250,6 +1263,400 @@ mod tests {
             let context = Context::with_env(env.clone());
             assert_eq!(program.execute(&context), Ok(Value::Int(expected)));
         }
+    }
+
+    /// An overload is picked by the coarse types of its arguments: that of a
+    /// `list(int)` is called with any list, one of a type parameter with
+    /// anything.
+    #[test]
+    fn a_call_resolves_to_generic_and_parameterized_overloads() {
+        static LIST_OF_INT: [Cow<'static, Type>; 1] = [Cow::Borrowed(&types::INT_TYPE)];
+        static MAP_OF_STRING_INT: [Cow<'static, Type>; 2] = [
+            Cow::Borrowed(&types::STRING_TYPE),
+            Cow::Borrowed(&types::INT_TYPE),
+        ];
+        let mut env = Env::stdlib();
+        for (name, arg) in [
+            ("ints", Type::new_list_type(&LIST_OF_INT)),
+            ("entries", Type::new_map_type(&MAP_OF_STRING_INT)),
+            ("any", Type::new_type_param("A")),
+        ] {
+            env.add_overload(name, name, vec![arg], noop).unwrap();
+        }
+        let env = Arc::new(env);
+        let eval = |source: &str| {
+            let program = env.compile(source).unwrap();
+            program.execute(&Context::with_env(Arc::clone(&env)))
+        };
+
+        for source in ["ints([])", "ints([1])", "ints(['a'])", "ints(['a', 1])"] {
+            assert!(eval(source).is_ok(), "{source}");
+        }
+        for source in ["entries({})", "entries({'a': 1})", "entries({1: 'a'})"] {
+            assert!(eval(source).is_ok(), "{source}");
+        }
+        for source in ["any(1)", "any('a')", "any([1])", "any(null)"] {
+            assert!(eval(source).is_ok(), "{source}");
+        }
+        for source in ["ints(1)", "ints({})", "entries([])", "entries(1)"] {
+            assert!(
+                matches!(eval(source), Err(crate::ExecutionError::NoSuchOverload(_))),
+                "{source}",
+            );
+        }
+    }
+
+    /// Only optionals reach the overloads of `optional_type`, and whatever
+    /// else they are called on doesn't have them.
+    #[test]
+    fn optional_overloads_reject_other_values() {
+        let env = Arc::new(Env::stdlib());
+        for source in [
+            "1.hasValue()",
+            "'a'.orValue(1)",
+            "1.value()",
+            "1.or(optional.none())",
+        ] {
+            let result = env
+                .compile(source)
+                .unwrap()
+                .execute(&Context::with_env(Arc::clone(&env)));
+            assert!(
+                matches!(result, Err(crate::ExecutionError::NoSuchOverload(_))),
+                "{source}: {result:?}",
+            );
+        }
+    }
+
+    /// The name of a type parameter only means something within its overload,
+    /// so it doesn't make for another signature.
+    #[test]
+    fn a_signature_is_the_same_whatever_its_type_params_are_named() {
+        const A: Type = Type::new_type_param("A");
+        const B: Type = Type::new_type_param("B");
+        static PARAM_A: Type = A;
+        static PARAM_B: Type = B;
+        static LIST_OF_A: [Cow<'static, Type>; 1] = [Cow::Borrowed(&PARAM_A)];
+        static LIST_OF_B: [Cow<'static, Type>; 1] = [Cow::Borrowed(&PARAM_B)];
+        let mut env = Env::default();
+
+        assert_eq!(env.add_overload("f", "f_a", vec![A], noop), Ok(()));
+        assert_eq!(
+            env.add_overload("f", "f_b", vec![B], noop),
+            Err(duplicate("f", "f_b"))
+        );
+        assert_eq!(
+            env.add_overload("g", "g_a", vec![Type::new_list_type(&LIST_OF_A)], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("g", "g_b", vec![Type::new_list_type(&LIST_OF_B)], noop),
+            Err(duplicate("g", "g_b"))
+        );
+        // a member overload's signature is another one
+        assert_eq!(env.add_member_overload("f", "a_f", A, vec![], noop), Ok(()));
+        assert_eq!(
+            env.add_member_overload("f", "b_f", B, vec![], noop),
+            Err(duplicate("f", "b_f"))
+        );
+    }
+
+    fn only_overload<'a>(env: &'a Env, name: &str) -> &'a crate::common::decls::OverloadDecl {
+        let mut overloads = env.function(name).unwrap().overloads();
+        assert_eq!(overloads.len(), 1);
+        overloads.next().unwrap()
+    }
+
+    #[test]
+    fn a_signature_declares_the_argument_and_result_types() {
+        let mut env = Env::default();
+        let signature = Signature::new(vec![types::INT_TYPE, types::UINT_TYPE]);
+        env.add_overload("f", "f_id", signature.returns(types::STRING_TYPE), noop)
+            .unwrap();
+
+        let overload = only_overload(&env, "f");
+        assert_eq!(overload.id, "f_id");
+        assert!(!overload.is_member_function());
+        assert_eq!(
+            overload.arg_types().collect::<Vec<_>>(),
+            [&types::INT_TYPE, &types::UINT_TYPE]
+        );
+        assert_eq!(overload.result_type(), &types::STRING_TYPE);
+    }
+
+    #[test]
+    fn a_member_overload_takes_its_receiver_first() {
+        let mut env = Env::default();
+        let signature = Signature::new(vec![types::UINT_TYPE]).returns(types::STRING_TYPE);
+        env.add_member_overload("f", "int_f", types::INT_TYPE, signature, noop)
+            .unwrap();
+
+        let overload = only_overload(&env, "f");
+        assert!(overload.is_member_function());
+        assert_eq!(
+            overload.arg_types().collect::<Vec<_>>(),
+            [&types::INT_TYPE, &types::UINT_TYPE]
+        );
+        assert_eq!(overload.result_type(), &types::STRING_TYPE);
+    }
+
+    #[test]
+    fn a_closure_declares_a_signature_too() {
+        let mut env = Env::default();
+        let signature = Signature::new(vec![types::INT_TYPE]).returns(types::STRING_TYPE);
+        env.add_overload_with("f", "f_id", signature, noop).unwrap();
+        env.add_overload_with("g", "g_id", vec![types::INT_TYPE], noop)
+            .unwrap();
+
+        assert_eq!(only_overload(&env, "f").result_type(), &types::STRING_TYPE);
+        assert_eq!(only_overload(&env, "g").result_type(), &types::DYN_TYPE);
+    }
+
+    /// Argument types alone leave the result undeclared, whichever way the
+    /// overload is added.
+    #[test]
+    fn an_undeclared_result_is_dyn() {
+        let mut env = Env::default();
+        env.add_overload("f", "f_id", vec![], noop).unwrap();
+        env.add_member_overload("g", "g_id", types::INT_TYPE, vec![], noop)
+            .unwrap();
+        assert_eq!(only_overload(&env, "f").result_type(), &types::DYN_TYPE);
+        assert_eq!(only_overload(&env, "g").result_type(), &types::DYN_TYPE);
+    }
+
+    #[test]
+    fn overloads_are_listed_in_the_order_they_were_declared() {
+        let mut env = Env::default();
+        for (id, arg) in [
+            ("f_string", types::STRING_TYPE),
+            ("f_int", types::INT_TYPE),
+            ("f_bool", types::BOOL_TYPE),
+        ] {
+            env.add_overload("f", id, vec![arg], noop).unwrap();
+        }
+        let ids: Vec<_> = env
+            .function("f")
+            .unwrap()
+            .overloads()
+            .map(|overload| overload.id.as_str())
+            .collect();
+        assert_eq!(ids, ["f_string", "f_int", "f_bool"]);
+    }
+
+    #[test]
+    fn an_undeclared_function_is_absent() {
+        assert!(Env::default().function("f").is_none());
+        assert!(Env::stdlib().function("f").is_none());
+        assert!(Env::stdlib().function("size").is_some());
+    }
+
+    /// Overloads are picked by their arguments, so that's all that tells them
+    /// apart.
+    #[test]
+    fn overloads_can_t_differ_by_their_result_type_alone() {
+        let mut env = Env::default();
+        let returning = |result| Signature::new(vec![types::INT_TYPE]).returns(result);
+        assert_eq!(
+            env.add_overload("f", "f_int", returning(types::INT_TYPE), noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("f", "f_string", returning(types::STRING_TYPE), noop),
+            Err(duplicate("f", "f_string"))
+        );
+    }
+
+    /// The result type is a declaration: evaluation doesn't look at it.
+    #[test]
+    fn evaluation_ignores_the_declared_result_type() {
+        let mut env = Env::stdlib();
+        let signature = Signature::new(vec![types::INT_TYPE]).returns(types::STRING_TYPE);
+        env.add_overload("f", "f_int", signature, noop).unwrap();
+        let env = Arc::new(env);
+        let result = env
+            .compile("f(1)")
+            .unwrap()
+            .execute(&Context::with_env(Arc::clone(&env)));
+        assert_eq!(result, Ok(crate::Value::Int(1)));
+    }
+
+    /// Spec, Functions: "Overloads must have non-overlapping argument types,
+    /// after erasure of all type variables".
+    #[test]
+    fn overloads_whose_argument_types_overlap_are_rejected() {
+        static LIST_OF_INT: [Cow<'static, Type>; 1] = [Cow::Borrowed(&types::INT_TYPE)];
+        static LIST_OF_STRING: [Cow<'static, Type>; 1] = [Cow::Borrowed(&types::STRING_TYPE)];
+        static PARAM_A: Type = A;
+        static LIST_OF_A: [Cow<'static, Type>; 1] = [Cow::Borrowed(&PARAM_A)];
+        static MAP_OF_INT_INT: [Cow<'static, Type>; 2] = [
+            Cow::Borrowed(&types::INT_TYPE),
+            Cow::Borrowed(&types::INT_TYPE),
+        ];
+        const A: Type = Type::new_type_param("A");
+        let list_of_int = || Type::new_list_type(&LIST_OF_INT);
+        let list_of_string = || Type::new_list_type(&LIST_OF_STRING);
+        let list_of_a = || Type::new_list_type(&LIST_OF_A);
+        let map_of_int_int = || Type::new_map_type(&MAP_OF_INT_INT);
+
+        let overlapping: Vec<(Vec<Type>, Vec<Type>)> = vec![
+            (vec![types::DYN_TYPE], vec![types::INT_TYPE]),
+            (vec![A], vec![types::INT_TYPE]),
+            (vec![A], vec![types::DYN_TYPE]),
+            (vec![A], vec![list_of_int()]),
+            (vec![list_of_a()], vec![list_of_int()]),
+            (vec![list_of_int()], vec![list_of_string()]),
+            (vec![types::LIST_TYPE], vec![list_of_a()]),
+            (vec![types::MAP_TYPE], vec![map_of_int_int()]),
+            (vec![types::OPTIONAL_TYPE], vec![A]),
+            (
+                vec![types::INT_TYPE, types::DYN_TYPE],
+                vec![types::DYN_TYPE, types::STRING_TYPE],
+            ),
+        ];
+        for (first, second) in overlapping {
+            let shown = format!("{first:?} / {second:?}");
+            // whichever is declared first
+            for (first, second) in [
+                (
+                    first.iter().map(Type::to_owned).collect::<Vec<_>>(),
+                    second.iter().map(Type::to_owned).collect::<Vec<_>>(),
+                ),
+                (second, first),
+            ] {
+                let mut env = Env::default();
+                assert_eq!(
+                    env.add_overload("f", "first", first, noop),
+                    Ok(()),
+                    "{shown}"
+                );
+                assert_eq!(
+                    env.add_overload("f", "second", second, noop),
+                    Err(DeclarationError::overlapping_overload(
+                        "f", "second", "first"
+                    )),
+                    "{shown}",
+                );
+            }
+        }
+
+        let distinct: Vec<(Vec<Type>, Vec<Type>)> = vec![
+            (vec![types::INT_TYPE], vec![types::STRING_TYPE]),
+            (vec![list_of_a()], vec![types::INT_TYPE]),
+            (vec![list_of_int()], vec![map_of_int_int()]),
+            (vec![types::OPTIONAL_TYPE], vec![types::LIST_TYPE]),
+            (
+                vec![types::DYN_TYPE],
+                vec![types::DYN_TYPE, types::DYN_TYPE],
+            ),
+            (vec![], vec![A]),
+            (
+                vec![types::INT_TYPE, types::DYN_TYPE],
+                vec![types::STRING_TYPE, types::DYN_TYPE],
+            ),
+            (
+                vec![Type::new_opaque_type("a")],
+                vec![Type::new_opaque_type("b")],
+            ),
+        ];
+        for (first, second) in distinct {
+            let shown = format!("{first:?} / {second:?}");
+            let mut env = Env::default();
+            assert_eq!(
+                env.add_overload("f", "first", first, noop),
+                Ok(()),
+                "{shown}"
+            );
+            assert_eq!(
+                env.add_overload("f", "second", second, noop),
+                Ok(()),
+                "{shown}"
+            );
+        }
+    }
+
+    #[test]
+    fn only_overloads_of_the_same_call_style_overlap() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_dyn", vec![types::DYN_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_member_overload("f", "int_f", types::INT_TYPE, vec![], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_member_overload("f", "dyn_f", types::DYN_TYPE, vec![], noop),
+            Err(DeclarationError::overlapping_overload(
+                "f", "dyn_f", "int_f"
+            ))
+        );
+        assert_eq!(
+            env.add_overload("g", "g_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload_with("g", "g_dyn", vec![types::DYN_TYPE], noop),
+            Err(DeclarationError::overlapping_overload(
+                "g", "g_dyn", "g_int"
+            ))
+        );
+    }
+
+    /// A duplicate is reported as such, even when another overload overlaps
+    /// first: only the id, or the signature, needs changing.
+    #[test]
+    fn a_duplicate_is_not_reported_as_an_overlap() {
+        let mut env = Env::default();
+        assert_eq!(
+            env.add_overload("f", "f_int", vec![types::INT_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("f", "f_string", vec![types::STRING_TYPE], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("f", "f_string", vec![types::DYN_TYPE], noop),
+            Err(duplicate("f", "f_string"))
+        );
+        assert_eq!(
+            env.add_overload("f", "f_other", vec![types::STRING_TYPE], noop),
+            Err(duplicate("f", "f_other"))
+        );
+    }
+
+    /// A rejected overload leaves the function as it was.
+    #[test]
+    fn a_rejected_overlap_declares_nothing() {
+        let mut env = Env::stdlib();
+        env.add_overload("f", "f_int", vec![types::INT_TYPE], noop)
+            .unwrap();
+        assert!(env
+            .add_overload("f", "f_dyn", vec![types::DYN_TYPE], noop)
+            .is_err());
+        let env = Arc::new(env);
+        let eval = |source: &str| {
+            let program = env.compile(source).unwrap();
+            program.execute(&Context::with_env(Arc::clone(&env)))
+        };
+        assert_eq!(eval("f(1)"), Ok(crate::Value::Int(1)));
+        assert!(matches!(
+            eval("f('a')"),
+            Err(crate::ExecutionError::NoSuchOverload(_))
+        ));
+    }
+
+    /// What the standard library and the extensions declare doesn't overlap.
+    #[test]
+    fn nothing_declared_by_this_crate_overlaps() {
+        let mut env = Env::stdlib().with_optional_support(true);
+        env.add_extension(crate::extensions::bindings).unwrap();
+        env.add_extension(crate::extensions::encoders).unwrap();
+        env.add_extension(crate::extensions::lists).unwrap();
+        env.add_extension(crate::extensions::math).unwrap();
+        env.add_extension(crate::extensions::network).unwrap();
+        env.add_extension(crate::extensions::strings).unwrap();
     }
 
     /// A closure and a function are overloads alike: neither's id, nor

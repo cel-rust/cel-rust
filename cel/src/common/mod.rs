@@ -45,7 +45,7 @@
 //! 1. among the overloads declared on the [`Env`](crate::Env), such as those
 //!    of [`Env::stdlib`](crate::Env::stdlib). Each overload is a
 //!    [`Function`](functions::Function) declared for argument types, and the
-//!    first whose types accept the arguments is called, see
+//!    one whose types accept the arguments is called, see
 //!    [`FunctionDecl::find_overload`](decls::FunctionDecl::find_overload);
 //! 2. then among the functions added to the [`Context`](crate::Context) with
 //!    [`Context::add_function`](crate::Context::add_function), which aren't
