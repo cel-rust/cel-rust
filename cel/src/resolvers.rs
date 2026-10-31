@@ -12,6 +12,9 @@ pub trait Resolver {
 
 impl Resolver for Expression {
     fn resolve(&self, ctx: &FunctionContext) -> ResolveResult {
+        // Re-entry starts a fresh evaluation without the private block frame.
+        // Function arguments are already evaluated with it, but expressions
+        // explicitly resolved by a host function cannot see block slots.
         Value::resolve(self, ctx.ptx)
     }
 }
