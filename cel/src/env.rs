@@ -781,7 +781,10 @@ impl StructType for StructDef {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::common::types::Type;
     use crate::common::value::Val;
+    use crate::Context;
+    use std::borrow::Cow;
     use std::cell::Cell;
     use std::sync::Arc;
 
@@ -1250,6 +1253,102 @@ mod tests {
             let context = Context::with_env(env.clone());
             assert_eq!(program.execute(&context), Ok(Value::Int(expected)));
         }
+    }
+
+    /// An overload is picked by the coarse types of its arguments: that of a
+    /// `list(int)` is called with any list, one of a type parameter with
+    /// anything.
+    #[test]
+    fn a_call_resolves_to_generic_and_parameterized_overloads() {
+        static LIST_OF_INT: [Cow<'static, Type>; 1] = [Cow::Borrowed(&types::INT_TYPE)];
+        static MAP_OF_STRING_INT: [Cow<'static, Type>; 2] = [
+            Cow::Borrowed(&types::STRING_TYPE),
+            Cow::Borrowed(&types::INT_TYPE),
+        ];
+        let mut env = Env::stdlib();
+        for (name, arg) in [
+            ("ints", Type::new_list_type(&LIST_OF_INT)),
+            ("entries", Type::new_map_type(&MAP_OF_STRING_INT)),
+            ("any", Type::new_type_param("A")),
+        ] {
+            env.add_overload(name, name, vec![arg], noop).unwrap();
+        }
+        let env = Arc::new(env);
+        let eval = |source: &str| {
+            let program = env.compile(source).unwrap();
+            program.execute(&Context::with_env(Arc::clone(&env)))
+        };
+
+        for source in ["ints([])", "ints([1])", "ints(['a'])", "ints(['a', 1])"] {
+            assert!(eval(source).is_ok(), "{source}");
+        }
+        for source in ["entries({})", "entries({'a': 1})", "entries({1: 'a'})"] {
+            assert!(eval(source).is_ok(), "{source}");
+        }
+        for source in ["any(1)", "any('a')", "any([1])", "any(null)"] {
+            assert!(eval(source).is_ok(), "{source}");
+        }
+        for source in ["ints(1)", "ints({})", "entries([])", "entries(1)"] {
+            assert!(
+                matches!(eval(source), Err(crate::ExecutionError::NoSuchOverload(_))),
+                "{source}",
+            );
+        }
+    }
+
+    /// Only optionals reach the overloads of `optional_type`, and whatever
+    /// else they are called on doesn't have them.
+    #[test]
+    fn optional_overloads_reject_other_values() {
+        let env = Arc::new(Env::stdlib());
+        for source in [
+            "1.hasValue()",
+            "'a'.orValue(1)",
+            "1.value()",
+            "1.or(optional.none())",
+        ] {
+            let result = env
+                .compile(source)
+                .unwrap()
+                .execute(&Context::with_env(Arc::clone(&env)));
+            assert!(
+                matches!(result, Err(crate::ExecutionError::NoSuchOverload(_))),
+                "{source}: {result:?}",
+            );
+        }
+    }
+
+    /// The name of a type parameter only means something within its overload,
+    /// so it doesn't make for another signature.
+    #[test]
+    fn a_signature_is_the_same_whatever_its_type_params_are_named() {
+        const A: Type = Type::new_type_param("A");
+        const B: Type = Type::new_type_param("B");
+        static PARAM_A: Type = A;
+        static PARAM_B: Type = B;
+        static LIST_OF_A: [Cow<'static, Type>; 1] = [Cow::Borrowed(&PARAM_A)];
+        static LIST_OF_B: [Cow<'static, Type>; 1] = [Cow::Borrowed(&PARAM_B)];
+        let mut env = Env::default();
+
+        assert_eq!(env.add_overload("f", "f_a", vec![A], noop), Ok(()));
+        assert_eq!(
+            env.add_overload("f", "f_b", vec![B], noop),
+            Err(duplicate("f", "f_b"))
+        );
+        assert_eq!(
+            env.add_overload("g", "g_a", vec![Type::new_list_type(&LIST_OF_A)], noop),
+            Ok(())
+        );
+        assert_eq!(
+            env.add_overload("g", "g_b", vec![Type::new_list_type(&LIST_OF_B)], noop),
+            Err(duplicate("g", "g_b"))
+        );
+        // a member overload's signature is another one
+        assert_eq!(env.add_member_overload("f", "a_f", A, vec![], noop), Ok(()));
+        assert_eq!(
+            env.add_member_overload("f", "b_f", B, vec![], noop),
+            Err(duplicate("f", "b_f"))
+        );
     }
 
     /// A closure and a function are overloads alike: neither's id, nor

@@ -94,7 +94,13 @@ impl FunctionDecl {
     fn is_present(&self, name: &str, member_function: bool, arg_types: &[Type]) -> bool {
         for overload in &self.overloads {
             if overload.id == name
-                || (overload.member_function == member_function && overload.arg_types == arg_types)
+                || (overload.member_function == member_function
+                    && overload.arg_types.len() == arg_types.len()
+                    && overload
+                        .arg_types
+                        .iter()
+                        .zip(arg_types)
+                        .all(|(declared, arg)| declared.is_equivalent(arg)))
             {
                 return true;
             }

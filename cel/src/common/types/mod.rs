@@ -163,8 +163,9 @@ pub enum Kind {
     /// `type`, the type of type values such as `int` or `type(x)`, see
     /// [`CelType`].
     Type,
-    /// A type parameter, as in a generic function's declaration. No type of
-    /// this crate has it.
+    /// A type parameter, as in a generic function's declaration:
+    /// what [`Type::new_type_param`] makes. An overload parameter of this kind
+    /// accepts any argument.
     TypeParam,
     /// `uint`.
     UInt,
@@ -206,26 +207,21 @@ impl Type {
     /// Returns true if the given value can be assigned to this type.
     ///
     /// That is how an overload is picked: it applies when each of its
-    /// parameter types accepts the argument in its position. A type accepts a
-    /// value whose [type](Val::get_type) equals it, [`DYN_TYPE`] accepts any
-    /// value, and an opaque type with parameters accepts the values its first
-    /// parameter accepts: [`OPTIONAL_TYPE`], `optional_type(dyn)`, accepts any
-    /// value.
+    /// parameter types accepts the argument in its position. [`DYN_TYPE`] and
+    /// [type parameters](Type::new_type_param) accept any value, and any other
+    /// type accepts the values whose [type](Val::get_type) has the same kind
+    /// and name.
     ///
-    /// Parameters are compared, not checked element by element: every
-    /// [`CelList`] has type [`LIST_TYPE`], `list(dyn)`, so a parameter of type
-    /// `list(int)` accepts none of them.
+    /// Parameters take no part in this, as the spec has overload dispatch use
+    /// the coarse types of values only: `list(int)` accepts every [`CelList`],
+    /// whatever its elements, and nothing else. What an overload gets called
+    /// with is thus not guaranteed to match the parameters it declares.
     pub fn is_assignable(&self, val: &dyn Val) -> bool {
-        if self == val.get_type() {
-            true
-        } else {
-            match self.kind() {
-                Kind::Dyn => true,
-                Kind::Opaque => self
-                    .parameters
-                    .first()
-                    .is_some_and(|t| t.is_assignable(val)),
-                _ => false,
+        match self.kind {
+            Kind::Dyn | Kind::TypeParam => true,
+            _ => {
+                let val_type = val.get_type();
+                self.kind == val_type.kind && self.runtime_type_name == val_type.runtime_type_name
             }
         }
     }
@@ -355,7 +351,7 @@ pub const NULL_TYPE: Type = {
 };
 
 /// `optional_type(dyn)`, the type of every [`CelOptional`], whatever its
-/// value. As an overload's parameter type, it accepts any value, see
+/// value. As an overload's parameter type, it accepts any of them, see
 /// [`Type::is_assignable`].
 pub const OPTIONAL_TYPE: Type = Type {
     kind: Kind::Opaque,
@@ -420,10 +416,39 @@ impl Type {
         }
     }
 
+    /// Creates a type parameter, of [`Kind::TypeParam`], for an overload to
+    /// declare the parameter types it is generic over, e.g. the `A` of
+    /// `list(A)`. Its name only means something within that overload.
+    ///
+    /// As an overload's parameter type it accepts any value, see
+    /// [`Type::is_assignable`]. No value has this type.
+    ///
+    /// ```
+    /// use cel::common::types::Type;
+    /// use cel::common::value::CowVal;
+    /// use cel::{Context, Env, ExecutionError, Value};
+    /// use std::sync::Arc;
+    ///
+    /// fn identity<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    ///     Ok(args.remove(0))
+    /// }
+    ///
+    /// const A: Type = Type::new_type_param("A");
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_overload("same", "same_a", vec![A], identity).unwrap();
+    /// let program = env.compile("same(1)").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Int(1)));
+    /// ```
+    pub const fn new_type_param(name: &'static str) -> Type {
+        Type::simple_type(Kind::TypeParam, name)
+    }
+
     /// Creates a new list type with the given element type.
     ///
-    /// No [`CelList`] has this type unless the element type is [`DYN_TYPE`]:
-    /// see [`Type::is_assignable`].
+    /// As an overload's parameter type, it accepts every [`CelList`], whatever
+    /// the element type: see [`Type::is_assignable`].
     pub fn new_list_type(param: &'static [Cow<Type>; 1]) -> Type {
         Type {
             kind: Kind::List,
@@ -439,8 +464,8 @@ impl Type {
 
     /// Creates a new map type with the given key and value types.
     ///
-    /// No [`CelMap`] has this type unless both are [`DYN_TYPE`]: see
-    /// [`Type::is_assignable`].
+    /// As an overload's parameter type, it accepts every [`CelMap`], whatever
+    /// the key and value types: see [`Type::is_assignable`].
     pub fn new_map_type(param: &'static [Cow<Type>; 2]) -> Type {
         Type {
             kind: Kind::Map,
@@ -508,6 +533,25 @@ impl Type {
         &self.runtime_type_name
     }
 
+    /// The type's parameters, in order: a list's element type, a map's key and
+    /// then value type, an optional's value type. Other types have no
+    /// parameters.
+    pub fn parameters(&self) -> impl ExactSizeIterator<Item = &Type> {
+        self.parameters.iter().map(Cow::as_ref)
+    }
+
+    /// Whether the two types are the same but for the names of their type
+    /// parameters, as `list(A)` and `list(B)` are.
+    pub(crate) fn is_equivalent(&self, other: &Type) -> bool {
+        self.kind == other.kind
+            && (self.kind == Kind::TypeParam || self.runtime_type_name == other.runtime_type_name)
+            && self.parameters.len() == other.parameters.len()
+            && self
+                .parameters()
+                .zip(other.parameters())
+                .all(|(a, b)| a.is_equivalent(b))
+    }
+
     /// Returns true if the type has the given trait.
     ///
     /// `t` is one of the `*_TYPE` constants of [`traits`], or several or-ed
@@ -553,4 +597,80 @@ impl<'v> Builtin<'v> {
 /// borrowed rather than cloning the value out of it.
 fn noop<'b, 'v>(mut args: Vec<CowVal<'b, 'v>>) -> Result<CowVal<'b, 'v>, ExecutionError> {
     Ok(args.remove(0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    static A: Type = Type::new_type_param("A");
+    static B: Type = Type::new_type_param("B");
+    static LIST_OF_INT: [Cow<'static, Type>; 1] = [Cow::Borrowed(&INT_TYPE)];
+    static LIST_OF_A: [Cow<'static, Type>; 1] = [Cow::Borrowed(&A)];
+    static LIST_OF_B: [Cow<'static, Type>; 1] = [Cow::Borrowed(&B)];
+    static MAP_OF_STRING_INT: [Cow<'static, Type>; 2] =
+        [Cow::Borrowed(&STRING_TYPE), Cow::Borrowed(&INT_TYPE)];
+
+    #[test]
+    fn a_type_param_accepts_any_value() {
+        assert!(A.is_assignable(&CelInt::from(1)));
+        assert!(A.is_assignable(&CelString::from("a")));
+        assert!(A.is_assignable(&CelNull));
+        assert!(A.is_assignable(&CelList::default()));
+        assert!(A.is_assignable(&CelOptional::none()));
+    }
+
+    /// Spec, Gradual Type Checking: "dynamic overload dispatch only use the
+    /// coarser types of dynamic values".
+    #[test]
+    fn parameters_take_no_part_in_what_a_list_type_accepts() {
+        let list_of_int = Type::new_list_type(&LIST_OF_INT);
+        assert!(list_of_int.is_assignable(&CelList::default()));
+        let int = || -> Box<dyn Val> { Box::new(CelInt::from(1)) };
+        let string = || -> Box<dyn Val> { Box::new(CelString::from("a")) };
+        assert!(list_of_int.is_assignable(&CelList::from(vec![int()])));
+        assert!(list_of_int.is_assignable(&CelList::from(vec![string()])));
+        assert!(list_of_int.is_assignable(&CelList::from(vec![string(), int()])));
+        assert!(Type::new_list_type(&LIST_OF_A).is_assignable(&CelList::default()));
+        assert!(!list_of_int.is_assignable(&CelInt::from(1)));
+        assert!(!list_of_int.is_assignable(&CelMap::default()));
+    }
+
+    #[test]
+    fn parameters_take_no_part_in_what_a_map_type_accepts() {
+        let map_of_string_int = Type::new_map_type(&MAP_OF_STRING_INT);
+        assert!(map_of_string_int.is_assignable(&CelMap::default()));
+        assert!(!map_of_string_int.is_assignable(&CelList::default()));
+    }
+
+    #[test]
+    fn a_type_accepts_values_of_its_kind_and_name_only() {
+        assert!(INT_TYPE.is_assignable(&CelInt::from(1)));
+        assert!(!INT_TYPE.is_assignable(&CelUInt::from(1u64)));
+        assert!(!Type::new_struct_type("acme.A").is_assignable(&CelInt::from(1)));
+        // same name as `int`, but a different kind
+        assert!(!Type::new_opaque_type("int").is_assignable(&CelInt::from(1)));
+        // same kind as `optional_type`, but a different name
+        assert!(!Type::new_opaque_type("other").is_assignable(&CelOptional::none()));
+        // both the same, and the parameters take no part
+        assert!(Type::new_opaque_type("optional_type").is_assignable(&CelOptional::none()));
+    }
+
+    #[test]
+    fn parameters_are_in_declaration_order() {
+        let map_of_string_int = Type::new_map_type(&MAP_OF_STRING_INT);
+        let parameters: Vec<_> = map_of_string_int.parameters().collect();
+        assert_eq!(parameters, [&STRING_TYPE, &INT_TYPE]);
+        assert_eq!(INT_TYPE.parameters().len(), 0);
+    }
+
+    #[test]
+    fn equivalence_ignores_the_names_of_type_params_only() {
+        assert!(A.is_equivalent(&B));
+        assert!(Type::new_list_type(&LIST_OF_A).is_equivalent(&Type::new_list_type(&LIST_OF_B)));
+        assert!(!A.is_equivalent(&INT_TYPE));
+        assert!(!INT_TYPE.is_equivalent(&UINT_TYPE));
+        assert!(!Type::new_list_type(&LIST_OF_A).is_equivalent(&Type::new_list_type(&LIST_OF_INT)));
+        assert!(!Type::new_opaque_type("a").is_equivalent(&Type::new_opaque_type("b")));
+    }
 }

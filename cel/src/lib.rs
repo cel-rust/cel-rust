@@ -330,7 +330,8 @@ pub enum DeclarationError {
     ///
     /// An id is unique across all the overloads of a function, member functions
     /// included. A signature is the argument types, together with whether the
-    /// overload is a member function.
+    /// overload is a member function. The names of type parameters take no part
+    /// in it: `f(A)` and `f(B)` have the same signature.
     #[error("Cannot declare overload '{id}' of '{function}': one with the same id or signature is already declared")]
     DuplicateOverload { function: String, id: String },
     /// A type could not be registered because another type is already
