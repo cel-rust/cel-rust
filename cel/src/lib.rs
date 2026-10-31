@@ -337,13 +337,15 @@ pub enum DeclarationError {
     /// An overload could not be declared for a function because a call could
     /// also resolve to another of its overloads, of a different signature.
     ///
-    /// Overloads of a function must have non-overlapping argument types once
-    /// type parameters are erased, as the spec requires, so that a call resolves
-    /// to at most one of them. Two overloads overlap when they are both member
+    /// A call must resolve to at most one overload of a function. The spec has
+    /// argument types not overlap once type variables are erased, and dynamic
+    /// dispatch only use the coarse types of values, so type arguments can't tell
+    /// overloads apart either. Two overloads overlap when they are both member
     /// functions, or neither is, take as many arguments, and could be called with
     /// the same values: in each position, one of the types is `dyn` or a type
     /// parameter, or both are of the same kind and name. So `f(dyn)` overlaps
-    /// `f(int)`, and `f(list(int))` overlaps `f(list(string))`.
+    /// `f(int)`, and `f(list(int))` overlaps `f(list(string))`, as both accept
+    /// every list.
     #[error("Cannot declare overload '{id}' of '{function}': its argument types overlap those of overload '{overlapping_id}'")]
     OverlappingOverload {
         function: String,
