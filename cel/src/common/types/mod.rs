@@ -369,13 +369,23 @@ pub const OPTIONAL_TYPE: Type = Type {
     trait_mask: 0,
 };
 
-/// `A`, the type parameter of the standard library's generic overloads.
+/// `V`, the type parameter of the standard library's generic overloads.
 // A literal rather than `Type::new_type_param`, so that constants can borrow it:
 // on the MSRV, the result of a `const fn` can't be borrowed by one.
-pub(crate) const PARAM_A: Type = Type {
+pub(crate) const PARAM_V: Type = Type {
     kind: Kind::TypeParam,
     parameters: Cow::Borrowed(&[]),
-    runtime_type_name: Cow::Borrowed("A"),
+    runtime_type_name: Cow::Borrowed("V"),
+    trait_mask: 0,
+};
+
+/// `optional_type(V)`, how the standard library's generic overloads declare an
+/// optional. Values have type [`OPTIONAL_TYPE`], whatever they hold, as
+/// parameters are erased at runtime.
+pub(crate) const OPTIONAL_OF_V: Type = Type {
+    kind: Kind::Opaque,
+    parameters: Cow::Borrowed(&[Cow::Borrowed(&PARAM_V)]),
+    runtime_type_name: Cow::Borrowed("optional_type"),
     trait_mask: 0,
 };
 
