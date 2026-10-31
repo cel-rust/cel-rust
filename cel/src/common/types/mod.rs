@@ -379,6 +379,16 @@ pub(crate) const PARAM_A: Type = Type {
     trait_mask: 0,
 };
 
+/// `optional_type(A)`, how the standard library's generic overloads declare an
+/// optional. Values have type [`OPTIONAL_TYPE`], whatever they hold, as
+/// parameters are erased at runtime.
+pub(crate) const OPTIONAL_OF_A: Type = Type {
+    kind: Kind::Opaque,
+    parameters: Cow::Borrowed(&[Cow::Borrowed(&PARAM_A)]),
+    runtime_type_name: Cow::Borrowed("optional_type"),
+    trait_mask: 0,
+};
+
 /// `string`, the type of [`CelString`].
 pub const STRING_TYPE: Type = Type {
     kind: Kind::String,
