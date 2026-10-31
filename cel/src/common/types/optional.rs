@@ -1,6 +1,7 @@
 use crate::common::ast::{operators, CallExpr, Expr, IdedExpr};
+use crate::common::decls::Signature;
 use crate::common::traits::Zeroer;
-use crate::common::types::{self, CelBool, Type, OPTIONAL_TYPE};
+use crate::common::types::{self, CelBool, Type, BOOL_TYPE, OPTIONAL_OF_A, PARAM_A};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
 use crate::parser::{Macro, MacroExprHelper, ParseError};
 use crate::ExecutionError;
@@ -286,51 +287,56 @@ fn optional_or_value<'b, 'v>(
 
 pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_type(types::OPTIONAL_TYPE).expect("Must be unique");
-    env.add_overload("optional.none", "optional_none", vec![], optional_none)
-        .expect("Must be unique");
+    env.add_overload(
+        "optional.none",
+        "optional_none",
+        Signature::new(vec![]).returns(OPTIONAL_OF_A),
+        optional_none,
+    )
+    .expect("Must be unique");
     env.add_overload(
         "optional.of",
         "optional_of",
-        vec![types::DYN_TYPE],
+        Signature::new(vec![PARAM_A]).returns(OPTIONAL_OF_A),
         optional_of,
     )
     .expect("Must be unique");
     env.add_overload(
         "optional.ofNonZeroValue",
         "optional_ofNonZeroValue",
-        vec![types::DYN_TYPE],
+        Signature::new(vec![PARAM_A]).returns(OPTIONAL_OF_A),
         optional_of_non_zero_value,
     )
     .expect("Must be unique");
     env.add_member_overload(
         "value",
         "optional_value",
-        OPTIONAL_TYPE,
-        vec![],
+        OPTIONAL_OF_A,
+        Signature::new(vec![]).returns(PARAM_A),
         optional_value,
     )
     .expect("Must be unique");
     env.add_member_overload(
         "hasValue",
         "optional_has_value",
-        OPTIONAL_TYPE,
-        vec![],
+        OPTIONAL_OF_A,
+        Signature::new(vec![]).returns(BOOL_TYPE),
         optional_has_value,
     )
     .expect("Must be unique");
     env.add_member_overload(
         "or",
         "optional_or_optional",
-        OPTIONAL_TYPE,
-        vec![OPTIONAL_TYPE],
+        OPTIONAL_OF_A,
+        Signature::new(vec![OPTIONAL_OF_A]).returns(OPTIONAL_OF_A),
         optional_or_optional,
     )
     .expect("Must be unique");
     env.add_member_overload(
         "orValue",
         "optional_or_value",
-        OPTIONAL_TYPE,
-        vec![types::DYN_TYPE],
+        OPTIONAL_OF_A,
+        Signature::new(vec![PARAM_A]).returns(PARAM_A),
         optional_or_value,
     )
     .expect("Must be unique");
@@ -418,6 +424,63 @@ mod tests {
     use super::*;
     use crate::common::types::{self, CelInt, CelString};
     use crate::{Context, Env, Value};
+
+    /// As cel-go declares them: the spec only defines optionals through its
+    /// conformance tests.
+    #[test]
+    fn overloads_are_declared_generic() {
+        let env = Env::stdlib();
+        let declared: [(&str, bool, &[&Type], &Type); 7] = [
+            ("optional.of", false, &[&PARAM_A], &OPTIONAL_OF_A),
+            (
+                "optional.ofNonZeroValue",
+                false,
+                &[&PARAM_A],
+                &OPTIONAL_OF_A,
+            ),
+            ("optional.none", false, &[], &OPTIONAL_OF_A),
+            ("value", true, &[&OPTIONAL_OF_A], &PARAM_A),
+            ("hasValue", true, &[&OPTIONAL_OF_A], &BOOL_TYPE),
+            (
+                "or",
+                true,
+                &[&OPTIONAL_OF_A, &OPTIONAL_OF_A],
+                &OPTIONAL_OF_A,
+            ),
+            ("orValue", true, &[&OPTIONAL_OF_A, &PARAM_A], &PARAM_A),
+        ];
+        for (name, member, args, result) in declared {
+            let mut overloads = env.function(name).unwrap().overloads();
+            assert_eq!(overloads.len(), 1, "{name}");
+            let overload = overloads.next().unwrap();
+            assert_eq!(overload.is_member_function(), member, "{name}");
+            assert_eq!(overload.arg_types().collect::<Vec<_>>(), args, "{name}");
+            assert_eq!(overload.result_type(), result, "{name}");
+        }
+    }
+
+    /// Parameters are erased at runtime: an optional's type doesn't depend on
+    /// what it holds, and is the type expressions name.
+    #[test]
+    fn values_have_the_erased_type() {
+        assert_eq!(Optional::none().get_type(), &types::OPTIONAL_TYPE);
+        let some = Optional::of(Box::new(CelInt::from(1)));
+        assert_eq!(some.get_type(), &types::OPTIONAL_TYPE);
+
+        let env = Arc::new(Env::stdlib());
+        let eval = |source: &str| {
+            let program = env.compile(source).unwrap();
+            program.execute(&Context::with_env(Arc::clone(&env)))
+        };
+        assert_eq!(
+            eval("type(optional.none()) == optional_type"),
+            Ok(Value::Bool(true))
+        );
+        assert_eq!(
+            eval("type(optional.of(1)) == optional_type"),
+            Ok(Value::Bool(true))
+        );
+    }
 
     #[test]
     fn is_assignable_from_optionals_only() {
