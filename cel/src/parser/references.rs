@@ -120,6 +120,9 @@ impl IdedExpr {
                 bound.push(&comp.accu_var);
                 comp.result._references(variables, functions, bound);
                 bound.push(&comp.iter_var);
+                if let Some(iter_var2) = &comp.iter_var2 {
+                    bound.push(iter_var2);
+                }
                 comp.loop_cond._references(variables, functions, bound);
                 comp.loop_step._references(variables, functions, bound);
                 bound.truncate(outer);
