@@ -399,16 +399,16 @@ fn member_call(helper: &mut MacroExprHelper<'_>, target: IdedExpr, func_name: &s
     }))
 }
 
-/// `optional.<func_name>(<args>)`.
+/// The global call `optional.<func_name>(<args>)`, as in cel-go: no `optional`
+/// identifier, which would read as a variable.
 fn optional_call(
     helper: &mut MacroExprHelper<'_>,
     func_name: &str,
     args: Vec<IdedExpr>,
 ) -> IdedExpr {
-    let namespace = helper.next_expr(Expr::Ident("optional".to_string()));
     helper.next_expr(Expr::Call(CallExpr {
-        func_name: func_name.to_string(),
-        target: Some(Box::new(namespace)),
+        func_name: format!("optional.{func_name}"),
+        target: None,
         args,
     }))
 }

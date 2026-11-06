@@ -570,8 +570,8 @@ mod tests {
     #[test]
     fn references() {
         let p = Program::compile("[1, 1].map(x, x * 2)").unwrap();
-        assert!(p.references().has_variable("x"));
-        assert_eq!(p.references().variables().len(), 1);
+        assert!(!p.references().has_variable("x"));
+        assert!(p.references().variables().is_empty());
     }
 
     #[test]
@@ -580,6 +580,81 @@ mod tests {
         assert_eq!(p.references().variables(), vec!["x"]);
         assert!(p.references().has_function("f"));
         assert!(!p.references().has_function(".f"));
+    }
+
+    /// Only what the caller must provide is a variable: neither what `optMap`
+    /// and `optFlatMap` bind, nor the `optional` namespace of their expansion.
+    #[test]
+    fn references_of_optional_macros_are_their_inputs() {
+        let env = crate::Env::stdlib();
+        for source in [
+            "input.?field.optMap(x, x + 1)",
+            "input.?field.optFlatMap(x, x.?nested)",
+        ] {
+            let program = env.compile(source).unwrap();
+            let references = program.references();
+            let mut variables = references.variables();
+            variables.sort_unstable();
+            assert_eq!(variables, vec!["input"], "{source}");
+            assert!(references.has_function("optional.none"), "{source}");
+        }
+    }
+
+    #[test]
+    fn references_exclude_what_comprehensions_bind() {
+        let mut env = crate::Env::stdlib();
+        env.add_extension(crate::extensions::bindings).unwrap();
+        for (source, expected) in [
+            ("[1].map(x, x + y)", vec!["y"]),
+            ("[1].map(x, [2].map(y, x + y))", vec![]),
+            ("cel.bind(a, b, a + c)", vec!["b", "c"]),
+            // Outside of their scope, the same names are variables
+            ("[x].map(x, x)", vec!["x"]),
+            ("[1].map(x, x) + [x]", vec!["x"]),
+            ("cel.bind(a, a, a)", vec!["a"]),
+            // An absolute name skips the comprehension's scope
+            ("[1].map(x, .x)", vec!["x"]),
+        ] {
+            let program = env.compile(source).unwrap();
+            let references = program.references();
+            let mut variables = references.variables();
+            variables.sort_unstable();
+            assert_eq!(variables, expected, "{source}");
+        }
+    }
+
+    /// A comprehension's result sees its accumulator, but not its loop variable,
+    /// as in cel-go's checker. The evaluator is more lenient: after at least one
+    /// iteration the result can still read `x`, but over an empty range it is
+    /// undeclared, so it has to be reported.
+    #[test]
+    fn references_treat_a_loop_variable_in_the_result_as_a_variable() {
+        use crate::common::ast::{ComprehensionExpr, Expr, LiteralValue};
+        use crate::parser::Macro;
+
+        let mut env = crate::Env::stdlib();
+        env.add_macro(Macro::global("fold", 2, |helper, _, args| {
+            let result = args.pop().unwrap();
+            let iter_range = args.pop().unwrap();
+            let accu_init = helper.next_expr(Expr::Literal(LiteralValue::Int(0.into())));
+            let loop_cond = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
+            let loop_step = helper.next_expr(Expr::Ident("a".to_string()));
+            Ok(Some(helper.next_expr(Expr::Comprehension(Box::new(
+                ComprehensionExpr {
+                    iter_range,
+                    iter_var: "x".to_string(),
+                    iter_var2: None,
+                    accu_var: "a".to_string(),
+                    accu_init,
+                    loop_cond,
+                    loop_step,
+                    result,
+                },
+            )))))
+        }))
+        .unwrap();
+        let program = env.compile("fold([1], a + x)").unwrap();
+        assert_eq!(program.references().variables(), vec!["x"]);
     }
 
     #[test]
