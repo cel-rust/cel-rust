@@ -13,14 +13,14 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     // As the spec's standard definitions declare it, for containers too. The
     // spec's prose on gradual type checking does have a list be `list(dyn)`, but
     // that can't be declared: it would be up to a type checker.
-    let signature = Signature::new(vec![super::PARAM_A]).returns(super::DYN_TYPE);
+    let signature = Signature::new(vec![super::PARAM_V]).returns(super::DYN_TYPE);
     env.add_overload("dyn", "to_dyn", signature, to_dyn)
         .expect("Must be unique id");
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::common::types::{DYN_TYPE, PARAM_A};
+    use crate::common::types::{DYN_TYPE, PARAM_V};
     use crate::{Context, Env, Program};
 
     fn eval(expr: &str) -> crate::objects::ResolveResult {
@@ -35,7 +35,7 @@ mod tests {
         assert_eq!(overloads.len(), 1);
         let overload = overloads.next().unwrap();
         assert!(!overload.is_member_function());
-        assert_eq!(overload.arg_types().collect::<Vec<_>>(), [&PARAM_A]);
+        assert_eq!(overload.arg_types().collect::<Vec<_>>(), [&PARAM_V]);
         assert_eq!(overload.result_type(), &DYN_TYPE);
     }
 
