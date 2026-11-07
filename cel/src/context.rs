@@ -204,6 +204,14 @@ impl<'p, 'v> Context<'p, 'v> {
         }
     }
 
+    /// Whether an evaluation with this context needs a [`Frame`]: whether
+    /// there is an iteration budget on the [`Env`], or an [`Interrupt`]
+    /// handle set. An evaluation that needs none runs without one, and pays
+    /// nothing for it.
+    pub(crate) fn needs_frame(&self) -> bool {
+        self.env().options().max_iterations() > 0 || self.interrupt().is_some()
+    }
+
     /// Creates an inner scope carrying a fresh [`Frame`] for a new evaluation.
     ///
     /// Callers must check [`frame`](Self::frame) first: a nested evaluation must

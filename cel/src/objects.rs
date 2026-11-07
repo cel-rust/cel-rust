@@ -1017,7 +1017,9 @@ impl Value {
     }
 
     /// Runs `f` within the evaluation frame of `ctx`, creating one if this is
-    /// the outermost entry point of the evaluation.
+    /// the outermost entry point of the evaluation, and there is something for
+    /// it to enforce: with no iteration budget and no interrupt handle, `f`
+    /// runs without a frame, at no cost.
     ///
     /// Re-entrant calls (a custom function resolving an expression, or running
     /// a nested program) find the existing frame and share its budget and
@@ -1030,9 +1032,13 @@ impl Value {
         if ctx.frame().is_some() {
             return f(ctx);
         }
-        let ctx = ctx.new_frame_scope();
-        let result = f(&ctx);
-        ctx.frame()
+        if !ctx.needs_frame() {
+            return f(ctx);
+        }
+        let framed = ctx.new_frame_scope();
+        let result = f(&framed);
+        framed
+            .frame()
             .expect("frame scope carries a frame")
             .finish(result)
     }
@@ -1111,48 +1117,46 @@ impl Value {
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            let left = match try_bool(Value::resolve_in(&call.args[0], ctx, frame))
-                            {
-                                Err(e) if e.is_fatal() => return Err(e),
-                                left => left,
-                            };
-                            return if Ok(true) == left {
-                                Ok(bool(true))
-                            } else {
-                                let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
-                                let right =
-                                    right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
-                                match (left, right) {
-                                    (Ok(false), Some(right)) => Ok(bool(right)),
-                                    (Err(_), Some(true)) => Ok(bool(true)),
-                                    (left, _) => Err(boolean_operator_error(
-                                        &call.func_name,
-                                        left,
-                                        right_value.as_ref(),
-                                    )),
+                            // A fatal error on the left is only looked for once
+                            // the left is known not to be `Ok`.
+                            return match try_bool(Value::resolve_in(&call.args[0], ctx, frame)) {
+                                Ok(true) => Ok(bool(true)),
+                                Err(e) if e.is_fatal() => Err(e),
+                                left => {
+                                    let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
+                                    let right =
+                                        right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
+                                    match (left, right) {
+                                        (Ok(false), Some(right)) => Ok(bool(right)),
+                                        (Err(_), Some(true)) => Ok(bool(true)),
+                                        (left, _) => Err(boolean_operator_error(
+                                            &call.func_name,
+                                            left,
+                                            right_value.as_ref(),
+                                        )),
+                                    }
                                 }
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = match try_bool(Value::resolve_in(&call.args[0], ctx, frame))
-                            {
-                                Err(e) if e.is_fatal() => return Err(e),
-                                left => left,
-                            };
-                            return if Ok(false) == left {
-                                Ok(bool(false))
-                            } else {
-                                let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
-                                let right =
-                                    right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
-                                match (left, right) {
-                                    (Ok(true), Some(right)) => Ok(bool(right)),
-                                    (Err(_), Some(false)) => Ok(bool(false)),
-                                    (left, _) => Err(boolean_operator_error(
-                                        &call.func_name,
-                                        left,
-                                        right_value.as_ref(),
-                                    )),
+                            // A fatal error on the left is only looked for once
+                            // the left is known not to be `Ok`.
+                            return match try_bool(Value::resolve_in(&call.args[0], ctx, frame)) {
+                                Ok(false) => Ok(bool(false)),
+                                Err(e) if e.is_fatal() => Err(e),
+                                left => {
+                                    let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
+                                    let right =
+                                        right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
+                                    match (left, right) {
+                                        (Ok(true), Some(right)) => Ok(bool(right)),
+                                        (Err(_), Some(false)) => Ok(bool(false)),
+                                        (left, _) => Err(boolean_operator_error(
+                                            &call.func_name,
+                                            left,
+                                            right_value.as_ref(),
+                                        )),
+                                    }
                                 }
                             };
                         }
@@ -1388,8 +1392,9 @@ impl Value {
                         }
                         operators::NOT_STRICTLY_FALSE => {
                             return match try_bool(Value::resolve_in(&call.args[0], ctx, frame)) {
+                                Ok(b) => Ok(bool(b)),
                                 Err(e) if e.is_fatal() => Err(e),
-                                res => Ok(bool(res.unwrap_or(true))),
+                                Err(_) => Ok(bool(true)),
                             };
                         }
                         _ => (),
