@@ -1,4 +1,4 @@
-use cel::{Context, Deadline, Env, ExecutionError, Program, RuntimeOptions};
+use cel::{Context, Deadline, Env, ExecutionError, RuntimeOptions};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
@@ -9,7 +9,6 @@ use std::time::Duration;
 const SLOW: &str = "list.map(x, list.exists(y, y > x + size(list)))";
 
 fn main() {
-    let program = Program::compile(SLOW).unwrap();
     let list: Vec<i64> = (0..100_000).collect();
 
     // 1. Bound the amount of work with an iteration budget.
@@ -20,8 +19,9 @@ fn main() {
     let mut env = Env::stdlib();
     env.set_options(RuntimeOptions::default().with_max_iterations(1_000_000));
     let env = Arc::new(env);
+    let program = env.compile(SLOW).unwrap();
 
-    let mut context = Context::with_env(env.clone());
+    let mut context = Context::with_env(env);
     context.add_variable("list", list.clone()).unwrap();
     let result = program.execute(&context);
     assert_eq!(
@@ -34,8 +34,10 @@ fn main() {
     //
     // Interrupt handles are per evaluation, so they are set on the `Context`.
     // The interpreter polls the handle while iterating comprehensions.
+    let env = Arc::new(Env::stdlib());
+    let program = env.compile(SLOW).unwrap();
     let deadline = Deadline::after(Duration::from_millis(50));
-    let mut context = Context::default();
+    let mut context = Context::with_env(env.clone());
     context.add_variable("list", list.clone()).unwrap();
     context.set_interrupt(&deadline);
     let result = program.execute(&context);
@@ -47,7 +49,7 @@ fn main() {
     // Any `Fn() -> bool + Send + Sync` works as a handle too, which is how a
     // runtime's cancellation token plugs in: `ctx.set_interrupt(&|| token.is_cancelled())`.
     let cancelled = AtomicBool::new(false);
-    let mut context = Context::default();
+    let mut context = Context::with_env(env);
     context.add_variable("list", list).unwrap();
     context.set_interrupt(&cancelled);
     let result = thread::scope(|scope| {

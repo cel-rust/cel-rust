@@ -12,7 +12,7 @@
 //! goes over, it fails with [`ExecutionError::IterationBudgetExceeded`].
 //!
 //! Run with `cargo run -p example --bin example-budget`.
-use cel::{Context, Env, ExecutionError, Program, ResolveResult, RuntimeOptions};
+use cel::{Context, Env, ExecutionError, ResolveResult, RuntimeOptions};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 
@@ -23,11 +23,12 @@ fn env_with_budget(max_iterations: u64) -> Arc<Env> {
     Arc::new(env)
 }
 
-/// Compiles and runs `source`, with `list` bound to `1..=len`.
-fn run(context: &mut Context, source: &str, len: i64) -> ResolveResult {
+/// Compiles `source` with `env`, and runs it with `context`, a context on that
+/// same `env`, with `list` bound to `1..=len`.
+fn run(env: &Env, context: &mut Context, source: &str, len: i64) -> ResolveResult {
     let list: Vec<i64> = (1..=len).collect();
     context.add_variable("list", list).unwrap();
-    Program::compile(source).unwrap().execute(context)
+    env.compile(source).unwrap().execute(context)
 }
 
 fn exceeded(limit: u64) -> ResolveResult {
@@ -38,9 +39,10 @@ fn main() {
     // 1. There is no budget unless you set one.
     //
     // Zero means unlimited, which is what `Env::stdlib()` gives you.
-    assert_eq!(Env::stdlib().options().max_iterations(), 0);
-    let mut context = Context::default();
-    let result = run(&mut context, "list.all(x, x > 0)", 20_000);
+    let env = Arc::new(Env::stdlib());
+    assert_eq!(env.options().max_iterations(), 0);
+    let mut context = Context::with_env(env.clone());
+    let result = run(&env, &mut context, "list.all(x, x > 0)", 20_000);
     assert_eq!(result, Ok(true.into()));
     println!("default: 20000 iterations, no limit, evaluated fine");
 
@@ -50,9 +52,12 @@ fn main() {
     // N+1st. The error carries the limit that was hit.
     let env = env_with_budget(5);
     assert_eq!(env.options().max_iterations(), 5);
-    let mut context = Context::with_env(env);
-    assert_eq!(run(&mut context, "list.all(x, x > 0)", 5), Ok(true.into()));
-    let result = run(&mut context, "list.all(x, x > 0)", 6);
+    let mut context = Context::with_env(env.clone());
+    assert_eq!(
+        run(&env, &mut context, "list.all(x, x > 0)", 5),
+        Ok(true.into())
+    );
+    let result = run(&env, &mut context, "list.all(x, x > 0)", 6);
     assert_eq!(result, exceeded(5));
     println!("limit 5: 6 iterations -> {}", result.unwrap_err());
 
@@ -64,13 +69,16 @@ fn main() {
     // exactly what makes it worth bounding. Plain arithmetic and function calls
     // cost nothing, so this last program fits a budget of 1 with room to spare.
     let nested = "list.map(x, [10, 20].all(y, y > x))";
-    let mut context = Context::with_env(env_with_budget(9));
-    assert!(run(&mut context, nested, 3).is_ok());
-    let mut context = Context::with_env(env_with_budget(8));
-    assert_eq!(run(&mut context, nested, 3), exceeded(8));
-    let mut context = Context::with_env(env_with_budget(1));
+    let env = env_with_budget(9);
+    let mut context = Context::with_env(env.clone());
+    assert!(run(&env, &mut context, nested, 3).is_ok());
+    let env = env_with_budget(8);
+    let mut context = Context::with_env(env.clone());
+    assert_eq!(run(&env, &mut context, nested, 3), exceeded(8));
+    let env = env_with_budget(1);
+    let mut context = Context::with_env(env.clone());
     let cheap = "1 + 2 * 3 == 7 && size(list) == 3";
-    assert_eq!(run(&mut context, cheap, 3), Ok(true.into()));
+    assert_eq!(run(&env, &mut context, cheap, 3), Ok(true.into()));
     println!("nested: 3 + 3 * 2 = 9 iterations; arithmetic is free");
 
     // 4. The budget belongs to a single evaluation.
@@ -80,10 +88,10 @@ fn main() {
     // contexts built from one shared `Env` each get their own count.
     let env = env_with_budget(9);
     let mut first = Context::with_env(env.clone());
-    let mut second = Context::with_env(env);
+    let mut second = Context::with_env(env.clone());
     for _ in 0..3 {
-        assert!(run(&mut first, nested, 3).is_ok());
-        assert!(run(&mut second, nested, 3).is_ok());
+        assert!(run(&env, &mut first, nested, 3).is_ok());
+        assert!(run(&env, &mut second, nested, 3).is_ok());
     }
     println!("per evaluation: 6 runs of a 9 iteration program, each within a budget of 9");
 
@@ -91,9 +99,10 @@ fn main() {
     //
     // The same expression is fine on a small list and rejected on a big one,
     // without you having to look at the data first.
-    let mut context = Context::with_env(env_with_budget(1_000));
-    assert!(run(&mut context, "list.all(x, x > 0)", 1_000).is_ok());
-    let result = run(&mut context, "list.all(x, x > 0)", 1_001);
+    let env = env_with_budget(1_000);
+    let mut context = Context::with_env(env.clone());
+    assert!(run(&env, &mut context, "list.all(x, x > 0)", 1_000).is_ok());
+    let result = run(&env, &mut context, "list.all(x, x > 0)", 1_001);
     assert_eq!(result, exceeded(1_000));
     println!(
         "input size: 1000 elements fit, 1001 -> {}",
@@ -106,11 +115,12 @@ fn main() {
     // answer: `1 / 0 == 1 || true` is `true`. A budget overrun is not absorbed,
     // or a caller could hide the overrun behind `|| true` and get a normal
     // looking answer from an evaluation that was cut short.
-    let mut context = Context::with_env(env_with_budget(2));
+    let env = env_with_budget(2);
+    let mut context = Context::with_env(env.clone());
     let ordinary = "1 / 0 == 1 || true";
-    assert_eq!(run(&mut context, ordinary, 5), Ok(true.into()));
+    assert_eq!(run(&env, &mut context, ordinary, 5), Ok(true.into()));
     let overrun = "list.all(x, x > 0) || true";
-    assert_eq!(run(&mut context, overrun, 5), exceeded(2));
+    assert_eq!(run(&env, &mut context, overrun, 5), exceeded(2));
     println!("fatal: `{ordinary}` is true, `{overrun}` is an error");
 
     // 7. The budget composes with the interrupt poll frequency.
@@ -140,16 +150,17 @@ fn main() {
     };
     let mut env = Env::stdlib();
     env.set_options(options);
-    let mut context = Context::with_env(Arc::new(env));
+    let env = Arc::new(env);
+    let mut context = Context::with_env(env.clone());
     context.set_interrupt(&counting_handle);
     assert_eq!(
-        run(&mut context, "list.all(x, x > 0)", 1_000),
+        run(&env, &mut context, "list.all(x, x > 0)", 1_000),
         Ok(true.into())
     );
     assert_eq!(polls.load(Ordering::Relaxed), 10);
     println!("poll frequency: 1000 iterations, handle polled 10 times");
     assert_eq!(
-        run(&mut context, "list.all(x, x > 0)", 2_001),
+        run(&env, &mut context, "list.all(x, x > 0)", 2_001),
         exceeded(2_000)
     );
 }
