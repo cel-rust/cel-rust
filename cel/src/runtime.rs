@@ -610,6 +610,35 @@ mod tests {
     }
 
     #[test]
+    fn fatal_function_error_is_not_absorbed_by_all_or_exists() {
+        // Neither function polls the frame, so it never records the abort:
+        // only the error carries it.
+        fn interrupted(_: &FunctionContext) -> ResolveResult {
+            Err(ExecutionError::Interrupted)
+        }
+        fn over_budget(_: &FunctionContext) -> ResolveResult {
+            Err(ExecutionError::IterationBudgetExceeded { limit: 1 })
+        }
+        let mut ctx = Context::default();
+        ctx.add_function("interrupted", interrupted).unwrap();
+        ctx.add_function("overBudget", over_budget).unwrap();
+        // The second element settles the result, which would absorb an
+        // ordinary error from the first.
+        assert_eq!(
+            run(&ctx, "[0, 1].all(x, x == 0 ? interrupted() : false)"),
+            Err(ExecutionError::Interrupted)
+        );
+        assert_eq!(
+            run(&ctx, "[0, 1].exists(x, x == 0 ? interrupted() : true)"),
+            Err(ExecutionError::Interrupted)
+        );
+        assert_eq!(
+            run(&ctx, "[0, 1].all(x, x == 0 ? overBudget() : false)"),
+            budget_exceeded(1)
+        );
+    }
+
+    #[test]
     fn function_without_interrupt_is_not_interrupted() {
         fn observe(ftx: &FunctionContext) -> ResolveResult {
             Ok(Value::Bool(ftx.is_interrupted()))

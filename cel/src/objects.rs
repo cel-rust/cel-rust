@@ -1759,12 +1759,14 @@ impl DeferredErrors {
     }
 
     /// Feeds one loop-step result. Returns the new accumulator, or `None`
-    /// when it must be left unchanged because an error is pending.
+    /// when it must be left unchanged because an error is pending. A fatal
+    /// error is never deferred: no later element may absorb it.
     fn step<'b, 'v>(
         &mut self,
         step: Result<CowVal<'b, 'v>, ExecutionError>,
     ) -> Result<Option<CowVal<'b, 'v>>, ExecutionError> {
         match (step, self.fold) {
+            (Err(err), _) if err.is_fatal() => Err(err),
             (Err(err), Some(_)) => {
                 self.pending = Some(err);
                 Ok(None)
