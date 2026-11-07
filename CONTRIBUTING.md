@@ -18,13 +18,28 @@ Opening an issue allows us to coordinate and ensure your effort is well-spent. W
 
 When contributing to cel-rust, please keep in mind our project priorities, in order:
 
-1. **Spec Compliance** — Full conformance with the [CEL specification](https://github.com/google/cel-spec) is our primary goal. Correctness and compatibility come first.
+1. **Spec Compliance** — cel-rust implements the [CEL specification](https://github.com/cel-expr/cel-spec) above all other concerns. Correctness against the specification comes first.
 
 2. **User Experience** — The library should be ergonomic, well-documented, and easy to integrate into Rust projects.
 
 3. **Performance** — We care about performance, but not at the expense of correctness or usability.
 
-These priorities guide our decision-making. For example, if a contribution improves performance but breaks spec compliance, we'll prioritize the spec.
+These priorities guide our decision-making. For example, if a contribution improves performance but breaks spec compliance, we'll prioritize the spec. See [GOVERNANCE.md](./GOVERNANCE.md) for roles and how decisions are made.
+
+## Changes to CEL Itself
+
+cel-rust implements CEL; it does not define it. If your proposal would change CEL's syntax, semantics, standard
+definitions or an extension library, rather than how cel-rust implements them, raise it in
+[cel-expr/cel-spec](https://github.com/cel-expr/cel-spec), following its [governance
+process](https://github.com/cel-expr/cel-spec/blob/master/GOVERNANCE.md). cel-rust adopts such changes once they are
+part of a cel-spec release.
+
+If cel-rust behaves differently from the specification, that is a bug in cel-rust: open a "Spec conformance gap" issue.
+
+## Reporting Security Issues
+
+Please don't open public issues for vulnerabilities. Report them privately through [GitHub private vulnerability
+reporting](https://github.com/cel-rust/cel-rust/security/advisories/new).
 
 ## AI Assistance Notice
 

@@ -2,7 +2,7 @@
 
 [![Rust](https://github.com/cel-rust/cel-rust/actions/workflows/rust.yml/badge.svg)](https://github.com/cel-rust/cel-rust/actions/workflows/rust.yml)
 
-The [Common Expression Language (CEL)](https://github.com/google/cel-spec) is a non-Turing complete language designed
+The [Common Expression Language (CEL)](https://github.com/cel-expr/cel-spec) is a non-Turing complete language designed
 for simplicity, speed, safety, and
 portability. CEL's C-like syntax looks nearly identical to equivalent expressions in C++, Go, Java, and TypeScript. CEL
 is ideal for lightweight expression evaluation when a fully sandboxed scripting language is too resource intensive.
@@ -110,21 +110,25 @@ long-running work.
 
 ## Goals
 
-This project aims to be a 100% spec-compliant implementation of Common Expression Language (CEL) in Rust.
+This project aims to be a fully conformant Rust implementation of the
+[CEL specification](https://github.com/cel-expr/cel-spec). Conformance comes before every other concern, including
+performance and API ergonomics. See [GOVERNANCE.md](./GOVERNANCE.md) for how the project is run.
 
 ### What This Means
 
-* **Fully aligns with the official CEL language specification:** Behavior, syntax, and semantics match the published CEL
-  spec.
-* **Compatible with other CEL implementations:** We ensure cross-runtime consistency with CEL implementations like
-  cel-go
-  and cel-python.
-* **Passes the CEL conformance test suite:** Every release is verified against the upstream test vectors provided by the
-  CEL
-  project.
+* **The specification is the reference:** Syntax, semantics, standard definitions and extension libraries behave as
+  cel-spec defines them. Where another CEL implementation disagrees with the specification, cel-rust follows the
+  specification.
+* **Conformance is tested:** CI runs the cel-spec conformance suite on every pull request and every push to `master`.
+  It is the same suite other CEL implementations, such as cel-go, cel-cpp and cel-java, test against.
+* **Known gaps are tracked:** Conformance tests cel-rust does not pass yet are listed and tracked until fixed; see
+  [conformance](./conformance/README.md).
 
 ### What This Does Not Mean
 
-* We do not introduce new language features or diverge from the spec.
-* We do not modify CEL syntax or semantics, even if doing so could offer Rust-specific advantages.
-* Proposals to change CEL behavior must first be accepted in the upstream spec before adoption here.
+* We do not add syntax, change semantics, or extend the standard definitions, even where doing so would suit Rust.
+* Changes to CEL itself are proposed to [cel-spec](https://github.com/cel-expr/cel-spec), following its
+  [governance process](https://github.com/cel-expr/cel-spec/blob/master/GOVERNANCE.md). cel-rust adopts them once they
+  are part of a cel-spec release.
+* It does not stop applications from registering their own functions: the specification leaves that mechanism to
+  implementations.
