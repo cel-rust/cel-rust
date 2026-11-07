@@ -1,12 +1,14 @@
 # Contributing to cel-rust
 
-Thank you for your interest in contributing to cel-rust! This document outlines our contribution policies and guidelines.
+Thank you for your interest in contributing to cel-rust! This document outlines our contribution policies and
+guidelines.
 
 ## Before You Start
 
 ### Feature Requests and New Features
 
-**Please open an issue first before working on new features.** The project maintainers are moving quickly and making large changes as we work toward full CEL spec compliance. Your PR might:
+**Please open an issue first before working on new features.** The project maintainers are moving quickly and making
+large changes as we work toward full CEL spec compliance. Your PR might:
 
 - Overlap with existing work already in progress
 - Move in a direction that conflicts with planned changes
@@ -18,13 +20,15 @@ Opening an issue allows us to coordinate and ensure your effort is well-spent. W
 
 When contributing to cel-rust, please keep in mind our project priorities, in order:
 
-1. **Spec Compliance** — cel-rust implements the [CEL specification](https://github.com/cel-expr/cel-spec) above all other concerns. Correctness against the specification comes first.
+1. **Spec Compliance** — cel-rust implements the [CEL specification](https://github.com/cel-expr/cel-spec) above all
+other concerns. Correctness against the specification comes first.
 
 2. **User Experience** — The library should be ergonomic, well-documented, and easy to integrate into Rust projects.
 
 3. **Performance** — We care about performance, but not at the expense of correctness or usability.
 
-These priorities guide our decision-making. For example, if a contribution improves performance but breaks spec compliance, we'll prioritize the spec. See [GOVERNANCE.md](./GOVERNANCE.md) for roles and how decisions are made.
+These priorities guide our decision-making. For example, if a contribution improves performance but breaks spec
+compliance, we'll prioritize the spec. See [GOVERNANCE.md](./GOVERNANCE.md) for roles and how decisions are made.
 
 ## Changes to CEL Itself
 
@@ -35,6 +39,8 @@ process](https://github.com/cel-expr/cel-spec/blob/master/GOVERNANCE.md). cel-ru
 part of a cel-spec release.
 
 If cel-rust behaves differently from the specification, that is a bug in cel-rust: open a "Spec conformance gap" issue.
+If the gap is already identified by an entry in the `ignored.txt` tests from the conformance test suite, there is no
+need to open an issue prior to opening the PR.
 
 ## Reporting Security Issues
 
@@ -49,7 +55,8 @@ reporting](https://github.com/cel-rust/cel-rust/security/advisories/new).
 
 If you use any kind of AI assistance (e.g., GitHub Copilot, ChatGPT, Claude, etc.) while contributing, you must:
 
-1. **Disclose this in your PR description**, including the extent of AI usage (e.g., "Used Copilot for autocomplete" or "Consulted ChatGPT for algorithm design")
+1. **Disclose this in your PR description**, including the extent of AI usage (e.g., "Used Copilot for autocomplete" or
+"Consulted ChatGPT for algorithm design")
 2. **Test your changes thoroughly** — you are responsible for understanding and validating the AI-generated code
 3. **Be able to explain and defend the changes** — maintainers may ask questions about the implementation
 
@@ -76,7 +83,8 @@ Or:
 > [!NOTE]
 > Trivial AI features like tab completion don't need to be disclosed. When in doubt, disclose it.
 
-Failure to disclose AI assistance is disrespectful to maintainers and makes it difficult to properly review your contribution. Please be transparent!
+Failure to disclose AI assistance is disrespectful to maintainers and makes it difficult to properly review your
+contribution. Please be transparent!
 
 ## Pull Request Guidelines
 
@@ -90,12 +98,13 @@ Failure to disclose AI assistance is disrespectful to maintainers and makes it d
 
 ### Developer Certificate of Origin (DCO)
 
-All commits must be signed off with a Developer Certificate of Origin (DCO). This is verified automatically by GitHub Actions.
+All commits must be signed off with a Developer Certificate of Origin (DCO). This is verified automatically by GitHub
+Actions.
 
 To sign off your commits, add the `-s` flag when committing:
 
-```bash
-git commit -s -m "Your commit message"
+```
+bash git commit -s -m "Your commit message"
 ```
 
 This adds a `Signed-off-by` line to your commit message:
@@ -104,7 +113,8 @@ This adds a `Signed-off-by` line to your commit message:
 Signed-off-by: Your Name <your.email@example.com>
 ```
 
-By signing off, you certify that you have the right to submit the code under the project's license and agree to the [Developer Certificate of Origin](https://developercertificate.org/).
+By signing off, you certify that you have the right to submit the code under the project's license and agree to the
+[Developer Certificate of Origin](https://developercertificate.org/).
 
 ## Code of Conduct
 
