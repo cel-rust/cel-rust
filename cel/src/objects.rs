@@ -5,6 +5,7 @@ use crate::common::types::optional::{unwrap_optional, Unwrapped};
 use crate::common::types::*;
 use crate::common::value::{BuiltinRef, CowVal, FromVal, StaticVal, Val};
 use crate::context::Context;
+use crate::runtime::Frame;
 use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -1002,15 +1003,44 @@ impl TryFrom<Value> for Box<dyn Val> {
 
 impl Value {
     pub fn resolve_all(expr: &[Expression], ctx: &Context) -> ResolveResult {
-        let mut res = Vec::with_capacity(expr.len());
-        for expr in expr {
-            res.push(Value::resolve(expr, ctx)?);
-        }
-        Ok(Value::List(res.into()))
+        Self::with_frame(ctx, |ctx| {
+            let mut res = Vec::with_capacity(expr.len());
+            for expr in expr {
+                res.push(Self::resolve_val(expr, ctx)?.as_ref().try_into()?);
+            }
+            Ok(Value::List(res.into()))
+        })
     }
 
     pub fn resolve(expr: &Expression, ctx: &Context) -> ResolveResult {
-        Self::resolve_val(expr, ctx)?.as_ref().try_into()
+        Self::with_frame(ctx, |ctx| Self::resolve_val(expr, ctx)?.as_ref().try_into())
+    }
+
+    /// Runs `f` within the evaluation frame of `ctx`, creating one if this is
+    /// the outermost entry point of the evaluation, and there is something for
+    /// it to enforce: with no iteration budget and no interrupt handle, `f`
+    /// runs without a frame, at no cost.
+    ///
+    /// Re-entrant calls (a custom function resolving an expression, or running
+    /// a nested program) find the existing frame and share its budget and
+    /// interrupt handle. Only the call that created the frame applies the
+    /// abort backstop, so a nested call cannot observe and discard an abort.
+    fn with_frame<T>(
+        ctx: &Context,
+        f: impl FnOnce(&Context) -> Result<T, ExecutionError>,
+    ) -> Result<T, ExecutionError> {
+        if ctx.frame().is_some() {
+            return f(ctx);
+        }
+        if !ctx.needs_frame() {
+            return f(ctx);
+        }
+        let framed = ctx.new_frame_scope();
+        let result = f(&framed);
+        framed
+            .frame()
+            .expect("frame scope carries a frame")
+            .finish(result)
     }
 
     /// Evaluates `expr` against `ctx`.
@@ -1019,6 +1049,12 @@ impl Value {
     /// variable borrows the context (`'e`), and anything carrying data the
     /// context's resolver or values borrow is bounded by `'v`. Nothing is
     /// copied unless an operation produces a new value.
+    ///
+    /// Unlike [`resolve`](Self::resolve), this does not create an evaluation
+    /// frame when called outside of an evaluation: interruption and the
+    /// iteration budget only apply when a frame exists, so prefer
+    /// [`resolve`](Self::resolve) or [`Program::execute`](crate::Program::execute)
+    /// as entry points.
     #[inline(always)]
     pub fn resolve_val<'e, 'p, 'v>(
         expr: &'e Expression,
@@ -1081,40 +1117,46 @@ impl Value {
                 if call.args.len() == 2 {
                     match call.func_name.as_str() {
                         operators::LOGICAL_OR => {
-                            let left = try_bool(Value::resolve_in(&call.args[0], ctx, frame));
-                            return if Ok(true) == left {
-                                Ok(bool(true))
-                            } else {
-                                let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
-                                let right =
-                                    right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
-                                match (left, right) {
-                                    (Ok(false), Some(right)) => Ok(bool(right)),
-                                    (Err(_), Some(true)) => Ok(bool(true)),
-                                    (left, _) => Err(boolean_operator_error(
-                                        &call.func_name,
-                                        left,
-                                        right_value.as_ref(),
-                                    )),
+                            // A fatal error on the left is only looked for once
+                            // the left is known not to be `Ok`.
+                            return match try_bool(Value::resolve_in(&call.args[0], ctx, frame)) {
+                                Ok(true) => Ok(bool(true)),
+                                Err(e) if e.is_fatal() => Err(e),
+                                left => {
+                                    let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
+                                    let right =
+                                        right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
+                                    match (left, right) {
+                                        (Ok(false), Some(right)) => Ok(bool(right)),
+                                        (Err(_), Some(true)) => Ok(bool(true)),
+                                        (left, _) => Err(boolean_operator_error(
+                                            &call.func_name,
+                                            left,
+                                            right_value.as_ref(),
+                                        )),
+                                    }
                                 }
                             };
                         }
                         operators::LOGICAL_AND => {
-                            let left = try_bool(Value::resolve_in(&call.args[0], ctx, frame));
-                            return if Ok(false) == left {
-                                Ok(bool(false))
-                            } else {
-                                let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
-                                let right =
-                                    right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
-                                match (left, right) {
-                                    (Ok(true), Some(right)) => Ok(bool(right)),
-                                    (Err(_), Some(false)) => Ok(bool(false)),
-                                    (left, _) => Err(boolean_operator_error(
-                                        &call.func_name,
-                                        left,
-                                        right_value.as_ref(),
-                                    )),
+                            // A fatal error on the left is only looked for once
+                            // the left is known not to be `Ok`.
+                            return match try_bool(Value::resolve_in(&call.args[0], ctx, frame)) {
+                                Ok(false) => Ok(bool(false)),
+                                Err(e) if e.is_fatal() => Err(e),
+                                left => {
+                                    let right_value = Value::resolve_in(&call.args[1], ctx, frame)?;
+                                    let right =
+                                        right_value.downcast_ref::<CelBool>().map(|b| *b.inner());
+                                    match (left, right) {
+                                        (Ok(true), Some(right)) => Ok(bool(right)),
+                                        (Err(_), Some(false)) => Ok(bool(false)),
+                                        (left, _) => Err(boolean_operator_error(
+                                            &call.func_name,
+                                            left,
+                                            right_value.as_ref(),
+                                        )),
+                                    }
                                 }
                             };
                         }
@@ -1349,10 +1391,11 @@ impl Value {
                             ));
                         }
                         operators::NOT_STRICTLY_FALSE => {
-                            return Ok(bool(
-                                try_bool(Value::resolve_in(&call.args[0], ctx, frame))
-                                    .unwrap_or(true),
-                            ));
+                            return match try_bool(Value::resolve_in(&call.args[0], ctx, frame)) {
+                                Ok(b) => Ok(bool(b)),
+                                Err(e) if e.is_fatal() => Err(e),
+                                Err(_) => Ok(bool(true)),
+                            };
                         }
                         _ => (),
                     }
@@ -1500,6 +1543,8 @@ impl Value {
                 let accu_init = Value::resolve_in(&comprehension.accu_init, ctx, frame)?;
                 let iter = Value::resolve_in(&comprehension.iter_range, ctx, frame)?;
 
+                let budget = ctx.frame();
+
                 // Mirror cel-go's optimization (see `folder.ResolveName` in
                 // `cel-go/interpreter/interpretable.go`): when the
                 // accumulator starts out as an empty list and the loop step
@@ -1512,7 +1557,7 @@ impl Value {
                         .downcast_ref::<CelList>()
                         .is_some_and(|list| list.inner().is_empty())
                     {
-                        return step.run(comprehension, &iter, ctx, frame);
+                        return step.run(comprehension, &iter, ctx, frame, budget);
                     }
                 }
 
@@ -1528,6 +1573,9 @@ impl Value {
                     .iter();
                 let mut deferred = DeferredErrors::of(comprehension);
                 while let Some(item) = items.next() {
+                    if let Some(budget) = budget {
+                        budget.tick()?;
+                    }
                     if !try_bool(Value::resolve_in(&comprehension.loop_cond, &ctx, frame))? {
                         break;
                     }
@@ -1716,12 +1764,14 @@ impl DeferredErrors {
     }
 
     /// Feeds one loop-step result. Returns the new accumulator, or `None`
-    /// when it must be left unchanged because an error is pending.
+    /// when it must be left unchanged because an error is pending. A fatal
+    /// error is never deferred: no later element may absorb it.
     fn step<'b, 'v>(
         &mut self,
         step: Result<CowVal<'b, 'v>, ExecutionError>,
     ) -> Result<Option<CowVal<'b, 'v>>, ExecutionError> {
         match (step, self.fold) {
+            (Err(err), _) if err.is_fatal() => Err(err),
             (Err(err), Some(_)) => {
                 self.pending = Some(err);
                 Ok(None)
@@ -1797,13 +1847,15 @@ impl<'e> AppendStep<'e> {
         }
     }
 
-    /// Runs the comprehension over `iter`, starting from an empty list.
+    /// Runs the comprehension over `iter`, starting from an empty list, and
+    /// charges every iteration to `budget`, as the generic loop does.
     fn run<'p, 'v>(
         &self,
         comprehension: &'e ComprehensionExpr,
         iter: &CowVal<'e, 'v>,
         ctx: &'e Context<'p, 'v>,
         frame: Option<&BlockFrame<'_, 'v>>,
+        budget: Option<&Frame<'v>>,
     ) -> Result<CowVal<'e, 'v>, ExecutionError> {
         let size_hint = iter
             .as_sizer()
@@ -1820,6 +1872,9 @@ impl<'e> AppendStep<'e> {
             })?
             .iter();
         while let Some(item) = items.next() {
+            if let Some(budget) = budget {
+                budget.tick()?;
+            }
             if !try_bool(Value::resolve_in(&comprehension.loop_cond, &ctx, frame))? {
                 break;
             }

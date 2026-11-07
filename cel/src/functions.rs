@@ -55,6 +55,27 @@ impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     pub fn error<M: ToString>(&self, message: M) -> ExecutionError {
         ExecutionError::function_error(self.name, message)
     }
+
+    /// Polls the [`Interrupt`](crate::Interrupt) handle of the current evaluation.
+    ///
+    /// Returns `false` when no handle was set with
+    /// [`Context::set_interrupt`](crate::Context::set_interrupt). Long-running
+    /// functions can poll this to return early; once it has returned `true`, the
+    /// evaluation fails with
+    /// [`ExecutionError::Interrupted`](crate::ExecutionError::Interrupted)
+    /// regardless of what the function returns.
+    ///
+    /// # Compared with cel-go and cel-cpp
+    ///
+    /// cel-go hands the `context.Context` only to async functions, bound with
+    /// `cel.AsyncBinding`: its synchronous functions can't observe
+    /// cancellation. cel-cpp has no cancellation to observe.
+    pub fn is_interrupted(&self) -> bool {
+        self.ptx
+            .frame()
+            .map(|frame| frame.observe_interrupt())
+            .unwrap_or(false)
+    }
 }
 
 pub fn max(Arguments(args): Arguments) -> Result<Value> {
