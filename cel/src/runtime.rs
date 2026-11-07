@@ -15,6 +15,13 @@
 //! [`ExecutionError::IterationBudgetExceeded`](crate::ExecutionError::IterationBudgetExceeded).
 //! Unlike ordinary CEL errors, these are never absorbed by `||`, `&&`, or
 //! optional accessors: once tripped, the evaluation as a whole fails.
+//!
+//! # Compared with cel-go and cel-cpp
+//!
+//! The interrupt handle plays the part of the `context.Context` that cel-go's
+//! `Program.ContextEval` takes; cel-cpp has no equivalent. The iteration
+//! budget is cel-cpp's `comprehension_max_iterations`; cel-go has none, its
+//! closest option being `cel.CostLimit`. Each item documents where it differs.
 
 use crate::ExecutionError;
 use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
@@ -33,15 +40,34 @@ use std::time::{Duration, Instant};
 ///
 /// # Example
 /// ```
-/// use cel::{Context, Deadline, ExecutionError, Program};
+/// use cel::{Context, Deadline, Env};
+/// use std::sync::Arc;
 /// use std::time::Duration;
 ///
-/// let program = Program::compile("[1, 2, 3].all(x, x > 0)").unwrap();
+/// let env = Arc::new(Env::stdlib());
+/// let program = env.compile("[1, 2, 3].all(x, x > 0)").unwrap();
 /// let deadline = Deadline::after(Duration::from_millis(50));
-/// let mut ctx = Context::default();
+/// let mut ctx = Context::with_env(env);
 /// ctx.set_interrupt(&deadline);
 /// assert_eq!(program.execute(&ctx), Ok(true.into()));
 /// ```
+///
+/// # Compared with cel-go and cel-cpp
+///
+/// cel-go cancels an evaluation through the `context.Context` passed to
+/// `Program.ContextEval`, but only checks it in programs built with
+/// `cel.InterruptCheckFrequency(n)`, for some `n > 0`: by default, a cancelled
+/// context goes unnoticed. Here, setting a handle is what turns polling on.
+///
+/// In cel-go, an interrupted comprehension evaluates to an ordinary error
+/// value, which `||` and `&&` absorb like any other: with the context
+/// cancelled, `list.all(x, x > 0) || true` is `true`. Here, an interruption
+/// fails the whole evaluation with [`ExecutionError::Interrupted`]. cel-go's
+/// error also carries the context's cause, as in `operation interrupted:
+/// context canceled`, while [`ExecutionError::Interrupted`] doesn't say which
+/// handle tripped.
+///
+/// cel-cpp has no way to cancel an evaluation.
 pub trait Interrupt: Send + Sync {
     /// Returns `true` once evaluation should stop.
     fn is_interrupted(&self) -> bool;
@@ -71,6 +97,12 @@ where
 ///
 /// let deadline = Deadline::after(Duration::from_secs(1));
 /// ```
+///
+/// # Compared with cel-go and cel-cpp
+///
+/// This is cel-go's `context.WithDeadline`, or `context.WithTimeout`, passed
+/// to `Program.ContextEval`, with the differences [`Interrupt`] lists. cel-cpp
+/// has no equivalent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Deadline(Instant);
 
@@ -107,22 +139,29 @@ impl Interrupt for Deadline {
 ///
 /// # Example
 /// ```
-/// use cel::{Context, Env, ExecutionError, Program, RuntimeOptions};
+/// use cel::{Context, Env, ExecutionError, RuntimeOptions};
 /// use std::sync::Arc;
 ///
 /// let mut env = Env::stdlib();
 /// env.set_options(RuntimeOptions::default().with_max_iterations(5));
-/// let ctx = Context::with_env(Arc::new(env));
+/// let env = Arc::new(env);
+/// let ctx = Context::with_env(env.clone());
 ///
-/// let program = Program::compile("[1, 2, 3].all(x, x > 0)").unwrap();
+/// let program = env.compile("[1, 2, 3].all(x, x > 0)").unwrap();
 /// assert_eq!(program.execute(&ctx), Ok(true.into()));
 ///
-/// let program = Program::compile("[1, 2, 3, 4, 5, 6].all(x, x > 0)").unwrap();
+/// let program = env.compile("[1, 2, 3, 4, 5, 6].all(x, x > 0)").unwrap();
 /// assert_eq!(
 ///     program.execute(&ctx),
 ///     Err(ExecutionError::IterationBudgetExceeded { limit: 5 })
 /// );
 /// ```
+///
+/// # Compared with cel-go and cel-cpp
+///
+/// The name and the iteration budget come from cel-cpp's `cel::RuntimeOptions`.
+/// cel-go sets its equivalents per program, as `cel.ProgramOption`s, rather
+/// than on the environment.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct RuntimeOptions {
@@ -145,6 +184,21 @@ impl RuntimeOptions {
     /// perform, across all comprehensions in the expression, nested ones included.
     ///
     /// Zero, the default, means unlimited.
+    ///
+    /// # Compared with cel-go and cel-cpp
+    ///
+    /// This is cel-cpp's `comprehension_max_iterations`. Both charge an
+    /// iteration as each element is fetched, before the loop condition, so the
+    /// element that ends a short-circuiting `all` or `exists` counts too. They
+    /// differ in two ways:
+    ///
+    /// - cel-cpp defaults to a budget of 10 000, where the default here is none;
+    /// - cel-cpp fails once the count reaches the limit, so a limit of `n`
+    ///   allows `n - 1` iterations, where here it allows `n`.
+    ///
+    /// cel-go has no iteration budget. Its closest option, `cel.CostLimit`,
+    /// charges every operation an evaluation performs, not only iterations, so
+    /// its limits don't carry over.
     pub fn with_max_iterations(mut self, max_iterations: u64) -> Self {
         self.max_iterations = max_iterations;
         self
@@ -154,6 +208,16 @@ impl RuntimeOptions {
     ///
     /// The default is one, polling on every iteration. Zero is clamped to one:
     /// setting a frequency never disables interruption.
+    ///
+    /// # Compared with cel-go and cel-cpp
+    ///
+    /// This is cel-go's `cel.InterruptCheckFrequency`, except that there zero,
+    /// the default, turns interruption off. Here, setting a handle is what turns
+    /// polling on, so zero is clamped instead. cel-go also polls after each
+    /// iteration's step, rather than before the iteration. In both, iterations
+    /// are counted across all the comprehensions of an evaluation.
+    ///
+    /// cel-cpp has no interrupt to poll.
     pub fn with_interrupt_check_frequency(mut self, frequency: u64) -> Self {
         self.interrupt_check_frequency = frequency.max(1);
         self

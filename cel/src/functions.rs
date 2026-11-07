@@ -64,6 +64,12 @@ impl<'context, 'call: 'context> FunctionContext<'context, 'call> {
     /// evaluation fails with
     /// [`ExecutionError::Interrupted`](crate::ExecutionError::Interrupted)
     /// regardless of what the function returns.
+    ///
+    /// # Compared with cel-go and cel-cpp
+    ///
+    /// cel-go hands the `context.Context` only to async functions, bound with
+    /// `cel.AsyncBinding`: its synchronous functions can't observe
+    /// cancellation. cel-cpp has no cancellation to observe.
     pub fn is_interrupted(&self) -> bool {
         self.ptx
             .frame()

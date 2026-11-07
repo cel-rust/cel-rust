@@ -205,13 +205,18 @@ pub enum ExecutionError {
     InternalError(String),
     /// The [`Interrupt`] handle set on the [`Context`] reported an interruption.
     ///
-    /// This error is fatal: it is never absorbed by `||`, `&&`, or optional accessors.
+    /// This error is fatal: it is never absorbed by `||`, `&&`, `all`,
+    /// `exists`, or optional accessors. In cel-go, an interruption is an
+    /// ordinary `operation interrupted` error, which `||` and `&&` can absorb:
+    /// [`Interrupt`] compares the two.
     #[error("operation interrupted")]
     Interrupted,
     /// The evaluation performed more comprehension iterations than allowed by
     /// [`RuntimeOptions::with_max_iterations`].
     ///
-    /// This error is fatal: it is never absorbed by `||`, `&&`, or optional accessors.
+    /// This error is fatal: it is never absorbed by `||`, `&&`, `all`,
+    /// `exists`, or optional accessors, just as cel-cpp's `Iteration budget
+    /// exceeded` aborts its evaluation.
     #[error("iteration budget of {limit} exceeded")]
     IterationBudgetExceeded { limit: u64 },
 }

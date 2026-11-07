@@ -160,14 +160,16 @@ impl<'p, 'v> Context<'p, 'v> {
     ///
     /// # Example
     /// ```
-    /// use cel::{Context, ExecutionError, Program};
+    /// use cel::{Context, Env, ExecutionError};
     /// use std::sync::atomic::{AtomicBool, Ordering};
+    /// use std::sync::Arc;
     ///
+    /// let env = Arc::new(Env::stdlib());
+    /// let program = env.compile("[1, 2, 3].all(x, x > 0)").unwrap();
     /// let cancelled = AtomicBool::new(false);
-    /// let mut ctx = Context::default();
+    /// let mut ctx = Context::with_env(env);
     /// ctx.set_interrupt(&cancelled);
     ///
-    /// let program = Program::compile("[1, 2, 3].all(x, x > 0)").unwrap();
     /// assert_eq!(program.execute(&ctx), Ok(true.into()));
     ///
     /// cancelled.store(true, Ordering::Relaxed);

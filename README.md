@@ -55,23 +55,28 @@ Check out these other examples to learn how to use this library:
 - [Functions](./example/src/functions.rs) - Defining and using custom functions in your program.
 - [Concurrent Execution](./example/src/threads.rs) - Executing the same program concurrently.
 - [Interrupting Evaluation](./example/src/interrupt.rs) - Cancelling an evaluation from a deadline or another thread, and capping the work it may do.
+- [Iteration Budget](./example/src/budget.rs) - Capping how many comprehension iterations an evaluation may perform.
 
 ### Bounding evaluation
 
 An evaluation can be cancelled cooperatively and bounded in the amount of work it does. Both are checked
 while iterating comprehensions (`all`, `exists`, `map`, `filter`, ...), and neither can be swallowed by
-`||`, `&&` or optional accessors: once tripped, the evaluation as a whole fails.
+`||`, `&&` or optional accessors: once tripped, the evaluation as a whole fails. This differs from cel-go,
+where an interrupted comprehension is an ordinary error that `||` and `&&` can absorb. The `cel::runtime`
+docs compare both mechanisms with cel-go's and cel-cpp's.
 
 Cancellation is per evaluation, so the handle is set on the `Context`. Anything implementing
 `cel::Interrupt` works: an `AtomicBool`, a `cel::Deadline`, or any `Fn() -> bool + Send + Sync` closure.
 
 ```rust
-use cel::{Context, Deadline, ExecutionError, Program};
+use cel::{Context, Deadline, Env, ExecutionError};
+use std::sync::Arc;
 use std::time::Duration;
 
-let program = Program::compile("list.all(x, list.exists(y, y > x))").unwrap();
+let env = Arc::new(Env::stdlib());
+let program = env.compile("list.all(x, list.exists(y, y > x))").unwrap();
 let deadline = Deadline::after(Duration::from_millis(50));
-let mut context = Context::default();
+let mut context = Context::with_env(env);
 context.add_variable("list", (0..100_000).collect::<Vec<i64>>()).unwrap();
 context.set_interrupt(&deadline);
 assert_eq!(program.execute(&context), Err(ExecutionError::Interrupted));
@@ -80,13 +85,14 @@ assert_eq!(program.execute(&context), Err(ExecutionError::Interrupted));
 The iteration budget is runtime policy, so it lives on the `Env`. It is off by default.
 
 ```rust
-use cel::{Context, Env, ExecutionError, Program, RuntimeOptions};
+use cel::{Context, Env, RuntimeOptions};
 use std::sync::Arc;
 
 let mut env = Env::stdlib();
 env.set_options(RuntimeOptions::default().with_max_iterations(10_000));
-let context = Context::with_env(Arc::new(env));
-let program = Program::compile("[1, 2, 3].all(x, x > 0)").unwrap();
+let env = Arc::new(env);
+let program = env.compile("[1, 2, 3].all(x, x > 0)").unwrap();
+let context = Context::with_env(env);
 assert_eq!(program.execute(&context), Ok(true.into()));
 ```
 
