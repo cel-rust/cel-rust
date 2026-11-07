@@ -5,6 +5,7 @@ use crate::common::types::optional::{unwrap_optional, Unwrapped};
 use crate::common::types::*;
 use crate::common::value::{BuiltinRef, CowVal, FromVal, StaticVal, Val};
 use crate::context::Context;
+use crate::runtime::Frame;
 use crate::{ExecutionError, Expression, FunctionContext};
 #[cfg(feature = "chrono")]
 use chrono::TimeZone;
@@ -1537,6 +1538,8 @@ impl Value {
                 let accu_init = Value::resolve_in(&comprehension.accu_init, ctx, frame)?;
                 let iter = Value::resolve_in(&comprehension.iter_range, ctx, frame)?;
 
+                let budget = ctx.frame();
+
                 // Mirror cel-go's optimization (see `folder.ResolveName` in
                 // `cel-go/interpreter/interpretable.go`): when the
                 // accumulator starts out as an empty list and the loop step
@@ -1549,13 +1552,10 @@ impl Value {
                         .downcast_ref::<CelList>()
                         .is_some_and(|list| list.inner().is_empty())
                     {
-                        return step.run(comprehension, &iter, ctx, frame);
+                        return step.run(comprehension, &iter, ctx, frame, budget);
                     }
                 }
 
-                // The evaluation's `runtime::Frame`, not to be confused with the
-                // `cel.@block` slots in `frame`.
-                let budget = ctx.frame();
                 let mut ctx = ctx.new_inner_scope();
                 ctx.add_variable_as_val(&comprehension.accu_var, accu_init.into_owned());
 
@@ -1840,13 +1840,15 @@ impl<'e> AppendStep<'e> {
         }
     }
 
-    /// Runs the comprehension over `iter`, starting from an empty list.
+    /// Runs the comprehension over `iter`, starting from an empty list, and
+    /// charges every iteration to `budget`, as the generic loop does.
     fn run<'p, 'v>(
         &self,
         comprehension: &'e ComprehensionExpr,
         iter: &CowVal<'e, 'v>,
         ctx: &'e Context<'p, 'v>,
         frame: Option<&BlockFrame<'_, 'v>>,
+        budget: Option<&Frame<'v>>,
     ) -> Result<CowVal<'e, 'v>, ExecutionError> {
         let size_hint = iter
             .as_sizer()
@@ -1863,6 +1865,9 @@ impl<'e> AppendStep<'e> {
             })?
             .iter();
         while let Some(item) = items.next() {
+            if let Some(budget) = budget {
+                budget.tick()?;
+            }
             if !try_bool(Value::resolve_in(&comprehension.loop_cond, &ctx, frame))? {
                 break;
             }

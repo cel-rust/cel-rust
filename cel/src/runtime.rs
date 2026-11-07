@@ -365,6 +365,37 @@ mod tests {
     }
 
     #[test]
+    fn budget_counts_map_and_filter() {
+        let ctx = budgeted(3);
+        for src in [
+            "[1, 2, 3].map(x, x)",
+            "[1, 2, 3].filter(x, x > 0)",
+            "[1, 2, 3].map(x, x > 0, x)",
+        ] {
+            assert!(run(&ctx, src).is_ok(), "{src}");
+        }
+        for src in [
+            "[1, 2, 3, 4].map(x, x)",
+            "[1, 2, 3, 4].filter(x, x > 0)",
+            "[1, 2, 3, 4].map(x, x > 0, x)",
+        ] {
+            assert_eq!(run(&ctx, src), budget_exceeded(3), "{src}");
+        }
+    }
+
+    #[test]
+    fn budget_counts_map_around_nested_comprehensions() {
+        // 2 outer `map` + 2 * 2 inner `all` = 6 iterations
+        let ctx = budgeted(6);
+        assert!(run(&ctx, "[1, 2].map(x, [1, 2].all(y, y > 0))").is_ok());
+        let ctx = budgeted(5);
+        assert_eq!(
+            run(&ctx, "[1, 2].map(x, [1, 2].all(y, y > 0))"),
+            budget_exceeded(5)
+        );
+    }
+
+    #[test]
     fn budget_is_per_evaluation() {
         let ctx = budgeted(3);
         for _ in 0..5 {
@@ -532,6 +563,20 @@ mod tests {
             run(&ctx, "[1, 2].all(x, x > 0) || true"),
             Err(ExecutionError::Interrupted)
         );
+    }
+
+    #[test]
+    fn interrupt_stops_map_and_filter() {
+        let interrupt = || true;
+        let mut ctx = Context::default();
+        ctx.set_interrupt(&interrupt);
+        for src in [
+            "[1, 2].map(x, x)",
+            "[1, 2].filter(x, x > 0)",
+            "[1, 2].map(x, x > 0, x)",
+        ] {
+            assert_eq!(run(&ctx, src), Err(ExecutionError::Interrupted), "{src}");
+        }
     }
 
     #[test]
