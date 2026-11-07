@@ -403,6 +403,28 @@ pub(crate) const OPTIONAL_OF_V: Type = Type {
     trait_mask: 0,
 };
 
+/// `K`, the type parameter of the standard library's generic overloads for
+/// the keys of a map, see [`MAP_OF_K_V`]. A literal, as [`PARAM_V`] is.
+pub(crate) const PARAM_K: Type = Type {
+    kind: Kind::TypeParam,
+    parameters: Cow::Borrowed(&[]),
+    runtime_type_name: Cow::Borrowed("K"),
+    trait_mask: 0,
+};
+
+/// `map(K, V)`, how the standard library's generic overloads declare a map.
+/// Values have type [`MAP_TYPE`], whatever their entries, as parameters are
+/// erased at runtime.
+pub(crate) const MAP_OF_K_V: Type = Type {
+    kind: Kind::Map,
+    parameters: Cow::Borrowed(&[Cow::Borrowed(&PARAM_K), Cow::Borrowed(&PARAM_V)]),
+    runtime_type_name: Cow::Borrowed("map"),
+    trait_mask: traits::CONTAINER_TYPE
+        | traits::INDEXER_TYPE
+        | traits::ITERABLE_TYPE
+        | traits::SIZER_TYPE,
+};
+
 /// `string`, the type of [`CelString`].
 pub const STRING_TYPE: Type = Type {
     kind: Kind::String,
