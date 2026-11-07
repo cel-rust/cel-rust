@@ -1,16 +1,25 @@
-//! This is a pretty straightforward TODO app using the Axum web framework.
-//! You can add TODOs to your list but only if they meet certain criteria.
+//! A TODO app using the Axum web framework, where every TODO must satisfy
+//! a policy written in CEL. Each kind of TODO has its own policy, which can
+//! be replaced while the app runs.
+//!
+//! It shows what to share across requests and what not to:
+//!
+//! - the [`Env`], with the functions policies may call, is built once, at
+//!   startup;
+//! - a policy is compiled into a [`Program`] once, when it's set;
+//! - each request only builds a [`Context`] of its own, holding its input,
+//!   and executes the policy's `Program` with it.
 //!
 //! To run it:
 //!
 //! ```shell
-//! cargo run
+//! cargo run -p example --bin example-axum --features axum
 //! ```
 //!
 //! Add a TODO (HTTP 202):
 //!
 //! ```shell
-//! curl -w "%{http_code}" -XPOST -H "content-type: application/json" \
+//! curl -w "%{http_code}" -XPOST -H "content-type: application/json" -H "x-user: alice" \
 //!   http://localhost:8080/todos -d '{"kind":"work","text":"Learn more Rust"}'
 //! ```
 //!
@@ -20,22 +29,46 @@
 //! curl http://localhost:8080/todos
 //! ```
 //!
-//! Add another TODO (HTTP 400):
+//! Add a TODO the `home` policy forbids (HTTP 403):
 //!
 //! ```shell
-//! curl -w "%{http_code}" -XPOST -H "content-type: application/json" \
+//! curl -w "%{http_code}" -XPOST -H "content-type: application/json" -H "x-user: alice" \
 //!   http://localhost:8080/todos -d '{"kind":"home","text":"Learn more Rust"}'
 //! ```
+//!
+//! Replace the `home` policy, letting `alice` hack on Rust at home (HTTP 204),
+//! then add that TODO again (HTTP 202):
+//!
+//! ```shell
+//! curl -w "%{http_code}" -XPUT http://localhost:8080/policies/home \
+//!   -d 'user == "alice" || !todo.text.contains("Rust")'
+//! ```
+//!
+//! A policy that doesn't compile is rejected when it's set (HTTP 400):
+//!
+//! ```shell
+//! curl -XPUT http://localhost:8080/policies/home -d 'user =='
+//! ```
 
-use std::sync::{Arc, Mutex};
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, RwLock};
 
-use axum::{extract::State, http::StatusCode, response::IntoResponse, routing::get, Json, Router};
-use cel::{Context, Env, Value};
+use axum::{
+    extract::{Path, State},
+    http::{HeaderMap, StatusCode},
+    response::{IntoResponse, Response},
+    routing::{get, put},
+    Json, Router,
+};
+use cel::common::types::{CelInt, CelString};
+use cel::{Context, Env, Program, Value};
 use serde::{Deserialize, Serialize};
 
-// Policies dictating which text TODOs may contain
-const WORK_TODO_POLICY: &str = "!text.contains('TV')"; // Don't watch TV at work!
-const HOME_TODO_POLICY: &str = "!text.contains('Rust')"; // Don't hack on Rust at home!
+// The policies the app starts with. Both cap a TODO at 10 words, then...
+// Don't watch TV at work!
+const WORK_TODO_POLICY: &str = "todo.text.wordCount() <= 10 && !todo.text.contains('TV')";
+// Don't hack on Rust at home!
+const HOME_TODO_POLICY: &str = "todo.text.wordCount() <= 10 && !todo.text.contains('Rust')";
 
 // TODOs carry some text and have a kind
 #[derive(Clone, Deserialize, Serialize)]
@@ -45,77 +78,67 @@ struct Todo {
 }
 
 // TODOs are either for work or for home
-#[derive(Clone, Deserialize, Serialize)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 enum TodoKind {
     Work,
     Home,
 }
 
-// POST a new TODO to the list
-async fn add_todo(
-    State(AppContext { todos, decider }): State<AppContext>,
-    Json(todo): Json<Todo>,
-) -> impl IntoResponse {
-    // Use the policy decider to see if the TODO is allowed
-    match decider.todo_is_allowed(&todo) {
-        Ok(is_allowed) => {
-            // If not, throw HTTP 400
-            if !is_allowed {
-                return StatusCode::BAD_REQUEST;
-            }
-
-            // If allowed, add it to the TODOs and return HTTP 202
-            let mut todos = todos.lock().unwrap();
-            todos.push(todo);
-            StatusCode::ACCEPTED
-        }
-        // If there's an error return an HTTP 500
-        Err(_) => StatusCode::INTERNAL_SERVER_ERROR,
-    }
+// A function policies can call, as `todo.text.wordCount()`
+fn word_count(this: &CelString<'_>) -> CelInt {
+    CelInt::from(this.inner().split_whitespace().count() as i64)
 }
 
-// GET the current list of TODOs
-async fn list_todos(State(AppContext { todos, .. }): State<AppContext>) -> impl IntoResponse {
-    Json(todos.lock().unwrap().clone())
-}
-
-// The policy engine for our TODOs app: the environment its policies are
-// compiled with, and the root context they're executed with
-struct PolicyDecider {
+// The policy of each kind of TODO, and the environment they're compiled and
+// executed with. Shared by all requests.
+struct Policies {
     env: Arc<Env>,
-    context: Context<'static, 'static>,
+    programs: RwLock<HashMap<TodoKind, Arc<Program>>>,
 }
 
-impl PolicyDecider {
-    // Start with the standard environment, and a root context on it
-    fn new() -> Self {
-        let env = Arc::new(Env::stdlib());
-        let context = Context::with_env(Arc::clone(&env));
-        Self { env, context }
+impl Policies {
+    // The standard environment, plus our own functions policies may call:
+    // declared once here, rather than on every request's context
+    fn new() -> Result<Self, cel::DeclarationError> {
+        let mut env = Env::stdlib();
+        cel::add_member_overload!(env, fn word_count: (CelString) -> CelInt)?;
+        Ok(Self {
+            env: Arc::new(env),
+            programs: RwLock::default(),
+        })
     }
 
-    // Determine whether a given TODO is allowed
-    fn todo_is_allowed(&self, todo: &Todo) -> Result<bool, TodosError> {
-        // Create a new mutable context out of the root context
-        let mut ctx = self.context.new_inner_scope();
-        // Add the TODO's text as a variable so that it can be part of the expression
-        ctx.add_variable_from_value("text", todo.text.clone());
+    // Compile a policy once, when it's set, rather than every time a TODO is
+    // checked against it. A policy that doesn't compile is rejected here, and
+    // the one it would have replaced stays.
+    fn set(&self, kind: TodoKind, policy: &str) -> Result<(), cel::ParseErrors> {
+        let program = self.env.compile(policy)?;
+        self.programs
+            .write()
+            .unwrap()
+            .insert(kind, Arc::new(program));
+        Ok(())
+    }
 
-        // Which policy to enforce depends on the kind of TODO
-        let policy = match todo.kind {
-            TodoKind::Home => HOME_TODO_POLICY,
-            TodoKind::Work => WORK_TODO_POLICY,
+    // Determine whether `user` may add a given TODO
+    fn allows(&self, user: &str, todo: &Todo) -> Result<bool, TodosError> {
+        // Take the policy out of the lock, so it isn't held while executing.
+        // A kind of TODO without a policy is allowed nothing.
+        let Some(program) = self.programs.read().unwrap().get(&todo.kind).cloned() else {
+            return Ok(false);
         };
 
-        // Compile the program with the environment it's executed with
-        let program = self.env.compile(policy)?;
+        // This request's input goes in a context of its own: only the
+        // environment is shared with the other requests
+        let mut ctx = Context::with_env(Arc::clone(&self.env));
+        ctx.add_variable("user", user)?;
+        ctx.add_variable("todo", todo)?;
 
-        // Execute the program and either return a Boolean or the TODO is
-        // considered invalid
+        // Execute the policy: anything but a Boolean is an error
         match program.execute(&ctx)? {
-            Value::Bool(b) => Ok(b),
-            _ => Err(TodosError::Invalid),
+            Value::Bool(allowed) => Ok(allowed),
+            _ => Err(TodosError::NotBool),
         }
     }
 }
@@ -123,33 +146,87 @@ impl PolicyDecider {
 // Custom error type
 #[derive(Debug, thiserror::Error)]
 enum TodosError {
-    #[error("CEL execution error: {0}")]
-    Execution(#[from] cel::ExecutionError),
-    #[error(transparent)]
-    Io(#[from] std::io::Error),
+    #[error("CEL declaration error: {0}")]
+    Declaration(#[from] cel::DeclarationError),
     #[error("CEL parse error: {0}")]
     Parse(#[from] cel::ParseErrors),
-    #[error("invalid TODO")]
-    Invalid,
+    #[error("CEL serialization error: {0}")]
+    Serialization(#[from] cel::SerializationError),
+    #[error("CEL execution error: {0}")]
+    Execution(#[from] cel::ExecutionError),
+    #[error("policy didn't evaluate to a Boolean")]
+    NotBool,
+    #[error(transparent)]
+    Io(#[from] std::io::Error),
 }
 
 // The state attached to the HTTP router
 #[derive(Clone)]
-struct AppContext {
+struct AppState {
     todos: Arc<Mutex<Vec<Todo>>>,
-    decider: Arc<PolicyDecider>,
+    policies: Arc<Policies>,
+}
+
+// POST a new TODO to the list, as the user named by the `x-user` header
+// (caller-supplied, this example does no authentication)
+async fn add_todo(
+    State(AppState { todos, policies }): State<AppState>,
+    headers: HeaderMap,
+    Json(todo): Json<Todo>,
+) -> StatusCode {
+    let Some(user) = headers.get("x-user").and_then(|user| user.to_str().ok()) else {
+        return StatusCode::UNAUTHORIZED;
+    };
+
+    match policies.allows(user, &todo) {
+        // If allowed, add it to the TODOs and return HTTP 202
+        Ok(true) => {
+            todos.lock().unwrap().push(todo);
+            StatusCode::ACCEPTED
+        }
+        // If not, return HTTP 403
+        Ok(false) => StatusCode::FORBIDDEN,
+        // If the policy failed to execute, return HTTP 500
+        Err(err) => {
+            eprintln!("policy failed: {err}");
+            StatusCode::INTERNAL_SERVER_ERROR
+        }
+    }
+}
+
+// GET the current list of TODOs
+async fn list_todos(State(AppState { todos, .. }): State<AppState>) -> Json<Vec<Todo>> {
+    Json(todos.lock().unwrap().clone())
+}
+
+// PUT the policy of a kind of TODO, its CEL source as the body
+async fn set_policy(
+    State(AppState { policies, .. }): State<AppState>,
+    Path(kind): Path<TodoKind>,
+    policy: String,
+) -> Response {
+    match policies.set(kind, &policy) {
+        Ok(()) => StatusCode::NO_CONTENT.into_response(),
+        // If it doesn't compile, return HTTP 400 with the parse errors
+        Err(errors) => (StatusCode::BAD_REQUEST, errors.to_string()).into_response(),
+    }
 }
 
 #[tokio::main]
 async fn main() -> Result<(), TodosError> {
-    let ctx = AppContext {
+    let policies = Policies::new()?;
+    policies.set(TodoKind::Work, WORK_TODO_POLICY)?;
+    policies.set(TodoKind::Home, HOME_TODO_POLICY)?;
+
+    let state = AppState {
         todos: Arc::new(Mutex::new(Vec::new())),
-        decider: Arc::new(PolicyDecider::new()),
+        policies: Arc::new(policies),
     };
 
     let app = Router::new()
         .route("/todos", get(list_todos).post(add_todo))
-        .with_state(ctx);
+        .route("/policies/:kind", put(set_policy))
+        .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:8080").await?;
 
