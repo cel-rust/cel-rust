@@ -1,6 +1,7 @@
+use crate::common::decls::Signature;
 use crate::common::traits::{Adder, Container, Indexer, Iterable, Sizer, Zeroer};
 use crate::common::types::map::double_to_int_lossless;
-use crate::common::types::{CelDouble, CelInt, CelUInt, Kind, Type};
+use crate::common::types::{CelDouble, CelInt, CelUInt, Kind, Type, INT_TYPE, LIST_OF_V};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
 use crate::common::{traits, types};
 use crate::ExecutionError;
@@ -357,15 +358,15 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "size",
         "size_list",
-        vec![super::LIST_TYPE],
+        Signature::new(vec![LIST_OF_V]).returns(INT_TYPE),
         traits::adapter::sizer_size,
     )
     .expect("Must be unique id");
     env.add_member_overload(
         "size",
         "list_size",
-        super::LIST_TYPE,
-        vec![],
+        LIST_OF_V,
+        Signature::new(vec![]).returns(INT_TYPE),
         traits::adapter::sizer_size,
     )
     .expect("Must be unique id");
@@ -379,6 +380,52 @@ pub mod tests {
     use crate::common::value::{CowVal, Val};
     use crate::ExecutionError;
     use crate::ExecutionError::{IndexOutOfBounds, UnexpectedType, UnsupportedIndex};
+    use crate::{Context, Env, Value};
+    use std::borrow::Cow;
+    use std::sync::Arc;
+
+    /// As the spec's standard definitions declare it: `(list(A)) -> int`.
+    #[test]
+    fn size_is_declared_generic() {
+        static OF_V: [Cow<'static, Type>; 1] = [Cow::Borrowed(&types::PARAM_V)];
+        assert_eq!(types::LIST_OF_V, Type::new_list_type(&OF_V));
+
+        let env = Env::stdlib();
+        for (id, member) in [("size_list", false), ("list_size", true)] {
+            let overload = env
+                .function("size")
+                .unwrap()
+                .overloads()
+                .find(|overload| overload.id == id)
+                .unwrap();
+            assert_eq!(overload.is_member_function(), member, "{id}");
+            assert_eq!(
+                overload.arg_types().collect::<Vec<_>>(),
+                [&types::LIST_OF_V],
+                "{id}"
+            );
+            assert_eq!(overload.result_type(), &types::INT_TYPE, "{id}");
+        }
+    }
+
+    /// Parameters are erased at runtime: a list's type doesn't depend on its
+    /// elements, and is the type expressions name.
+    #[test]
+    fn values_have_the_erased_type() {
+        assert_eq!(DefaultList::default().get_type(), &types::LIST_TYPE);
+        let ints = DefaultList::from(vec![box_val(CelInt::from(1))]);
+        assert_eq!(ints.get_type(), &types::LIST_TYPE);
+
+        let env = Arc::new(Env::stdlib());
+        let eval = |source: &str| {
+            let program = env.compile(source).unwrap();
+            program.execute(&Context::with_env(Arc::clone(&env)))
+        };
+        assert_eq!(eval("type([]) == list"), Ok(Value::Bool(true)));
+        assert_eq!(eval("type([1]) == list"), Ok(Value::Bool(true)));
+        assert_eq!(eval("size([1, 'a'])"), Ok(Value::Int(2)));
+        assert_eq!(eval("[1, 'a'].size()"), Ok(Value::Int(2)));
+    }
 
     #[test]
     fn list_has_indexer() {

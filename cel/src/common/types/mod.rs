@@ -379,6 +379,20 @@ pub(crate) const PARAM_V: Type = Type {
     trait_mask: 0,
 };
 
+/// `list(V)`, how the standard library's generic overloads declare a list.
+/// Values have type [`LIST_TYPE`], whatever their elements, as parameters are
+/// erased at runtime.
+pub(crate) const LIST_OF_V: Type = Type {
+    kind: Kind::List,
+    parameters: Cow::Borrowed(&[Cow::Borrowed(&PARAM_V)]),
+    runtime_type_name: Cow::Borrowed("list"),
+    trait_mask: traits::ADDER_TYPE
+        | traits::CONTAINER_TYPE
+        | traits::INDEXER_TYPE
+        | traits::ITERABLE_TYPE
+        | traits::SIZER_TYPE,
+};
+
 /// `optional_type(V)`, how the standard library's generic overloads declare an
 /// optional. Values have type [`OPTIONAL_TYPE`], whatever they hold, as
 /// parameters are erased at runtime.
