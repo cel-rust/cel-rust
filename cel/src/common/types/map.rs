@@ -1,5 +1,8 @@
+use crate::common::decls::Signature;
 use crate::common::traits::{Container, Indexer, Iterable, Sizer, Zeroer};
-use crate::common::types::{CelBool, CelDouble, CelInt, CelString, CelUInt, Type};
+use crate::common::types::{
+    CelBool, CelDouble, CelInt, CelString, CelUInt, Type, INT_TYPE, MAP_OF_K_V,
+};
 use crate::common::value::{Builtin, BuiltinRef, CowVal, Val};
 use crate::common::{traits, types};
 use crate::ExecutionError;
@@ -539,16 +542,74 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
     env.add_overload(
         "size",
         "size_map",
-        vec![super::MAP_TYPE],
+        Signature::new(vec![MAP_OF_K_V]).returns(INT_TYPE),
         traits::adapter::sizer_size,
     )
     .expect("Must be unique id");
     env.add_member_overload(
         "size",
         "map_size",
-        super::MAP_TYPE,
-        vec![],
+        MAP_OF_K_V,
+        Signature::new(vec![]).returns(INT_TYPE),
         traits::adapter::sizer_size,
     )
     .expect("Must be unique id");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{DefaultMap, Key};
+    use crate::common::types::{self, CelInt, Type};
+    use crate::common::value::Val;
+    use crate::{Context, Env, Value};
+    use std::borrow::Cow;
+    use std::collections::HashMap;
+    use std::sync::Arc;
+
+    /// As the spec's standard definitions declare it: `(map(A, B)) -> int`.
+    #[test]
+    fn size_is_declared_generic() {
+        static OF_K_V: [Cow<'static, Type>; 2] = [
+            Cow::Borrowed(&types::PARAM_K),
+            Cow::Borrowed(&types::PARAM_V),
+        ];
+        assert_eq!(types::MAP_OF_K_V, Type::new_map_type(&OF_K_V));
+
+        let env = Env::stdlib();
+        for (id, member) in [("size_map", false), ("map_size", true)] {
+            let overload = env
+                .function("size")
+                .unwrap()
+                .overloads()
+                .find(|overload| overload.id == id)
+                .unwrap();
+            assert_eq!(overload.is_member_function(), member, "{id}");
+            assert_eq!(
+                overload.arg_types().collect::<Vec<_>>(),
+                [&types::MAP_OF_K_V],
+                "{id}"
+            );
+            assert_eq!(overload.result_type(), &types::INT_TYPE, "{id}");
+        }
+    }
+
+    /// Parameters are erased at runtime: a map's type doesn't depend on its
+    /// entries, and is the type expressions name.
+    #[test]
+    fn values_have_the_erased_type() {
+        assert_eq!(DefaultMap::default().get_type(), &types::MAP_TYPE);
+        let entries: HashMap<Key, Box<dyn Val>> =
+            HashMap::from([(Key::from("a"), Box::new(CelInt::from(1)) as Box<dyn Val>)]);
+        assert_eq!(DefaultMap::from(entries).get_type(), &types::MAP_TYPE);
+
+        let env = Arc::new(Env::stdlib());
+        let eval = |source: &str| {
+            let program = env.compile(source).unwrap();
+            program.execute(&Context::with_env(Arc::clone(&env)))
+        };
+        assert_eq!(eval("type({}) == map"), Ok(Value::Bool(true)));
+        assert_eq!(eval("type({'a': 1}) == map"), Ok(Value::Bool(true)));
+        assert_eq!(eval("size({'a': 1, 'b': 2})"), Ok(Value::Int(2)));
+        assert_eq!(eval("{'a': 1, 'b': 2}.size()"), Ok(Value::Int(2)));
+    }
 }
