@@ -24,6 +24,14 @@ auth.claims.email_verified && resources.all(r, r.startsWith(auth.claims.email))
 
 ## Getting Started
 
+### With CEL & this interpreter
+
+If you want to try CEL out first, before integrating it in a project, we've set up a
+[playground](https://cel-rust.github.io/playground/), where you can look at different expressions and their usages,
+explore extensions to the language and the libraries currently being shipped.
+
+### With `cel-rust`
+
 Add `cel` to your `Cargo.toml`:
 
 ```shell
@@ -46,7 +54,7 @@ fn main() {
 }
 ```
 
-### Examples
+#### Examples
 
 Check out these other examples to learn how to use this library:
 
