@@ -40,6 +40,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: Run conformance tests
         run: cargo test -p conformance --release
+      - name: Check generated conformance tests match their inputs
+        run: |
+          cargo run --release -p conformance --bin generate
+          cargo fmt -p conformance
+          git add --intent-to-add conformance/tests
+          git diff --exit-code HEAD -- conformance/tests || {
+            echo "::error::conformance/tests is out of date; run generate as described in conformance/README.md"
+            exit 1
+          }
   fuzz:
     name: Fuzz
     runs-on: ubuntu-latest
