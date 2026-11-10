@@ -1229,6 +1229,7 @@ mod tests {
             ("cel.lib.ext.lists", extensions::lists),
             ("cel.lib.ext.math", extensions::math),
             ("cel.lib.ext.network", extensions::network),
+            ("cel.lib.ext.sets", extensions::sets),
             ("cel.lib.ext.strings", extensions::strings),
         ];
         let mut env = Env::stdlib();
