@@ -89,6 +89,10 @@ jobs:
         run: cargo run --bin example-json --manifest-path example/Cargo.toml --features json
       - name: Run example-anyhow
         run: cargo run --bin example-anyhow --manifest-path example/Cargo.toml --features anyhow
+      - name: Run example-budget
+        run: cargo run --bin example-budget --manifest-path example/Cargo.toml
+      - name: Run example-interrupt
+        run: cargo run --bin example-interrupt --manifest-path example/Cargo.toml
         # Build, don't run since it starts an HTTP server
       - name: Run example-axum
         run: cargo build --bin example-axum --manifest-path example/Cargo.toml --features axum
