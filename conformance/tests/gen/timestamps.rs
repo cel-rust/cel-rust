@@ -83,6 +83,68 @@ mod duration_conversions {
         ));
     }
 
+    // Test: toString_duration_max
+    #[should_panic]
+    #[test]
+    fn tostring_duration_max() {
+        run_test(&dedent!(
+            r#"
+                expr: "string(duration('315576000000s999999999ns'))"
+                value: { string_value: "315576000000.999999999s" }
+            "#
+        ));
+    }
+
+    // Test: toString_duration_min
+    #[should_panic]
+    #[test]
+    fn tostring_duration_min() {
+        run_test(&dedent!(
+            r#"
+                expr: "string(duration('-315576000000s999999999ns'))"
+                value: { string_value: "-315576000000.999999999s" }
+            "#
+        ));
+    }
+
+    // Test: from_string_max
+    #[should_panic]
+    #[test]
+    fn from_string_max() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('315576000000s999999999ns')"
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Duration] {
+                      seconds: 315576000000
+                      nanos: 999999999
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: from_string_min
+    #[should_panic]
+    #[test]
+    fn from_string_min() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('-315576000000s999999999ns')"
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Duration] {
+                      seconds: -315576000000
+                      nanos: -999999999
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
     // Test: toType_duration
     #[test]
     fn totype_duration() {
@@ -557,6 +619,54 @@ mod timestamp_arithmetic {
             "#
         ));
     }
+
+    // Test: add_max_duration_to_min_time
+    #[should_panic]
+    #[test]
+    fn add_max_duration_to_min_time() {
+        run_test(&dedent!(
+            r#"
+                expr: "timestamp('0001-01-01T00:00:00Z') + duration('315537897599s999999999ns') == timestamp('9999-12-31T23:59:59.999999999Z')"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: subtract_max_duration_from_max_time
+    #[should_panic]
+    #[test]
+    fn subtract_max_duration_from_max_time() {
+        run_test(&dedent!(
+            r#"
+                expr: "timestamp('9999-12-31T23:59:59.999999999Z') - duration('315537897599s999999999ns') == timestamp('0001-01-01T00:00:00Z')"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: add_duration_to_duration_max
+    #[should_panic]
+    #[test]
+    fn add_duration_to_duration_max() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('315576000000s') + duration('999999999ns') == duration('315576000000s999999999ns')"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: subtract_duration_from_duration_min
+    #[should_panic]
+    #[test]
+    fn subtract_duration_from_duration_min() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('-315576000000s') - duration('999999999ns') == duration('-315576000000s999999999ns')"
+                value: { bool_value: true }
+            "#
+        ));
+    }
 }
 
 // Section: comparisons
@@ -879,26 +989,36 @@ mod timestamp_range {
     }
 
     // Test: sub_time_duration_over
+    #[should_panic]
     #[test]
     fn sub_time_duration_over() {
         run_test(&dedent!(
             r#"
                 expr: "timestamp('9999-12-31T23:59:59Z') - timestamp('0001-01-01T00:00:00Z')"
-                eval_error {
-                  errors { message: "range" }
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Duration] {
+                      seconds: 315537897599
+                    }
+                  }
                 }
             "#
         ));
     }
 
     // Test: sub_time_duration_under
+    #[should_panic]
     #[test]
     fn sub_time_duration_under() {
         run_test(&dedent!(
             r#"
                 expr: "timestamp('0001-01-01T00:00:00Z') - timestamp('9999-12-31T23:59:59Z')"
-                eval_error {
-                  errors { message: "range" }
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Duration] {
+                      seconds: -315537897599
+                    }
+                  }
                 }
             "#
         ));
@@ -937,6 +1057,58 @@ mod duration_range {
         ));
     }
 
+    // Test: from_string_under_boundary
+    #[test]
+    fn from_string_under_boundary() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('-315576000001s')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
+    // Test: from_string_over_boundary
+    #[test]
+    fn from_string_over_boundary() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('315576000001s')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
+    // Test: from_string_nanos_under_boundary
+    #[test]
+    fn from_string_nanos_under_boundary() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('-315576000000s1000000000ns')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
+    // Test: from_string_nanos_over_boundary
+    #[test]
+    fn from_string_nanos_over_boundary() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('315576000000s1000000000ns')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
     // Test: add_under
     #[test]
     fn add_under() {
@@ -963,6 +1135,32 @@ mod duration_range {
         ));
     }
 
+    // Test: add_nanos_under
+    #[test]
+    fn add_nanos_under() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('-315576000000s999999999ns') + duration('-1ns')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
+    // Test: add_nanos_over
+    #[test]
+    fn add_nanos_over() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('315576000000s999999999ns') + duration('1ns')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
     // Test: sub_under
     #[test]
     fn sub_under() {
@@ -982,6 +1180,32 @@ mod duration_range {
         run_test(&dedent!(
             r#"
                 expr: "duration('200000000000s') - duration('-200000000000s')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
+    // Test: sub_nanos_under
+    #[test]
+    fn sub_nanos_under() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('-315576000000s999999999ns') - duration('1ns')"
+                eval_error {
+                  errors { message: "range" }
+                }
+            "#
+        ));
+    }
+
+    // Test: sub_nanos_over
+    #[test]
+    fn sub_nanos_over() {
+        run_test(&dedent!(
+            r#"
+                expr: "duration('315576000000s999999999ns') - duration('-1ns')"
                 eval_error {
                   errors { message: "range" }
                 }

@@ -87,9 +87,9 @@ mod index_of {
         ));
     }
 
-    // Test: empty_index
+    // Test: empty_index_offset
     #[test]
-    fn empty_index_1() {
+    fn empty_index_offset() {
         run_test(&dedent!(
             r#"
                 expr: "'tacocat'.indexOf('', 3) == 3"
@@ -97,9 +97,9 @@ mod index_of {
         ));
     }
 
-    // Test: char_index
+    // Test: char_index_offset
     #[test]
-    fn char_index() {
+    fn char_index_offset() {
         run_test(&dedent!(
             r#"
                 expr: "'tacocat'.indexOf('a', 3) == 5"
@@ -107,9 +107,9 @@ mod index_of {
         ));
     }
 
-    // Test: string_index
+    // Test: string_index_offset
     #[test]
-    fn string_index_1() {
+    fn string_index_offset() {
         run_test(&dedent!(
             r#"
                 expr: "'tacocat'.indexOf('at', 3) == 5"
@@ -159,7 +159,7 @@ mod index_of {
 
     // Test: char_index
     #[test]
-    fn char_index_1() {
+    fn char_index() {
         run_test(&dedent!(
             r#"
                 expr: "'ijk'.indexOf('k') == 2"
@@ -902,9 +902,9 @@ mod format {
     fn no_op() {
         run_test(&dedent!(
             r#"
-                expr: '"no substitution".format([])'
+                expr: "\"no substitution\".format([])"
                 value: {
-                  string_value: 'no substitution',
+                  string_value: "no substitution"
                 }
             "#
         ));
@@ -915,9 +915,9 @@ mod format {
     fn mid_string_substitution() {
         run_test(&dedent!(
             r#"
-                expr: '"str is %s and some more".format(["filler"])'
+                expr: "\"str is %s and some more\".format([\"filler\"])"
                 value: {
-                  string_value: 'str is filler and some more',
+                  string_value: "str is filler and some more"
                 }
             "#
         ));
@@ -928,9 +928,9 @@ mod format {
     fn percent_escaping() {
         run_test(&dedent!(
             r#"
-                expr: '"%% and also %%".format([])'
+                expr: "\"%% and also %%\".format([])"
                 value: {
-                  string_value: '% and also %',
+                  string_value: "% and also %"
                 }
             "#
         ));
@@ -941,9 +941,9 @@ mod format {
     fn substitution_inside_escaped_percent_signs() {
         run_test(&dedent!(
             r#"
-                expr: '"%%%s%%".format(["text"])'
+                expr: "\"%%%s%%\".format([\"text\"])"
                 value: {
-                  string_value: '%text%',
+                  string_value: "%text%"
                 }
             "#
         ));
@@ -954,9 +954,9 @@ mod format {
     fn substitution_with_one_escaped_percent_sign_on_the_right() {
         run_test(&dedent!(
             r#"
-                expr: '"%s%%".format(["percent on the right"])'
+                expr: "\"%s%%\".format([\"percent on the right\"])"
                 value: {
-                  string_value: 'percent on the right%',
+                  string_value: "percent on the right%"
                 }
             "#
         ));
@@ -967,9 +967,9 @@ mod format {
     fn substitution_with_one_escaped_percent_sign_on_the_left() {
         run_test(&dedent!(
             r#"
-                expr: '"%%%s".format(["percent on the left"])'
+                expr: "\"%%%s\".format([\"percent on the left\"])"
                 value: {
-                  string_value: '%percent on the left',
+                  string_value: "%percent on the left"
                 }
             "#
         ));
@@ -980,9 +980,9 @@ mod format {
     fn multiple_substitutions() {
         run_test(&dedent!(
             r#"
-                expr: '"%d %d %d, %s %s %s, %d %d %d, %s %s %s".format([1, 2, 3, "A", "B", "C", 4, 5, 6, "D", "E", "F"])'
+                expr: "\"%d %d %d, %s %s %s, %d %d %d, %s %s %s\".format([1, 2, 3, \"A\", \"B\", \"C\", 4, 5, 6, \"D\", \"E\", \"F\"])"
                 value: {
-                  string_value: '1 2 3, A B C, 4 5 6, D E F',
+                  string_value: "1 2 3, A B C, 4 5 6, D E F"
                 }
             "#
         ));
@@ -993,9 +993,9 @@ mod format {
     fn percent_sign_escape_sequence_support() {
         run_test(&dedent!(
             r#"
-                expr: '"%%escaped %s%%".format(["percent"])'
+                expr: "\"%%escaped %s%%\".format([\"percent\"])"
                 value: {
-                  string_value: '%escaped percent%',
+                  string_value: "%escaped percent%"
                 }
             "#
         ));
@@ -1006,9 +1006,9 @@ mod format {
     fn fixed_point_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%.3f".format([1.2345])'
+                expr: "\"%.3f\".format([1.2345])"
                 value: {
-                  string_value: '1.234',
+                  string_value: "1.234"
                 }
             "#
         ));
@@ -1019,9 +1019,9 @@ mod format {
     fn binary_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"this is 5 in binary: %b".format([5])'
+                expr: "\"this is 5 in binary: %b\".format([5])"
                 value: {
-                  string_value: 'this is 5 in binary: 101',
+                  string_value: "this is 5 in binary: 101"
                 }
             "#
         ));
@@ -1032,9 +1032,9 @@ mod format {
     fn uint_support_for_binary_formatting() {
         run_test(&dedent!(
             r#"
-                expr: '"unsigned 64 in binary: %b".format([uint(64)])'
+                expr: "\"unsigned 64 in binary: %b\".format([uint(64)])"
                 value: {
-                  string_value: 'unsigned 64 in binary: 1000000',
+                  string_value: "unsigned 64 in binary: 1000000"
                 }
             "#
         ));
@@ -1045,9 +1045,9 @@ mod format {
     fn bool_support_for_binary_formatting() {
         run_test(&dedent!(
             r#"
-                expr: '"bit set from bool: %b".format([true])'
+                expr: "\"bit set from bool: %b\".format([true])"
                 value: {
-                  string_value: 'bit set from bool: 1',
+                  string_value: "bit set from bool: 1"
                 }
             "#
         ));
@@ -1058,9 +1058,9 @@ mod format {
     fn octal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%o".format([11])'
+                expr: "\"%o\".format([11])"
                 value: {
-                  string_value: '13',
+                  string_value: "13"
                 }
             "#
         ));
@@ -1071,9 +1071,9 @@ mod format {
     fn uint_support_for_octal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"this is an unsigned octal: %o".format([uint(65535)])'
+                expr: "\"this is an unsigned octal: %o\".format([uint(65535)])"
                 value: {
-                  string_value: 'this is an unsigned octal: 177777',
+                  string_value: "this is an unsigned octal: 177777"
                 }
             "#
         ));
@@ -1084,9 +1084,9 @@ mod format {
     fn lowercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%x is 20 in hexadecimal".format([30])'
+                expr: "\"%x is 20 in hexadecimal\".format([30])"
                 value: {
-                  string_value: '1e is 20 in hexadecimal',
+                  string_value: "1e is 20 in hexadecimal"
                 }
             "#
         ));
@@ -1097,9 +1097,9 @@ mod format {
     fn uppercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%X is 20 in hexadecimal".format([30])'
+                expr: "\"%X is 20 in hexadecimal\".format([30])"
                 value: {
-                  string_value: '1E is 20 in hexadecimal',
+                  string_value: "1E is 20 in hexadecimal"
                 }
             "#
         ));
@@ -1110,9 +1110,9 @@ mod format {
     fn unsigned_support_for_hexadecimal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%X is 6000 in hexadecimal".format([uint(6000)])'
+                expr: "\"%X is 6000 in hexadecimal\".format([uint(6000)])"
                 value: {
-                  string_value: '1770 is 6000 in hexadecimal',
+                  string_value: "1770 is 6000 in hexadecimal"
                 }
             "#
         ));
@@ -1123,9 +1123,9 @@ mod format {
     fn string_support_with_hexadecimal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%x".format(["Hello world!"])'
+                expr: "\"%x\".format([\"Hello world!\"])"
                 value: {
-                  string_value: '48656c6c6f20776f726c6421',
+                  string_value: "48656c6c6f20776f726c6421"
                 }
             "#
         ));
@@ -1136,9 +1136,9 @@ mod format {
     fn string_support_with_uppercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%X".format(["Hello world!"])'
+                expr: "\"%X\".format([\"Hello world!\"])"
                 value: {
-                  string_value: '48656C6C6F20776F726C6421',
+                  string_value: "48656C6C6F20776F726C6421"
                 }
             "#
         ));
@@ -1149,9 +1149,9 @@ mod format {
     fn byte_support_with_hexadecimal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%x".format([b"byte string"])'
+                expr: "\"%x\".format([b\"byte string\"])"
                 value: {
-                  string_value: '6279746520737472696e67',
+                  string_value: "6279746520737472696e67"
                 }
             "#
         ));
@@ -1162,9 +1162,9 @@ mod format {
     fn byte_support_with_uppercase_hexadecimal_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%X".format([b"byte string"])'
+                expr: "\"%X\".format([b\"byte string\"])"
                 value: {
-                  string_value: '6279746520737472696E67',
+                  string_value: "6279746520737472696E67"
                 }
             "#
         ));
@@ -1175,9 +1175,9 @@ mod format {
     fn scientific_notation_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%.6e".format([1052.032911275])'
+                expr: "\"%.6e\".format([1052.032911275])"
                 value: {
-                  string_value: '1.052033e+03',
+                  string_value: "1.052033e+03"
                 }
             "#
         ));
@@ -1188,9 +1188,9 @@ mod format {
     fn default_precision_for_fixed_point_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%f".format([2.71828])'
+                expr: "\"%f\".format([2.71828])"
                 value: {
-                  string_value: '2.718280',
+                  string_value: "2.718280"
                 }
             "#
         ));
@@ -1201,9 +1201,9 @@ mod format {
     fn default_precision_for_fixed_point_clause_with_int() {
         run_test(&dedent!(
             r#"
-                expr: '"%f".format([2])'
+                expr: "\"%f\".format([2])"
                 value: {
-                  string_value: '2.000000',
+                  string_value: "2.000000"
                 }
             "#
         ));
@@ -1214,9 +1214,9 @@ mod format {
     fn default_precision_for_fixed_point_clause_with_uint() {
         run_test(&dedent!(
             r#"
-                expr: '"%f".format([3u])'
+                expr: "\"%f\".format([3u])"
                 value: {
-                  string_value: '3.000000',
+                  string_value: "3.000000"
                 }
             "#
         ));
@@ -1227,9 +1227,9 @@ mod format {
     fn default_precision_for_scientific_notation() {
         run_test(&dedent!(
             r#"
-                expr: '"%e".format([2.71828])'
+                expr: "\"%e\".format([2.71828])"
                 value: {
-                  string_value: '2.718280e+00',
+                  string_value: "2.718280e+00"
                 }
             "#
         ));
@@ -1240,9 +1240,9 @@ mod format {
     fn default_precision_for_scientific_notation_with_int() {
         run_test(&dedent!(
             r#"
-                expr: '"%e".format([2])'
+                expr: "\"%e\".format([2])"
                 value: {
-                  string_value: '2.000000e+00',
+                  string_value: "2.000000e+00"
                 }
             "#
         ));
@@ -1253,9 +1253,9 @@ mod format {
     fn default_precision_for_scientific_notation_with_uint() {
         run_test(&dedent!(
             r#"
-                expr: '"%e".format([3u])'
+                expr: "\"%e\".format([3u])"
                 value: {
-                  string_value: '3.000000e+00',
+                  string_value: "3.000000e+00"
                 }
             "#
         ));
@@ -1266,9 +1266,9 @@ mod format {
     fn nan_support_for_scientific_notation() {
         run_test(&dedent!(
             r#"
-                expr: '"%e".format([double("NaN")])'
+                expr: "\"%e\".format([double(\"NaN\")])"
                 value: {
-                  string_value: 'NaN',
+                  string_value: "NaN"
                 }
             "#
         ));
@@ -1279,9 +1279,9 @@ mod format {
     fn positive_infinity_support_for_scientific_notation() {
         run_test(&dedent!(
             r#"
-                expr: '"%e".format([double("Infinity")])'
+                expr: "\"%e\".format([double(\"Infinity\")])"
                 value: {
-                  string_value: 'Infinity',
+                  string_value: "Infinity"
                 }
             "#
         ));
@@ -1292,9 +1292,9 @@ mod format {
     fn negative_infinity_support_for_scientific_notation() {
         run_test(&dedent!(
             r#"
-                expr: '"%e".format([double("-Infinity")])'
+                expr: "\"%e\".format([double(\"-Infinity\")])"
                 value: {
-                  string_value: '-Infinity',
+                  string_value: "-Infinity"
                 }
             "#
         ));
@@ -1305,9 +1305,9 @@ mod format {
     fn nan_support_for_decimal() {
         run_test(&dedent!(
             r#"
-                expr: '"%d".format([double("NaN")])'
+                expr: "\"%d\".format([double(\"NaN\")])"
                 value: {
-                  string_value: 'NaN',
+                  string_value: "NaN"
                 }
             "#
         ));
@@ -1318,9 +1318,9 @@ mod format {
     fn positive_infinity_support_for_decimal() {
         run_test(&dedent!(
             r#"
-                expr: '"%d".format([double("Infinity")])'
+                expr: "\"%d\".format([double(\"Infinity\")])"
                 value: {
-                  string_value: 'Infinity',
+                  string_value: "Infinity"
                 }
             "#
         ));
@@ -1331,9 +1331,9 @@ mod format {
     fn negative_infinity_support_for_decimal() {
         run_test(&dedent!(
             r#"
-                expr: '"%d".format([double("-Infinity")])'
+                expr: "\"%d\".format([double(\"-Infinity\")])"
                 value: {
-                  string_value: '-Infinity',
+                  string_value: "-Infinity"
                 }
             "#
         ));
@@ -1344,9 +1344,9 @@ mod format {
     fn nan_support_for_fixed_point() {
         run_test(&dedent!(
             r#"
-                expr: '"%f".format([double("NaN")])'
+                expr: "\"%f\".format([double(\"NaN\")])"
                 value: {
-                  string_value: 'NaN',
+                  string_value: "NaN"
                 }
             "#
         ));
@@ -1357,9 +1357,9 @@ mod format {
     fn positive_infinity_support_for_fixed_point() {
         run_test(&dedent!(
             r#"
-                expr: '"%f".format([double("Infinity")])'
+                expr: "\"%f\".format([double(\"Infinity\")])"
                 value: {
-                  string_value: 'Infinity',
+                  string_value: "Infinity"
                 }
             "#
         ));
@@ -1370,9 +1370,9 @@ mod format {
     fn negative_infinity_support_for_fixed_point() {
         run_test(&dedent!(
             r#"
-                expr: '"%f".format([double("-Infinity")])'
+                expr: "\"%f\".format([double(\"-Infinity\")])"
                 value: {
-                  string_value: '-Infinity',
+                  string_value: "-Infinity"
                 }
             "#
         ));
@@ -1383,9 +1383,9 @@ mod format {
     fn uint_support_for_decimal_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%d".format([uint(64)])'
+                expr: "\"%d\".format([uint(64)])"
                 value: {
-                  string_value: '64',
+                  string_value: "64"
                 }
             "#
         ));
@@ -1396,9 +1396,9 @@ mod format {
     fn null_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([null])'
+                expr: "\"%s\".format([null])"
                 value: {
-                  string_value: 'null',
+                  string_value: "null"
                 }
             "#
         ));
@@ -1409,9 +1409,9 @@ mod format {
     fn int_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([999999999999])'
+                expr: "\"%s\".format([999999999999])"
                 value: {
-                  string_value: '999999999999',
+                  string_value: "999999999999"
                 }
             "#
         ));
@@ -1422,9 +1422,9 @@ mod format {
     fn bytes_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([b"xyz"])'
+                expr: "\"%s\".format([b\"xyz\"])"
                 value: {
-                  string_value: 'xyz',
+                  string_value: "xyz"
                 }
             "#
         ));
@@ -1435,9 +1435,9 @@ mod format {
     fn type_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([type("test string")])'
+                expr: "\"%s\".format([type(\"test string\")])"
                 value: {
-                  string_value: 'string',
+                  string_value: "string"
                 }
             "#
         ));
@@ -1448,9 +1448,9 @@ mod format {
     fn timestamp_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([timestamp("2023-02-03T23:31:20+00:00")])'
+                expr: "\"%s\".format([timestamp(\"2023-02-03T23:31:20+00:00\")])"
                 value: {
-                  string_value: '2023-02-03T23:31:20Z',
+                  string_value: "2023-02-03T23:31:20Z"
                 }
             "#
         ));
@@ -1461,9 +1461,9 @@ mod format {
     fn duration_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([duration("1h45m47s")])'
+                expr: "\"%s\".format([duration(\"1h45m47s\")])"
                 value: {
-                  string_value: '6347s',
+                  string_value: "6347s"
                 }
             "#
         ));
@@ -1474,9 +1474,9 @@ mod format {
     fn list_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([["abc", 3.14, null, [9, 8, 7, 6], timestamp("2023-02-03T23:31:20Z")]])'
+                expr: "\"%s\".format([[\"abc\", 3.14, null, [9, 8, 7, 6], timestamp(\"2023-02-03T23:31:20Z\")]])"
                 value: {
-                  string_value: '[abc, 3.14, null, [9, 8, 7, 6], 2023-02-03T23:31:20Z]',
+                  string_value: "[abc, 3.14, null, [9, 8, 7, 6], 2023-02-03T23:31:20Z]"
                 }
             "#
         ));
@@ -1487,9 +1487,9 @@ mod format {
     fn map_support_for_string() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([{"key1": b"xyz", "key5": null, "key2": duration("2h"), "key4": true, "key3": 2.71828}])'
+                expr: "\"%s\".format([{\"key1\": b\"xyz\", \"key5\": null, \"key2\": duration(\"2h\"), \"key4\": true, \"key3\": 2.71828}])"
                 value: {
-                  string_value: '{key1: xyz, key2: 7200s, key3: 2.71828, key4: true, key5: null}',
+                  string_value: "{key1: xyz, key2: 7200s, key3: 2.71828, key4: true, key5: null}"
                 }
             "#
         ));
@@ -1500,9 +1500,9 @@ mod format {
     fn map_support_all_key_types() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([{1: "value1", uint(2): "value2", true: double("NaN")}])'
+                expr: "\"%s\".format([{1: \"value1\", uint(2): \"value2\", true: double(\"NaN\")}])"
                 value: {
-                  string_value: '{1: value1, 2: value2, true: NaN}',
+                  string_value: "{1: value1, 2: value2, true: NaN}"
                 }
             "#
         ));
@@ -1513,9 +1513,22 @@ mod format {
     fn boolean_support_for_s() {
         run_test(&dedent!(
             r#"
-                expr: '"%s, %s".format([true, false])'
+                expr: "\"%s, %s\".format([true, false])"
                 value: {
-                  string_value: 'true, false',
+                  string_value: "true, false"
+                }
+            "#
+        ));
+    }
+
+    // Test: dyntype support for string formatting clause
+    #[test]
+    fn dyntype_support_for_string_formatting_clause() {
+        run_test(&dedent!(
+            r#"
+                expr: "\"%s\".format([dyn(\"a string\")])"
+                value: {
+                  string_value: "a string"
                 }
             "#
         ));
@@ -1526,9 +1539,9 @@ mod format {
     fn dyntype_support_for_numbers_with_string_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%s, %s".format([dyn(32), dyn(56.8)])'
+                expr: "\"%s, %s\".format([dyn(32), dyn(56.8)])"
                 value: {
-                  string_value: '32, 56.8',
+                  string_value: "32, 56.8"
                 }
             "#
         ));
@@ -1539,9 +1552,9 @@ mod format {
     fn dyntype_support_for_integer_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%d".format([dyn(128)])'
+                expr: "\"%d\".format([dyn(128)])"
                 value: {
-                  string_value: '128',
+                  string_value: "128"
                 }
             "#
         ));
@@ -1552,9 +1565,9 @@ mod format {
     fn dyntype_support_for_integer_formatting_clause_unsigned() {
         run_test(&dedent!(
             r#"
-                expr: '"%d".format([dyn(256u)])'
+                expr: "\"%d\".format([dyn(256u)])"
                 value: {
-                  string_value: '256',
+                  string_value: "256"
                 }
             "#
         ));
@@ -1565,9 +1578,9 @@ mod format {
     fn dyntype_support_for_hex_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%x".format([dyn(22)])'
+                expr: "\"%x\".format([dyn(22)])"
                 value: {
-                  string_value: '16',
+                  string_value: "16"
                 }
             "#
         ));
@@ -1578,9 +1591,9 @@ mod format {
     fn dyntype_support_for_hex_formatting_clause_uppercase() {
         run_test(&dedent!(
             r#"
-                expr: '"%X".format([dyn(26)])'
+                expr: "\"%X\".format([dyn(26)])"
                 value: {
-                  string_value: '1A',
+                  string_value: "1A"
                 }
             "#
         ));
@@ -1591,9 +1604,9 @@ mod format {
     fn dyntype_support_for_unsigned_hex_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%x".format([dyn(500u)])'
+                expr: "\"%x\".format([dyn(500u)])"
                 value: {
-                  string_value: '1f4',
+                  string_value: "1f4"
                 }
             "#
         ));
@@ -1604,9 +1617,9 @@ mod format {
     fn dyntype_support_for_fixed_point_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%.3f".format([dyn(4.5)])'
+                expr: "\"%.3f\".format([dyn(4.5)])"
                 value: {
-                  string_value: '4.500',
+                  string_value: "4.500"
                 }
             "#
         ));
@@ -1617,9 +1630,9 @@ mod format {
     fn dyntype_support_for_scientific_notation() {
         run_test(&dedent!(
             r#"
-                expr: '"%e".format([dyn(2.71828)])'
+                expr: "\"%e\".format([dyn(2.71828)])"
                 value: {
-                  string_value: '2.718280e+00',
+                  string_value: "2.718280e+00"
                 }
             "#
         ));
@@ -1630,9 +1643,9 @@ mod format {
     fn dyntype_nan_infinity_support() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([[double("NaN"), double("Infinity"), double("-Infinity")]])'
+                expr: "\"%s\".format([[double(\"NaN\"), double(\"Infinity\"), double(\"-Infinity\")]])"
                 value: {
-                  string_value: '[NaN, Infinity, -Infinity]',
+                  string_value: "[NaN, Infinity, -Infinity]"
                 }
             "#
         ));
@@ -1643,9 +1656,9 @@ mod format {
     fn dyntype_support_for_timestamp() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([dyn(timestamp("2009-11-10T23:00:00Z"))])'
+                expr: "\"%s\".format([dyn(timestamp(\"2009-11-10T23:00:00Z\"))])"
                 value: {
-                  string_value: '2009-11-10T23:00:00Z',
+                  string_value: "2009-11-10T23:00:00Z"
                 }
             "#
         ));
@@ -1656,9 +1669,9 @@ mod format {
     fn dyntype_support_for_duration() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([dyn(duration("8747s"))])'
+                expr: "\"%s\".format([dyn(duration(\"8747s\"))])"
                 value: {
-                  string_value: '8747s',
+                  string_value: "8747s"
                 }
             "#
         ));
@@ -1669,9 +1682,9 @@ mod format {
     fn dyntype_support_for_lists() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([dyn([6, 4.2, "a string"])])'
+                expr: "\"%s\".format([dyn([6, 4.2, \"a string\"])])"
                 value: {
-                  string_value: '[6, 4.2, a string]',
+                  string_value: "[6, 4.2, a string]"
                 }
             "#
         ));
@@ -1682,9 +1695,9 @@ mod format {
     fn dyntype_support_for_maps() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([{"strKey":"x", 6:duration("422s"), true:42}])'
+                expr: "\"%s\".format([{\"strKey\":\"x\", 6:duration(\"422s\"), true:42}])"
                 value: {
-                  string_value: '{6: 422s, strKey: x, true: 42}',
+                  string_value: "{6: 422s, strKey: x, true: 42}"
                 }
             "#
         ));
@@ -1695,9 +1708,9 @@ mod format {
     fn string_substitution_in_a_string_variable() {
         run_test(&dedent!(
             r#"
-                expr: 'str_var.format(["filler"])'
+                expr: "str_var.format([\"filler\"])"
                 type_env: {
-                  name: "str_var",
+                  name: "str_var"
                   ident: { type: { primitive: STRING } }
                 }
                 bindings: {
@@ -1705,7 +1718,7 @@ mod format {
                   value: { value: { string_value: "%s" } }
                 }
                 value: {
-                  string_value: 'filler',
+                  string_value: "filler"
                 }
             "#
         ));
@@ -1716,9 +1729,9 @@ mod format {
     fn multiple_substitutions_in_a_string_variable() {
         run_test(&dedent!(
             r#"
-                expr: 'str_var.format([1, 2, 3, "A", "B", "C", 4, 5, 6, "D", "E", "F"])'
+                expr: "str_var.format([1, 2, 3, \"A\", \"B\", \"C\", 4, 5, 6, \"D\", \"E\", \"F\"])"
                 type_env: {
-                  name: "str_var",
+                  name: "str_var"
                   ident: { type: { primitive: STRING } }
                 }
                 bindings: {
@@ -1726,7 +1739,7 @@ mod format {
                   value: { value: { string_value: "%d %d %d, %s %s %s, %d %d %d, %s %s %s" } }
                 }
                 value: {
-                  string_value: '1 2 3, A B C, 4 5 6, D E F',
+                  string_value: "1 2 3, A B C, 4 5 6, D E F"
                 }
             "#
         ));
@@ -1737,9 +1750,9 @@ mod format {
     fn substitution_inside_escaped_percent_signs_in_a_string_variable() {
         run_test(&dedent!(
             r#"
-                expr: 'str_var.format(["text"])'
+                expr: "str_var.format([\"text\"])"
                 type_env: {
-                  name: "str_var",
+                  name: "str_var"
                   ident: { type: { primitive: STRING } }
                 }
                 bindings: {
@@ -1747,7 +1760,7 @@ mod format {
                   value: { value: { string_value: "%%%s%%" } }
                 }
                 value: {
-                  string_value: '%text%',
+                  string_value: "%text%"
                 }
             "#
         ));
@@ -1758,9 +1771,9 @@ mod format {
     fn fixed_point_formatting_clause_in_a_string_variable() {
         run_test(&dedent!(
             r#"
-                expr: 'str_var.format([1.2345])'
+                expr: "str_var.format([1.2345])"
                 type_env: {
-                  name: "str_var",
+                  name: "str_var"
                   ident: { type: { primitive: STRING } }
                 }
                 bindings: {
@@ -1768,7 +1781,7 @@ mod format {
                   value: { value: { string_value: "%.3f" } }
                 }
                 value: {
-                  string_value: '1.234',
+                  string_value: "1.234"
                 }
             "#
         ));
@@ -1779,9 +1792,9 @@ mod format {
     fn binary_formatting_clause_in_a_string_variable() {
         run_test(&dedent!(
             r#"
-                expr: 'str_var.format([5])'
+                expr: "str_var.format([5])"
                 type_env: {
-                  name: "str_var",
+                  name: "str_var"
                   ident: { type: { primitive: STRING } }
                 }
                 bindings: {
@@ -1789,7 +1802,7 @@ mod format {
                   value: { value: { string_value: "%b" } }
                 }
                 value: {
-                  string_value: '101',
+                  string_value: "101"
                 }
             "#
         ));
@@ -1800,9 +1813,9 @@ mod format {
     fn scientific_notation_formatting_clause_in_a_string_variable() {
         run_test(&dedent!(
             r#"
-                expr: 'str_var.format([1052.032911275])'
+                expr: "str_var.format([1052.032911275])"
                 type_env: {
-                  name: "str_var",
+                  name: "str_var"
                   ident: { type: { primitive: STRING } }
                 }
                 bindings: {
@@ -1810,7 +1823,7 @@ mod format {
                   value: { value: { string_value: "%.6e" } }
                 }
                 value: {
-                  string_value: '1.052033e+03',
+                  string_value: "1.052033e+03"
                 }
             "#
         ));
@@ -1821,9 +1834,9 @@ mod format {
     fn default_precision_for_fixed_point_clause_in_a_string_variable() {
         run_test(&dedent!(
             r#"
-                expr: 'str_var.format([2.71828])'
+                expr: "str_var.format([2.71828])"
                 type_env: {
-                  name: "str_var",
+                  name: "str_var"
                   ident: { type: { primitive: STRING } }
                 }
                 bindings: {
@@ -1831,7 +1844,7 @@ mod format {
                   value: { value: { string_value: "%f" } }
                 }
                 value: {
-                  string_value: '2.718280',
+                  string_value: "2.718280"
                 }
             "#
         ));
@@ -1842,9 +1855,9 @@ mod format {
     fn format_f_insignificant_zeroes_removed() {
         run_test(&dedent!(
             r#"
-                expr: '"%.0f".format([123.000000])'
+                expr: "\"%.0f\".format([123.000000])"
                 value: {
-                  string_value: '123',
+                  string_value: "123"
                 }
             "#
         ));
@@ -1855,9 +1868,9 @@ mod format {
     fn format_f_positive_round_to_whole_number() {
         run_test(&dedent!(
             r#"
-                expr: '"%.0f".format([3.5001])'
+                expr: "\"%.0f\".format([3.5001])"
                 value: {
-                  string_value: '4',
+                  string_value: "4"
                 }
             "#
         ));
@@ -1868,9 +1881,9 @@ mod format {
     fn format_f_negative_truncate_to_whole_number() {
         run_test(&dedent!(
             r#"
-                expr: '"%.0f".format([3.4999])'
+                expr: "\"%.0f\".format([3.4999])"
                 value: {
-                  string_value: '3',
+                  string_value: "3"
                 }
             "#
         ));
@@ -1881,9 +1894,9 @@ mod format {
     fn format_f_halfway_round_up_to_nearest_even() {
         run_test(&dedent!(
             r#"
-                expr: '"%.0f".format([1.5])'
+                expr: "\"%.0f\".format([1.5])"
                 value: {
-                  string_value: '2',
+                  string_value: "2"
                 }
             "#
         ));
@@ -1894,9 +1907,9 @@ mod format {
     fn format_f_halfway_truncate_to_nearest_even() {
         run_test(&dedent!(
             r#"
-                expr: '"%.0f".format([2.5])'
+                expr: "\"%.0f\".format([2.5])"
                 value: {
-                  string_value: '2',
+                  string_value: "2"
                 }
             "#
         ));
@@ -1907,9 +1920,9 @@ mod format {
     fn format_f_positive_round_up() {
         run_test(&dedent!(
             r#"
-                expr: '"%.3f".format([123.4999])'
+                expr: "\"%.3f\".format([123.4999])"
                 value: {
-                  string_value: '123.500',
+                  string_value: "123.500"
                 }
             "#
         ));
@@ -1920,9 +1933,9 @@ mod format {
     fn format_f_positive_round_down() {
         run_test(&dedent!(
             r#"
-                expr: '"%.3f".format([123.4994])'
+                expr: "\"%.3f\".format([123.4994])"
                 value: {
-                  string_value: '123.499',
+                  string_value: "123.499"
                 }
             "#
         ));
@@ -1933,9 +1946,9 @@ mod format {
     fn format_f_negative_round_up() {
         run_test(&dedent!(
             r#"
-                expr: '"%.3f".format([-123.4999])'
+                expr: "\"%.3f\".format([-123.4999])"
                 value: {
-                  string_value: '-123.500',
+                  string_value: "-123.500"
                 }
             "#
         ));
@@ -1946,9 +1959,9 @@ mod format {
     fn format_f_negative_round_down() {
         run_test(&dedent!(
             r#"
-                expr: '"%.3f".format([-123.4994])'
+                expr: "\"%.3f\".format([-123.4994])"
                 value: {
-                  string_value: '-123.499',
+                  string_value: "-123.499"
                 }
             "#
         ));
@@ -1959,9 +1972,9 @@ mod format {
     fn format_f_zero_padding() {
         run_test(&dedent!(
             r#"
-                expr: '"%.5f".format([-1.2])'
+                expr: "\"%.5f\".format([-1.2])"
                 value: {
-                  string_value: '-1.20000',
+                  string_value: "-1.20000"
                 }
             "#
         ));
@@ -1978,11 +1991,11 @@ mod format_errors {
     fn unrecognized_formatting_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%a".format([1])'
+                expr: "\"%a\".format([1])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'could not parse formatting clause: unrecognized formatting clause "a"'
+                    message: "could not parse formatting clause: unrecognized formatting clause \"a\""
                   }
                 }
             "#
@@ -1994,11 +2007,11 @@ mod format_errors {
     fn out_of_bounds_arg_index() {
         run_test(&dedent!(
             r#"
-                expr: '"%d %d %d".format([0, 1])'
+                expr: "\"%d %d %d\".format([0, 1])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'index 2 out of range'
+                    message: "index 2 out of range"
                   }
                 }
             "#
@@ -2010,11 +2023,11 @@ mod format_errors {
     fn string_substitution_is_not_allowed_with_binary_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"string is %b".format(["abc"])'
+                expr: "\"string is %b\".format([\"abc\"])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: only integers and bools can be formatted as binary, was given string'
+                    message: "error during formatting: only integers and bools can be formatted as binary, was given string"
                   }
                 }
             "#
@@ -2026,11 +2039,11 @@ mod format_errors {
     fn duration_substitution_not_allowed_with_decimal_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"%d".format([duration("30m2s")])'
+                expr: "\"%d\".format([duration(\"30m2s\")])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: decimal clause can only be used on integers, was given google.protobuf.Duration'
+                    message: "error during formatting: decimal clause can only be used on integers, was given google.protobuf.Duration"
                   }
                 }
             "#
@@ -2042,11 +2055,11 @@ mod format_errors {
     fn string_substitution_not_allowed_with_octal_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"octal: %o".format(["a string"])'
+                expr: "\"octal: %o\".format([\"a string\"])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: octal clause can only be used on integers, was given string'
+                    message: "error during formatting: octal clause can only be used on integers, was given string"
                   }
                 }
             "#
@@ -2058,11 +2071,11 @@ mod format_errors {
     fn double_substitution_not_allowed_with_hex_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"double is %x".format([0.5])'
+                expr: "\"double is %x\".format([0.5])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: only integers, byte buffers, and strings can be formatted as hex, was given double'
+                    message: "error during formatting: only integers, byte buffers, and strings can be formatted as hex, was given double"
                   }
                 }
             "#
@@ -2074,11 +2087,11 @@ mod format_errors {
     fn uppercase_not_allowed_for_scientific_clause() {
         run_test(&dedent!(
             r#"
-                expr: '"double is %E".format([0.5])'
+                expr: "\"double is %E\".format([0.5])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'could not parse formatting clause: unrecognized formatting clause "E"'
+                    message: "could not parse formatting clause: unrecognized formatting clause \"E\""
                   }
                 }
             "#
@@ -2090,11 +2103,11 @@ mod format_errors {
     fn object_not_allowed() {
         run_test(&dedent!(
             r#"
-                expr: '"object is %s".format([cel.expr.conformance.proto3.TestAllTypes{}])'
+                expr: "\"object is %s\".format([cel.expr.conformance.proto3.TestAllTypes{}])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: string clause can only be used on strings, bools, bytes, ints, doubles, maps, lists, types, durations, and timestamps, was given cel.expr.conformance.proto3.TestAllTypes'
+                    message: "error during formatting: string clause can only be used on strings, bools, bytes, ints, doubles, maps, lists, types, durations, and timestamps, was given cel.expr.conformance.proto3.TestAllTypes"
                   }
                 }
             "#
@@ -2106,11 +2119,11 @@ mod format_errors {
     fn object_inside_list() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([[1, 2, cel.expr.conformance.proto3.TestAllTypes{}]])'
+                expr: "\"%s\".format([[1, 2, cel.expr.conformance.proto3.TestAllTypes{}]])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: string clause can only be used on strings, bools, bytes, ints, doubles, maps, lists, types, durations, and timestamps, was given cel.expr.conformance.proto3.TestAllTypes'
+                    message: "error during formatting: string clause can only be used on strings, bools, bytes, ints, doubles, maps, lists, types, durations, and timestamps, was given cel.expr.conformance.proto3.TestAllTypes"
                   }
                 }
             "#
@@ -2122,11 +2135,11 @@ mod format_errors {
     fn object_inside_map() {
         run_test(&dedent!(
             r#"
-                expr: '"%s".format([{1: "a", 2: cel.expr.conformance.proto3.TestAllTypes{}}])'
+                expr: "\"%s\".format([{1: \"a\", 2: cel.expr.conformance.proto3.TestAllTypes{}}])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: string clause can only be used on strings, bools, bytes, ints, doubles, maps, lists, types, durations, and timestamps, was given cel.expr.conformance.proto3.TestAllTypes'
+                    message: "error during formatting: string clause can only be used on strings, bools, bytes, ints, doubles, maps, lists, types, durations, and timestamps, was given cel.expr.conformance.proto3.TestAllTypes"
                   }
                 }
             "#
@@ -2138,11 +2151,11 @@ mod format_errors {
     fn null_not_allowed_for_d() {
         run_test(&dedent!(
             r#"
-                expr: '"null: %d".format([null])'
+                expr: "\"null: %d\".format([null])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: decimal clause can only be used on integers, was given null_type'
+                    message: "error during formatting: decimal clause can only be used on integers, was given null_type"
                   }
                 }
             "#
@@ -2154,11 +2167,11 @@ mod format_errors {
     fn null_not_allowed_for_e() {
         run_test(&dedent!(
             r#"
-                expr: '"null: %e".format([null])'
+                expr: "\"null: %e\".format([null])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: scientific clause can only be used on doubles, was given null_type'
+                    message: "error during formatting: scientific clause can only be used on doubles, was given null_type"
                   }
                 }
             "#
@@ -2170,11 +2183,11 @@ mod format_errors {
     fn null_not_allowed_for_f() {
         run_test(&dedent!(
             r#"
-                expr: '"null: %f".format([null])'
+                expr: "\"null: %f\".format([null])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: fixed-point clause can only be used on doubles, was given null_type'
+                    message: "error during formatting: fixed-point clause can only be used on doubles, was given null_type"
                   }
                 }
             "#
@@ -2186,11 +2199,11 @@ mod format_errors {
     fn null_not_allowed_for_x() {
         run_test(&dedent!(
             r#"
-                expr: '"null: %x".format([null])'
+                expr: "\"null: %x\".format([null])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: only integers, byte buffers, and strings can be formatted as hex, was given null_type'
+                    message: "error during formatting: only integers, byte buffers, and strings can be formatted as hex, was given null_type"
                   }
                 }
             "#
@@ -2202,11 +2215,11 @@ mod format_errors {
     fn null_not_allowed_for_x_1() {
         run_test(&dedent!(
             r#"
-                expr: '"null: %X".format([null])'
+                expr: "\"null: %X\".format([null])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: only integers, byte buffers, and strings can be formatted as hex, was given null_type'
+                    message: "error during formatting: only integers, byte buffers, and strings can be formatted as hex, was given null_type"
                   }
                 }
             "#
@@ -2218,11 +2231,11 @@ mod format_errors {
     fn null_not_allowed_for_b() {
         run_test(&dedent!(
             r#"
-                expr: '"null: %b".format([null])'
+                expr: "\"null: %b\".format([null])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: only integers and bools can be formatted as binary, was given null_type'
+                    message: "error during formatting: only integers and bools can be formatted as binary, was given null_type"
                   }
                 }
             "#
@@ -2234,11 +2247,11 @@ mod format_errors {
     fn null_not_allowed_for_o() {
         run_test(&dedent!(
             r#"
-                expr: '"null: %o".format([null])'
+                expr: "\"null: %o\".format([null])"
                 disable_check: true
                 eval_error: {
                   errors: {
-                    message: 'error during formatting: octal clause can only be used on integers, was given null_type'
+                    message: "error during formatting: octal clause can only be used on integers, was given null_type"
                   }
                 }
             "#

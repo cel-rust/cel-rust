@@ -597,6 +597,134 @@ mod duration {
             "#
         ));
     }
+
+    // Test: max_value
+    #[should_panic]
+    #[test]
+    fn max_value() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{seconds: 315576000000, nanos: 999999999}"
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Duration] {
+                      seconds: 315576000000
+                      nanos: 999999999
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: min_value
+    #[should_panic]
+    #[test]
+    fn min_value() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{seconds: -315576000000, nanos: -999999999}"
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Duration] {
+                      seconds: -315576000000
+                      nanos: -999999999
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: seconds_over
+    #[test]
+    fn seconds_over() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{seconds: 315576000001}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: seconds_under
+    #[test]
+    fn seconds_under() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{seconds: -315576000001}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: nanos_over
+    #[test]
+    fn nanos_over() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{nanos: 1000000000}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: nanos_under
+    #[test]
+    fn nanos_under() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{nanos: -1000000000}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: positive_seconds_negative_nanos
+    #[test]
+    fn positive_seconds_negative_nanos() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{seconds: 1, nanos: -1}"
+                eval_error {
+                  errors {
+                    message: "sign"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: negative_seconds_positive_nanos
+    #[test]
+    fn negative_seconds_positive_nanos() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Duration{seconds: -1, nanos: 1}"
+                eval_error {
+                  errors {
+                    message: "sign"
+                  }
+                }
+            "#
+        ));
+    }
 }
 
 // Section: timestamp
@@ -614,6 +742,118 @@ mod timestamp {
                 expr: "TestAllTypes{single_value: timestamp('9999-12-31T23:59:59.999999999Z')}.single_value"
                 value {
                   string_value: "9999-12-31T23:59:59.999999999Z"
+                }
+            "#
+        ));
+    }
+
+    // Test: max_value
+    #[should_panic]
+    #[test]
+    fn max_value() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Timestamp{seconds: 253402300799, nanos: 999999999}"
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Timestamp] {
+                      seconds: 253402300799
+                      nanos: 999999999
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: min_value
+    #[should_panic]
+    #[test]
+    fn min_value() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Timestamp{seconds: -62135596800, nanos: 0}"
+                value {
+                  object_value {
+                    [type.googleapis.com/google.protobuf.Timestamp] {
+                      seconds: -62135596800
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: seconds_over
+    #[test]
+    fn seconds_over() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Timestamp{seconds: 253402300800}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: seconds_under
+    #[test]
+    fn seconds_under() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Timestamp{seconds: -62135596801}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: nanos_over
+    #[test]
+    fn nanos_over() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Timestamp{nanos: 1000000000}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: nanos_under
+    #[test]
+    fn nanos_under() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Timestamp{nanos: -1}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: negative_seconds_negative_nanos
+    #[test]
+    fn negative_seconds_negative_nanos() {
+        run_test(&dedent!(
+            r#"
+                expr: "google.protobuf.Timestamp{seconds: -1, nanos: -1}"
+                eval_error {
+                  errors {
+                    message: "range"
+                  }
                 }
             "#
         ));

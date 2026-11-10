@@ -61,10 +61,13 @@ mod int32 {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Int32Value]
-                        { value: 2000000 }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Int32Value] { value: 2000000 }
+                      }
+                    }
+                  }
                 }
                 value { int64_value: 2000000 }
             "#
@@ -81,8 +84,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: 432}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int32_wrapper { value: 432 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int32_wrapper { value: 432 } }
                   }
                 }
             "#
@@ -99,8 +101,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: 0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int32_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int32_wrapper {} }
                   }
                 }
             "#
@@ -117,8 +118,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: 2147483647}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int32_wrapper { value: 2147483647 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int32_wrapper { value: 2147483647 } }
                   }
                 }
             "#
@@ -135,8 +135,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: -2147483648}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int32_wrapper { value: -2147483648 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int32_wrapper { value: -2147483648 } }
                   }
                 }
             "#
@@ -206,8 +205,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: -975}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_int32_wrapper { value: -975 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_int32_wrapper { value: -975 } }
                   }
                 }
             "#
@@ -224,8 +222,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: 0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_int32_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_int32_wrapper {} }
                   }
                 }
             "#
@@ -242,8 +239,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: 2147483647}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_int32_wrapper { value: 2147483647 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_int32_wrapper { value: 2147483647 } }
                   }
                 }
             "#
@@ -260,8 +256,7 @@ mod int32 {
                 expr: "TestAllTypes{single_int32_wrapper: -2147483648}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_int32_wrapper { value: -2147483648 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_int32_wrapper { value: -2147483648 } }
                   }
                 }
             "#
@@ -379,10 +374,13 @@ mod int64 {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Int64Value]
-                        { value: 2000000 }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Int64Value] { value: 2000000 }
+                      }
+                    }
+                  }
                 }
                 value { int64_value: 2000000 }
             "#
@@ -399,8 +397,7 @@ mod int64 {
                 expr: "TestAllTypes{single_int64_wrapper: 432}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int64_wrapper { value: 432 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int64_wrapper { value: 432 } }
                   }
                 }
             "#
@@ -417,8 +414,7 @@ mod int64 {
                 expr: "TestAllTypes{single_int64_wrapper: 0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int64_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int64_wrapper {} }
                   }
                 }
             "#
@@ -435,8 +431,7 @@ mod int64 {
                 expr: "TestAllTypes{single_int64_wrapper: -975}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_int64_wrapper { value: -975 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_int64_wrapper { value: -975 } }
                   }
                 }
             "#
@@ -453,8 +448,7 @@ mod int64 {
                 expr: "TestAllTypes{single_int64_wrapper: 0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_int64_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_int64_wrapper {} }
                   }
                 }
             "#
@@ -519,10 +513,13 @@ mod uint32 {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.UInt32Value]
-                        { value: 2000000 }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.UInt32Value] { value: 2000000 }
+                      }
+                    }
+                  }
                 }
                 value { uint64_value: 2000000 }
             "#
@@ -539,8 +536,7 @@ mod uint32 {
                 expr: "TestAllTypes{single_uint32_wrapper: 432u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_uint32_wrapper { value: 432 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_uint32_wrapper { value: 432 } }
                   }
                 }
             "#
@@ -557,8 +553,7 @@ mod uint32 {
                 expr: "TestAllTypes{single_uint32_wrapper: 0u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_uint32_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_uint32_wrapper {} }
                   }
                 }
             "#
@@ -575,8 +570,7 @@ mod uint32 {
                 expr: "TestAllTypes{single_uint32_wrapper: 4294967295u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_uint32_wrapper { value: 4294967295} }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_uint32_wrapper { value: 4294967295 } }
                   }
                 }
             "#
@@ -607,8 +601,7 @@ mod uint32 {
                 expr: "TestAllTypes{single_uint32_wrapper: 975u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_uint32_wrapper { value: 975 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_uint32_wrapper { value: 975 } }
                   }
                 }
             "#
@@ -625,8 +618,7 @@ mod uint32 {
                 expr: "TestAllTypes{single_uint32_wrapper: 0u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_uint32_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_uint32_wrapper {} }
                   }
                 }
             "#
@@ -643,8 +635,7 @@ mod uint32 {
                 expr: "TestAllTypes{single_uint32_wrapper: 4294967295u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_uint32_wrapper { value: 4294967295 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_uint32_wrapper { value: 4294967295 } }
                   }
                 }
             "#
@@ -762,10 +753,13 @@ mod uint64 {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.UInt64Value]
-                        { value: 2000000 }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.UInt64Value] { value: 2000000 }
+                      }
+                    }
+                  }
                 }
                 value { uint64_value: 2000000 }
             "#
@@ -782,8 +776,7 @@ mod uint64 {
                 expr: "TestAllTypes{single_uint64_wrapper: 432u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_uint64_wrapper { value: 432 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_uint64_wrapper { value: 432 } }
                   }
                 }
             "#
@@ -800,8 +793,7 @@ mod uint64 {
                 expr: "TestAllTypes{single_uint64_wrapper: 0u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_uint64_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_uint64_wrapper {} }
                   }
                 }
             "#
@@ -818,8 +810,7 @@ mod uint64 {
                 expr: "TestAllTypes{single_uint64_wrapper: 975u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_uint64_wrapper { value: 975 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_uint64_wrapper { value: 975 } }
                   }
                 }
             "#
@@ -836,8 +827,7 @@ mod uint64 {
                 expr: "TestAllTypes{single_uint64_wrapper: 0u}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_uint64_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_uint64_wrapper {} }
                   }
                 }
             "#
@@ -954,10 +944,13 @@ mod float {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.FloatValue]
-                        { value: -1.25e6 }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.FloatValue] { value: -1.25e6 }
+                      }
+                    }
+                  }
                 }
                 value { double_value: -1250000.0 }
             "#
@@ -974,8 +967,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: 86.75}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_float_wrapper { value: 86.75 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_float_wrapper { value: 86.75 } }
                   }
                 }
             "#
@@ -992,8 +984,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: 0.0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_float_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_float_wrapper {} }
                   }
                 }
             "#
@@ -1011,8 +1002,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: 1e-40}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_float_wrapper { value: 1e-40 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_float_wrapper { value: 1e-40 } }
                   }
                 }
             "#
@@ -1030,8 +1020,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: 1e-50}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_float_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_float_wrapper {} }
                   }
                 }
             "#
@@ -1049,8 +1038,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: 1.4e55}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_float_wrapper { value: inf } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_float_wrapper { value: inf } }
                   }
                 }
             "#
@@ -1106,8 +1094,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: -9.75}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_float_wrapper { value: -9.75 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_float_wrapper { value: -9.75 } }
                   }
                 }
             "#
@@ -1124,27 +1111,25 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: 0.0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_float_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_float_wrapper {} }
                   }
                 }
             "#
         ));
     }
 
-    // Test: field_assign_proto2_subnorm
+    // Test: field_assign_proto3_subnorm
     #[should_panic]
     #[test]
-    fn field_assign_proto2_subnorm_1() {
+    fn field_assign_proto3_subnorm() {
         run_test(&dedent!(
             r#"
                 description: "Subnormal single floats range from ~1e-38 to ~1e-45."
-                container: "cel.expr.conformance.proto2"
+                container: "cel.expr.conformance.proto3"
                 expr: "TestAllTypes{single_float_wrapper: 1e-40}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_float_wrapper { value: 1e-40 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_float_wrapper { value: 1e-40 } }
                   }
                 }
             "#
@@ -1161,8 +1146,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: -9.9e-100}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_float_wrapper { value: -0 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_float_wrapper { value: -0 } }
                   }
                 }
             "#
@@ -1180,8 +1164,7 @@ mod float {
                 expr: "TestAllTypes{single_float_wrapper: -9.9e100}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_float_wrapper { value: -inf } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_float_wrapper { value: -inf } }
                   }
                 }
             "#
@@ -1285,10 +1268,13 @@ mod double {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.DoubleValue]
-                        { value: -1.25e6 }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.DoubleValue] { value: -1.25e6 }
+                      }
+                    }
+                  }
                 }
                 value { double_value: -1250000.0 }
             "#
@@ -1305,8 +1291,7 @@ mod double {
                 expr: "TestAllTypes{single_double_wrapper: 86.75}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_double_wrapper { value: 86.75 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_double_wrapper { value: 86.75 } }
                   }
                 }
             "#
@@ -1323,8 +1308,7 @@ mod double {
                 expr: "TestAllTypes{single_double_wrapper: 0.0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_double_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_double_wrapper {} }
                   }
                 }
             "#
@@ -1341,8 +1325,7 @@ mod double {
                 expr: "TestAllTypes{single_double_wrapper: 1.4e55}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_double_wrapper { value: 1.4e55 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_double_wrapper { value: 1.4e55 } }
                   }
                 }
             "#
@@ -1398,8 +1381,7 @@ mod double {
                 expr: "TestAllTypes{single_double_wrapper: -9.75}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_double_wrapper { value: -9.75 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_double_wrapper { value: -9.75 } }
                   }
                 }
             "#
@@ -1416,8 +1398,7 @@ mod double {
                 expr: "TestAllTypes{single_double_wrapper: 0.0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_double_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_double_wrapper {} }
                   }
                 }
             "#
@@ -1434,8 +1415,7 @@ mod double {
                 expr: "TestAllTypes{single_double_wrapper: -9.9e100}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_double_wrapper { value: -9.9e100 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_double_wrapper { value: -9.9e100 } }
                   }
                 }
             "#
@@ -1539,10 +1519,13 @@ mod bool {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.BoolValue]
-                        { value: true }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.BoolValue] { value: true }
+                      }
+                    }
+                  }
                 }
                 value { bool_value: true }
             "#
@@ -1559,8 +1542,7 @@ mod bool {
                 expr: "TestAllTypes{single_bool_wrapper: true}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_bool_wrapper { value: true } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_bool_wrapper { value: true } }
                   }
                 }
             "#
@@ -1577,8 +1559,7 @@ mod bool {
                 expr: "TestAllTypes{single_bool_wrapper: false}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_bool_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_bool_wrapper {} }
                   }
                 }
             "#
@@ -1595,8 +1576,7 @@ mod bool {
                 expr: "TestAllTypes{single_bool_wrapper: true}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_bool_wrapper { value: true } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_bool_wrapper { value: true } }
                   }
                 }
             "#
@@ -1613,8 +1593,7 @@ mod bool {
                 expr: "TestAllTypes{single_bool_wrapper: false}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_bool_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_bool_wrapper {} }
                   }
                 }
             "#
@@ -1691,10 +1670,13 @@ mod string {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.StringValue]
-                        { value: "bar" }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.StringValue] { value: "bar" }
+                      }
+                    }
+                  }
                 }
                 value { string_value: "bar" }
             "#
@@ -1711,8 +1693,7 @@ mod string {
                 expr: "TestAllTypes{single_string_wrapper: 'baz'}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_string_wrapper { value: "baz" } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_string_wrapper { value: "baz" } }
                   }
                 }
             "#
@@ -1729,8 +1710,7 @@ mod string {
                 expr: "TestAllTypes{single_string_wrapper: ''}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_string_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_string_wrapper {} }
                   }
                 }
             "#
@@ -1747,8 +1727,7 @@ mod string {
                 expr: "TestAllTypes{single_string_wrapper: 'bletch'}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_string_wrapper { value: "bletch" } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_string_wrapper { value: "bletch" } }
                   }
                 }
             "#
@@ -1765,8 +1744,7 @@ mod string {
                 expr: "TestAllTypes{single_string_wrapper: ''}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_string_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_string_wrapper {} }
                   }
                 }
             "#
@@ -1843,10 +1821,13 @@ mod bytes {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.BytesValue]
-                        { value: "bar" }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.BytesValue] { value: "bar" }
+                      }
+                    }
+                  }
                 }
                 value { bytes_value: "bar" }
             "#
@@ -1863,8 +1844,7 @@ mod bytes {
                 expr: "TestAllTypes{single_bytes_wrapper: b'baz'}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_bytes_wrapper { value: "baz" } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_bytes_wrapper { value: "baz" } }
                   }
                 }
             "#
@@ -1881,8 +1861,7 @@ mod bytes {
                 expr: "TestAllTypes{single_bytes_wrapper: b''}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_bytes_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_bytes_wrapper {} }
                   }
                 }
             "#
@@ -1899,8 +1878,7 @@ mod bytes {
                 expr: "TestAllTypes{single_bytes_wrapper: b'bletch'}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_bytes_wrapper { value: "bletch" } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_bytes_wrapper { value: "bletch" } }
                   }
                 }
             "#
@@ -1917,8 +1895,7 @@ mod bytes {
                 expr: "TestAllTypes{single_bytes_wrapper: b''}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_bytes_wrapper { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_bytes_wrapper {} }
                   }
                 }
             "#
@@ -1971,7 +1948,7 @@ mod list {
         run_test(&dedent!(
             r#"
                 expr: "google.protobuf.ListValue{values: []}"
-                value { list_value { } }
+                value { list_value {} }
             "#
         ));
     }
@@ -1989,16 +1966,21 @@ mod list {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.ListValue]
-                        {
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.ListValue] {
                           values { string_value: "bar" }
-                          values { list_value {
+                          values {
+                            list_value {
                               values { string_value: "a" }
                               values { string_value: "b" }
-                            } }
+                            }
+                          }
                         }
-                      } } }
+                      }
+                    }
+                  }
                 }
                 value {
                   list_value {
@@ -2025,11 +2007,12 @@ mod list {
                 expr: "TestAllTypes{list_value: [1.0, 'one']}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { list_value {
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] {
+                      list_value {
                         values: { number_value: 1.0 }
                         values: { string_value: "one" }
-                      } }
+                      }
+                    }
                   }
                 }
             "#
@@ -2046,8 +2029,7 @@ mod list {
                 expr: "TestAllTypes{list_value: []}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { list_value { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { list_value {} }
                   }
                 }
             "#
@@ -2080,7 +2062,7 @@ mod list {
             r#"
                 container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{list_value: []}.list_value"
-                value { list_value { } }
+                value { list_value {} }
             "#
         ));
     }
@@ -2094,7 +2076,7 @@ mod list {
                 description: "Not a wrapper type, so doesn't convert to null."
                 container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{}.list_value"
-                value { list_value { } }
+                value { list_value {} }
             "#
         ));
     }
@@ -2109,11 +2091,12 @@ mod list {
                 expr: "TestAllTypes{list_value: [1.0, 'one']}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { list_value {
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] {
+                      list_value {
                         values: { number_value: 1.0 }
                         values: { string_value: "one" }
-                      } }
+                      }
+                    }
                   }
                 }
             "#
@@ -2130,8 +2113,7 @@ mod list {
                 expr: "TestAllTypes{list_value: []}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { list_value { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { list_value {} }
                   }
                 }
             "#
@@ -2164,7 +2146,7 @@ mod list {
             r#"
                 container: "cel.expr.conformance.proto3"
                 expr: "TestAllTypes{list_value: []}.list_value"
-                value { list_value { } }
+                value { list_value {} }
             "#
         ));
     }
@@ -2178,7 +2160,7 @@ mod list {
                 description: "Not a wrapper type, so doesn't convert to null."
                 container: "cel.expr.conformance.proto3"
                 expr: "TestAllTypes{}.list_value"
-                value { list_value { } }
+                value { list_value {} }
             "#
         ));
     }
@@ -2234,7 +2216,7 @@ mod r#struct {
         run_test(&dedent!(
             r#"
                 expr: "google.protobuf.Struct{fields: {}}"
-                value { map_value { } }
+                value { map_value {} }
             "#
         ));
     }
@@ -2252,9 +2234,10 @@ mod r#struct {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Struct]
-                        {
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Struct] {
                           fields {
                             key: "first"
                             value { string_value: "Abraham" }
@@ -2264,7 +2247,9 @@ mod r#struct {
                             value { string_value: "Lincoln" }
                           }
                         }
-                      } } }
+                      }
+                    }
+                  }
                 }
                 value {
                   map_value {
@@ -2292,8 +2277,8 @@ mod r#struct {
                 expr: "TestAllTypes{single_struct: {'un': 1.0, 'deux': 2.0}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_struct {
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] {
+                      single_struct {
                         fields {
                           key: "un"
                           value { number_value: 1.0 }
@@ -2302,7 +2287,8 @@ mod r#struct {
                           key: "deux"
                           value { number_value: 2.0 }
                         }
-                      } }
+                      }
+                    }
                   }
                 }
             "#
@@ -2319,8 +2305,7 @@ mod r#struct {
                 expr: "TestAllTypes{single_struct: {}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_struct { } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_struct {} }
                   }
                 }
             "#
@@ -2370,7 +2355,7 @@ mod r#struct {
             r#"
                 container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{single_struct: {}}.single_struct"
-                value { map_value { } }
+                value { map_value {} }
             "#
         ));
     }
@@ -2384,7 +2369,7 @@ mod r#struct {
                 description: "Not a wrapper type, so doesn't convert to null."
                 container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{}.single_struct"
-                value { map_value { } }
+                value { map_value {} }
             "#
         ));
     }
@@ -2399,8 +2384,8 @@ mod r#struct {
                 expr: "TestAllTypes{single_struct: {'un': 1.0, 'deux': 2.0}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_struct {
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] {
+                      single_struct {
                         fields {
                           key: "un"
                           value { number_value: 1.0 }
@@ -2409,7 +2394,8 @@ mod r#struct {
                           key: "deux"
                           value { number_value: 2.0 }
                         }
-                      } }
+                      }
+                    }
                   }
                 }
             "#
@@ -2426,8 +2412,7 @@ mod r#struct {
                 expr: "TestAllTypes{single_struct: {}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_struct { } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_struct {} }
                   }
                 }
             "#
@@ -2477,7 +2462,7 @@ mod r#struct {
             r#"
                 container: "cel.expr.conformance.proto3"
                 expr: "TestAllTypes{single_struct: {}}.single_struct"
-                value { map_value { } }
+                value { map_value {} }
             "#
         ));
     }
@@ -2491,7 +2476,7 @@ mod r#struct {
                 description: "Not a wrapper type, so doesn't convert to null."
                 container: "cel.expr.conformance.proto3"
                 expr: "TestAllTypes{}.single_struct"
-                value { map_value { } }
+                value { map_value {} }
             "#
         ));
     }
@@ -2556,10 +2541,13 @@ mod value_null {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Value]
-                        { null_value: NULL_VALUE }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Value] { null_value: NULL_VALUE }
+                      }
+                    }
+                  }
                 }
                 value { null_value: NULL_VALUE }
             "#
@@ -2576,8 +2564,7 @@ mod value_null {
                 expr: "TestAllTypes{single_value: null}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { null_value: NULL_VALUE } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { null_value: NULL_VALUE } }
                   }
                 }
             "#
@@ -2620,8 +2607,7 @@ mod value_null {
                 expr: "TestAllTypes{single_value: null}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { null_value: NULL_VALUE } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { null_value: NULL_VALUE } }
                   }
                 }
             "#
@@ -2712,10 +2698,13 @@ mod value_number {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Value]
-                        { number_value: -26.375 }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Value] { number_value: -26.375 }
+                      }
+                    }
+                  }
                 }
                 value { double_value: -26.375 }
             "#
@@ -2732,8 +2721,7 @@ mod value_number {
                 expr: "TestAllTypes{single_value: 7e23}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { number_value: 7e23 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { number_value: 7e23 } }
                   }
                 }
             "#
@@ -2750,8 +2738,7 @@ mod value_number {
                 expr: "TestAllTypes{single_value: 0.0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { number_value: 0.0 } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { number_value: 0.0 } }
                   }
                 }
             "#
@@ -2794,8 +2781,7 @@ mod value_number {
                 expr: "TestAllTypes{single_value: 7e23}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { number_value: 7e23 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { number_value: 7e23 } }
                   }
                 }
             "#
@@ -2812,8 +2798,7 @@ mod value_number {
                 expr: "TestAllTypes{single_value: 0.0}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { number_value: 0.0 } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { number_value: 0.0 } }
                   }
                 }
             "#
@@ -2904,10 +2889,13 @@ mod value_string {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Value]
-                        { string_value: "bar" }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Value] { string_value: "bar" }
+                      }
+                    }
+                  }
                 }
                 value { string_value: "bar" }
             "#
@@ -2924,8 +2912,7 @@ mod value_string {
                 expr: "TestAllTypes{single_value: 'baz'}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { string_value: "baz" } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { string_value: "baz" } }
                   }
                 }
             "#
@@ -2942,8 +2929,7 @@ mod value_string {
                 expr: "TestAllTypes{single_value: ''}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { string_value: "" } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { string_value: "" } }
                   }
                 }
             "#
@@ -2986,8 +2972,7 @@ mod value_string {
                 expr: "TestAllTypes{single_value: 'baz'}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { string_value: "baz" } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { string_value: "baz" } }
                   }
                 }
             "#
@@ -3004,8 +2989,7 @@ mod value_string {
                 expr: "TestAllTypes{single_value: ''}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { string_value: "" } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { string_value: "" } }
                   }
                 }
             "#
@@ -3096,10 +3080,13 @@ mod value_bool {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Value]
-                        { bool_value: true }
-                      } } }
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Value] { bool_value: true }
+                      }
+                    }
+                  }
                 }
                 value { bool_value: true }
             "#
@@ -3116,8 +3103,7 @@ mod value_bool {
                 expr: "TestAllTypes{single_value: true}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { bool_value: true } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { bool_value: true } }
                   }
                 }
             "#
@@ -3134,8 +3120,7 @@ mod value_bool {
                 expr: "TestAllTypes{single_value: false}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { bool_value: false } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { bool_value: false } }
                   }
                 }
             "#
@@ -3178,8 +3163,7 @@ mod value_bool {
                 expr: "TestAllTypes{single_value: true}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { bool_value: true } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { bool_value: true } }
                   }
                 }
             "#
@@ -3196,8 +3180,7 @@ mod value_bool {
                 expr: "TestAllTypes{single_value: false}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { bool_value: false } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { bool_value: false } }
                   }
                 }
             "#
@@ -3281,7 +3264,7 @@ mod value_struct {
         run_test(&dedent!(
             r#"
                 expr: "google.protobuf.Value{struct_value: {}}"
-                value { map_value: { } }
+                value { map_value: {} }
             "#
         ));
     }
@@ -3299,9 +3282,11 @@ mod value_struct {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Value]
-                        { struct_value {
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Value] {
+                          struct_value {
                             fields {
                               key: "x"
                               value { null_value: NULL_VALUE }
@@ -3310,8 +3295,11 @@ mod value_struct {
                               key: "y"
                               value { bool_value: false }
                             }
-                          } }
-                      } } }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
                 value {
                   map_value {
@@ -3339,8 +3327,9 @@ mod value_struct {
                 expr: "TestAllTypes{single_value: {'un': 1.0, 'deux': 2.0}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { struct_value {
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] {
+                      single_value {
+                        struct_value {
                           fields {
                             key: "un"
                             value { number_value: 1.0 }
@@ -3349,7 +3338,9 @@ mod value_struct {
                             key: "deux"
                             value { number_value: 2.0 }
                           }
-                        } } }
+                        }
+                      }
+                    }
                   }
                 }
             "#
@@ -3366,8 +3357,7 @@ mod value_struct {
                 expr: "TestAllTypes{single_value: {}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { struct_value: { } } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { struct_value: {} } }
                   }
                 }
             "#
@@ -3402,7 +3392,7 @@ mod value_struct {
             r#"
                 container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{single_value: {}}.single_value"
-                value { map_value: { } }
+                value { map_value: {} }
             "#
         ));
     }
@@ -3417,8 +3407,9 @@ mod value_struct {
                 expr: "TestAllTypes{single_value: {'un': 1.0, 'deux': 2.0}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { struct_value {
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] {
+                      single_value {
+                        struct_value {
                           fields {
                             key: "un"
                             value { number_value: 1.0 }
@@ -3427,7 +3418,9 @@ mod value_struct {
                             key: "deux"
                             value { number_value: 2.0 }
                           }
-                        } } }
+                        }
+                      }
+                    }
                   }
                 }
             "#
@@ -3444,8 +3437,7 @@ mod value_struct {
                 expr: "TestAllTypes{single_value: {}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { struct_value: { } } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { struct_value: {} } }
                   }
                 }
             "#
@@ -3480,7 +3472,7 @@ mod value_struct {
             r#"
                 container: "cel.expr.conformance.proto3"
                 expr: "TestAllTypes{single_value: {}}.single_value"
-                value { map_value: { } }
+                value { map_value: {} }
             "#
         ));
     }
@@ -3530,7 +3522,7 @@ mod value_list {
         run_test(&dedent!(
             r#"
                 expr: "google.protobuf.Value{list_value: []}"
-                value { list_value: { } }
+                value { list_value: {} }
             "#
         ));
     }
@@ -3548,14 +3540,19 @@ mod value_list {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Value]
-                        { list_value {
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Value] {
+                          list_value {
                             values { number_value: 1.0 }
                             values { bool_value: true }
                             values { string_value: "hi" }
-                          } }
-                      } } }
+                          }
+                        }
+                      }
+                    }
+                  }
                 }
                 value {
                   list_value {
@@ -3578,11 +3575,14 @@ mod value_list {
                 expr: "TestAllTypes{single_value: ['un', 1.0]}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { list_value {
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] {
+                      single_value {
+                        list_value {
                           values { string_value: "un" }
                           values { number_value: 1.0 }
-                        } } }
+                        }
+                      }
+                    }
                   }
                 }
             "#
@@ -3599,8 +3599,7 @@ mod value_list {
                 expr: "TestAllTypes{single_value: []}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_value { list_value: { } } }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_value { list_value: {} } }
                   }
                 }
             "#
@@ -3633,7 +3632,7 @@ mod value_list {
             r#"
                 container: "cel.expr.conformance.proto2"
                 expr: "TestAllTypes{single_value: []}.single_value"
-                value { list_value: { } }
+                value { list_value: {} }
             "#
         ));
     }
@@ -3648,11 +3647,14 @@ mod value_list {
                 expr: "TestAllTypes{single_value: ['un', 1.0]}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { list_value {
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] {
+                      single_value {
+                        list_value {
                           values { string_value: "un" }
                           values { number_value: 1.0 }
-                        } } }
+                        }
+                      }
+                    }
                   }
                 }
             "#
@@ -3669,8 +3671,7 @@ mod value_list {
                 expr: "TestAllTypes{single_value: []}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_value { list_value: { } } }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_value { list_value: {} } }
                   }
                 }
             "#
@@ -3703,7 +3704,7 @@ mod value_list {
             r#"
                 container: "cel.expr.conformance.proto3"
                 expr: "TestAllTypes{single_value: []}.single_value"
-                value { list_value: { } }
+                value { list_value: {} }
             "#
         ));
     }
@@ -3724,8 +3725,7 @@ mod any {
                 expr: "google.protobuf.Any{type_url: 'type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes', value: b'\\x08\\x96\\x01'}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int32: 150 }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int32: 150 }
                   }
                 }
             "#
@@ -3772,18 +3772,20 @@ mod any {
                 }
                 bindings {
                   key: "x"
-                  value { value { object_value {
-                        [type.googleapis.com/google.protobuf.Any]
-                        {
+                  value {
+                    value {
+                      object_value {
+                        [type.googleapis.com/google.protobuf.Any] {
                           type_url: "type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes"
                           value: "\x08\x96\x01"
                         }
-                      } } }
+                      }
+                    }
+                  }
                 }
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int32: 150 }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int32: 150 }
                   }
                 }
             "#
@@ -3800,8 +3802,7 @@ mod any {
                 expr: "TestAllTypes{single_any: TestAllTypes{single_int32: 150}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    {
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] {
                       single_any {
                         type_url: "type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes"
                         value: "\x08\x96\x01"
@@ -3823,8 +3824,7 @@ mod any {
                 expr: "TestAllTypes{single_any: TestAllTypes{single_int32: 150}}.single_any"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes]
-                    { single_int32: 150 }
+                    [type.googleapis.com/cel.expr.conformance.proto2.TestAllTypes] { single_int32: 150 }
                   }
                 }
             "#
@@ -3841,8 +3841,7 @@ mod any {
                 expr: "TestAllTypes{single_any: TestAllTypes{single_int32: 150}}"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    {
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] {
                       single_any {
                         type_url: "type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes"
                         value: "\x08\x96\x01"
@@ -3864,8 +3863,7 @@ mod any {
                 expr: "TestAllTypes{single_any: TestAllTypes{single_int32: 150}}.single_any"
                 value {
                   object_value {
-                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes]
-                    { single_int32: 150 }
+                    [type.googleapis.com/cel.expr.conformance.proto3.TestAllTypes] { single_int32: 150 }
                   }
                 }
             "#
