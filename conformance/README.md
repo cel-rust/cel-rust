@@ -20,7 +20,10 @@ cargo run -p conformance --features skip-version-check --bin generate
 cargo fmt -p conformance
 ```
 
-to regenerate test code. Then run the tests to see if there are any new failures. If there are,
+to regenerate test code. If the new version removed or renamed tests, `generate` lists the
+`src/bin/ignored.txt` entries that no longer match any test and stops. Check the list, then delete
+those lines, or run the same command again with `-- --remove-unmatched` to delete them and finish.
+Then run the tests to see if there are any new failures. If there are,
 either fix code to allow them to pass, or mark them ignored for tracking. To update the list of
 ignored tests,
 

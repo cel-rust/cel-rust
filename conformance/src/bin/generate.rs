@@ -7,9 +7,21 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 type IgnoredTests = HashMap<String, HashMap<String, HashSet<String>>>;
-const IGNORED_TESTS_TEXT: &str = include_str!("ignored.txt");
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut remove_unmatched = false;
+    for arg in std::env::args().skip(1) {
+        match arg.as_str() {
+            "--remove-unmatched" => remove_unmatched = true,
+            _ => {
+                return Err(format!(
+                    "Unknown argument {arg} (the only option is --remove-unmatched)"
+                )
+                .into())
+            }
+        }
+    }
+
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     let manifest = Manifest::from_path(manifest_dir.join("Cargo.toml"))?;
     let cel_spec_version = manifest
@@ -37,17 +49,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .join("simple")
         .join("testdata");
 
-    let gen_root = manifest_dir.join("src").join("gen");
-    compile_protos(&extracted_spec_root.join("proto"), &gen_root)?;
-
     let tests_dir = manifest_dir.join("tests");
     let generated_tests_dir = tests_dir.join("gen");
-    clear_directory(&generated_tests_dir)?;
-    fs::create_dir_all(&tests_dir)?;
-    let ignored_tests = parse_ignored_tests(IGNORED_TESTS_TEXT)?;
+    let ignored_path = manifest_dir.join("src").join("bin").join("ignored.txt");
+    let ignored_text = fs::read_to_string(&ignored_path)?;
+    let mut ignored_tests = parse_ignored_tests(&ignored_text)?;
     let mut generated_modules = Vec::new();
+    let mut rendered_modules = Vec::new();
 
-    for path in find_files(&test_data_dir, "textproto") {
+    for path in find_files(&test_data_dir, "textproto")? {
         let content = fs::read_to_string(&path)?;
 
         let stem = path
@@ -57,8 +67,42 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let module_file = generated_tests_dir.join(format!("{}.rs", stem));
         generated_modules.push(stem.to_string());
 
-        let file_content = render_file_module(stem, &content, &ignored_tests);
-        fs::write(&module_file, file_content)?;
+        let file_content = render_file_module(stem, &content, &mut ignored_tests);
+        rendered_modules.push((module_file, file_content));
+    }
+    // Without test files every ignored.txt entry would look stale.
+    if rendered_modules.is_empty() {
+        return Err(format!(
+            "No .textproto files found under {}",
+            test_data_dir.display()
+        )
+        .into());
+    }
+
+    // Checked before anything is written, so a failed run leaves the tree as it was.
+    let unmatched = unmatched_ignored_tests(&ignored_tests);
+    if !unmatched.is_empty() {
+        for entry in &unmatched {
+            eprintln!("{entry}");
+        }
+        if !remove_unmatched {
+            return Err(format!(
+                "the {} ignored.txt entries above match no test in cel-spec {cel_spec_version} \
+                 (removed or renamed upstream, or mistyped); delete them, or run generate \
+                 again with `-- --remove-unmatched`",
+                unmatched.len()
+            )
+            .into());
+        }
+    }
+
+    let gen_root = manifest_dir.join("src").join("gen");
+    compile_protos(&extracted_spec_root.join("proto"), &gen_root)?;
+
+    clear_directory(&generated_tests_dir)?;
+    fs::create_dir_all(&tests_dir)?;
+    for (module_file, file_content) in rendered_modules {
+        fs::write(module_file, file_content)?;
     }
 
     generated_modules.sort();
@@ -72,6 +116,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         render_version_file(cel_spec_version),
     )?;
 
+    // Written last, so a run that fails while generating keeps the list as it was.
+    if !unmatched.is_empty() {
+        fs::write(&ignored_path, remove_entries(&ignored_text, &unmatched))?;
+        eprintln!(
+            "Removed the {} entries above from ignored.txt",
+            unmatched.len()
+        );
+    }
+
     println!(
         "Generated conformance tests in {}",
         generated_tests_dir.display()
@@ -82,7 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 fn compile_protos(proto_root: &Path, gen_root: &Path) -> Result<(), Box<dyn std::error::Error>> {
     clear_directory(gen_root)?;
-    let paths = find_files(proto_root, "proto");
+    let paths = find_files(proto_root, "proto")?;
     if paths.is_empty() {
         return Err(format!("No .proto files found under {}", proto_root.display()).into());
     }
@@ -99,10 +152,13 @@ fn compile_protos(proto_root: &Path, gen_root: &Path) -> Result<(), Box<dyn std:
     Ok(())
 }
 
-fn find_files(test_data_dir: &Path, extension: &str) -> Vec<PathBuf> {
+// Walk errors are returned rather than skipped: a partial listing would make ignored.txt entries look stale.
+fn find_files(test_data_dir: &Path, extension: &str) -> Result<Vec<PathBuf>, String> {
     let mut paths: Vec<PathBuf> = WalkDir::new(test_data_dir)
         .into_iter()
-        .filter_map(Result::ok)
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|err| err.to_string())?
+        .into_iter()
         .map(|entry| entry.into_path())
         .filter(|path| {
             path.extension()
@@ -111,7 +167,7 @@ fn find_files(test_data_dir: &Path, extension: &str) -> Vec<PathBuf> {
         })
         .collect();
     paths.sort();
-    paths
+    Ok(paths)
 }
 
 struct TestCase {
@@ -140,7 +196,7 @@ struct ParsedFile {
 fn parse_file_module(
     file_name: &str,
     test_textproto: &str,
-    ignored_tests: &IgnoredTests,
+    ignored_tests: &mut IgnoredTests,
 ) -> ParsedFile {
     let mut source_name = None;
     let mut description = None;
@@ -190,7 +246,7 @@ fn parse_file_module(
                 let identifier =
                     dedupe_identifier(sanitize_identifier(test_name), &mut identifier_counts);
                 let section = sections.last_mut().unwrap();
-                let ignored = should_ignore_test(
+                let ignored = take_ignored_test(
                     ignored_tests,
                     file_name,
                     Some(&section.identifier),
@@ -217,7 +273,7 @@ fn parse_file_module(
 fn render_file_module(
     file_name: &str,
     test_textproto: &str,
-    ignored_tests: &IgnoredTests,
+    ignored_tests: &mut IgnoredTests,
 ) -> String {
     let parsed = parse_file_module(file_name, test_textproto, ignored_tests);
 
@@ -285,8 +341,8 @@ fn render_test_index(modules: &[String]) -> String {
     out
 }
 
-fn should_ignore_test(
-    ignored_tests: &IgnoredTests,
+fn take_ignored_test(
+    ignored_tests: &mut IgnoredTests,
     file_name: &str,
     section_name: Option<&str>,
     test_name: &str,
@@ -295,15 +351,38 @@ fn should_ignore_test(
         return false;
     };
 
-    let Some(sections) = ignored_tests.get(file_name) else {
+    let Some(sections) = ignored_tests.get_mut(file_name) else {
         return false;
     };
 
-    let Some(tests) = sections.get(section_name) else {
+    let Some(tests) = sections.get_mut(section_name) else {
         return false;
     };
 
-    tests.contains(test_name)
+    // Matched entries are taken out, so whatever is left afterwards matched no test.
+    tests.remove(test_name)
+}
+
+fn unmatched_ignored_tests(ignored_tests: &IgnoredTests) -> Vec<String> {
+    let mut unmatched: Vec<String> = ignored_tests
+        .iter()
+        .flat_map(|(stem, sections)| {
+            sections.iter().flat_map(move |(section, tests)| {
+                tests
+                    .iter()
+                    .map(move |test| format!("{stem}::{section}::{test}"))
+            })
+        })
+        .collect();
+    unmatched.sort();
+    unmatched
+}
+
+fn remove_entries(ignored_text: &str, entries: &[String]) -> String {
+    ignored_text
+        .split_inclusive('\n')
+        .filter(|line| !entries.iter().any(|entry| entry == line.trim()))
+        .collect()
 }
 
 fn parse_ignored_tests(input: &str) -> Result<IgnoredTests, Box<dyn std::error::Error>> {
@@ -450,4 +529,36 @@ fn clear_directory(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     }
     fs::create_dir_all(dir)?;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reports_ignored_entries_that_match_no_test() {
+        let mut ignored =
+            parse_ignored_tests("basic::sec::kept\nbasic::sec::gone\nother::sec::t\n").unwrap();
+        let textproto =
+            "name: \"basic\"\nsection {\n  name: \"sec\"\n  test {\n    name: \"kept\"\n  }\n}\n";
+
+        let parsed = parse_file_module("basic", textproto, &mut ignored);
+
+        assert!(parsed.sections[0].tests[0].ignored);
+        assert_eq!(
+            unmatched_ignored_tests(&ignored),
+            ["basic::sec::gone", "other::sec::t"]
+        );
+    }
+
+    #[test]
+    fn removes_only_the_given_entries() {
+        let text = "# keep me\r\nbasic::sec::kept\r\nbasic::sec::gone\r\n\nbasic::sec::gone\nother::sec::t";
+        let entries = ["basic::sec::gone".to_string(), "other::sec::t".to_string()];
+
+        let removed = remove_entries(text, &entries);
+
+        assert_eq!(removed, "# keep me\r\nbasic::sec::kept\r\n\n");
+        assert_eq!(remove_entries(&removed, &entries), removed);
+    }
 }
