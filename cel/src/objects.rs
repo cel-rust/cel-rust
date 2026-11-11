@@ -1315,32 +1315,32 @@ impl Value {
                             let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(bool(
                                 compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
-                                    == Ordering::Less,
+                                    == Some(Ordering::Less),
                             ));
                         }
                         operators::LESS_EQUALS => {
                             let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
                             let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
-                            return Ok(bool(
-                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
-                                    != Ordering::Greater,
-                            ));
+                            return Ok(bool(matches!(
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?,
+                                Some(Ordering::Less | Ordering::Equal)
+                            )));
                         }
                         operators::GREATER => {
                             let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
                             let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
                             return Ok(bool(
                                 compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
-                                    == Ordering::Greater,
+                                    == Some(Ordering::Greater),
                             ));
                         }
                         operators::GREATER_EQUALS => {
                             let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
                             let rhs = Value::resolve_in(&call.args[1], ctx, frame)?;
-                            return Ok(bool(
-                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?
-                                    != Ordering::Less,
-                            ));
+                            return Ok(bool(matches!(
+                                compare_values(&call.func_name, lhs.as_ref(), rhs.as_ref())?,
+                                Some(Ordering::Greater | Ordering::Equal)
+                            )));
                         }
                         operators::IN => {
                             let lhs = Value::resolve_in(&call.args[0], ctx, frame)?;
@@ -1682,16 +1682,35 @@ fn bool<'b, 'v>(boolean: bool) -> CowVal<'b, 'v> {
     CowVal::Borrowed(if boolean { &Bool::TRUE } else { &Bool::FALSE })
 }
 
+/// How `lhs` orders against `rhs` for `<`, `<=`, `>` and `>=`: `None` when a
+/// `NaN` meets a number, which makes all four operators `false`, as IEEE 754
+/// has it.
 fn compare_values(
     operator: &str,
     lhs: &dyn Val,
     rhs: &dyn Val,
-) -> Result<Ordering, ExecutionError> {
+) -> Result<Option<Ordering>, ExecutionError> {
+    if (is_nan(lhs) && is_number(rhs)) || (is_number(lhs) && is_nan(rhs)) {
+        return Ok(None);
+    }
     let context = ExecutionError::overload_for_values(operator, [lhs, rhs], false);
     lhs.as_comparer()
         .ok_or_else(|| context.clone())
         .and_then(|comparer| comparer.compare(rhs))
+        .map(Some)
         .map_err(|error| error.with_overload_context(context))
+}
+
+fn is_nan(value: &dyn Val) -> bool {
+    value
+        .downcast_ref::<CelDouble>()
+        .is_some_and(|double| double.is_nan())
+}
+
+fn is_number(value: &dyn Val) -> bool {
+    value.downcast_ref::<CelDouble>().is_some()
+        || value.downcast_ref::<CelInt>().is_some()
+        || value.downcast_ref::<CelUInt>().is_some()
 }
 
 fn boolean_operator_error(
@@ -2764,11 +2783,36 @@ mod tests {
         let value = program.execute(&context).unwrap();
         assert_eq!(value, false.into(), "NaN should not equal itself");
 
-        let program = Program::compile("1.0 > double('NaN')").unwrap();
+        for expr in [
+            "double('NaN') < 1.0",
+            "double('NaN') <= 1.0",
+            "double('NaN') > 1.0",
+            "double('NaN') >= 1.0",
+            "1.0 < double('NaN')",
+            "1.0 <= double('NaN')",
+            "1.0 > double('NaN')",
+            "1.0 >= double('NaN')",
+            "double('NaN') <= double('NaN')",
+            "double('NaN') >= double('NaN')",
+            "double('NaN') < 1",
+            "1 >= double('NaN')",
+            "double('NaN') > 1u",
+            "1u <= double('NaN')",
+        ] {
+            let program = Program::compile(expr).unwrap();
+            let value = program.execute(&context);
+            assert_eq!(
+                value,
+                Ok(false.into()),
+                "{expr}: NaN orders against nothing"
+            );
+        }
+
+        let program = Program::compile("double('NaN') < 'a'").unwrap();
         let result = program.execute(&context);
         assert!(
             result.is_err(),
-            "NaN should not be comparable with inequality operators"
+            "NaN still has no ordering against a non-number"
         );
     }
 
