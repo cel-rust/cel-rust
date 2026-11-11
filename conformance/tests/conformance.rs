@@ -76,6 +76,9 @@ mod proto2_ext;
 #[path = "gen/proto3.rs"]
 #[allow(clippy::all)]
 mod proto3;
+#[path = "gen/sets_ext.rs"]
+#[allow(clippy::all)]
+mod sets_ext;
 #[path = "gen/string.rs"]
 #[allow(clippy::all)]
 mod string;

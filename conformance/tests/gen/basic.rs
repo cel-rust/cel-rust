@@ -487,18 +487,6 @@ mod functions {
             "#
         ));
     }
-
-    // Test: unbound_is_runtime_error
-    #[test]
-    fn unbound_is_runtime_error() {
-        run_test(&dedent!(
-            r#"
-                expr: "f_unknown(17) || true"
-                disable_check: true
-                value { bool_value: true }
-            "#
-        ));
-    }
 }
 
 // Section: reserved_const

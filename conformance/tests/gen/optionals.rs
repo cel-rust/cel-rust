@@ -850,6 +850,72 @@ mod optionals {
         ));
     }
 
+    // Test: optional_eq_int_double
+    #[test]
+    fn optional_eq_int_double() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of(1) == optional.of(dyn(1.0))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_eq_int_uint
+    #[test]
+    fn optional_eq_int_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of(1) == optional.of(dyn(1u))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_eq_neg_zero_pos_zero
+    #[test]
+    fn optional_eq_neg_zero_pos_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of(-0.0) == optional.of(0.0)"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_eq_nan_nan
+    #[test]
+    fn optional_eq_nan_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of(0.0/0.0) == optional.of(0.0/0.0)"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: optional_ne_nan_nan
+    #[test]
+    fn optional_ne_nan_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of(0.0/0.0) != optional.of(0.0/0.0)"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_eq_list_int_double
+    #[test]
+    fn optional_eq_list_int_double() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of([1]) == optional.of([dyn(1.0)])"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
     // Test: map_optional_has
     #[test]
     fn map_optional_has() {
@@ -872,6 +938,17 @@ mod optionals {
         ));
     }
 
+    // Test: map_optional_of_select_has
+    #[test]
+    fn map_optional_of_select_has() {
+        run_test(&dedent!(
+            r#"
+                expr: "has({'foo': optional.of({'bar': 1})}.foo.bar)"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
     // Test: map_optional_entry_has
     #[test]
     fn map_optional_entry_has() {
@@ -879,6 +956,259 @@ mod optionals {
             r#"
                 expr: "has({?'foo': optional.none()}.foo)"
                 value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: map_optional_none_select
+    #[test]
+    fn map_optional_none_select() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': optional.none()}.a.b == optional.none()"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_optional_of_select
+    #[test]
+    fn map_optional_of_select() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': optional.of({'b': 1})}.a.b == optional.of(1)"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_optional_none_optselect
+    #[test]
+    fn map_optional_none_optselect() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': optional.none()}.?a == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_optional_of_optselect
+    #[test]
+    fn map_optional_of_optselect() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': optional.of(1)}.?a == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_none_optselect
+    #[test]
+    fn optional_map_optional_none_optselect() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.none()}).?a == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_of_optselect
+    #[test]
+    fn optional_map_optional_of_optselect() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.of(1)}).?a == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_none_select
+    #[test]
+    fn optional_map_optional_none_select() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.none()}).a == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_of_select
+    #[test]
+    fn optional_map_optional_of_select() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.of(1)}).a == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_optional_none_optindex
+    #[test]
+    fn map_optional_none_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': optional.none()}[?'a'] == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_optional_of_optindex
+    #[test]
+    fn map_optional_of_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': optional.of(1)}[?'a'] == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_none_optindex
+    #[test]
+    fn optional_map_optional_none_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.none()})[?'a'] == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_of_optindex
+    #[test]
+    fn optional_map_optional_of_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.of(1)})[?'a'] == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_none_index
+    #[test]
+    fn optional_map_optional_none_index() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.none()})['a'] == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_map_optional_of_index
+    #[test]
+    fn optional_map_optional_of_index() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of({'a': optional.of(1)})['a'] == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: list_optional_none_optindex
+    #[test]
+    fn list_optional_none_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "[optional.none()][?0] == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: list_optional_of_optindex
+    #[test]
+    fn list_optional_of_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "[optional.of(1)][?0] == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_list_optional_none_optindex
+    #[test]
+    fn optional_list_optional_none_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of([optional.none()])[?0] == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_list_optional_of_optindex
+    #[test]
+    fn optional_list_optional_of_optindex() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of([optional.of(1)])[?0] == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_list_optional_none_index
+    #[test]
+    fn optional_list_optional_none_index() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of([optional.none()])[0] == optional.of(optional.none())"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: optional_list_optional_of_index
+    #[test]
+    fn optional_list_optional_of_index() {
+        run_test(&dedent!(
+            r#"
+                expr: "optional.of([optional.of(1)])[0] == optional.of(optional.of(1))"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: map_optional_entry_nested_none
+    #[test]
+    fn map_optional_entry_nested_none() {
+        run_test(&dedent!(
+            r#"
+                expr: "{?'a': {'a': optional.none()}.?a}.a == optional.none()"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: list_optional_element_nested_none
+    #[test]
+    fn list_optional_element_nested_none() {
+        run_test(&dedent!(
+            r#"
+                expr: "[?{'a': optional.none()}.?a] == [optional.none()]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: list_optional_elements_nested
+    #[test]
+    fn list_optional_elements_nested() {
+        run_test(&dedent!(
+            r#"
+                expr: "[?optional.of(optional.none()), ?optional.none(), ?optional.of(optional.of(1))] == [optional.none(), optional.of(1)]"
+                value: { bool_value: true }
             "#
         ));
     }

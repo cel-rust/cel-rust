@@ -175,6 +175,28 @@ mod eq_literal {
         ));
     }
 
+    // Test: not_eq_double_nan_left
+    #[test]
+    fn not_eq_double_nan_left() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 == 1.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_eq_double_nan_right
+    #[test]
+    fn not_eq_double_nan_right() {
+        run_test(&dedent!(
+            r#"
+                expr: "1.0 == 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
     // Test: not_eq_int_double_nan
     #[test]
     fn not_eq_int_double_nan() {
@@ -186,12 +208,34 @@ mod eq_literal {
         ));
     }
 
+    // Test: not_eq_double_nan_int
+    #[test]
+    fn not_eq_double_nan_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) == 1"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
     // Test: not_eq_uint_double_nan
     #[test]
     fn not_eq_uint_double_nan() {
         run_test(&dedent!(
             r#"
                 expr: "dyn(1u) == 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_eq_double_nan_uint
+    #[test]
+    fn not_eq_double_nan_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) == 1u"
                 value: { bool_value: false }
             "#
         ));
@@ -237,6 +281,72 @@ mod eq_literal {
             r#"
                 expr: "dyn(2.0) == 1u"
                 value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: eq_double_neg_zero
+    #[test]
+    fn eq_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 == 0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_double_zero_neg_zero
+    #[test]
+    fn eq_double_zero_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0 == -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_double_neg_zero_int
+    #[test]
+    fn eq_double_neg_zero_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) == 0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_int_double_neg_zero
+    #[test]
+    fn eq_int_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0) == -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_double_neg_zero_uint
+    #[test]
+    fn eq_double_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) == 0u"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_uint_double_neg_zero
+    #[test]
+    fn eq_uint_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0u) == -0.0"
+                value: { bool_value: true }
             "#
         ));
     }
@@ -441,6 +551,83 @@ mod eq_literal {
         ));
     }
 
+    // Test: not_eq_list_double_nan
+    #[test]
+    fn not_eq_list_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "[0.0/0.0] == [0.0/0.0]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_eq_nested_list_double_nan
+    #[test]
+    fn not_eq_nested_list_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "[[0.0/0.0]] == [[0.0/0.0]]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_eq_nested_list_map_double_nan
+    #[test]
+    fn not_eq_nested_list_map_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "[{'k': [0.0/0.0]}] == [{'k': [0.0/0.0]}]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: eq_list_double_neg_zero
+    #[test]
+    fn eq_list_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "[-0.0] == [0.0]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_list_mixed_type_neg_zero
+    #[test]
+    fn eq_list_mixed_type_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "[-0.0, 1] == [0, 1.0]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_list_mixed_type_neg_zero_uint
+    #[test]
+    fn eq_list_mixed_type_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "[-0.0, 1u] == [0u, 1.0]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_nested_list_mixed_type_neg_zero
+    #[test]
+    fn eq_nested_list_mixed_type_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "[[-0.0, 1]] == [[0, 1u]]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
     // Test: not_eq_list_order
     #[test]
     fn not_eq_list_order() {
@@ -536,6 +723,72 @@ mod eq_literal {
         run_test(&dedent!(
             r#"
                 expr: "{'k':1.0} == {'k':1e+0}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: not_eq_map_double_nan
+    #[test]
+    fn not_eq_map_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': 0.0/0.0} == {'k': 0.0/0.0}"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_eq_nested_map_list_double_nan
+    #[test]
+    fn not_eq_nested_map_list_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': [0.0/0.0, {'a': 1.0}]} == {'k': [0.0/0.0, {'a': 1.0}]}"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: eq_map_double_neg_zero
+    #[test]
+    fn eq_map_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': -0.0} == {'k': 0.0}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_map_mixed_type_neg_zero
+    #[test]
+    fn eq_map_mixed_type_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "{1: -0.0, 2: 0} == {1: 0, 2: -0.0}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_map_mixed_type_neg_zero_uint
+    #[test]
+    fn eq_map_mixed_type_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "{1: -0.0, 2: 0u} == {1: 0u, 2: -0.0}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: eq_nested_map_list_neg_zero
+    #[test]
+    fn eq_nested_map_list_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': [-0.0, {'a': -0.0, 'b': 1}]} == {'k': [0, {'a': 0u, 'b': 1.0}]}"
                 value: { bool_value: true }
             "#
         ));
@@ -1858,6 +2111,28 @@ mod ne_literal {
         ));
     }
 
+    // Test: ne_double_nan_left
+    #[test]
+    fn ne_double_nan_left() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 != 1.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: ne_double_nan_right
+    #[test]
+    fn ne_double_nan_right() {
+        run_test(&dedent!(
+            r#"
+                expr: "1.0 != 0.0/0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
     // Test: not_ne_int_double_nan
     #[test]
     fn not_ne_int_double_nan() {
@@ -1869,12 +2144,34 @@ mod ne_literal {
         ));
     }
 
+    // Test: ne_double_nan_int
+    #[test]
+    fn ne_double_nan_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) != 1"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
     // Test: not_ne_uint_double_nan
     #[test]
     fn not_ne_uint_double_nan() {
         run_test(&dedent!(
             r#"
                 expr: "dyn(1u) != 0.0/0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: ne_double_nan_uint
+    #[test]
+    fn ne_double_nan_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) != 1u"
                 value: { bool_value: true }
             "#
         ));
@@ -1930,6 +2227,72 @@ mod ne_literal {
         run_test(&dedent!(
             r#"
                 expr: "dyn(1u) != 1e+0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_double_neg_zero
+    #[test]
+    fn not_ne_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 != 0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_double_zero_neg_zero
+    #[test]
+    fn not_ne_double_zero_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0 != -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_double_neg_zero_int
+    #[test]
+    fn not_ne_double_neg_zero_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) != 0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_int_double_neg_zero
+    #[test]
+    fn not_ne_int_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0) != -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_double_neg_zero_uint
+    #[test]
+    fn not_ne_double_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) != 0u"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_uint_double_neg_zero
+    #[test]
+    fn not_ne_uint_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0u) != -0.0"
                 value: { bool_value: false }
             "#
         ));
@@ -2101,6 +2464,83 @@ mod ne_literal {
         ));
     }
 
+    // Test: ne_list_double_nan
+    #[test]
+    fn ne_list_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "[0.0/0.0] != [0.0/0.0]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: ne_nested_list_double_nan
+    #[test]
+    fn ne_nested_list_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "[[0.0/0.0]] != [[0.0/0.0]]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: ne_nested_list_map_double_nan
+    #[test]
+    fn ne_nested_list_map_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "[{'k': [0.0/0.0]}] != [{'k': [0.0/0.0]}]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: not_ne_list_double_neg_zero
+    #[test]
+    fn not_ne_list_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "[-0.0] != [0.0]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_list_mixed_type_neg_zero
+    #[test]
+    fn not_ne_list_mixed_type_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "[-0.0, 1] != [0, 1.0]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_list_mixed_type_neg_zero_uint
+    #[test]
+    fn not_ne_list_mixed_type_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "[-0.0, 1u] != [0u, 1.0]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_nested_list_mixed_type_neg_zero
+    #[test]
+    fn not_ne_nested_list_mixed_type_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "[[-0.0, 1]] != [[0, 1u]]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
     // Test: ne_map_by_value
     #[test]
     fn ne_map_by_value() {
@@ -2129,6 +2569,72 @@ mod ne_literal {
         run_test(&dedent!(
             r#"
                 expr: "{1:1.0} != {1:1.0}"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: ne_map_double_nan
+    #[test]
+    fn ne_map_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': 0.0/0.0} != {'k': 0.0/0.0}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: ne_nested_map_list_double_nan
+    #[test]
+    fn ne_nested_map_list_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': [0.0/0.0, {'a': 1.0}]} != {'k': [0.0/0.0, {'a': 1.0}]}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: not_ne_map_double_neg_zero
+    #[test]
+    fn not_ne_map_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': -0.0} != {'k': 0.0}"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_map_mixed_type_neg_zero
+    #[test]
+    fn not_ne_map_mixed_type_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "{1: -0.0, 2: 0} != {1: 0, 2: -0.0}"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_map_mixed_type_neg_zero_uint
+    #[test]
+    fn not_ne_map_mixed_type_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "{1: -0.0, 2: 0u} != {1: 0u, 2: -0.0}"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_ne_nested_map_list_neg_zero
+    #[test]
+    fn not_ne_nested_map_list_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'k': [-0.0, {'a': -0.0, 'b': 1}]} != {'k': [0, {'a': 0u, 'b': 1.0}]}"
                 value: { bool_value: false }
             "#
         ));
@@ -2376,6 +2882,145 @@ mod lt_literal {
             r#"
                 description: "Following IEEE 754, negative zero compares equal to zero"
                 expr: "-0.0 < 0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_double_zero_neg_zero
+    #[test]
+    fn not_lt_double_zero_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0 < -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_double_neg_zero_int
+    #[test]
+    fn not_lt_dyn_double_neg_zero_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) < 0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_int_double_neg_zero
+    #[test]
+    fn not_lt_dyn_int_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0) < -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_double_neg_zero_uint
+    #[test]
+    fn not_lt_dyn_double_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) < 0u"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_uint_double_neg_zero
+    #[test]
+    fn not_lt_dyn_uint_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0u) < -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_double_nan
+    #[should_panic]
+    #[test]
+    fn not_lt_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 < 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_double_nan_left
+    #[should_panic]
+    #[test]
+    fn not_lt_double_nan_left() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 < 1.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_double_nan_right
+    #[should_panic]
+    #[test]
+    fn not_lt_double_nan_right() {
+        run_test(&dedent!(
+            r#"
+                expr: "1.0 < 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_double_nan_int
+    #[should_panic]
+    #[test]
+    fn not_lt_dyn_double_nan_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) < 1"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_int_double_nan
+    #[should_panic]
+    #[test]
+    fn not_lt_dyn_int_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1) < 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_double_nan_uint
+    #[should_panic]
+    #[test]
+    fn not_lt_dyn_double_nan_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) < 1u"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lt_dyn_uint_double_nan
+    #[should_panic]
+    #[test]
+    fn not_lt_dyn_uint_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1u) < 0.0/0.0"
                 value: { bool_value: false }
             "#
         ));
@@ -2953,6 +3598,156 @@ mod gt_literal {
         ));
     }
 
+    // Test: not_gt_double_neg_zero
+    #[test]
+    fn not_gt_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 > 0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_double_zero_neg_zero
+    #[test]
+    fn not_gt_double_zero_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0 > -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_double_neg_zero_int
+    #[test]
+    fn not_gt_dyn_double_neg_zero_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) > 0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_int_double_neg_zero
+    #[test]
+    fn not_gt_dyn_int_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0) > -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_double_neg_zero_uint
+    #[test]
+    fn not_gt_dyn_double_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) > 0u"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_uint_double_neg_zero
+    #[test]
+    fn not_gt_dyn_uint_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0u) > -0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_double_nan
+    #[should_panic]
+    #[test]
+    fn not_gt_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 > 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_double_nan_left
+    #[should_panic]
+    #[test]
+    fn not_gt_double_nan_left() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 > 1.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_double_nan_right
+    #[should_panic]
+    #[test]
+    fn not_gt_double_nan_right() {
+        run_test(&dedent!(
+            r#"
+                expr: "1.0 > 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_double_nan_int
+    #[should_panic]
+    #[test]
+    fn not_gt_dyn_double_nan_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) > 1"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_int_double_nan
+    #[should_panic]
+    #[test]
+    fn not_gt_dyn_int_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1) > 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_double_nan_uint
+    #[should_panic]
+    #[test]
+    fn not_gt_dyn_double_nan_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) > 1u"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gt_dyn_uint_double_nan
+    #[should_panic]
+    #[test]
+    fn not_gt_dyn_uint_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1u) > 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
     // Test: gt_string_case
     #[test]
     fn gt_string_case() {
@@ -3485,6 +4280,156 @@ mod lte_literal {
         run_test(&dedent!(
             r#"
                 expr: "1.0 <= 0.99"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: lte_double_neg_zero
+    #[test]
+    fn lte_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 <= 0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: lte_double_zero_neg_zero
+    #[test]
+    fn lte_double_zero_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0 <= -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: lte_dyn_double_neg_zero_int
+    #[test]
+    fn lte_dyn_double_neg_zero_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) <= 0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: lte_dyn_int_double_neg_zero
+    #[test]
+    fn lte_dyn_int_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0) <= -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: lte_dyn_double_neg_zero_uint
+    #[test]
+    fn lte_dyn_double_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) <= 0u"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: lte_dyn_uint_double_neg_zero
+    #[test]
+    fn lte_dyn_uint_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0u) <= -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: not_lte_double_nan
+    #[should_panic]
+    #[test]
+    fn not_lte_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 <= 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lte_double_nan_left
+    #[should_panic]
+    #[test]
+    fn not_lte_double_nan_left() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 <= 1.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lte_double_nan_right
+    #[should_panic]
+    #[test]
+    fn not_lte_double_nan_right() {
+        run_test(&dedent!(
+            r#"
+                expr: "1.0 <= 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lte_dyn_double_nan_int
+    #[should_panic]
+    #[test]
+    fn not_lte_dyn_double_nan_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) <= 1"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lte_dyn_int_double_nan
+    #[should_panic]
+    #[test]
+    fn not_lte_dyn_int_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1) <= 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lte_dyn_double_nan_uint
+    #[should_panic]
+    #[test]
+    fn not_lte_dyn_double_nan_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) <= 1u"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_lte_dyn_uint_double_nan
+    #[should_panic]
+    #[test]
+    fn not_lte_dyn_uint_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1u) <= 0.0/0.0"
                 value: { bool_value: false }
             "#
         ));
@@ -4049,6 +4994,156 @@ mod gte_literal {
         ));
     }
 
+    // Test: gte_double_neg_zero
+    #[test]
+    fn gte_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 >= 0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: gte_double_zero_neg_zero
+    #[test]
+    fn gte_double_zero_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0 >= -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: gte_dyn_double_neg_zero_int
+    #[test]
+    fn gte_dyn_double_neg_zero_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) >= 0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: gte_dyn_int_double_neg_zero
+    #[test]
+    fn gte_dyn_int_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0) >= -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: gte_dyn_double_neg_zero_uint
+    #[test]
+    fn gte_dyn_double_neg_zero_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) >= 0u"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: gte_dyn_uint_double_neg_zero
+    #[test]
+    fn gte_dyn_uint_double_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0u) >= -0.0"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: not_gte_double_nan
+    #[should_panic]
+    #[test]
+    fn not_gte_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 >= 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gte_double_nan_left
+    #[should_panic]
+    #[test]
+    fn not_gte_double_nan_left() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 >= 1.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gte_double_nan_right
+    #[should_panic]
+    #[test]
+    fn not_gte_double_nan_right() {
+        run_test(&dedent!(
+            r#"
+                expr: "1.0 >= 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gte_dyn_double_nan_int
+    #[should_panic]
+    #[test]
+    fn not_gte_dyn_double_nan_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) >= 1"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gte_dyn_int_double_nan
+    #[should_panic]
+    #[test]
+    fn not_gte_dyn_int_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1) >= 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gte_dyn_double_nan_uint
+    #[should_panic]
+    #[test]
+    fn not_gte_dyn_double_nan_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) >= 1u"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: not_gte_dyn_uint_double_nan
+    #[should_panic]
+    #[test]
+    fn not_gte_dyn_uint_double_nan() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(1u) >= 0.0/0.0"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
     // Test: gte_string_empty
     #[test]
     fn gte_string_empty() {
@@ -4598,6 +5693,116 @@ mod in_list_literal {
             "#
         ));
     }
+
+    // Test: nan_not_in_list
+    #[test]
+    fn nan_not_in_list() {
+        run_test(&dedent!(
+            r#"
+                expr: "0.0/0.0 in [0.0/0.0]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: nested_list_nan_not_in_list
+    #[test]
+    fn nested_list_nan_not_in_list() {
+        run_test(&dedent!(
+            r#"
+                expr: "[0.0/0.0] in [[0.0/0.0]]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: nested_map_nan_not_in_list
+    #[test]
+    fn nested_map_nan_not_in_list() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': 0.0/0.0} in [{'a': 0.0/0.0}]"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: neg_zero_in_list_double
+    #[test]
+    fn neg_zero_in_list_double() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 in [0.0]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: neg_zero_in_list_int
+    #[test]
+    fn neg_zero_in_list_int() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 in [0, 1.0]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: neg_zero_in_list_uint
+    #[test]
+    fn neg_zero_in_list_uint() {
+        run_test(&dedent!(
+            r#"
+                expr: "-0.0 in [0u, 1.0]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: int_zero_in_list_neg_zero
+    #[test]
+    fn int_zero_in_list_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0 in [-0.0, 1]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: uint_zero_in_list_neg_zero
+    #[test]
+    fn uint_zero_in_list_neg_zero() {
+        run_test(&dedent!(
+            r#"
+                expr: "0u in [-0.0, 1u]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: nested_list_neg_zero_in_list
+    #[test]
+    fn nested_list_neg_zero_in_list() {
+        run_test(&dedent!(
+            r#"
+                expr: "[-0.0] in [[0.0]]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: nested_map_neg_zero_in_list
+    #[test]
+    fn nested_map_neg_zero_in_list() {
+        run_test(&dedent!(
+            r#"
+                expr: "{'a': -0.0} in [{'a': 0.0}]"
+                value: { bool_value: true }
+            "#
+        ));
+    }
 }
 
 // Section: in_map_literal
@@ -4658,6 +5863,39 @@ mod in_map_literal {
             r#"
                 expr: "'key' in {1u:'str', 2:b'bytes'}"
                 value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: nan_not_in_map
+    #[test]
+    fn nan_not_in_map() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(0.0/0.0) in {1: 'a', 2u: 'b'}"
+                value: { bool_value: false }
+            "#
+        ));
+    }
+
+    // Test: neg_zero_in_map_int_key
+    #[test]
+    fn neg_zero_in_map_int_key() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) in {0: 'a', 1u: 'b'}"
+                value: { bool_value: true }
+            "#
+        ));
+    }
+
+    // Test: neg_zero_in_map_uint_key
+    #[test]
+    fn neg_zero_in_map_uint_key() {
+        run_test(&dedent!(
+            r#"
+                expr: "dyn(-0.0) in {0u: 'a', 1: 'b'}"
+                value: { bool_value: true }
             "#
         ));
     }
@@ -4892,6 +6130,214 @@ mod bound {
                 bindings: {
                   key: "x"
                   value: { value: { null_value: NULL_VALUE } }
+                }
+            "#
+        ));
+    }
+
+    // Test: double_nan_eq_self_false
+    #[test]
+    fn double_nan_eq_self_false() {
+        run_test(&dedent!(
+            r#"
+                expr: "x == x"
+                value: { bool_value: false }
+                type_env: {
+                  name: "x"
+                  ident: { type: { primitive: DOUBLE } }
+                }
+                bindings: {
+                  key: "x"
+                  value: { value: { double_value: nan } }
+                }
+            "#
+        ));
+    }
+
+    // Test: double_nan_ne_self_true
+    #[test]
+    fn double_nan_ne_self_true() {
+        run_test(&dedent!(
+            r#"
+                expr: "x != x"
+                value: { bool_value: true }
+                type_env: {
+                  name: "x"
+                  ident: { type: { primitive: DOUBLE } }
+                }
+                bindings: {
+                  key: "x"
+                  value: { value: { double_value: nan } }
+                }
+            "#
+        ));
+    }
+
+    // Test: list_of_bound_nan_eq_false
+    #[test]
+    fn list_of_bound_nan_eq_false() {
+        run_test(&dedent!(
+            r#"
+                expr: "[x] == [x]"
+                value: { bool_value: false }
+                type_env: {
+                  name: "x"
+                  ident: { type: { primitive: DOUBLE } }
+                }
+                bindings: {
+                  key: "x"
+                  value: { value: { double_value: nan } }
+                }
+            "#
+        ));
+    }
+
+    // Test: list_of_bound_nan_ne_true
+    #[test]
+    fn list_of_bound_nan_ne_true() {
+        run_test(&dedent!(
+            r#"
+                expr: "[x] != [x]"
+                value: { bool_value: true }
+                type_env: {
+                  name: "x"
+                  ident: { type: { primitive: DOUBLE } }
+                }
+                bindings: {
+                  key: "x"
+                  value: { value: { double_value: nan } }
+                }
+            "#
+        ));
+    }
+
+    // Test: bound_list_nan_eq_self_false
+    #[test]
+    fn bound_list_nan_eq_self_false() {
+        run_test(&dedent!(
+            r#"
+                expr: "x == x"
+                value: { bool_value: false }
+                type_env: {
+                  name: "x"
+                  ident: {
+                    type: {
+                      list_type: {
+                        elem_type: { primitive: DOUBLE }
+                      }
+                    }
+                  }
+                }
+                bindings: {
+                  key: "x"
+                  value: {
+                    value: {
+                      list_value {
+                        values: { double_value: nan }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: bound_list_nan_ne_self_true
+    #[test]
+    fn bound_list_nan_ne_self_true() {
+        run_test(&dedent!(
+            r#"
+                expr: "x != x"
+                value: { bool_value: true }
+                type_env: {
+                  name: "x"
+                  ident: {
+                    type: {
+                      list_type: {
+                        elem_type: { primitive: DOUBLE }
+                      }
+                    }
+                  }
+                }
+                bindings: {
+                  key: "x"
+                  value: {
+                    value: {
+                      list_value {
+                        values: { double_value: nan }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: bound_map_nan_eq_self_false
+    #[test]
+    fn bound_map_nan_eq_self_false() {
+        run_test(&dedent!(
+            r#"
+                expr: "x == x"
+                value: { bool_value: false }
+                type_env: {
+                  name: "x"
+                  ident: {
+                    type: {
+                      map_type: {
+                        key_type: { primitive: STRING }
+                        value_type: { primitive: DOUBLE }
+                      }
+                    }
+                  }
+                }
+                bindings: {
+                  key: "x"
+                  value: {
+                    value: {
+                      map_value {
+                        entries {
+                          key: { string_value: "a" }
+                          value: { double_value: nan }
+                        }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: bound_map_nan_ne_self_true
+    #[test]
+    fn bound_map_nan_ne_self_true() {
+        run_test(&dedent!(
+            r#"
+                expr: "x != x"
+                value: { bool_value: true }
+                type_env: {
+                  name: "x"
+                  ident: {
+                    type: {
+                      map_type: {
+                        key_type: { primitive: STRING }
+                        value_type: { primitive: DOUBLE }
+                      }
+                    }
+                  }
+                }
+                bindings: {
+                  key: "x"
+                  value: {
+                    value: {
+                      map_value {
+                        entries {
+                          key: { string_value: "a" }
+                          value: { double_value: nan }
+                        }
+                      }
+                    }
+                  }
                 }
             "#
         ));

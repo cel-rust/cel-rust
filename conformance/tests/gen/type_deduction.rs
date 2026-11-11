@@ -1290,3 +1290,540 @@ mod legacy_nullable_types {
         ));
     }
 }
+
+// Section: type_parameters_in_type_type
+// Tests for type parameter deduction within TypeType (type(T)).
+mod type_parameters_in_type_type {
+    use conformance::runner::run_test;
+    use dedent::dedent;
+
+    // Test: type_param_in_type_type_int
+    #[should_panic]
+    #[test]
+    fn type_param_in_type_type_int() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "cast('hello', int)"
+                type_env {
+                  name: "cast"
+                  function {
+                    overloads {
+                      overload_id: "cast_val_to_type"
+                      params { dyn {} }
+                      params {
+                        type {
+                          type_param: "T"
+                        }
+                      }
+                      result_type {
+                        type_param: "T"
+                      }
+                    }
+                  }
+                }
+                typed_result {
+                  deduced_type {
+                    primitive: INT64
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_param_in_type_type_string
+    #[should_panic]
+    #[test]
+    fn type_param_in_type_type_string() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "cast(123, string)"
+                type_env {
+                  name: "cast"
+                  function {
+                    overloads {
+                      overload_id: "cast_val_to_type"
+                      params { dyn {} }
+                      params {
+                        type {
+                          type_param: "T"
+                        }
+                      }
+                      result_type {
+                        type_param: "T"
+                      }
+                    }
+                  }
+                }
+                typed_result {
+                  deduced_type {
+                    primitive: STRING
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: composite_type_param_in_type_type
+    #[should_panic]
+    #[test]
+    fn composite_type_param_in_type_type() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "first_elem_type('data', type([1]))"
+                type_env {
+                  name: "first_elem_type"
+                  function {
+                    overloads {
+                      overload_id: "first_elem_type_list"
+                      params { dyn {} }
+                      params {
+                        type {
+                          list_type {
+                            elem_type {
+                              type_param: "T"
+                            }
+                          }
+                        }
+                      }
+                      result_type {
+                        type_param: "T"
+                      }
+                    }
+                  }
+                }
+                typed_result {
+                  deduced_type {
+                    primitive: INT64
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: nested_type_param_in_type_type
+    #[should_panic]
+    #[test]
+    fn nested_type_param_in_type_type() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "unwrap_type(type(int))"
+                type_env {
+                  name: "unwrap_type"
+                  function {
+                    overloads {
+                      overload_id: "unwrap_type_t"
+                      params {
+                        type {
+                          type {
+                            type_param: "T"
+                          }
+                        }
+                      }
+                      result_type {
+                        type {
+                          type_param: "T"
+                        }
+                      }
+                    }
+                  }
+                }
+                typed_result {
+                  deduced_type {
+                    type {
+                      primitive: INT64
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_map_erasure_comparison
+    #[should_panic]
+    #[test]
+    fn type_map_erasure_comparison() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "type({}) == map"
+                typed_result {
+                  deduced_type {
+                    primitive: BOOL
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_list_erasure_comparison
+    #[should_panic]
+    #[test]
+    fn type_list_erasure_comparison() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "type([1]) == list"
+                typed_result {
+                  deduced_type {
+                    primitive: BOOL
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_comparison_different_types_inequality
+    #[should_panic]
+    #[test]
+    fn type_comparison_different_types_inequality() {
+        run_test(&dedent!(
+            r#"
+                expr: "type(1) != type(1u)"
+                typed_result {
+                  result {
+                    bool_value: true
+                  }
+                  deduced_type {
+                    primitive: BOOL
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_comparison_different_types_equality
+    #[should_panic]
+    #[test]
+    fn type_comparison_different_types_equality() {
+        run_test(&dedent!(
+            r#"
+                expr: "type(1) == type(1u)"
+                typed_result {
+                  result {
+                    bool_value: false
+                  }
+                  deduced_type {
+                    primitive: BOOL
+                  }
+                }
+            "#
+        ));
+    }
+}
+
+// Section: empty_range_nested_comprehensions
+// An empty iteration range gives the iteration variable a free type
+mod empty_range_nested_comprehensions {
+    use conformance::runner::run_test;
+    use dedent::dedent;
+
+    // Test: empty_list_range_nested_list_comprehension
+    #[should_panic]
+    #[test]
+    fn empty_list_range_nested_list_comprehension() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "[].map(x, x.map(y, y))"
+                typed_result {
+                  deduced_type {
+                    list_type { elem_type { list_type { elem_type { dyn {} } } } }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: empty_map_range_nested_comprehension
+    #[should_panic]
+    #[test]
+    fn empty_map_range_nested_comprehension() {
+        run_test(&dedent!(
+            r#"
+                check_only: true
+                expr: "{}.map(k, k.map(y, y))"
+                typed_result {
+                  deduced_type {
+                    list_type { elem_type { list_type { elem_type { dyn {} } } } }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: empty_range_nested_comprehension_before_constraint
+    #[should_panic]
+    #[test]
+    fn empty_range_nested_comprehension_before_constraint() {
+        run_test(&dedent!(
+            r#"
+                description: "Inner comprehension widens the outer element type to dyn, so the "
+                             "subsequent int comparison is legal."
+                expr: "[].all(x, x.all(y, y == 1) && x == 1)"
+                typed_result {
+                  result { bool_value: true }
+                  deduced_type { primitive: BOOL }
+                }
+            "#
+        ));
+    }
+
+    // Test: empty_range_nested_comprehension_boolean_map
+    #[should_panic]
+    #[test]
+    fn empty_range_nested_comprehension_boolean_map() {
+        run_test(&dedent!(
+            r#"
+                description: "Inner comprehension body produces bool, so the expression deduces to "
+                             "list(list(bool)) even though the range variable is widened to dyn."
+                check_only: true
+                expr: "[].map(i, i.map(j, j > 1))"
+                typed_result {
+                  deduced_type {
+                    list_type { elem_type { list_type { elem_type { primitive: BOOL } } } }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: empty_range_nested_comprehension_equality
+    #[should_panic]
+    #[test]
+    fn empty_range_nested_comprehension_equality() {
+        run_test(&dedent!(
+            r#"
+                description: "Inner comprehension widens the outer element type to dyn and deduces "
+                             "list(list(bool)), which is comparable with [[]] (list(list(dyn)))."
+                expr: "[].map(i, i.map(j, j > 1)) == [[]]"
+                typed_result {
+                  result { bool_value: false }
+                  deduced_type { primitive: BOOL }
+                }
+            "#
+        ));
+    }
+}
+
+// Section: type_decay
+// Tests for type decay / least-upper-bound generalization of type values.
+mod type_decay {
+    use conformance::runner::run_test;
+    use dedent::dedent;
+
+    // Test: type_list_decay
+    #[should_panic]
+    #[test]
+    fn type_list_decay() {
+        run_test(&dedent!(
+            r#"
+                expr: "[int, bool, double]"
+                typed_result {
+                  result {
+                    list_value {
+                      values {
+                        type_value: "int"
+                      }
+                      values {
+                        type_value: "bool"
+                      }
+                      values {
+                        type_value: "double"
+                      }
+                    }
+                  }
+                  deduced_type {
+                    list_type {
+                      elem_type {
+                        type {
+                          dyn {}
+                        }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_ternary_decay
+    #[should_panic]
+    #[test]
+    fn type_ternary_decay() {
+        run_test(&dedent!(
+            r#"
+                expr: "true ? type(1) : type(1u)"
+                typed_result {
+                  result {
+                    type_value: "int"
+                  }
+                  deduced_type {
+                    type {
+                      dyn {}
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_free_param_list_decay
+    #[should_panic]
+    #[test]
+    fn type_free_param_list_decay() {
+        run_test(&dedent!(
+            r#"
+                description: "Type decay for list literal containing a free type parameter in a type value and a concrete type."
+                expr: "[type([]), int]"
+                typed_result {
+                  result {
+                    list_value {
+                      values {
+                        type_value: "list"
+                      }
+                      values {
+                        type_value: "int"
+                      }
+                    }
+                  }
+                  deduced_type {
+                    list_type {
+                      elem_type {
+                        type {
+                          dyn {}
+                        }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_free_param_list_decay_order_independent
+    #[should_panic]
+    #[test]
+    fn type_free_param_list_decay_order_independent() {
+        run_test(&dedent!(
+            r#"
+                description: "Type decay for list literal containing a concrete type and a free type parameter in a type value."
+                expr: "[int, type([])]"
+                typed_result {
+                  result {
+                    list_value {
+                      values {
+                        type_value: "int"
+                      }
+                      values {
+                        type_value: "list"
+                      }
+                    }
+                  }
+                  deduced_type {
+                    list_type {
+                      elem_type {
+                        type {
+                          dyn {}
+                        }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_nested_list_decay
+    #[should_panic]
+    #[test]
+    fn type_nested_list_decay() {
+        run_test(&dedent!(
+            r#"
+                description: "Type decay for nested list literal with differing type values."
+                expr: "[[type(1)], [type(1u)]]"
+                typed_result {
+                  result {
+                    list_value {
+                      values {
+                        list_value {
+                          values {
+                            type_value: "int"
+                          }
+                        }
+                      }
+                      values {
+                        list_value {
+                          values {
+                            type_value: "uint"
+                          }
+                        }
+                      }
+                    }
+                  }
+                  deduced_type {
+                    list_type {
+                      elem_type {
+                        list_type {
+                          elem_type {
+                            type {
+                              dyn {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+
+    // Test: type_free_param_list_concat
+    #[should_panic]
+    #[test]
+    fn type_free_param_list_concat() {
+        run_test(&dedent!(
+            r#"
+                description: "Type deduction for concatenated lists containing free type parameters in type values."
+                expr: "([] + [[type(1)]]) + [[type([])]]"
+                typed_result {
+                  result {
+                    list_value {
+                      values {
+                        list_value {
+                          values {
+                            type_value: "int"
+                          }
+                        }
+                      }
+                      values {
+                        list_value {
+                          values {
+                            type_value: "list"
+                          }
+                        }
+                      }
+                    }
+                  }
+                  deduced_type {
+                    list_type {
+                      elem_type {
+                        list_type {
+                          elem_type {
+                            type {
+                              dyn {}
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+            "#
+        ));
+    }
+}

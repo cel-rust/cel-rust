@@ -349,25 +349,27 @@ mod ipv4 {
         ));
     }
 
-    // Test: ipv4_equals_ipv6
-    #[should_panic]
+    // Test: invalid_ipv4_equals_ipv6
     #[test]
-    fn ipv4_equals_ipv6() {
+    fn invalid_ipv4_equals_ipv6() {
         run_test(&dedent!(
             r#"
                 expr: "ip('::ffff:c0a8:1') == ip('192.168.0.1')"
-                value: { bool_value: true }
+                eval_error: {
+                  errors: {
+                    message: "IPv4-mapped IPv6 address is not allowed"
+                  }
+                }
             "#
         ));
     }
 
     // Test: ipv4_not_equals_ipv6
-    #[should_panic]
     #[test]
     fn ipv4_not_equals_ipv6() {
         run_test(&dedent!(
             r#"
-                expr: "ip('::ffff:c0a8:1') == ip('192.168.10.1')"
+                expr: "ip('192.168.0.1') == ip('2001:db8::1')"
                 value: { bool_value: false }
             "#
         ));
