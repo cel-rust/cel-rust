@@ -65,13 +65,18 @@ pub(super) fn proto_value_to_cel_value(
             // Tests expecting Enum type will fail
             Ok(Int(enum_val.value as i64))
         }
-        Some(crate::proto::cel::expr::value::Kind::ObjectValue(any)) => {
-            let _decoded = convert_any_to_cel_value(any)?;
-            Err(ConversionError::Unsupported(format!(
-                "TODO: native support for protobuf messages is not supported yet (type_url: {})",
-                any.type_url
-            )))
-        }
+        Some(crate::proto::cel::expr::value::Kind::ObjectValue(any)) => match type_name(any) {
+            // The well-known time types are CEL values of their own.
+            "google.protobuf.Duration" => duration_value(decode(any)?),
+            "google.protobuf.Timestamp" => timestamp_value(decode(any)?),
+            _ => {
+                let _decoded = convert_any_to_cel_value(any)?;
+                Err(ConversionError::Unsupported(format!(
+                    "TODO: native support for protobuf messages is not supported yet (type_url: {})",
+                    any.type_url
+                )))
+            }
+        },
         Some(crate::proto::cel::expr::value::Kind::TypeValue(v)) => {
             // TypeValue is a string representing a type name
             Ok(String(Arc::new(v.clone())))
@@ -80,17 +85,47 @@ pub(super) fn proto_value_to_cel_value(
     }
 }
 
+/// The `google.protobuf.Duration` `duration` as a CEL `duration`: its `nanos`
+/// have the sign of its `seconds`, or are the whole duration.
+fn duration_value(duration: prost_types::Duration) -> Result<CelValue, ConversionError> {
+    chrono::Duration::try_seconds(duration.seconds)
+        .and_then(|seconds| {
+            seconds.checked_add(&chrono::Duration::nanoseconds(duration.nanos.into()))
+        })
+        .map(CelValue::Duration)
+        .ok_or_else(|| ConversionError::Unsupported(format!("duration {duration:?}")))
+}
+
+/// The `google.protobuf.Timestamp` `timestamp` as a CEL `timestamp`, in UTC.
+fn timestamp_value(timestamp: prost_types::Timestamp) -> Result<CelValue, ConversionError> {
+    u32::try_from(timestamp.nanos)
+        .ok()
+        .and_then(|nanos| chrono::DateTime::from_timestamp(timestamp.seconds, nanos))
+        .map(|utc| CelValue::Timestamp(utc.fixed_offset()))
+        .ok_or_else(|| ConversionError::Unsupported(format!("timestamp {timestamp:?}")))
+}
+
+/// The name of the message type `any` holds: its `type_url` past the last `/`.
+fn type_name(any: &Any) -> &str {
+    any.type_url.rsplit('/').next().unwrap_or(&any.type_url)
+}
+
+/// The `M` message `any` holds.
+fn decode<M: Message + Default>(any: &Any) -> Result<M, ConversionError> {
+    M::decode(&any.value[..]).map_err(|e| {
+        ConversionError::Unsupported(format!("Failed decoding {}: {}", type_name(any), e))
+    })
+}
+
 /// Converts a google.protobuf.Any message to a decoded protobuf message.
 ///
 /// This helper is intentionally kept for future native protobuf-message support in CEL values.
 pub(super) fn convert_any_to_cel_value(any: &Any) -> Result<Box<dyn Message>, ConversionError> {
-    let type_name = any.type_url.rsplit('/').next().unwrap_or(&any.type_url);
+    let type_name = type_name(any);
 
     macro_rules! decode_message {
         ($ty:ty) => {
-            <$ty>::decode(&any.value[..]).map_err(|e| {
-                ConversionError::Unsupported(format!("Failed decoding {}: {}", type_name, e))
-            })
+            decode::<$ty>(any)
         };
     }
 
@@ -216,4 +251,48 @@ struct UInt32ValueWkt {
 struct UInt64ValueWkt {
     #[prost(uint64, tag = "1")]
     value: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{duration_value, timestamp_value};
+    use cel::objects::Value;
+
+    #[test]
+    fn a_duration_takes_the_sign_of_its_seconds_and_nanos() {
+        for (seconds, nanos, expected) in [
+            (1, 500_000_000, chrono::Duration::milliseconds(1_500)),
+            (-1, -500_000_000, chrono::Duration::milliseconds(-1_500)),
+            (0, -1, chrono::Duration::nanoseconds(-1)),
+            (
+                -315_576_000_000,
+                -999_999_999,
+                chrono::Duration::seconds(-315_576_000_000)
+                    - chrono::Duration::nanoseconds(999_999_999),
+            ),
+        ] {
+            let duration = prost_types::Duration { seconds, nanos };
+            assert!(
+                matches!(duration_value(duration), Ok(Value::Duration(d)) if d == expected),
+                "{seconds}s {nanos}ns"
+            );
+        }
+    }
+
+    #[test]
+    fn a_timestamp_is_in_utc_and_needs_positive_nanos() {
+        let timestamp = prost_types::Timestamp {
+            seconds: 253_402_300_799,
+            nanos: 999_999_999,
+        };
+        let expected =
+            chrono::DateTime::parse_from_rfc3339("9999-12-31T23:59:59.999999999Z").unwrap();
+        assert!(matches!(timestamp_value(timestamp), Ok(Value::Timestamp(t)) if t == expected));
+
+        let timestamp = prost_types::Timestamp {
+            seconds: 0,
+            nanos: -1,
+        };
+        assert!(timestamp_value(timestamp).is_err());
+    }
 }
