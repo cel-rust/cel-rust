@@ -193,6 +193,8 @@ pub trait Comparer {
     /// compare with, or either is a `NaN` double. The built-in types fail with
     /// [`ExecutionError::ValuesNotComparable`], which the interpreter reports as
     /// a [`NoSuchOverload`](ExecutionError::NoSuchOverload) for the operator.
+    /// The interpreter doesn't ask about a `NaN` against a number: the four
+    /// operators are `false` for it.
     fn compare(&self, _rhs: &dyn Val) -> Result<Ordering, ExecutionError>;
 }
 

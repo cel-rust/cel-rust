@@ -12,8 +12,8 @@ use std::ops::Deref;
 /// Arithmetic takes another `double`, and follows IEEE 754: dividing by zero
 /// yields an infinity, nothing overflows. It has no `%`. Comparisons and
 /// equality also take an `int` or a `uint`, and compare numerically:
-/// `1.0 == 1`. A `NaN` equals nothing, itself included, and ordering it is
-/// an error.
+/// `1.0 == 1`. A `NaN` equals nothing, itself included, and orders against
+/// no number: `<`, `<=`, `>` and `>=` are all `false`.
 pub struct Double(f64);
 
 impl Double {
