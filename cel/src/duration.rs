@@ -125,10 +125,7 @@ fn to_duration(number: &str, unit: Unit) -> Option<Duration> {
     let Some(nanos) = nanos.map(|n| if negative { -n } else { n }) else {
         return Some(past);
     };
-    // A leading `-` negates the components after they're summed, so a
-    // component as long as the most negative duration isn't past it.
-    let longest = MAX_NANOS.max(-MIN_NANOS);
-    if !(-longest..=longest).contains(&nanos) {
+    if !(MIN_NANOS..=MAX_NANOS).contains(&nanos) {
         return Some(past);
     }
     Some(
@@ -287,7 +284,7 @@ mod tests {
             ("infs", Duration::MAX),
             ("-INFs", Duration::MIN),
             ("1e400s", Duration::MAX),
-            ("9223372037s", Duration::MAX),
+            ("315576000001s", Duration::MAX),
         ] {
             assert_duration(input, expected);
         }
@@ -301,7 +298,7 @@ mod tests {
 
         for (input, kind) in [
             ("nans", ErrorKind::TooLarge),
-            ("9223372037s1ns", ErrorKind::TooLarge),
+            ("315576000001s1ns", ErrorKind::TooLarge),
             ("1es", ErrorKind::Float),
         ] {
             match parse_duration(input) {

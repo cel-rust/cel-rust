@@ -97,10 +97,7 @@ impl ser::Serialize for Duration {
             ) -> std::result::Result<S::Ok, S::Error> {
                 let mut s = serializer.serialize_struct(Duration::STRUCT_NAME, 2)?;
                 s.serialize_field(Duration::SECS_FIELD, &self.0.num_seconds())?;
-                s.serialize_field(
-                    Duration::NANOS_FIELD,
-                    &(self.0.num_nanoseconds().unwrap_or(0) % 1_000_000_000),
-                )?;
+                s.serialize_field(Duration::NANOS_FIELD, &i64::from(self.0.subsec_nanos()))?;
                 s.end()
             }
         }
@@ -1228,6 +1225,21 @@ mod tests {
     struct TestTimeTypes {
         dur: Duration,
         ts: Timestamp,
+    }
+
+    /// A duration past an `i64` count of nanoseconds keeps its nanoseconds,
+    /// as far as `google.protobuf.Duration` goes.
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn test_longest_durations() {
+        let longest =
+            chrono::Duration::seconds(315_576_000_000) + chrono::Duration::nanoseconds(999_999_999);
+        for duration in [longest, -longest] {
+            assert_eq!(
+                to_value(Duration::from(duration)).unwrap(),
+                Value::Duration(duration)
+            );
+        }
     }
 
     #[cfg(feature = "chrono")]

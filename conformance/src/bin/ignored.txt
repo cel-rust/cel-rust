@@ -701,16 +701,6 @@ sets_ext::intersects::proto_messages_false
 sets_ext::intersects::proto_wrappers
 sets_ext::intersects::proto_wrappers_messages
 sets_ext::intersects::proto_wrappers_null_not_default_false
-timestamps::duration_conversions::from_string_max
-timestamps::duration_conversions::from_string_min
-timestamps::duration_conversions::tostring_duration_max
-timestamps::duration_conversions::tostring_duration_min
-timestamps::timestamp_arithmetic::add_duration_to_duration_max
-timestamps::timestamp_arithmetic::add_max_duration_to_min_time
-timestamps::timestamp_arithmetic::subtract_duration_from_duration_min
-timestamps::timestamp_arithmetic::subtract_max_duration_from_max_time
-timestamps::timestamp_range::sub_time_duration_over
-timestamps::timestamp_range::sub_time_duration_under
 type_deduction::empty_range_nested_comprehensions::empty_list_range_nested_list_comprehension
 type_deduction::empty_range_nested_comprehensions::empty_map_range_nested_comprehension
 type_deduction::empty_range_nested_comprehensions::empty_range_nested_comprehension_before_constraint
