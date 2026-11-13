@@ -4,6 +4,7 @@ mod encoders;
 mod lists;
 mod math;
 mod network;
+mod sets;
 mod strings;
 
 pub use bindings::{extension as bindings, Bindings};
@@ -12,6 +13,7 @@ pub use encoders::{extension as encoders, Encoders};
 pub use lists::{extension as lists, Lists};
 pub use math::{extension as math, Math};
 pub use network::{extension as network, Network};
+pub use sets::{extension as sets, Sets};
 pub use strings::{extension as strings, Strings};
 
 use crate::common::traits::Iterable;

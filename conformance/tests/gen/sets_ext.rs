@@ -11,7 +11,6 @@ mod contains {
     use dedent::dedent;
 
     // Test: empty_empty
-    #[should_panic]
     #[test]
     fn empty_empty() {
         run_test(&dedent!(
@@ -22,7 +21,6 @@ mod contains {
     }
 
     // Test: nonempty_empty
-    #[should_panic]
     #[test]
     fn nonempty_empty() {
         run_test(&dedent!(
@@ -33,7 +31,6 @@ mod contains {
     }
 
     // Test: empty_nonempty
-    #[should_panic]
     #[test]
     fn empty_nonempty() {
         run_test(&dedent!(
@@ -44,7 +41,6 @@ mod contains {
     }
 
     // Test: single_equal
-    #[should_panic]
     #[test]
     fn single_equal() {
         run_test(&dedent!(
@@ -55,7 +51,6 @@ mod contains {
     }
 
     // Test: single_not_equal
-    #[should_panic]
     #[test]
     fn single_not_equal() {
         run_test(&dedent!(
@@ -66,7 +61,6 @@ mod contains {
     }
 
     // Test: duplicates_in_sublist
-    #[should_panic]
     #[test]
     fn duplicates_in_sublist() {
         run_test(&dedent!(
@@ -77,7 +71,6 @@ mod contains {
     }
 
     // Test: duplicates_in_list
-    #[should_panic]
     #[test]
     fn duplicates_in_list() {
         run_test(&dedent!(
@@ -88,7 +81,6 @@ mod contains {
     }
 
     // Test: subset
-    #[should_panic]
     #[test]
     fn subset() {
         run_test(&dedent!(
@@ -99,7 +91,6 @@ mod contains {
     }
 
     // Test: not_subset
-    #[should_panic]
     #[test]
     fn not_subset() {
         run_test(&dedent!(
@@ -110,7 +101,6 @@ mod contains {
     }
 
     // Test: superset_not_contained
-    #[should_panic]
     #[test]
     fn superset_not_contained() {
         run_test(&dedent!(
@@ -121,7 +111,6 @@ mod contains {
     }
 
     // Test: heterogeneous_numeric
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric() {
         run_test(&dedent!(
@@ -132,7 +121,6 @@ mod contains {
     }
 
     // Test: heterogeneous_numeric_duplicates
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_duplicates() {
         run_test(&dedent!(
@@ -143,7 +131,6 @@ mod contains {
     }
 
     // Test: heterogeneous_numeric_fractional_false
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_fractional_false() {
         run_test(&dedent!(
@@ -154,7 +141,6 @@ mod contains {
     }
 
     // Test: numeric_negatives
-    #[should_panic]
     #[test]
     fn numeric_negatives() {
         run_test(&dedent!(
@@ -165,7 +151,6 @@ mod contains {
     }
 
     // Test: numeric_negatives_and_uint_false
-    #[should_panic]
     #[test]
     fn numeric_negatives_and_uint_false() {
         run_test(&dedent!(
@@ -176,7 +161,6 @@ mod contains {
     }
 
     // Test: numeric_uint64_max
-    #[should_panic]
     #[test]
     fn numeric_uint64_max() {
         run_test(&dedent!(
@@ -187,7 +171,6 @@ mod contains {
     }
 
     // Test: numeric_uint64_max_false
-    #[should_panic]
     #[test]
     fn numeric_uint64_max_false() {
         run_test(&dedent!(
@@ -198,7 +181,6 @@ mod contains {
     }
 
     // Test: double_nan_false
-    #[should_panic]
     #[test]
     fn double_nan_false() {
         run_test(&dedent!(
@@ -209,7 +191,6 @@ mod contains {
     }
 
     // Test: double_inf
-    #[should_panic]
     #[test]
     fn double_inf() {
         run_test(&dedent!(
@@ -220,7 +201,6 @@ mod contains {
     }
 
     // Test: double_inf_false
-    #[should_panic]
     #[test]
     fn double_inf_false() {
         run_test(&dedent!(
@@ -231,7 +211,6 @@ mod contains {
     }
 
     // Test: heterogeneous_types_true
-    #[should_panic]
     #[test]
     fn heterogeneous_types_true() {
         run_test(&dedent!(
@@ -242,7 +221,6 @@ mod contains {
     }
 
     // Test: heterogeneous_types_false
-    #[should_panic]
     #[test]
     fn heterogeneous_types_false() {
         run_test(&dedent!(
@@ -253,7 +231,6 @@ mod contains {
     }
 
     // Test: strings
-    #[should_panic]
     #[test]
     fn strings() {
         run_test(&dedent!(
@@ -264,7 +241,6 @@ mod contains {
     }
 
     // Test: strings_false
-    #[should_panic]
     #[test]
     fn strings_false() {
         run_test(&dedent!(
@@ -275,7 +251,6 @@ mod contains {
     }
 
     // Test: bools
-    #[should_panic]
     #[test]
     fn bools() {
         run_test(&dedent!(
@@ -286,7 +261,6 @@ mod contains {
     }
 
     // Test: bytes
-    #[should_panic]
     #[test]
     fn bytes() {
         run_test(&dedent!(
@@ -297,7 +271,6 @@ mod contains {
     }
 
     // Test: nested_lists
-    #[should_panic]
     #[test]
     fn nested_lists() {
         run_test(&dedent!(
@@ -308,7 +281,6 @@ mod contains {
     }
 
     // Test: nested_lists_false
-    #[should_panic]
     #[test]
     fn nested_lists_false() {
         run_test(&dedent!(
@@ -319,7 +291,6 @@ mod contains {
     }
 
     // Test: maps
-    #[should_panic]
     #[test]
     fn maps() {
         run_test(&dedent!(
@@ -330,7 +301,6 @@ mod contains {
     }
 
     // Test: maps_heterogeneous_numeric
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_numeric() {
         run_test(&dedent!(
@@ -341,7 +311,6 @@ mod contains {
     }
 
     // Test: maps_heterogeneous_keys
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_keys() {
         run_test(&dedent!(
@@ -352,7 +321,6 @@ mod contains {
     }
 
     // Test: maps_heterogeneous_keys_false
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_keys_false() {
         run_test(&dedent!(
@@ -363,7 +331,6 @@ mod contains {
     }
 
     // Test: maps_false
-    #[should_panic]
     #[test]
     fn maps_false() {
         run_test(&dedent!(
@@ -441,7 +408,6 @@ mod equivalent {
     use dedent::dedent;
 
     // Test: empty_empty
-    #[should_panic]
     #[test]
     fn empty_empty() {
         run_test(&dedent!(
@@ -452,7 +418,6 @@ mod equivalent {
     }
 
     // Test: nonempty_empty
-    #[should_panic]
     #[test]
     fn nonempty_empty() {
         run_test(&dedent!(
@@ -463,7 +428,6 @@ mod equivalent {
     }
 
     // Test: empty_nonempty
-    #[should_panic]
     #[test]
     fn empty_nonempty() {
         run_test(&dedent!(
@@ -474,7 +438,6 @@ mod equivalent {
     }
 
     // Test: single_equal
-    #[should_panic]
     #[test]
     fn single_equal() {
         run_test(&dedent!(
@@ -485,7 +448,6 @@ mod equivalent {
     }
 
     // Test: single_not_equal
-    #[should_panic]
     #[test]
     fn single_not_equal() {
         run_test(&dedent!(
@@ -496,7 +458,6 @@ mod equivalent {
     }
 
     // Test: duplicates_right
-    #[should_panic]
     #[test]
     fn duplicates_right() {
         run_test(&dedent!(
@@ -507,7 +468,6 @@ mod equivalent {
     }
 
     // Test: duplicates_left
-    #[should_panic]
     #[test]
     fn duplicates_left() {
         run_test(&dedent!(
@@ -518,7 +478,6 @@ mod equivalent {
     }
 
     // Test: duplicates_both_reordered
-    #[should_panic]
     #[test]
     fn duplicates_both_reordered() {
         run_test(&dedent!(
@@ -529,7 +488,6 @@ mod equivalent {
     }
 
     // Test: strict_superset_left
-    #[should_panic]
     #[test]
     fn strict_superset_left() {
         run_test(&dedent!(
@@ -540,7 +498,6 @@ mod equivalent {
     }
 
     // Test: strict_subset_left
-    #[should_panic]
     #[test]
     fn strict_subset_left() {
         run_test(&dedent!(
@@ -551,7 +508,6 @@ mod equivalent {
     }
 
     // Test: heterogeneous_numeric_single
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_single() {
         run_test(&dedent!(
@@ -562,7 +518,6 @@ mod equivalent {
     }
 
     // Test: heterogeneous_numeric_reordered
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_reordered() {
         run_test(&dedent!(
@@ -573,7 +528,6 @@ mod equivalent {
     }
 
     // Test: heterogeneous_numeric_missing_element
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_missing_element() {
         run_test(&dedent!(
@@ -584,7 +538,6 @@ mod equivalent {
     }
 
     // Test: heterogeneous_numeric_fractional_false
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_fractional_false() {
         run_test(&dedent!(
@@ -595,7 +548,6 @@ mod equivalent {
     }
 
     // Test: numeric_negatives
-    #[should_panic]
     #[test]
     fn numeric_negatives() {
         run_test(&dedent!(
@@ -606,7 +558,6 @@ mod equivalent {
     }
 
     // Test: numeric_negatives_and_uint_false
-    #[should_panic]
     #[test]
     fn numeric_negatives_and_uint_false() {
         run_test(&dedent!(
@@ -617,7 +568,6 @@ mod equivalent {
     }
 
     // Test: numeric_uint64_max
-    #[should_panic]
     #[test]
     fn numeric_uint64_max() {
         run_test(&dedent!(
@@ -628,7 +578,6 @@ mod equivalent {
     }
 
     // Test: numeric_uint64_max_false
-    #[should_panic]
     #[test]
     fn numeric_uint64_max_false() {
         run_test(&dedent!(
@@ -639,7 +588,6 @@ mod equivalent {
     }
 
     // Test: double_nan_false
-    #[should_panic]
     #[test]
     fn double_nan_false() {
         run_test(&dedent!(
@@ -650,7 +598,6 @@ mod equivalent {
     }
 
     // Test: double_inf
-    #[should_panic]
     #[test]
     fn double_inf() {
         run_test(&dedent!(
@@ -661,7 +608,6 @@ mod equivalent {
     }
 
     // Test: double_inf_false
-    #[should_panic]
     #[test]
     fn double_inf_false() {
         run_test(&dedent!(
@@ -672,7 +618,6 @@ mod equivalent {
     }
 
     // Test: strings
-    #[should_panic]
     #[test]
     fn strings() {
         run_test(&dedent!(
@@ -683,7 +628,6 @@ mod equivalent {
     }
 
     // Test: strings_false
-    #[should_panic]
     #[test]
     fn strings_false() {
         run_test(&dedent!(
@@ -694,7 +638,6 @@ mod equivalent {
     }
 
     // Test: bools
-    #[should_panic]
     #[test]
     fn bools() {
         run_test(&dedent!(
@@ -705,7 +648,6 @@ mod equivalent {
     }
 
     // Test: bools_false
-    #[should_panic]
     #[test]
     fn bools_false() {
         run_test(&dedent!(
@@ -716,7 +658,6 @@ mod equivalent {
     }
 
     // Test: bytes
-    #[should_panic]
     #[test]
     fn bytes() {
         run_test(&dedent!(
@@ -727,7 +668,6 @@ mod equivalent {
     }
 
     // Test: nulls
-    #[should_panic]
     #[test]
     fn nulls() {
         run_test(&dedent!(
@@ -738,7 +678,6 @@ mod equivalent {
     }
 
     // Test: durations
-    #[should_panic]
     #[test]
     fn durations() {
         run_test(&dedent!(
@@ -749,7 +688,6 @@ mod equivalent {
     }
 
     // Test: timestamps
-    #[should_panic]
     #[test]
     fn timestamps() {
         run_test(&dedent!(
@@ -760,7 +698,6 @@ mod equivalent {
     }
 
     // Test: nested_lists
-    #[should_panic]
     #[test]
     fn nested_lists() {
         run_test(&dedent!(
@@ -771,7 +708,6 @@ mod equivalent {
     }
 
     // Test: nested_lists_order_matters
-    #[should_panic]
     #[test]
     fn nested_lists_order_matters() {
         run_test(&dedent!(
@@ -782,7 +718,6 @@ mod equivalent {
     }
 
     // Test: maps
-    #[should_panic]
     #[test]
     fn maps() {
         run_test(&dedent!(
@@ -793,7 +728,6 @@ mod equivalent {
     }
 
     // Test: maps_heterogeneous_numeric
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_numeric() {
         run_test(&dedent!(
@@ -804,7 +738,6 @@ mod equivalent {
     }
 
     // Test: maps_heterogeneous_keys
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_keys() {
         run_test(&dedent!(
@@ -815,7 +748,6 @@ mod equivalent {
     }
 
     // Test: maps_heterogeneous_keys_false
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_keys_false() {
         run_test(&dedent!(
@@ -893,7 +825,6 @@ mod intersects {
     use dedent::dedent;
 
     // Test: empty_empty
-    #[should_panic]
     #[test]
     fn empty_empty() {
         run_test(&dedent!(
@@ -904,7 +835,6 @@ mod intersects {
     }
 
     // Test: nonempty_empty
-    #[should_panic]
     #[test]
     fn nonempty_empty() {
         run_test(&dedent!(
@@ -915,7 +845,6 @@ mod intersects {
     }
 
     // Test: empty_nonempty
-    #[should_panic]
     #[test]
     fn empty_nonempty() {
         run_test(&dedent!(
@@ -926,7 +855,6 @@ mod intersects {
     }
 
     // Test: single_equal
-    #[should_panic]
     #[test]
     fn single_equal() {
         run_test(&dedent!(
@@ -937,7 +865,6 @@ mod intersects {
     }
 
     // Test: single_not_equal
-    #[should_panic]
     #[test]
     fn single_not_equal() {
         run_test(&dedent!(
@@ -948,7 +875,6 @@ mod intersects {
     }
 
     // Test: duplicates_right
-    #[should_panic]
     #[test]
     fn duplicates_right() {
         run_test(&dedent!(
@@ -959,7 +885,6 @@ mod intersects {
     }
 
     // Test: duplicates_left
-    #[should_panic]
     #[test]
     fn duplicates_left() {
         run_test(&dedent!(
@@ -970,7 +895,6 @@ mod intersects {
     }
 
     // Test: overlap
-    #[should_panic]
     #[test]
     fn overlap() {
         run_test(&dedent!(
@@ -981,7 +905,6 @@ mod intersects {
     }
 
     // Test: disjoint
-    #[should_panic]
     #[test]
     fn disjoint() {
         run_test(&dedent!(
@@ -992,7 +915,6 @@ mod intersects {
     }
 
     // Test: heterogeneous_numeric
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric() {
         run_test(&dedent!(
@@ -1003,7 +925,6 @@ mod intersects {
     }
 
     // Test: heterogeneous_numeric_multiple
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_multiple() {
         run_test(&dedent!(
@@ -1014,7 +935,6 @@ mod intersects {
     }
 
     // Test: heterogeneous_numeric_with_fractional
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_with_fractional() {
         run_test(&dedent!(
@@ -1025,7 +945,6 @@ mod intersects {
     }
 
     // Test: heterogeneous_numeric_false
-    #[should_panic]
     #[test]
     fn heterogeneous_numeric_false() {
         run_test(&dedent!(
@@ -1036,7 +955,6 @@ mod intersects {
     }
 
     // Test: numeric_negatives
-    #[should_panic]
     #[test]
     fn numeric_negatives() {
         run_test(&dedent!(
@@ -1047,7 +965,6 @@ mod intersects {
     }
 
     // Test: numeric_negatives_and_uint_false
-    #[should_panic]
     #[test]
     fn numeric_negatives_and_uint_false() {
         run_test(&dedent!(
@@ -1058,7 +975,6 @@ mod intersects {
     }
 
     // Test: numeric_uint64_max
-    #[should_panic]
     #[test]
     fn numeric_uint64_max() {
         run_test(&dedent!(
@@ -1069,7 +985,6 @@ mod intersects {
     }
 
     // Test: numeric_uint64_max_false
-    #[should_panic]
     #[test]
     fn numeric_uint64_max_false() {
         run_test(&dedent!(
@@ -1080,7 +995,6 @@ mod intersects {
     }
 
     // Test: double_nan_false
-    #[should_panic]
     #[test]
     fn double_nan_false() {
         run_test(&dedent!(
@@ -1091,7 +1005,6 @@ mod intersects {
     }
 
     // Test: double_inf
-    #[should_panic]
     #[test]
     fn double_inf() {
         run_test(&dedent!(
@@ -1102,7 +1015,6 @@ mod intersects {
     }
 
     // Test: double_inf_false
-    #[should_panic]
     #[test]
     fn double_inf_false() {
         run_test(&dedent!(
@@ -1113,7 +1025,6 @@ mod intersects {
     }
 
     // Test: heterogeneous_types_false
-    #[should_panic]
     #[test]
     fn heterogeneous_types_false() {
         run_test(&dedent!(
@@ -1124,7 +1035,6 @@ mod intersects {
     }
 
     // Test: strings
-    #[should_panic]
     #[test]
     fn strings() {
         run_test(&dedent!(
@@ -1135,7 +1045,6 @@ mod intersects {
     }
 
     // Test: strings_false
-    #[should_panic]
     #[test]
     fn strings_false() {
         run_test(&dedent!(
@@ -1146,7 +1055,6 @@ mod intersects {
     }
 
     // Test: nested_lists
-    #[should_panic]
     #[test]
     fn nested_lists() {
         run_test(&dedent!(
@@ -1157,7 +1065,6 @@ mod intersects {
     }
 
     // Test: maps
-    #[should_panic]
     #[test]
     fn maps() {
         run_test(&dedent!(
@@ -1168,7 +1075,6 @@ mod intersects {
     }
 
     // Test: maps_heterogeneous_numeric
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_numeric() {
         run_test(&dedent!(
@@ -1179,7 +1085,6 @@ mod intersects {
     }
 
     // Test: maps_heterogeneous_keys
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_keys() {
         run_test(&dedent!(
@@ -1190,7 +1095,6 @@ mod intersects {
     }
 
     // Test: maps_heterogeneous_keys_false
-    #[should_panic]
     #[test]
     fn maps_heterogeneous_keys_false() {
         run_test(&dedent!(
@@ -1201,7 +1105,6 @@ mod intersects {
     }
 
     // Test: maps_false
-    #[should_panic]
     #[test]
     fn maps_false() {
         run_test(&dedent!(
