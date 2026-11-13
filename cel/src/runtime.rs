@@ -460,6 +460,15 @@ mod tests {
     }
 
     #[test]
+    fn budget_stops_counting_once_all_or_exists_is_decided() {
+        // The first element decides both: the loop ticks for the second, whose
+        // `loop_cond` stops it, and never reaches the last two.
+        let ctx = budgeted(2);
+        assert_eq!(run(&ctx, "[1, 2, 3, 4].all(x, x < 0)"), Ok(false.into()));
+        assert_eq!(run(&ctx, "[1, 2, 3, 4].exists(x, x > 0)"), Ok(true.into()));
+    }
+
+    #[test]
     fn budget_is_per_evaluation() {
         let ctx = budgeted(3);
         for _ in 0..5 {

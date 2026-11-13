@@ -238,6 +238,11 @@ pub trait Divider {
 /// yields its keys, in no particular order. The interpreter clones each
 /// element into the loop variable.
 ///
+/// A comprehension with a second loop variable binds a `list`'s index and
+/// element, and a `map`'s key and value: the interpreter looks each key up
+/// with [`Indexer::get`], so a `map` it iterates that way must also be an
+/// [`Indexer`] (see [`Val::as_indexer`]).
+///
 /// The `+` of a `list` takes any `list` on its right, and reaches its
 /// elements through it. So do the functions that take a `list`: those of the
 /// lists extension, `join` and `format` of the strings extension, and
