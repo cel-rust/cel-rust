@@ -5,10 +5,23 @@ use crate::{ExecutionError, Value};
 use std::any::Any;
 use std::ops::Deref;
 
-/// CEL durations are limited to what fits in an `i64` count of nanoseconds,
-/// the same range as cel-go's `time.Duration`.
+/// The longest duration, in nanoseconds: CEL durations are limited to what
+/// fits in an `i64` count of nanoseconds, the same range as cel-go's
+/// `time.Duration`.
+pub(crate) const MAX_NANOS: i128 = i64::MAX as i128;
+
+/// The most negative duration, in nanoseconds: see [`MAX_NANOS`].
+pub(crate) const MIN_NANOS: i128 = i64::MIN as i128;
+
+/// Whether `d` is past the range of a CEL duration, [`MIN_NANOS`] to
+/// [`MAX_NANOS`].
 pub(crate) fn out_of_range(d: &chrono::Duration) -> bool {
-    d.num_nanoseconds().is_none()
+    !(MIN_NANOS..=MAX_NANOS).contains(&nanos(d))
+}
+
+/// `d` in nanoseconds, which an `i128` always holds.
+fn nanos(d: &chrono::Duration) -> i128 {
+    i128::from(d.num_seconds()) * 1_000_000_000 + i128::from(d.subsec_nanos())
 }
 
 /// A CEL `google.protobuf.Duration`, of type
