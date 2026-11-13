@@ -106,7 +106,6 @@ assert_eq!(program.execute(&context), Ok(true.into()));
 
 Custom functions can poll the handle through `FunctionContext::is_interrupted()` to return early from
 long-running work.
-=======
 
 ## Goals
 
