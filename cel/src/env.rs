@@ -1224,6 +1224,7 @@ mod tests {
         type Extension = fn(&mut Env) -> Result<(), DeclarationError>;
         let named: &[(&str, Extension)] = &[
             ("cel.lib.ext.cel.bindings", extensions::bindings),
+            ("cel.lib.ext.comprev2", extensions::two_var_comprehensions),
             #[cfg(feature = "ext_encoders")]
             ("cel.lib.ext.encoders", extensions::encoders),
             ("cel.lib.ext.lists", extensions::lists),

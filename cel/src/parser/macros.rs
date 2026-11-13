@@ -623,7 +623,15 @@ fn filter_macro_expander(
     )
 }
 
-fn extract_ident(expr: IdedExpr, helper: &mut MacroExprHelper) -> Result<String, ParseError> {
+/// The name `expr` is, when it is a simple identifier.
+///
+/// # Errors
+///
+/// Fails with `argument must be a simple name` otherwise.
+pub(crate) fn extract_ident(
+    expr: IdedExpr,
+    helper: &mut MacroExprHelper,
+) -> Result<String, ParseError> {
     match expr.expr {
         Expr::Ident(ident) => Ok(ident),
         _ => Err(helper.new_error(expr.id, "argument must be a simple name")),

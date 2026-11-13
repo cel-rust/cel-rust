@@ -1,4 +1,5 @@
 pub(crate) mod bindings;
+mod comprehensions;
 #[cfg(feature = "ext_encoders")]
 mod encoders;
 mod lists;
@@ -8,6 +9,7 @@ mod sets;
 mod strings;
 
 pub use bindings::{extension as bindings, Bindings};
+pub use comprehensions::{extension as two_var_comprehensions, TwoVarComprehensions};
 #[cfg(feature = "ext_encoders")]
 pub use encoders::{extension as encoders, Encoders};
 pub use lists::{extension as lists, Lists};
