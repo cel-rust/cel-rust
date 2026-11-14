@@ -1,3 +1,5 @@
+#[cfg(feature = "chrono")]
+use crate::common::types::duration::nanos;
 use crate::Value;
 use base64::prelude::*;
 #[cfg(feature = "chrono")]
@@ -59,10 +61,10 @@ impl Value {
             #[cfg(feature = "chrono")]
             Value::Timestamp(ref dt) => dt.to_rfc3339().into(),
             #[cfg(feature = "chrono")]
-            Value::Duration(ref v) => serde_json::Value::Number(serde_json::Number::from(
-                v.num_nanoseconds()
+            Value::Duration(ref v) => serde_json::Value::Number(
+                serde_json::Number::from_i128(nanos(v))
                     .ok_or(ConvertToJsonError::DurationOverflow(v))?,
-            )),
+            ),
             Value::Opaque(ref opaque) => (**opaque).json().unwrap_or(serde_json::Value::Null),
             _ => return Err(ConvertToJsonError::Value(self)),
         })
@@ -109,6 +111,26 @@ mod tests {
 
         for (expected, value) in tests.iter() {
             assert_eq!(value.json().unwrap(), *expected, "{value:?}={expected:?}");
+        }
+    }
+
+    #[cfg(feature = "chrono")]
+    #[test]
+    fn test_large_durations_to_json() {
+        let cases = [
+            (Duration::seconds(9_223_372_037), "9223372037000000000"),
+            (Duration::seconds(-9_223_372_037), "-9223372037000000000"),
+            (
+                Duration::seconds(315_576_000_000) + Duration::nanoseconds(999_999_999),
+                "315576000000999999999",
+            ),
+        ];
+
+        for (duration, expected) in cases {
+            assert_eq!(
+                CelValue::Duration(duration).json().unwrap().to_string(),
+                expected
+            );
         }
     }
 }
