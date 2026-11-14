@@ -7,6 +7,10 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::{Arc, LazyLock};
 
+/// The accumulator of the comprehensions the standard macros expand to: as
+/// it starts with `@`, CEL source can't refer to it.
+pub(crate) const ACCUMULATOR: &str = "@result";
+
 /// Rewrites a matched call, given its target (for a receiver call) and its
 /// arguments, into the expression that replaces it.
 type Expander = dyn Fn(
@@ -331,46 +335,14 @@ fn exists_macro_expander(
     if args.len() != 2 {
         unreachable!("Expected two args!")
     }
-
-    let mut arguments = vec![args.remove(1)];
-    let v = extract_ident(args.remove(0), helper)?;
-
-    let init = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
-    let result_binding = "@result".to_string();
-    let accu_ident = helper.next_expr(Expr::Ident(result_binding.clone()));
-    let arg = helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::LOGICAL_NOT.to_string(),
-        target: None,
-        args: vec![accu_ident],
-    }));
-    let condition = helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::NOT_STRICTLY_FALSE.to_string(),
-        target: None,
-        args: vec![arg],
-    }));
-
-    arguments.insert(0, helper.next_expr(Expr::Ident(result_binding.clone())));
-    let step = helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::LOGICAL_OR.to_string(),
-        target: None,
-        args: arguments,
-    }));
-
-    let result = helper.next_expr(Expr::Ident(result_binding.clone()));
-
-    Ok(
-        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.take().unwrap(),
-            iter_var: v,
-            iter_var2: None,
-            accu_var: result_binding,
-            accu_init: init,
-            loop_cond: condition,
-            loop_step: step,
-            result,
-        }))),
-    )
+    let predicate = args.remove(1);
+    let iter_var = extract_ident(args.remove(0), helper)?;
+    let range = target.take().unwrap();
+    Ok(exists_comprehension(
+        helper, range, iter_var, None, predicate,
+    ))
 }
+
 fn all_macro_expander(
     helper: &mut MacroExprHelper,
     target: &mut Option<IdedExpr>,
@@ -382,40 +354,10 @@ fn all_macro_expander(
     if args.len() != 2 {
         unreachable!("Expected two args!")
     }
-
-    let mut arguments = vec![args.remove(1)];
-    let v = extract_ident(args.remove(0), helper)?;
-
-    let init = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
-    let result_binding = "@result".to_string();
-    let accu_ident = helper.next_expr(Expr::Ident(result_binding.clone()));
-    let condition = helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::NOT_STRICTLY_FALSE.to_string(),
-        target: None,
-        args: vec![accu_ident],
-    }));
-
-    arguments.insert(0, helper.next_expr(Expr::Ident(result_binding.clone())));
-    let step = helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::LOGICAL_AND.to_string(),
-        target: None,
-        args: arguments,
-    }));
-
-    let result = helper.next_expr(Expr::Ident(result_binding.clone()));
-
-    Ok(
-        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.take().unwrap(),
-            iter_var: v,
-            iter_var2: None,
-            accu_var: result_binding,
-            accu_init: init,
-            loop_cond: condition,
-            loop_step: step,
-            result,
-        }))),
-    )
+    let predicate = args.remove(1);
+    let iter_var = extract_ident(args.remove(0), helper)?;
+    let range = target.take().unwrap();
+    Ok(all_comprehension(helper, range, iter_var, None, predicate))
 }
 
 fn exists_one_macro_expander(
@@ -429,51 +371,12 @@ fn exists_one_macro_expander(
     if args.len() != 2 {
         unreachable!("Expected two args!")
     }
-
-    let mut arguments = vec![args.remove(1)];
-    let v = extract_ident(args.remove(0), helper)?;
-
-    let init = helper.next_expr(Expr::Literal(LiteralValue::Int(0.into())));
-    let result_binding = "@result".to_string();
-    let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
-
-    let args = vec![
-        helper.next_expr(Expr::Ident(result_binding.clone())),
-        helper.next_expr(Expr::Literal(LiteralValue::Int(1.into()))),
-    ];
-    arguments.push(helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::ADD.to_string(),
-        target: None,
-        args,
-    })));
-    arguments.push(helper.next_expr(Expr::Ident(result_binding.clone())));
-
-    let step = helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::CONDITIONAL.to_string(),
-        target: None,
-        args: arguments,
-    }));
-
-    let accu = helper.next_expr(Expr::Ident(result_binding.clone()));
-    let one = helper.next_expr(Expr::Literal(LiteralValue::Int(1.into())));
-    let result = helper.next_expr(Expr::Call(CallExpr {
-        func_name: operators::EQUALS.to_string(),
-        target: None,
-        args: vec![accu, one],
-    }));
-
-    Ok(
-        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.take().unwrap(),
-            iter_var: v,
-            iter_var2: None,
-            accu_var: result_binding,
-            accu_init: init,
-            loop_cond: condition,
-            loop_step: step,
-            result,
-        }))),
-    )
+    let predicate = args.remove(1);
+    let iter_var = extract_ident(args.remove(0), helper)?;
+    let range = target.take().unwrap();
+    Ok(exists_one_comprehension(
+        helper, range, iter_var, None, predicate,
+    ))
 }
 
 /// Expands `target.map(v, f)`, or `target.map(v, p, f)`: also the key list of
@@ -489,29 +392,163 @@ pub(crate) fn map_macro_expander(
     if args.len() != 2 && args.len() != 3 {
         unreachable!("Expected two or three args!")
     }
-
-    let func = args.pop().unwrap();
-    let v = extract_ident(args.remove(0), helper)?;
-
-    let init = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
-    let result_binding = "@result".to_string();
-    let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
-
+    let transform = args.pop().unwrap();
+    let iter_var = extract_ident(args.remove(0), helper)?;
     let filter = args.pop();
+    let range = target.take().unwrap();
+    Ok(list_comprehension(
+        helper, range, iter_var, None, filter, transform,
+    ))
+}
 
-    let args = vec![
-        helper.next_expr(Expr::Ident(result_binding.clone())),
-        helper.next_expr(Expr::List(ListExpr::new(vec![func]))),
-    ];
+/// Whether `predicate` holds for every entry of `range`: the comprehension
+/// `range.all(iter_var, predicate)` expands to, or, with `iter_var2`, the
+/// two-variable `range.all(iter_var, iter_var2, predicate)`. It stops at the
+/// first entry for which `predicate` is `false`.
+pub(crate) fn all_comprehension(
+    helper: &mut MacroExprHelper,
+    range: IdedExpr,
+    iter_var: String,
+    iter_var2: Option<String>,
+    predicate: IdedExpr,
+) -> IdedExpr {
+    let init = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
+    let accu_ident = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let condition = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::NOT_STRICTLY_FALSE.to_string(),
+        target: None,
+        args: vec![accu_ident],
+    }));
+    let accu = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let step = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::LOGICAL_AND.to_string(),
+        target: None,
+        args: vec![accu, predicate],
+    }));
+    let result = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+        iter_range: range,
+        iter_var,
+        iter_var2,
+        accu_var: ACCUMULATOR.to_string(),
+        accu_init: init,
+        loop_cond: condition,
+        loop_step: step,
+        result,
+    })))
+}
+
+/// Whether `predicate` holds for any entry of `range`: the comprehension
+/// `range.exists(iter_var, predicate)` expands to, or, with `iter_var2`, the
+/// two-variable `range.exists(iter_var, iter_var2, predicate)`. It stops at
+/// the first entry for which `predicate` is `true`.
+pub(crate) fn exists_comprehension(
+    helper: &mut MacroExprHelper,
+    range: IdedExpr,
+    iter_var: String,
+    iter_var2: Option<String>,
+    predicate: IdedExpr,
+) -> IdedExpr {
+    let init = helper.next_expr(Expr::Literal(LiteralValue::Boolean(false.into())));
+    let accu_ident = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let arg = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::LOGICAL_NOT.to_string(),
+        target: None,
+        args: vec![accu_ident],
+    }));
+    let condition = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::NOT_STRICTLY_FALSE.to_string(),
+        target: None,
+        args: vec![arg],
+    }));
+    let accu = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let step = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::LOGICAL_OR.to_string(),
+        target: None,
+        args: vec![accu, predicate],
+    }));
+    let result = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+        iter_range: range,
+        iter_var,
+        iter_var2,
+        accu_var: ACCUMULATOR.to_string(),
+        accu_init: init,
+        loop_cond: condition,
+        loop_step: step,
+        result,
+    })))
+}
+
+/// Whether `predicate` holds for exactly one entry of `range`: the
+/// comprehension `range.existsOne(iter_var, predicate)` expands to, or, with
+/// `iter_var2`, the two-variable `range.existsOne(iter_var, iter_var2,
+/// predicate)`. It evaluates `predicate` for every entry.
+pub(crate) fn exists_one_comprehension(
+    helper: &mut MacroExprHelper,
+    range: IdedExpr,
+    iter_var: String,
+    iter_var2: Option<String>,
+    predicate: IdedExpr,
+) -> IdedExpr {
+    let init = helper.next_expr(Expr::Literal(LiteralValue::Int(0.into())));
+    let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
+    let accu = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let one = helper.next_expr(Expr::Literal(LiteralValue::Int(1.into())));
+    let incremented = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::ADD.to_string(),
+        target: None,
+        args: vec![accu, one],
+    }));
+    let unchanged = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let step = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::CONDITIONAL.to_string(),
+        target: None,
+        args: vec![predicate, incremented, unchanged],
+    }));
+    let accu = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let one = helper.next_expr(Expr::Literal(LiteralValue::Int(1.into())));
+    let result = helper.next_expr(Expr::Call(CallExpr {
+        func_name: operators::EQUALS.to_string(),
+        target: None,
+        args: vec![accu, one],
+    }));
+    helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+        iter_range: range,
+        iter_var,
+        iter_var2,
+        accu_var: ACCUMULATOR.to_string(),
+        accu_init: init,
+        loop_cond: condition,
+        loop_step: step,
+        result,
+    })))
+}
+
+/// The list of `transform` for each entry of `range`, or for each one
+/// `filter` holds for: the comprehension `range.map(iter_var, [filter,]
+/// transform)` expands to, or, with `iter_var2`, the two-variable
+/// `range.transformList(iter_var, iter_var2, [filter,] transform)`.
+pub(crate) fn list_comprehension(
+    helper: &mut MacroExprHelper,
+    range: IdedExpr,
+    iter_var: String,
+    iter_var2: Option<String>,
+    filter: Option<IdedExpr>,
+    transform: IdedExpr,
+) -> IdedExpr {
+    let init = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
+    let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
+    let accu = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    let item = helper.next_expr(Expr::List(ListExpr::new(vec![transform])));
     let step = helper.next_expr(Expr::Call(CallExpr {
         func_name: operators::ADD.to_string(),
         target: None,
-        args,
+        args: vec![accu, item],
     }));
-
     let step = match filter {
         Some(filter) => {
-            let accu = helper.next_expr(Expr::Ident(result_binding.clone()));
+            let accu = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
             helper.next_expr(Expr::Call(CallExpr {
                 func_name: operators::CONDITIONAL.to_string(),
                 target: None,
@@ -520,21 +557,17 @@ pub(crate) fn map_macro_expander(
         }
         None => step,
     };
-
-    let result = helper.next_expr(Expr::Ident(result_binding.clone()));
-
-    Ok(
-        helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
-            iter_range: target.take().unwrap(),
-            iter_var: v,
-            iter_var2: None,
-            accu_var: result_binding,
-            accu_init: init,
-            loop_cond: condition,
-            loop_step: step,
-            result,
-        }))),
-    )
+    let result = helper.next_expr(Expr::Ident(ACCUMULATOR.to_string()));
+    helper.next_expr(Expr::Comprehension(Box::new(ComprehensionExpr {
+        iter_range: range,
+        iter_var,
+        iter_var2,
+        accu_var: ACCUMULATOR.to_string(),
+        accu_init: init,
+        loop_cond: condition,
+        loop_step: step,
+        result,
+    })))
 }
 
 fn filter_macro_expander(
@@ -554,7 +587,7 @@ fn filter_macro_expander(
     let filter = args.pop().unwrap();
 
     let init = helper.next_expr(Expr::List(ListExpr::new(Vec::default())));
-    let result_binding = "@result".to_string();
+    let result_binding = ACCUMULATOR.to_string();
     let condition = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
 
     let args = vec![
@@ -590,7 +623,15 @@ fn filter_macro_expander(
     )
 }
 
-fn extract_ident(expr: IdedExpr, helper: &mut MacroExprHelper) -> Result<String, ParseError> {
+/// The name `expr` is, when it is a simple identifier.
+///
+/// # Errors
+///
+/// Fails with `argument must be a simple name` otherwise.
+pub(crate) fn extract_ident(
+    expr: IdedExpr,
+    helper: &mut MacroExprHelper,
+) -> Result<String, ParseError> {
     match expr.expr {
         Expr::Ident(ident) => Ok(ident),
         _ => Err(helper.new_error(expr.id, "argument must be a simple name")),

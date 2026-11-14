@@ -631,14 +631,26 @@ mod tests {
     fn references_exclude_what_comprehensions_bind() {
         let mut env = crate::Env::stdlib();
         env.add_extension(crate::extensions::bindings).unwrap();
+        env.add_extension(crate::extensions::two_var_comprehensions)
+            .unwrap();
         for (source, expected) in [
             ("[1].map(x, x + y)", vec!["y"]),
             ("[1].map(x, [2].map(y, x + y))", vec![]),
             ("cel.bind(a, b, a + c)", vec!["b", "c"]),
+            // Neither variable of a two-variable comprehension is one
+            ("m.all(k, v, k == v && y)", vec!["m", "y"]),
+            ("m.exists(k, v, k == v)", vec!["m"]),
+            ("m.existsOne(k, v, k == v)", vec!["m"]),
+            ("m.transformList(k, v, k > 0, k + v)", vec!["m"]),
+            ("m.transformMap(k, v, k > 0, k + v)", vec!["m"]),
+            ("m.transformMapEntry(k, v, k > 0, {v: k})", vec!["m"]),
+            ("m.all(k, vs, vs.all(v, v == k))", vec!["m"]),
             // Outside of their scope, the same names are variables
             ("[x].map(x, x)", vec!["x"]),
             ("[1].map(x, x) + [x]", vec!["x"]),
             ("cel.bind(a, a, a)", vec!["a"]),
+            ("[k, v].all(k, v, k == v)", vec!["k", "v"]),
+            ("m.all(k, v, true) && v", vec!["m", "v"]),
             // An absolute name skips the comprehension's scope
             ("[1].map(x, .x)", vec!["x"]),
         ] {

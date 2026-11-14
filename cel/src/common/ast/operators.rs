@@ -37,6 +37,12 @@ pub const FILTER: &str = "filter";
 pub const NOT_STRICTLY_FALSE: &str = "@not_strictly_false";
 pub const IN: &str = "@in";
 
+/// The internal function the map-building macros of the two-variable
+/// comprehensions extension expand to: `cel.@mapInsert(map, key, value)` and
+/// `cel.@mapInsert(map, map)`. CEL source can't call it, as `@` can't start
+/// an identifier.
+pub(crate) const MAP_INSERT: &str = "cel.@mapInsert";
+
 const OPERATORS: [(&str, &str); 12] = [
     ("-", SUBSTRACT),
     ("+", ADD),

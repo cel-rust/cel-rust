@@ -208,6 +208,10 @@ fn unsupported_key(key: &dyn Val) -> ExecutionError {
     ExecutionError::UnsupportedKeyType(key.try_into().unwrap_or(crate::Value::Null))
 }
 
+fn duplicate_key(key: &dyn Val) -> ExecutionError {
+    ExecutionError::DuplicateKey(key.try_into().unwrap_or(crate::Value::Null))
+}
+
 fn no_such_key(key: &dyn Val) -> ExecutionError {
     let key = if let Some(s) = key.downcast_ref::<CelString>() {
         s.inner().to_string()
@@ -291,6 +295,83 @@ impl Zeroer for DefaultMap<'_> {
 impl<'v> From<HashMap<Key<'v>, Box<dyn Val + 'v>>> for DefaultMap<'v> {
     fn from(value: HashMap<Key<'v>, Box<dyn Val + 'v>>) -> Self {
         Self(value)
+    }
+}
+
+/// A map under construction, inserted into in place.
+///
+/// `MutableMap` is an internal helper used by the comprehension evaluator
+/// (see [`crate::objects::Value::resolve_val`]) to build up the accumulator of
+/// comprehensions that insert into a map on every iteration, as
+/// `@result = cel.@mapInsert(@result, k, v)` does, avoiding the quadratic
+/// copy-on-insert cost a [`DefaultMap`] would incur.
+///
+/// Like [`MutableList`](super::MutableList), it is deliberately not a
+/// [`Val`]: the evaluator owns it for the duration of the loop and never binds
+/// it to a variable, so no expression can observe it half-built. When the loop
+/// completes, the evaluator converts it into a [`DefaultMap`] via
+/// [`MutableMap::to_immutable`].
+#[derive(Debug, Default)]
+#[doc(hidden)]
+pub struct MutableMap<'v>(HashMap<Key<'v>, Box<dyn Val + 'v>>);
+
+impl<'v> MutableMap<'v> {
+    pub fn with_capacity(cap: usize) -> Self {
+        Self(HashMap::with_capacity(cap))
+    }
+
+    /// Inserts `value` at `key`.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`ExecutionError::UnsupportedKeyType`] when `key` isn't a
+    /// `bool`, `int`, `uint` or `string`, and with
+    /// [`ExecutionError::DuplicateKey`] when the map already has `key`, or the
+    /// same number as the other integer type: `1` and `1u` are the same key.
+    pub fn insert(
+        &mut self,
+        key: CowVal<'_, 'v>,
+        value: CowVal<'_, 'v>,
+    ) -> Result<(), ExecutionError> {
+        let key = Key::try_from(key)?;
+        if has_key(&self.0, &key) {
+            return Err(duplicate_key(key.inner()));
+        }
+        self.0.insert(key, value.into_owned());
+        Ok(())
+    }
+
+    /// Inserts a copy of every entry of `entries`, which must be a map, each
+    /// as [`insert`](Self::insert) does.
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`ExecutionError::UnexpectedType`] when `entries` isn't an
+    /// iterable and indexable map, and as [`insert`](Self::insert) does for an
+    /// entry whose key the map already has. The entries before it stay
+    /// inserted.
+    pub fn extend(&mut self, entries: &(dyn Val + 'v)) -> Result<(), ExecutionError> {
+        let not_a_map = || ExecutionError::UnexpectedType {
+            got: entries.get_type().name().to_owned(),
+            want: "map".to_owned(),
+        };
+        if entries.get_type().kind() != types::Kind::Map {
+            return Err(not_a_map());
+        }
+        let (Some(keys), Some(map)) = (entries.as_iterable(), entries.as_indexer()) else {
+            return Err(not_a_map());
+        };
+        let mut keys = keys.iter();
+        while let Some(key) = keys.next() {
+            self.insert(CowVal::Borrowed(key), map.get(key)?)?;
+        }
+        Ok(())
+    }
+
+    /// Converts the mutable map into an immutable [`DefaultMap`], reusing the
+    /// backing storage.
+    pub fn to_immutable(self) -> DefaultMap<'v> {
+        DefaultMap(self.0)
     }
 }
 
@@ -558,10 +639,10 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 
 #[cfg(test)]
 mod tests {
-    use super::{DefaultMap, Key};
-    use crate::common::types::{self, CelInt, Type};
-    use crate::common::value::Val;
-    use crate::{Context, Env, Value};
+    use super::{DefaultMap, Key, MutableMap};
+    use crate::common::types::{self, CelDouble, CelInt, CelList, CelString, CelUInt, Type};
+    use crate::common::value::{CowVal, Val};
+    use crate::{Context, Env, ExecutionError, Value};
     use std::borrow::Cow;
     use std::collections::HashMap;
     use std::sync::Arc;
@@ -611,5 +692,88 @@ mod tests {
         assert_eq!(eval("type({'a': 1}) == map"), Ok(Value::Bool(true)));
         assert_eq!(eval("size({'a': 1, 'b': 2})"), Ok(Value::Int(2)));
         assert_eq!(eval("{'a': 1, 'b': 2}.size()"), Ok(Value::Int(2)));
+    }
+
+    fn int(i: i64) -> CowVal<'static, 'static> {
+        CowVal::owned(CelInt::from(i))
+    }
+
+    /// `{key: value}`, a map to extend a [`MutableMap`] with.
+    fn entry(key: Key<'static>, value: i64) -> DefaultMap<'static> {
+        DefaultMap::from(HashMap::from([(
+            key,
+            Box::new(CelInt::from(value)) as Box<dyn Val>,
+        )]))
+    }
+
+    #[test]
+    fn mutable_map_inserts_in_place() {
+        let mut m = MutableMap::with_capacity(2);
+        m.insert(int(1), CowVal::owned(CelString::from("one")))
+            .unwrap();
+        m.insert(CowVal::owned(CelString::from("two")), int(2))
+            .unwrap();
+
+        let imm = m.to_immutable();
+        assert_eq!(imm.inner().len(), 2);
+        let one = imm.inner()[&Key::from(1i64)].downcast_ref::<CelString>();
+        assert_eq!(one.map(|s| s.inner()), Some("one"));
+        let two = imm.inner()[&Key::from("two")].downcast_ref::<CelInt>();
+        assert_eq!(two.map(|i| *i.inner()), Some(2));
+    }
+
+    /// Keys compare as numbers, as in a map literal: `1u` is the key `1`.
+    #[test]
+    fn mutable_map_insert_rejects_a_key_it_has() {
+        let mut m = MutableMap::with_capacity(1);
+        m.insert(int(1), int(10)).unwrap();
+
+        assert_eq!(
+            m.insert(int(1), int(20)),
+            Err(ExecutionError::DuplicateKey(Value::Int(1)))
+        );
+        assert_eq!(
+            m.insert(CowVal::owned(CelUInt::from(1u64)), int(20)),
+            Err(ExecutionError::DuplicateKey(Value::UInt(1)))
+        );
+        let imm = m.to_immutable();
+        assert_eq!(imm.inner().len(), 1);
+        let kept = imm.inner()[&Key::from(1i64)].downcast_ref::<CelInt>();
+        assert_eq!(kept.map(|i| *i.inner()), Some(10));
+    }
+
+    #[test]
+    fn mutable_map_insert_requires_a_key_type() {
+        let mut m = MutableMap::with_capacity(0);
+        assert_eq!(
+            m.insert(CowVal::owned(CelDouble::from(1.0)), int(1)),
+            Err(ExecutionError::UnsupportedKeyType(Value::Float(1.0)))
+        );
+    }
+
+    #[test]
+    fn mutable_map_extends_with_the_entries_of_a_map() {
+        let mut m = MutableMap::with_capacity(0);
+        m.extend(&entry(Key::from(1i64), 10)).unwrap();
+        m.extend(&entry(Key::from("a"), 20)).unwrap();
+
+        assert_eq!(
+            m.extend(&entry(Key::from(1u64), 30)),
+            Err(ExecutionError::DuplicateKey(Value::UInt(1)))
+        );
+        assert_eq!(m.to_immutable().inner().len(), 2);
+    }
+
+    #[test]
+    fn mutable_map_extend_requires_a_map() {
+        let mut m = MutableMap::with_capacity(0);
+        let list = CelList::from(vec![Box::new(CelInt::from(1i64)) as Box<dyn Val>]);
+        assert_eq!(
+            m.extend(&list),
+            Err(ExecutionError::UnexpectedType {
+                got: "list".to_owned(),
+                want: "map".to_owned(),
+            })
+        );
     }
 }

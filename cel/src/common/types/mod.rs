@@ -106,6 +106,8 @@ pub use list::DefaultList as CelList;
 pub use list::MutableList;
 pub use map::DefaultMap as CelMap;
 pub use map::Key as CelMapKey;
+#[doc(hidden)]
+pub use map::MutableMap;
 pub use null::Null as CelNull;
 pub use optional::Optional as CelOptional;
 pub use r#struct::Struct as CelStruct;

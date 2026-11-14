@@ -44,6 +44,8 @@ pub fn run_test(simple_test_textproto: &str) {
         .expect("We need that extension to register");
     env.add_extension(cel::extensions::sets)
         .expect("We need that extension to register");
+    env.add_extension(cel::extensions::two_var_comprehensions)
+        .expect("We need that extension to register");
     for m in block_test_macros() {
         env.add_macro(m)
             .expect("We need the test macros to register");

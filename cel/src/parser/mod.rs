@@ -15,7 +15,10 @@ mod parser;
 pub mod pratt_parser;
 
 pub use macros::Macro;
-pub(crate) use macros::{map_macro_expander, Macros};
+pub(crate) use macros::{
+    all_comprehension, exists_comprehension, exists_one_comprehension, extract_ident,
+    list_comprehension, map_macro_expander, Macros, ACCUMULATOR,
+};
 pub use parser::*;
 #[cfg(feature = "parser_pratt")]
 #[doc(hidden)]
