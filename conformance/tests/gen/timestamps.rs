@@ -84,7 +84,6 @@ mod duration_conversions {
     }
 
     // Test: toString_duration_max
-    #[should_panic]
     #[test]
     fn tostring_duration_max() {
         run_test(&dedent!(
@@ -96,7 +95,6 @@ mod duration_conversions {
     }
 
     // Test: toString_duration_min
-    #[should_panic]
     #[test]
     fn tostring_duration_min() {
         run_test(&dedent!(
@@ -108,7 +106,6 @@ mod duration_conversions {
     }
 
     // Test: from_string_max
-    #[should_panic]
     #[test]
     fn from_string_max() {
         run_test(&dedent!(
@@ -127,7 +124,6 @@ mod duration_conversions {
     }
 
     // Test: from_string_min
-    #[should_panic]
     #[test]
     fn from_string_min() {
         run_test(&dedent!(
@@ -621,7 +617,6 @@ mod timestamp_arithmetic {
     }
 
     // Test: add_max_duration_to_min_time
-    #[should_panic]
     #[test]
     fn add_max_duration_to_min_time() {
         run_test(&dedent!(
@@ -633,7 +628,6 @@ mod timestamp_arithmetic {
     }
 
     // Test: subtract_max_duration_from_max_time
-    #[should_panic]
     #[test]
     fn subtract_max_duration_from_max_time() {
         run_test(&dedent!(
@@ -645,7 +639,6 @@ mod timestamp_arithmetic {
     }
 
     // Test: add_duration_to_duration_max
-    #[should_panic]
     #[test]
     fn add_duration_to_duration_max() {
         run_test(&dedent!(
@@ -657,7 +650,6 @@ mod timestamp_arithmetic {
     }
 
     // Test: subtract_duration_from_duration_min
-    #[should_panic]
     #[test]
     fn subtract_duration_from_duration_min() {
         run_test(&dedent!(
@@ -989,7 +981,6 @@ mod timestamp_range {
     }
 
     // Test: sub_time_duration_over
-    #[should_panic]
     #[test]
     fn sub_time_duration_over() {
         run_test(&dedent!(
@@ -1007,7 +998,6 @@ mod timestamp_range {
     }
 
     // Test: sub_time_duration_under
-    #[should_panic]
     #[test]
     fn sub_time_duration_under() {
         run_test(&dedent!(

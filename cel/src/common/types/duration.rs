@@ -5,19 +5,34 @@ use crate::{ExecutionError, Value};
 use std::any::Any;
 use std::ops::Deref;
 
-/// CEL durations are limited to what fits in an `i64` count of nanoseconds,
-/// the same range as cel-go's `time.Duration`.
+/// The longest duration, in nanoseconds: `315576000000s` and `999999999ns`.
+/// CEL durations are limited to the range of `google.protobuf.Duration`,
+/// about ±10,000 years, as cel-spec has it since v0.26.0. cel-go limits them
+/// further, to an `i64` count of nanoseconds.
+pub(crate) const MAX_NANOS: i128 = 315_576_000_000_999_999_999;
+
+/// The most negative duration, in nanoseconds: see [`MAX_NANOS`].
+pub(crate) const MIN_NANOS: i128 = -MAX_NANOS;
+
+/// Whether `d` is past the range of a CEL duration, [`MIN_NANOS`] to
+/// [`MAX_NANOS`].
 pub(crate) fn out_of_range(d: &chrono::Duration) -> bool {
-    d.num_nanoseconds().is_none()
+    !(MIN_NANOS..=MAX_NANOS).contains(&nanos(d))
+}
+
+/// `d` in nanoseconds, which an `i128` always holds.
+fn nanos(d: &chrono::Duration) -> i128 {
+    i128::from(d.num_seconds()) * 1_000_000_000 + i128::from(d.subsec_nanos())
 }
 
 /// A CEL `google.protobuf.Duration`, of type
 /// [`DURATION_TYPE`](super::DURATION_TYPE): a [`chrono::Duration`].
 ///
 /// It adds to and subtracts from another `duration`, and adds to a
-/// `timestamp`. A `duration` must fit in an `i64` count of nanoseconds, as in
-/// cel-go, so an operation whose result doesn't fails. It only compares, and
-/// is only equal, to another `duration`.
+/// `timestamp`. A `duration` is limited to the range of
+/// `google.protobuf.Duration`, `-315576000000.999999999s` to
+/// `315576000000.999999999s`, so an operation whose result is past it fails.
+/// It only compares, and is only equal, to another `duration`.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub struct Duration(chrono::Duration);
 

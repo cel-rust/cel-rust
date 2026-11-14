@@ -424,6 +424,14 @@ mod tests {
                 "timestamp getMilliseconds tz",
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds('UTC') == 123",
             ),
+            (
+                "timestamp difference spans the timestamp range",
+                "timestamp('9999-12-31T23:59:59Z') - timestamp('0001-01-01T00:00:00Z') == duration('315537897599s')",
+            ),
+            (
+                "timestamp difference spans the timestamp range (negative)",
+                "timestamp('0001-01-01T00:00:00Z') - timestamp('9999-12-31T23:59:59Z') == duration('-315537897599s')",
+            ),
         ]
         .iter()
         .for_each(assert_script);
@@ -494,16 +502,6 @@ mod tests {
                 "timestamp('0001-01-01T00:00:00Z') + duration('-1s')",
                 "Overflow from binary operator 'add': Timestamp(0001-01-01T00:00:00+00:00), Duration(TimeDelta { secs: -1, nanos: 0 })",
             ),
-            (
-                "timestamp difference exceeds duration range",
-                "timestamp('9999-12-31T23:59:59Z') - timestamp('0001-01-01T00:00:00Z')",
-                "Overflow from binary operator 'sub': Timestamp(9999-12-31T23:59:59+00:00), Timestamp(0001-01-01T00:00:00+00:00)",
-            ),
-            (
-                "timestamp difference exceeds duration range (negative)",
-                "timestamp('0001-01-01T00:00:00Z') - timestamp('9999-12-31T23:59:59Z')",
-                "Overflow from binary operator 'sub': Timestamp(0001-01-01T00:00:00+00:00), Timestamp(9999-12-31T23:59:59+00:00)",
-            ),
         ]
         .iter()
         .for_each(assert_error)
@@ -571,24 +569,64 @@ mod tests {
                 "Error executing function 'duration': range error parsing duration",
             ),
             (
+                "duration from_string over boundary",
+                "duration('315576000001s')",
+                "Error executing function 'duration': range error parsing duration",
+            ),
+            (
+                "duration from_string under boundary",
+                "duration('-315576000001s')",
+                "Error executing function 'duration': range error parsing duration",
+            ),
+            (
+                "duration from_string nanos over boundary",
+                "duration('315576000000s1000000000ns')",
+                "Error executing function 'duration': range error parsing duration",
+            ),
+            (
+                "duration from_string nanos under boundary",
+                "duration('-315576000000s1000000000ns')",
+                "Error executing function 'duration': range error parsing duration",
+            ),
+            (
                 "duration add over range",
-                "duration('9000000000s') + duration('9000000000s')",
-                "Overflow from binary operator 'add': Duration(TimeDelta { secs: 9000000000, nanos: 0 }), Duration(TimeDelta { secs: 9000000000, nanos: 0 })",
+                "duration('200000000000s') + duration('200000000000s')",
+                "Overflow from binary operator 'add': Duration(TimeDelta { secs: 200000000000, nanos: 0 }), Duration(TimeDelta { secs: 200000000000, nanos: 0 })",
             ),
             (
                 "duration add under range",
-                "duration('-9000000000s') + duration('-9000000000s')",
-                "Overflow from binary operator 'add': Duration(TimeDelta { secs: -9000000000, nanos: 0 }), Duration(TimeDelta { secs: -9000000000, nanos: 0 })",
+                "duration('-200000000000s') + duration('-200000000000s')",
+                "Overflow from binary operator 'add': Duration(TimeDelta { secs: -200000000000, nanos: 0 }), Duration(TimeDelta { secs: -200000000000, nanos: 0 })",
             ),
             (
                 "duration sub over range",
-                "duration('9000000000s') - duration('-9000000000s')",
-                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: 9000000000, nanos: 0 }), Duration(TimeDelta { secs: -9000000000, nanos: 0 })",
+                "duration('200000000000s') - duration('-200000000000s')",
+                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: 200000000000, nanos: 0 }), Duration(TimeDelta { secs: -200000000000, nanos: 0 })",
             ),
             (
                 "duration sub under range",
-                "duration('-9000000000s') - duration('9000000000s')",
-                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: -9000000000, nanos: 0 }), Duration(TimeDelta { secs: 9000000000, nanos: 0 })",
+                "duration('-200000000000s') - duration('200000000000s')",
+                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: -200000000000, nanos: 0 }), Duration(TimeDelta { secs: 200000000000, nanos: 0 })",
+            ),
+            (
+                "duration add nanos over range",
+                "duration('315576000000s999999999ns') + duration('1ns')",
+                "Overflow from binary operator 'add': Duration(TimeDelta { secs: 315576000000, nanos: 999999999 }), Duration(TimeDelta { secs: 0, nanos: 1 })",
+            ),
+            (
+                "duration add nanos under range",
+                "duration('-315576000000s999999999ns') + duration('-1ns')",
+                "Overflow from binary operator 'add': Duration(TimeDelta { secs: -315576000001, nanos: 1 }), Duration(TimeDelta { secs: -1, nanos: 999999999 })",
+            ),
+            (
+                "duration sub nanos over range",
+                "duration('315576000000s999999999ns') - duration('-1ns')",
+                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: 315576000000, nanos: 999999999 }), Duration(TimeDelta { secs: -1, nanos: 999999999 })",
+            ),
+            (
+                "duration sub nanos under range",
+                "duration('-315576000000s999999999ns') - duration('1ns')",
+                "Overflow from binary operator 'sub': Duration(TimeDelta { secs: -315576000001, nanos: 1 }), Duration(TimeDelta { secs: 0, nanos: 1 })",
             ),
         ]
         .iter()
