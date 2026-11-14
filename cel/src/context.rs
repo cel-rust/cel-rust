@@ -335,6 +335,9 @@ impl<'p, 'v> Context<'p, 'v> {
         let env = self.env();
         env.container().candidates(name).find_map(|candidate| {
             self.own_variable(&candidate).or_else(|| {
+                // Check constants (after variables, before types)
+                env.get_constant(&candidate)
+            }).or_else(|| {
                 if !may_be_type || !matches!(self, Context::Root { .. }) {
                     return None;
                 }

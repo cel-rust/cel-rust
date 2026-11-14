@@ -5,6 +5,7 @@ use crate::common::{
     value::CowVal,
 };
 use crate::container::Container;
+use crate::objects::{TryIntoValue, Value};
 use crate::parser::{Macro, Macros, Parser};
 use crate::registry::{TypeDecl, TypeRegistry};
 use crate::runtime::RuntimeOptions;
@@ -15,6 +16,17 @@ use std::collections::{
     BTreeMap, BTreeSet,
 };
 use std::sync::Arc;
+
+/// Whether `name` is an identifier, or several separated by dots.
+fn is_qualified_ident(name: &str) -> bool {
+    name.split('.').all(|ident| {
+        let mut chars = ident.chars();
+        chars
+            .next()
+            .is_some_and(|c| c.is_ascii_alphabetic() || c == '_')
+            && chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+    })
+}
 
 /// An environment for the CEL execution.
 ///
@@ -56,6 +68,7 @@ pub struct Env {
     functions: BTreeMap<String, FunctionDecl>,
     namespaces: BTreeSet<String>,
     types: TypeRegistry,
+    constants: BTreeMap<String, Box<dyn Val + 'static>>,
     macros: Arc<Macros>,
     options: RuntimeOptions,
     error_on_duplicate_map_keys: bool,
@@ -76,6 +89,7 @@ impl Default for Env {
             functions: BTreeMap::new(),
             namespaces: BTreeSet::new(),
             types: TypeRegistry::default(),
+            constants: BTreeMap::new(),
             macros: Arc::default(),
             options: RuntimeOptions::default(),
             error_on_duplicate_map_keys: true,
@@ -496,6 +510,81 @@ impl Env {
     /// and so is registering a struct type whose type was registered alone.
     pub fn add_type(&mut self, t: impl Into<TypeDecl>) -> Result<(), DeclarationError> {
         self.types.register(t)
+    }
+
+    /// Adds a constant value to the environment, accessible by qualified name.
+    ///
+    /// Constants are resolved during qualified-name lookup, after variables but
+    /// before types. This makes them ideal for enum-like values: registering
+    /// `"status_code.OK"` as `200i64` lets the expression `status_code.OK`
+    /// resolve to `200`.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_constant("status_code.OK", 200i64).unwrap();
+    /// env.add_constant("status_code.NOT_FOUND", 404i64).unwrap();
+    /// let program = env.compile("status_code.OK").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Int(200)));
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Fails with [`DeclarationError::DuplicateConstant`] if a constant of that
+    /// name is already added, or with [`DeclarationError::InvalidTypeName`] if
+    /// the name is not a valid qualified identifier.
+    pub fn add_constant<S, V>(&mut self, name: S, value: V) -> Result<(), DeclarationError>
+    where
+        S: Into<String>,
+        V: TryIntoValue,
+    {
+        let name = name.into();
+        if !is_qualified_ident(&name) {
+            return Err(DeclarationError::invalid_type_name(&name));
+        }
+        match self.constants.entry(name) {
+            Vacant(entry) => {
+                let val: Box<dyn Val> = value.try_into_value().map_err(|_| {
+                    DeclarationError::invalid_type_name("constant value")
+                })?;
+                entry.insert(val);
+                Ok(())
+            }
+            Occupied(_) => Err(DeclarationError::duplicate_constant(&name)),
+        }
+    }
+
+    /// Adds a constant value to the environment, accepting an owned [`Value`].
+    ///
+    /// Convenience wrapper around [`add_constant`](Self::add_constant) that
+    /// accepts a [`Value`] directly.
+    ///
+    /// ```
+    /// use cel::{Context, Env, Value};
+    /// use std::sync::Arc;
+    ///
+    /// let mut env = Env::stdlib();
+    /// env.add_constant_from_value("my_const", Value::Int(42));
+    /// let program = env.compile("my_const").unwrap();
+    /// let context = Context::with_env(Arc::new(env));
+    /// assert_eq!(program.execute(&context), Ok(Value::Int(42)));
+    /// ```
+    pub fn add_constant_from_value<S>(&mut self, name: S, value: Value)
+    where
+        S: Into<String>,
+    {
+        let name = name.into();
+        if is_qualified_ident(&name) {
+            let val: Box<dyn Val> = value.try_into().unwrap();
+            self.constants.insert(name, val);
+        }
+    }
+
+    pub(crate) fn get_constant(&self, name: &str) -> Option<CowVal<'_, 'static>> {
+        self.constants.get(name).map(|v| CowVal::Borrowed(v.as_ref()))
     }
 
     /// The runtime policy applied to every evaluation under this environment.
