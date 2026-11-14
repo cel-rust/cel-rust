@@ -7,6 +7,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.16.0](https://github.com/cel-rust/cel-rust/compare/v0.15.0...v0.16.0) - 2026-11-14
+
+### Added
+
+- *(duration)* [**breaking**] widen to the `google.protobuf.Duration` range
+- *(extensions)* add the two-variable comprehensions extension
+- *(comprehensions)* [**breaking**] bind both iteration variables before the condition
+- *(extensions)* add the sets extension (sets.contains, sets.equivalent, sets.intersects)
+- *(budget)* [**breaking**] Basic execution `Frame`
+- *(stdlib)* declare `size` on maps with type params
+- *(stdlib)* declare `size` on lists with a type parameter
+- *(stdlib)* declare `Optional`'s overloads with a type parameter
+- *(stdlib)* declare `dyn` as `dyn(A) -> dyn`
+- *(overloads)* declare the result types of overloads
+- *(overloads)* [**breaking**] reject overloads with overlapping argument types
+- *(overloads)* [**breaking**] add type parameters, dispatch on coarse types only
+- *(extensions)* [**breaking**] evaluate `cel.@block` from the bindings extension
+- *(extensions)* add the network extension (net.IP, net.CIDR)
+- *(extensions)* `lists.range` max size configurable
+- *(env)* libraries added once, by name
+- *(extensions)* add the bindings extension (cel.bind)
+
+### Fixed
+
+- *(duration)* parse each component exactly
+- fix
+- *(double)* [**breaking**] order a NaN against a number as false
+- *(budget)* `all` and `exists` don't absorb fatal errors
+- *(budget)* `map` and `filter` count toward the budget
+- *(references)* Preemptively guard `iter_var2` to be included from a `Comprehension`
+- *(references)* [**breaking**] exclude comprehension bindings from `variables()`
+- *(interpreter)* restrict append fast path to hidden accumulators
+- *(bench)* make every runtime execute fixture evaluate
+- *(parser)* references() reports leading-dot names without the dot
+- *(maps)* `in` and optional access follow cel-go on unusable keys
+- *(env)* restore UnwindSafe on FunctionDecl and OverloadDecl
+- *(lists)* Fake `Lister` trait with `Kind`
+
+### Other
+
+- Merge pull request #444 from alexsnaps/duration
+- Merge pull request #442 from alexsnaps/macro2
+- *(references)* two-variable comprehensions bind both variables
+- *(comprehensions)* build a map accumulator in place
+- defer CEL language matters to cel-expr/cel-spec
+- Added goals section to readme
+- Merge pull request #441 from doxxx93/sets
+- Merge pull request #339 from alexsnaps/budget
+- *(readme)* added link to playground
+- *(budget)* no frame when there's nothing to enforce
+- *(budget)* interrupt & budget diffs w/ go & cpp
+- Merge pull request #431 from alexsnaps/issue-427
+- move to the end, for isize casting
+- reworded `OverlappingOverload`
+- *(extensions)* keep the `cel.@block` slots off `Context`
+- Merge pull request #418 from doxxx93/ext-network
+- *(extensions)* check the network extension registers once
+- Align struct creation AST ID and location with ANTLR
+- Fix Pratt parser and lexer discrepancies with ANTLR
+- [Pratt parser] Port changes improving compatibility with ANTLR parser from cel/c++
+- Fix parsing of unescaped newlines in string literals
+- Merge pull request #408 from alexsnaps/env-idempotent
+
 ## [0.15.0](https://github.com/cel-rust/cel-rust/compare/v0.14.5...v0.15.0) - 2026-10-06
 
 ### Added
