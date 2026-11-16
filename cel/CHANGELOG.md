@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0](https://github.com/cel-rust/cel-rust/compare/v0.16.0...v0.17.0) - 2026-11-16
+
+### Fixed
+
+- *(comprehensions)* [**breaking**] keep the iteration variables out of the result
+
+### Other
+
+- *(clippy)* fixes with v1.100
+
 ## [0.16.0](https://github.com/cel-rust/cel-rust/compare/v0.15.0...v0.16.0) - 2026-11-14
 
 ### Added
