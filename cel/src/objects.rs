@@ -1773,7 +1773,8 @@ impl DeferredErrors {
 /// A loop step a comprehension can run in place, adding to an accumulator it
 /// builds without ever binding it: `addition`, or `guard ? addition : accu`,
 /// where the accumulator `accu` starts with `@`, so that CEL source can't
-/// refer to it, the loop condition is a literal, and the result is `accu`.
+/// refer to it, no iteration variable shadows it, the loop condition is a
+/// literal, and the result is `accu`.
 ///
 /// Evaluating such a step generically copies the whole accumulator on every
 /// iteration; [`AppendStep`] and [`InsertStep`] recognise the additions
@@ -1789,8 +1790,11 @@ impl<'e> InPlaceStep<'e> {
     fn of(comprehension: &'e ComprehensionExpr) -> Option<Self> {
         let is_accu = |e: &Expression| is_accu(comprehension, e);
         // Like cel-go's isMutableAccuSafe, only optimise accumulators that
-        // cannot be referenced by expressions written in CEL source.
+        // cannot be referenced by expressions written in CEL source, and that
+        // the loop step sees: an iteration variable of the same name would
+        // make the step's `accu` that variable.
         if !comprehension.accu_var.starts_with('@')
+            || iter_vars(comprehension).any(|var| var == comprehension.accu_var)
             || !is_accu(&comprehension.result)
             || !matches!(comprehension.loop_cond.expr, Expr::Literal(_))
         {
@@ -1915,7 +1919,8 @@ impl<'e> InsertStep<'e> {
 ///
 /// Each iteration binds the iteration variables to the next entry of the
 /// range, then evaluates `loop_cond`, which ends the loop when `false`, then
-/// `loop_step`, as cel-go's `folder.FoldEntry` does.
+/// `loop_step`, as cel-go's `folder.FoldEntry` does. The iteration variables
+/// are in scope of `loop_cond` and `loop_step` only, not of `result`.
 fn fold<'v>(
     comprehension: &ComprehensionExpr,
     accu_init: CowVal<'_, 'v>,
@@ -1936,16 +1941,28 @@ fn fold<'v>(
         }
         accu.step(comprehension, &mut scope, frame)?;
     }
-    accu.finish(comprehension, &scope, frame)
+    accu.finish(comprehension, scope, frame)
+}
+
+/// The names `comprehension` binds to each entry of its range.
+fn iter_vars(comprehension: &ComprehensionExpr) -> impl Iterator<Item = &str> {
+    std::iter::once(comprehension.iter_var.as_str()).chain(comprehension.iter_var2.as_deref())
 }
 
 /// How a comprehension accumulates its result.
 enum Accumulator<'c, 'v> {
-    /// The accumulator is bound in the loop's scope as `accu_var`, and
-    /// replaced by each step's value, unless [`DeferredErrors`] holds the
-    /// step's error back; the result is the comprehension's `result`,
-    /// evaluated in that scope.
-    Generic(DeferredErrors),
+    /// The accumulator is replaced by each step's value, unless
+    /// [`DeferredErrors`] holds the step's error back; the result is the
+    /// comprehension's `result`, evaluated with the accumulator bound as
+    /// `accu_var` and the iteration variables unbound.
+    ///
+    /// The accumulator is bound in the loop's scope, unless an iteration
+    /// variable of the same name shadows it there: it's then held in
+    /// `shadowed`, out of the loop's sight, until `result` is evaluated.
+    Generic {
+        deferred: DeferredErrors,
+        shadowed: Option<Box<dyn Val + 'v>>,
+    },
     /// A `map` / `filter` step, appending to a list built in place: see
     /// [`AppendStep`]. The accumulator is never bound.
     List(AppendStep<'c>, MutableList<'v>),
@@ -1956,7 +1973,8 @@ enum Accumulator<'c, 'v> {
 
 impl<'c, 'v> Accumulator<'c, 'v> {
     /// The accumulator of `comprehension`, starting as `init`, for the range
-    /// `iter`. A [`Generic`](Self::Generic) one binds `accu_var` in `scope`.
+    /// `iter`. A [`Generic`](Self::Generic) one binds `accu_var` in `scope`,
+    /// unless an iteration variable shadows it.
     fn of(
         comprehension: &'c ComprehensionExpr,
         init: CowVal<'_, 'v>,
@@ -1991,8 +2009,19 @@ impl<'c, 'v> Accumulator<'c, 'v> {
                 return Self::Map(step, MutableMap::with_capacity(size_hint()));
             }
         }
-        scope.add_variable_as_val(&comprehension.accu_var, init.into_owned());
-        Self::Generic(DeferredErrors::of(comprehension))
+        let deferred = DeferredErrors::of(comprehension);
+        let init = init.into_owned();
+        if iter_vars(comprehension).any(|var| var == comprehension.accu_var) {
+            return Self::Generic {
+                deferred,
+                shadowed: Some(init),
+            };
+        }
+        scope.add_variable_as_val(&comprehension.accu_var, init);
+        Self::Generic {
+            deferred,
+            shadowed: None,
+        }
     }
 
     /// Evaluates the loop step of `comprehension` in `scope`, where the
@@ -2004,11 +2033,14 @@ impl<'c, 'v> Accumulator<'c, 'v> {
         frame: Option<&BlockFrame<'_, 'v>>,
     ) -> Result<(), ExecutionError> {
         match self {
-            Self::Generic(deferred) => {
+            Self::Generic { deferred, shadowed } => {
                 let step = Value::resolve_in(&comprehension.loop_step, scope, frame);
                 if let Some(accu) = deferred.step(step)? {
                     let accu = accu.into_owned();
-                    scope.add_variable_as_val(&comprehension.accu_var, accu);
+                    match shadowed {
+                        Some(shadowed) => *shadowed = accu,
+                        None => scope.add_variable_as_val(&comprehension.accu_var, accu),
+                    }
                 }
             }
             Self::List(step, list) => {
@@ -2033,17 +2065,25 @@ impl<'c, 'v> Accumulator<'c, 'v> {
         Ok(())
     }
 
-    /// The value of `comprehension`, once its loop has ended.
+    /// The value of `comprehension`, once its loop has ended in `scope`.
     fn finish(
         self,
         comprehension: &ComprehensionExpr,
-        scope: &Context<'_, 'v>,
+        mut scope: Context<'_, 'v>,
         frame: Option<&BlockFrame<'_, 'v>>,
     ) -> Result<Box<dyn Val + 'v>, ExecutionError> {
         match self {
-            Self::Generic(deferred) => {
+            Self::Generic { deferred, shadowed } => {
                 deferred.finish()?;
-                Ok(Value::resolve_in(&comprehension.result, scope, frame)?.into_owned())
+                // `result` resolves the iteration variables' names outside
+                // the comprehension: only the accumulator stays bound.
+                for var in iter_vars(comprehension) {
+                    scope.remove_variable(var);
+                }
+                if let Some(accu) = shadowed {
+                    scope.add_variable_as_val(&comprehension.accu_var, accu);
+                }
+                Ok(Value::resolve_in(&comprehension.result, &scope, frame)?.into_owned())
             }
             Self::List(_, list) => Ok(Box::new(list.to_immutable())),
             Self::Map(_, map) => Ok(Box::new(map.to_immutable())),
@@ -2978,6 +3018,190 @@ mod tests {
             .unwrap();
 
         assert_eq!(program.execute(&context), Ok(Value::Int(1)));
+    }
+
+    /// An env with the generic folds `name(range, init, cond, step, result)`,
+    /// their accumulator `a` starting as `init`: `fold` over `x`, `fold2` over
+    /// `k` and `v`, `same2` over `k` and `k`, and `shadowed` over `a`,
+    /// `shadowed2` over `k` and `a`, whose iteration variables share the
+    /// accumulator's name.
+    fn fold_env() -> Env {
+        use crate::common::ast::{ComprehensionExpr, Expr, IdedExpr};
+        use crate::parser::Macro;
+
+        let mut env = Env::stdlib();
+        for (name, iter_var, iter_var2, accu_var) in [
+            ("fold", "x", None, "a"),
+            ("fold2", "k", Some("v"), "a"),
+            ("same2", "k", Some("k"), "a"),
+            ("shadowed", "a", None, "a"),
+            ("shadowed2", "k", Some("a"), "a"),
+        ] {
+            env.add_macro(Macro::global(name, 5, move |helper, _target, args| {
+                let [iter_range, accu_init, loop_cond, loop_step, result] =
+                    <[IdedExpr; 5]>::try_from(std::mem::take(args)).unwrap();
+                Ok(Some(helper.next_expr(Expr::Comprehension(Box::new(
+                    ComprehensionExpr {
+                        iter_range,
+                        iter_var: iter_var.to_string(),
+                        iter_var2: iter_var2.map(str::to_string),
+                        accu_var: accu_var.to_string(),
+                        accu_init,
+                        loop_cond,
+                        loop_step,
+                        result,
+                    },
+                )))))
+            }))
+            .unwrap();
+        }
+        env
+    }
+
+    /// Only the loop condition and the loop step see the iteration variables:
+    /// the result sees the accumulator, and resolves the iteration variables'
+    /// names outside the comprehension, however the loop ended.
+    #[test]
+    fn test_the_result_does_not_see_the_iteration_variables() {
+        let env = Arc::new(fold_env());
+        let eval = |context: &Context, expr: &str| env.compile(expr).unwrap().execute(context);
+        let ints = |v: &[i64]| Value::List(Arc::new(v.iter().map(|i| Value::Int(*i)).collect()));
+        let mut outer = Context::with_env(Arc::clone(&env));
+        for (name, value) in [("x", 99), ("k", 98), ("v", 97)] {
+            outer.add_variable_from_value(name, Value::Int(value));
+        }
+
+        assert_eq!(
+            eval(&outer, "fold([1, 2], 0, true, a + x, [a, x])"),
+            Ok(ints(&[3, 99]))
+        );
+        // (the loop ends on its first condition, with the first element bound)
+        assert_eq!(
+            eval(&outer, "fold([1, 2], 0, false, a + x, [a, x])"),
+            Ok(ints(&[0, 99]))
+        );
+        assert_eq!(
+            eval(&outer, "fold2([10, 20], 0, true, a + v, [a, k, v])"),
+            Ok(ints(&[30, 98, 97]))
+        );
+        assert_eq!(
+            eval(&outer, "fold2({'k': 10}, 0, false, a + v, [a, k, v])"),
+            Ok(ints(&[0, 98, 97]))
+        );
+        // (the second `k`, each element, shadows the first in the loop)
+        assert_eq!(
+            eval(&outer, "same2([10, 20], 0, true, a + k, [a, k])"),
+            Ok(ints(&[30, 98]))
+        );
+        // (an inner comprehension's result sees the outer one's `x`)
+        assert_eq!(
+            eval(
+                &outer,
+                "fold([1, 2], 0, true, a + fold([10], 0, true, a + x, x), a)"
+            ),
+            Ok(Value::Int(3))
+        );
+        let without_outer = Context::with_env(Arc::clone(&env));
+        assert_eq!(
+            eval(&without_outer, "fold([1, 2], 0, true, a + x, x)"),
+            Err(ExecutionError::UndeclaredReference(Arc::new("x".into())))
+        );
+    }
+
+    /// An iteration variable named like the accumulator shadows it in the
+    /// loop condition and the loop step, but not in the result: the result
+    /// sees the accumulator, even when the loop ends with that variable bound.
+    #[test]
+    fn test_the_result_sees_an_accumulator_an_iteration_variable_shadows() {
+        let context = Context::with_env(Arc::new(fold_env()));
+        let eval = |expr: &str| context.env().compile(expr).unwrap().execute(&context);
+
+        // (each step adds 10 to the element, not to the accumulator)
+        assert_eq!(
+            eval("shadowed([1, 2], 0, true, a + 10, a)"),
+            Ok(Value::Int(12))
+        );
+        assert_eq!(
+            eval("shadowed([1, 2], 0, a < 2, a + 10, a)"),
+            Ok(Value::Int(11))
+        );
+        assert_eq!(
+            eval("shadowed([1, 2], 0, false, a + 10, a)"),
+            Ok(Value::Int(0))
+        );
+        assert_eq!(eval("shadowed([], 0, true, a + 10, a)"), Ok(Value::Int(0)));
+        assert_eq!(
+            eval("shadowed2([1, 2], 0, a < 2, a + 10, a)"),
+            Ok(Value::Int(11))
+        );
+    }
+
+    /// A step shaped like `map`'s or `transformMap`'s isn't run in place when
+    /// an iteration variable shadows the accumulator: the step's `@a` is the
+    /// element then, and the step is evaluated generically.
+    #[test]
+    fn test_a_shadowed_accumulator_is_not_built_in_place() {
+        use crate::common::ast::{
+            operators, CallExpr, ComprehensionExpr, Expr, ListExpr, LiteralValue, MapExpr,
+        };
+        use crate::parser::Macro;
+
+        // `append(range)`: `@a + [9]` from `[]`, and `insert(range)`:
+        // `cel.@mapInsert(@a, 'new', 2)` from `{}`, over `@a`. Only a macro
+        // can name them `@a`.
+        let mut env = Env::stdlib();
+        env.add_extension(crate::extensions::two_var_comprehensions)
+            .unwrap();
+        for (name, insert) in [("append", false), ("insert", true)] {
+            env.add_macro(Macro::global(name, 1, move |helper, _target, args| {
+                let iter_range = args.pop().unwrap();
+                let accu = helper.next_expr(Expr::Ident("@a".to_string()));
+                let (accu_init, func_name, args) = if insert {
+                    let key = helper.next_expr(Expr::Literal(LiteralValue::String(
+                        "new".to_string().into(),
+                    )));
+                    let value = helper.next_expr(Expr::Literal(LiteralValue::Int(2.into())));
+                    let init = helper.next_expr(Expr::Map(MapExpr::default()));
+                    (init, operators::MAP_INSERT, vec![accu, key, value])
+                } else {
+                    let nine = helper.next_expr(Expr::Literal(LiteralValue::Int(9.into())));
+                    let item = helper.next_expr(Expr::List(ListExpr::new(vec![nine])));
+                    let init = helper.next_expr(Expr::List(ListExpr::new(vec![])));
+                    (init, operators::ADD, vec![accu, item])
+                };
+                let loop_step = helper.next_expr(Expr::Call(CallExpr {
+                    func_name: func_name.to_string(),
+                    target: None,
+                    args,
+                }));
+                let loop_cond = helper.next_expr(Expr::Literal(LiteralValue::Boolean(true.into())));
+                let result = helper.next_expr(Expr::Ident("@a".to_string()));
+                Ok(Some(helper.next_expr(Expr::Comprehension(Box::new(
+                    ComprehensionExpr {
+                        iter_range,
+                        iter_var: "@a".to_string(),
+                        iter_var2: None,
+                        accu_var: "@a".to_string(),
+                        accu_init,
+                        loop_cond,
+                        loop_step,
+                        result,
+                    },
+                )))))
+            }))
+            .unwrap();
+        }
+        let context = Context::with_env(Arc::new(env));
+        let eval = |expr: &str| context.env().compile(expr).unwrap().execute(&context);
+        let ints = |v: &[i64]| Value::List(Arc::new(v.iter().map(|i| Value::Int(*i)).collect()));
+
+        assert_eq!(eval("append([[1], [2]])"), Ok(ints(&[2, 9])));
+        assert_eq!(
+            eval("insert([{'old': 1}])"),
+            Ok(Value::Map(
+                HashMap::from([("old", Value::Int(1)), ("new", Value::Int(2))]).into()
+            ))
+        );
     }
 
     /// With a second iteration variable, a list binds each index and element,

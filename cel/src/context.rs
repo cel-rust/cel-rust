@@ -140,6 +140,16 @@ impl<'p, 'v> Context<'p, 'v> {
         }
     }
 
+    /// Unbinds a variable of this scope alone: a parent's variable of the
+    /// same name is visible again.
+    pub(crate) fn remove_variable(&mut self, name: &str) {
+        match self {
+            Context::Root { variables, .. } | Context::Child { variables, .. } => {
+                variables.remove(name);
+            }
+        }
+    }
+
     pub fn set_variable_resolver(&mut self, r: &'v dyn VariableResolver) {
         match self {
             Context::Root { resolver, .. } => {
