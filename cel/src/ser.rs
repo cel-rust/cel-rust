@@ -217,7 +217,7 @@ impl ser::Serializer for Serializer {
     type SerializeTupleStruct = SerializeVec;
     type SerializeTupleVariant = SerializeTupleVariant;
     type SerializeMap = SerializeMap;
-    type SerializeStruct = SerializeMap;
+    type SerializeStruct = SerializeStructValue;
     type SerializeStructVariant = SerializeStructVariant;
 
     fn serialize_bool(self, v: bool) -> Result<Value> {
@@ -369,7 +369,19 @@ impl ser::Serializer for Serializer {
     }
 
     fn serialize_struct(self, _name: &'static str, len: usize) -> Result<Self::SerializeStruct> {
-        self.serialize_map(Some(len))
+        #[cfg(feature = "json")]
+        if _name == SERDE_JSON_NUMBER {
+            return Ok(SerializeStructValue {
+                inner: SerializeStructKind::JsonNumber(None),
+            });
+        }
+
+        Ok(SerializeStructValue {
+            inner: SerializeStructKind::Struct(SerializeMap {
+                map: HashMap::with_capacity(len),
+                next_key: None,
+            }),
+        })
     }
 
     fn serialize_struct_variant(
@@ -399,6 +411,19 @@ pub struct SerializeMap {
     map: HashMap<Key, Value>,
     next_key: Option<Key>,
 }
+
+pub struct SerializeStructValue {
+    inner: SerializeStructKind,
+}
+
+enum SerializeStructKind {
+    Struct(SerializeMap),
+    #[cfg(feature = "json")]
+    JsonNumber(Option<String>),
+}
+
+#[cfg(feature = "json")]
+const SERDE_JSON_NUMBER: &str = "$serde_json::private::Number";
 
 pub struct SerializeStructVariant {
     name: String,
@@ -511,7 +536,7 @@ impl ser::SerializeMap for SerializeMap {
     }
 }
 
-impl ser::SerializeStruct for SerializeMap {
+impl ser::SerializeStruct for SerializeStructValue {
     type Ok = Value;
     type Error = SerializationError;
 
@@ -519,11 +544,54 @@ impl ser::SerializeStruct for SerializeMap {
     where
         T: ?Sized + Serialize,
     {
-        serde::ser::SerializeMap::serialize_entry(self, key, value)
+        match &mut self.inner {
+            SerializeStructKind::Struct(map) => {
+                serde::ser::SerializeMap::serialize_entry(map, key, value)
+            }
+            #[cfg(feature = "json")]
+            SerializeStructKind::JsonNumber(number) => {
+                if key != SERDE_JSON_NUMBER || number.is_some() {
+                    return Err(SerializationError::SerdeError(
+                        "invalid serde_json number representation".to_string(),
+                    ));
+                }
+                match to_value(value)? {
+                    Value::String(value) => *number = Some(value.to_string()),
+                    _ => {
+                        return Err(SerializationError::SerdeError(
+                            "invalid serde_json number representation".to_string(),
+                        ));
+                    }
+                }
+                Ok(())
+            }
+        }
     }
 
     fn end(self) -> Result<Value> {
-        serde::ser::SerializeMap::end(self)
+        match self.inner {
+            SerializeStructKind::Struct(map) => serde::ser::SerializeMap::end(map),
+            #[cfg(feature = "json")]
+            SerializeStructKind::JsonNumber(number) => {
+                let number = number.ok_or_else(|| {
+                    SerializationError::SerdeError(
+                        "missing serde_json number representation".to_string(),
+                    )
+                })?;
+                let number = number
+                    .parse::<serde_json::Number>()
+                    .map_err(|error| SerializationError::SerdeError(error.to_string()))?;
+                if let Some(value) = number.as_i64() {
+                    Ok(Value::Int(value))
+                } else if let Some(value) = number.as_u64() {
+                    Ok(Value::UInt(value))
+                } else {
+                    number.as_f64().map(Value::Float).ok_or_else(|| {
+                        SerializationError::SerdeError("invalid JSON number".to_string())
+                    })
+                }
+            }
+        }
     }
 }
 
@@ -1006,6 +1074,21 @@ mod tests {
     // primitive_test!(test_triple_double_quoted_string, #"r"""""""#, "");
     // primitive_test!(test_triple_single_quoted_string, "r''''''", "");
     primitive_test!(test_utf8_character_as_bytes, "b'ÿ'", vec!(195_u8, 191_u8));
+
+    #[cfg(feature = "json")]
+    #[test]
+    fn test_serde_json_numbers_convert_to_cel_numbers() {
+        let cases = [
+            (serde_json::json!(1), Value::Int(1)),
+            (serde_json::json!(-1), Value::Int(-1)),
+            (serde_json::json!(u64::MAX), Value::UInt(u64::MAX)),
+            (serde_json::json!(1.5), Value::Float(1.5)),
+        ];
+
+        for (json, expected) in cases {
+            assert_eq!(to_value(json).unwrap(), expected);
+        }
+    }
 
     #[test]
     fn test_json_data_conversion() {
