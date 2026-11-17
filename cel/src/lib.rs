@@ -380,6 +380,10 @@ pub enum DeclarationError {
     /// already added.
     #[error("Cannot add macro '{function}': one for the same call style and argument count is already added")]
     DuplicateMacro { function: String },
+    /// A constant could not be added because one with the same name is
+    /// already added.
+    #[error("Cannot add constant '{name}': a constant with that name is already added")]
+    DuplicateConstant { name: String },
     /// An overload could not be declared for a function because a call could
     /// also resolve to another of its overloads, of a different signature.
     ///
@@ -443,6 +447,12 @@ impl DeclarationError {
     pub fn duplicate_macro(function: &str) -> Self {
         DeclarationError::DuplicateMacro {
             function: function.to_string(),
+        }
+    }
+
+    pub fn duplicate_constant(name: &str) -> Self {
+        DeclarationError::DuplicateConstant {
+            name: name.to_string(),
         }
     }
 }
