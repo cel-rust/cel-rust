@@ -21,6 +21,7 @@
 //! | `a < b`, `a <= b`, `a > b`, `a >= b` | `a` | [`Val::as_comparer`] | [`Comparer::compare`] |
 //! | `a in b` | `b` | [`Val::as_container`] | [`Container::contains`] |
 //! | `a[i]`, `a.f`, `has(a.f)`, `a.?f`, `a[?i]` | `a` | [`Val::as_indexer`], [`Val::into_indexer`] | [`Indexer::get`], [`Indexer::steal`] |
+//! | `has(a.f)`, `a.?f`, before the [`Indexer`] | `a` | [`Val::as_field_tester`] | [`FieldTester::is_set`] |
 //! | `a.all(x, ..)`, `a.exists(x, ..)`, `a.map(x, ..)`, ... | `a` | [`Val::as_iterable`] | [`Iterable::iter`] |
 //! | `size(a)`, `a.size()`, for a `list` or `map` | `a` | [`Val::as_sizer`] | [`Sizer::size`] |
 //! | `a == b`, `a != b` | `a` | | [`Val::equals`] |
@@ -112,8 +113,8 @@ pub const CONTAINER_TYPE: TraitSet = COMPARER_TYPE << 1;
 /// Types that support `/`, see [`Divider`].
 pub const DIVIDER_TYPE: TraitSet = CONTAINER_TYPE << 1;
 
-/// Types whose fields can be tested for presence with `has(x.f)`. In this
-/// crate, that is part of [`Indexer`].
+/// Types whose fields can be tested for presence with `has(x.f)`: by a
+/// [`FieldTester`], or by the [`Indexer`] of a value without one.
 pub const FIELD_TESTER_TYPE: TraitSet = DIVIDER_TYPE << 1;
 
 /// Types that support indexing and field selection, see [`Indexer`].
@@ -226,6 +227,130 @@ pub trait Divider {
     fn div<'b, 'v>(&'b self, _rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
     where
         Self: 'v;
+}
+
+/// Field presence, for `has(a.f)` and `a.?f`: obtained with
+/// [`Val::as_field_tester`].
+///
+/// A value without one has a field when its [`Indexer`] finds it. A value can
+/// tell the presence of a field apart from reading it: a message's field
+/// that isn't set reads as its default value, see the CEL spec's
+/// [field selection], and an application may not count a field that holds
+/// `null` as set. Given a `FieldTester`:
+///
+/// * `has(a.f)` is what [`is_set`](Self::is_set) returns, and fails when it
+///   fails.
+/// * `a.?f` is `optional.none()` when `is_set` returns `false`, and
+///   `optional.of(a.f)`, read with the [`Indexer`], when it returns `true`:
+///   a field said to be set that the `Indexer` can't read is an error, not
+///   `optional.none()`. So is `.f` on an optional, as in `a.?b.f`, which the
+///   optional access carries over to.
+///
+/// The other accesses, `a.f`, `a[i]` and `a[?i]`, only use the [`Indexer`].
+/// A value without an [`Indexer`] has no fields to test: its `FieldTester` is
+/// never asked, and `has(a.f)` and `a.?f` fail on it as on any value that
+/// can't be indexed. It mirrors cel-go's `traits.FieldTester`.
+///
+/// [field selection]: https://github.com/cel-expr/cel-spec/blob/master/doc/langdef.md#field-selection
+///
+/// # Example
+///
+/// ```
+/// use cel::common::traits::{FieldTester, Indexer};
+/// use cel::common::types::{CelNull, CelString, Type};
+/// use cel::common::value::{CowVal, StaticVal, Val};
+/// use cel::{Context, Env, ExecutionError, Value};
+/// use std::any::Any;
+/// use std::sync::Arc;
+///
+/// static USER: Type = Type::new_unspecified_type("acme.User");
+///
+/// /// A user, whose `nickname` is `null` when they have none.
+/// #[derive(Clone, Debug)]
+/// struct User {
+///     nickname: Option<CelString<'static>>,
+/// }
+///
+/// impl FieldTester for User {
+///     fn is_set(&self, field: &dyn Val) -> Result<bool, ExecutionError> {
+///         match field.downcast_ref::<CelString>().map(CelString::inner) {
+///             // a `null` nickname isn't set
+///             Some("nickname") => Ok(self.nickname.is_some()),
+///             _ => Err(ExecutionError::no_such_key("field")),
+///         }
+///     }
+/// }
+///
+/// impl Indexer for User {
+///     fn get<'b, 'v>(&'b self, field: &dyn Val) -> Result<CowVal<'b, 'v>, ExecutionError>
+///     where
+///         Self: 'v,
+///     {
+///         match field.downcast_ref::<CelString>().map(CelString::inner) {
+///             Some("nickname") => Ok(match &self.nickname {
+///                 Some(nickname) => CowVal::Borrowed(nickname),
+///                 None => CowVal::owned(CelNull),
+///             }),
+///             _ => Err(ExecutionError::no_such_key("field")),
+///         }
+///     }
+///
+///     fn steal<'v>(self: Box<Self>, field: &dyn Val) -> Result<Box<dyn Val + 'v>, ExecutionError>
+///     where
+///         Self: 'v,
+///     {
+///         self.get(field).map(CowVal::into_owned)
+///     }
+/// }
+///
+/// impl Val for User {
+///     fn get_type(&self) -> &Type {
+///         &USER
+///     }
+///     fn cel_type() -> &'static Type {
+///         &USER
+///     }
+///     fn as_field_tester(&self) -> Option<&dyn FieldTester> {
+///         Some(self)
+///     }
+///     fn as_indexer<'b, 'v>(&'b self) -> Option<&'b (dyn Indexer + 'v)>
+///     where
+///         Self: 'v,
+///     {
+///         Some(self)
+///     }
+///     fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+///         Box::new(self.clone())
+///     }
+///     fn as_any(&self) -> Option<&dyn Any> {
+///         Some(self)
+///     }
+/// }
+/// impl StaticVal for User {}
+///
+/// let env = Arc::new(Env::stdlib());
+/// let mut context = Context::with_env(Arc::clone(&env));
+/// context.add_variable_as_val("user", Box::new(User { nickname: None }));
+/// let eval = |expr: &str| env.compile(expr).unwrap().execute(&context);
+///
+/// assert_eq!(eval("has(user.nickname)"), Ok(Value::Bool(false)));
+/// assert_eq!(eval("user.?nickname.hasValue()"), Ok(Value::Bool(false)));
+/// // the field still reads as `null`
+/// assert_eq!(eval("user.nickname"), Ok(Value::Null));
+/// ```
+pub trait FieldTester {
+    /// Returns whether `field` is set on `self`.
+    ///
+    /// # Errors
+    ///
+    /// An error is the result of `has()` and `.?`. cel-go fails on a field
+    /// that the type doesn't declare, as the CEL spec has `has()` do on a
+    /// message; returning `false` makes `has()` false and `.?`
+    /// `optional.none()` instead. A field name of a type `self` doesn't take
+    /// should fail with [`ExecutionError::UnexpectedType`], which the
+    /// interpreter reports as a [`NoSuchOverload`](ExecutionError::NoSuchOverload)
+    /// for the operator.
+    fn is_set(&self, field: &dyn Val) -> Result<bool, ExecutionError>;
 }
 
 /// The values comprehensions iterate over: obtained with
@@ -369,7 +494,8 @@ pub trait Zeroer {
 ///
 /// A struct-like value that reports a missing field with
 /// [`ExecutionError::no_such_key`] therefore supports `has()` with no further
-/// work.
+/// work. A value with a [`FieldTester`] answers `has(a.f)` and `a.?f` with it
+/// instead, and is only read for a field it says is set.
 ///
 /// # Example
 ///

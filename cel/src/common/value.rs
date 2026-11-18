@@ -67,8 +67,8 @@
 //! assert!(std::ptr::eq(path.inner(), request_path.as_str()), "not a copy");
 //! ```
 use crate::common::traits::{
-    Adder, Comparer, Container, Divider, Indexer, Iterable, Modder, Multiplier, Negator, Sizer,
-    Subtractor, Zeroer,
+    Adder, Comparer, Container, Divider, FieldTester, Indexer, Iterable, Modder, Multiplier,
+    Negator, Sizer, Subtractor, Zeroer,
 };
 use crate::common::types::CelStruct;
 use crate::common::types::{CelBytes, CelList, CelMap, CelOptional, CelString, Type};
@@ -211,6 +211,17 @@ pub trait Val: Debug + Send + Sync {
     where
         Self: 'v,
     {
+        None
+    }
+
+    /// `has(self.f)` and `self.?f`: `Some(self)` if the value implements
+    /// [`FieldTester`], for a field it can read that isn't set. It is only
+    /// asked of a value that also has an [`Indexer`] (see
+    /// [`as_indexer`](Val::as_indexer)).
+    ///
+    /// With the default, `None`, a field is present when
+    /// [`as_indexer`](Val::as_indexer)'s [`Indexer::get`] finds it.
+    fn as_field_tester(&self) -> Option<&dyn FieldTester> {
         None
     }
 
