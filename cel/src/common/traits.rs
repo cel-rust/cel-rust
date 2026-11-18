@@ -373,6 +373,12 @@ pub trait FieldTester {
 /// lists extension, `join` and `format` of the strings extension, and
 /// `math.greatest` and `math.least` given a list. So any value whose
 /// [type](Val::get_type) is `list` gets them by implementing `Iterable`.
+///
+/// A built-in `list` on the left of `==` also takes any `list` on its right,
+/// and compares it element by element, in order; a built-in `map` takes any
+/// `map` that is also an [`Indexer`], and looks each of its own keys up in
+/// it. The value on the right only answers through its own
+/// [`Val::equals`] when it is on the left.
 pub trait Iterable {
     /// Returns an iterator over borrows of the elements, which live as long
     /// as `self` is borrowed (`'b`) and borrow data for `'v`.
