@@ -202,8 +202,9 @@ pub trait Comparer {
 /// `value in self`: obtained with [`Val::as_container`] on the **right-hand**
 /// operand.
 ///
-/// A `list` contains the values one of its elements [equals](Val::equals); a
-/// `map` contains its keys. A value that can't be a key, such as a `list`, is
+/// A `list` contains the values that [equal](Val::equals) one of its
+/// elements, the value being asked, as the left operand of `==` is; a `map`
+/// contains its keys. A value that can't be a key, such as a `list`, is
 /// in no `map`.
 pub trait Container {
     /// Returns whether `value` is in `self`.

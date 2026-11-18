@@ -11,8 +11,8 @@ use std::ops::Deref;
 ///
 /// Of type [`LIST_TYPE`](super::LIST_TYPE), `list(dyn)`, whatever its
 /// elements, which can be values of any type. It supports `+` with any
-/// `list` on the right, `in` (an element [equals](Val::equals) the
-/// value), `[i]` with an `int`, `uint` or whole `double` index, `size()`, and
+/// `list` on the right, `in` (the value [equals](Val::equals) an
+/// element), `[i]` with an `int`, `uint` or whole `double` index, `size()`, and
 /// the comprehensions, which iterate over its elements in order. Two lists
 /// are equal when their elements are, pairwise.
 #[derive(Debug, Default)]
@@ -161,8 +161,10 @@ impl<'v> Adder for DefaultList<'v> {
 
 impl Container for DefaultList<'_> {
     fn contains(&self, value: &dyn Val) -> Result<bool, ExecutionError> {
+        // The value looked up is asked, as the left operand of `==` is, and as cel-go's
+        // `baseList.Contains` does: it only matters for a value whose `equals` isn't symmetric.
         for i in &self.0 {
-            if i.equals(value) {
+            if value.equals(i.as_ref()) {
                 return Ok(true);
             }
         }
@@ -660,9 +662,28 @@ pub mod tests {
             ("[] == empty", true),
             ("[[1, 2]] == [s]", true),
             ("{'k': [1, 2]} == {'k': s}", true),
-            ("s in [[1, 2]]", true),
+            ("[1, 2] in [s]", true),
             // A map is iterable too, over its keys, but it isn't a list.
             ("[1] == {1: 'a'}", false),
+        ] {
+            assert_eq!(eval(expr), Ok(Value::Bool(expected)), "{expr}");
+        }
+    }
+
+    /// `in` asks the value looked up whether it equals an element, as `==` asks
+    /// its left operand: with a `list` whose equality differs from a
+    /// [`DefaultList`]'s, the value's equality decides.
+    #[test]
+    fn in_asks_the_value_looked_up() {
+        let env = Arc::new(Env::stdlib());
+        let mut ctx = Context::with_env(Arc::clone(&env));
+        ctx.add_variable_as_val("s", Box::new(Set::of(&[1, 2])));
+        let eval = |source: &str| env.compile(source).unwrap().execute(&ctx);
+        for (expr, expected) in [
+            ("[2, 1] in [s]", false),
+            ("s in [[2, 1]]", true),
+            ("1 in [1u, 2.0]", true),
+            ("2.0 in [1, 2]", true),
         ] {
             assert_eq!(eval(expr), Ok(Value::Bool(expected)), "{expr}");
         }
