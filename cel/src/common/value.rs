@@ -228,8 +228,7 @@ pub trait Val: Debug + Send + Sync {
     /// `self[i]`, `self.f`, `has(self.f)`, `self.?f` and `self[?i]`:
     /// `Some(self)` if the value implements [`Indexer`].
     ///
-    /// The default, `None`, makes the first three errors, and the optional
-    /// ones `optional.none()`.
+    /// The default, `None`, makes all five errors.
     fn as_indexer<'b, 'v>(&'b self) -> Option<&'b (dyn Indexer + 'v)>
     where
         Self: 'v,
