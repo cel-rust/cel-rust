@@ -1223,9 +1223,9 @@ impl Value {
                                 Unwrapped::NotOptional(v) | Unwrapped::Some(v) => v,
                                 Unwrapped::None => return Ok(CowVal::owned(CelOptional::none())),
                             };
-                            return into_optional(index_into(target, field, "_?._", |value| {
+                            return select_optional(target, field, "_?._", |value| {
                                 ExecutionError::overload_for_values("_?._", [value, field], false)
-                            }));
+                            });
                         }
                         // END OF SPECIAL CASES
 
@@ -2299,7 +2299,7 @@ fn select_field<'b, 'v>(
                 if inner.as_indexer().is_none() {
                     return Err(no_such_key());
                 }
-                into_optional(index_into(inner, &key, "_._", |_| no_such_key()))
+                select_optional(inner, &key, "_._", |_| no_such_key())
             };
         }
     };
@@ -2318,21 +2318,64 @@ fn select_field<'b, 'v>(
     }
 }
 
-/// `has(value.field)`: whether `value` has something at `field`. Only a
-/// missing key says it doesn't: any other failure is the result, reported as
-/// `value` having no overload for the selection. `no_fields` is the error when
+/// `has(value.field)`: what `value`'s
+/// [`FieldTester`](traits::FieldTester) says, if it has one. Otherwise,
+/// whether `value` has something at `field`: only a missing key says it
+/// doesn't. Any other failure is the result, reported as `value`
+/// having no overload for the selection. `no_fields` is the error when
 /// `value` can't be indexed at all.
 fn has_field(
     value: &dyn Val,
     field: &CelString,
     no_fields: impl FnOnce() -> ExecutionError,
 ) -> Result<bool, ExecutionError> {
+    if let Some(is_set) = field_is_set(value, field, "_._") {
+        return is_set;
+    }
     match value.as_indexer().ok_or_else(no_fields)?.get(field) {
         Ok(_) => Ok(true),
         Err(ExecutionError::NoSuchKey(_)) => Ok(false),
         Err(error) => Err(error.with_lazy_overload_context(|| {
             ExecutionError::overload_for_values("_._", [value, field], false)
         })),
+    }
+}
+
+/// Whether `field` is set on `value`, if `value` has a
+/// [`FieldTester`](traits::FieldTester) and an [`Indexer`]: as in cel-go, a
+/// value that can't be indexed has no fields to test. A failure for want of a
+/// matching overload reports `function` applied to the types of `value` and
+/// `field`.
+fn field_is_set(
+    value: &dyn Val,
+    field: &dyn Val,
+    function: &str,
+) -> Option<Result<bool, ExecutionError>> {
+    let tester = value.as_field_tester()?;
+    value.as_indexer()?;
+    Some(tester.is_set(field).map_err(|error| {
+        error.with_lazy_overload_context(|| {
+            ExecutionError::overload_for_values(function, [value, field], false)
+        })
+    }))
+}
+
+/// `value.?field`, and `.field` on an optional. When `value` has a
+/// [`FieldTester`](traits::FieldTester), `optional.none()` if it says `field`
+/// isn't set, and `optional.of` the field otherwise, failing if it can't be
+/// read. Without one, the [`into_optional`] of reading it. `function` and
+/// `missing` are as for [`index_into`].
+fn select_optional<'b, 'v>(
+    value: CowVal<'b, 'v>,
+    field: &dyn Val,
+    function: &str,
+    missing: impl FnOnce(&dyn Val) -> ExecutionError,
+) -> Result<CowVal<'b, 'v>, ExecutionError> {
+    match field_is_set(value.as_ref(), field, function).transpose()? {
+        Some(false) => Ok(CowVal::owned(CelOptional::none())),
+        Some(true) => index_into(value, field, function, missing)
+            .map(|field| CowVal::owned(CelOptional::of(field.into_owned()))),
+        None => into_optional(index_into(value, field, function, missing)),
     }
 }
 
@@ -4025,6 +4068,281 @@ mod tests {
                     )),
                     "{expr}"
                 );
+            }
+        }
+
+        /// A value with a `FieldTester` decides what `has()` and the optional
+        /// field accesses see, apart from what reads and counts.
+        mod field_tester {
+            use crate::common::decls::Signature;
+            use crate::common::traits::{adapter, FieldTester, Indexer, Sizer};
+            use crate::common::types::{
+                CelInt, CelNull, CelString, CelStruct, Type, INT_TYPE, STRING_TYPE,
+            };
+            use crate::common::value::{CowVal, StaticVal, Val};
+            use crate::{Context, Env, ExecutionError, StructDef, Value};
+            use std::any::Any;
+            use std::collections::BTreeMap;
+            use std::sync::Arc;
+
+            static OBJECT: Type = Type::new_unspecified_type("acme.Object");
+
+            /// A host object whose fields may hold `null`, which it doesn't
+            /// count as set: such a field still reads as `null`, and counts in
+            /// `size()` and in equality.
+            #[derive(Clone, Debug, PartialEq)]
+            struct Object(BTreeMap<&'static str, Option<i64>>);
+
+            impl Object {
+                fn field(&self, field: &dyn Val) -> Result<Option<i64>, ExecutionError> {
+                    let name = field.downcast_ref::<CelString>().map_or("?", |s| s.inner());
+                    self.0
+                        .get(name)
+                        .copied()
+                        .ok_or_else(|| ExecutionError::no_such_key(name))
+                }
+            }
+
+            impl FieldTester for Object {
+                fn is_set(&self, field: &dyn Val) -> Result<bool, ExecutionError> {
+                    // a field said to be set that can't be read
+                    if field.downcast_ref::<CelString>().map(|s| s.inner()) == Some("gone") {
+                        return Ok(true);
+                    }
+                    self.field(field).map(|value| value.is_some())
+                }
+            }
+
+            impl Indexer for Object {
+                fn get<'b, 'v>(&'b self, idx: &dyn Val) -> Result<CowVal<'b, 'v>, ExecutionError>
+                where
+                    Self: 'v,
+                {
+                    Ok(match self.field(idx)? {
+                        Some(value) => CowVal::owned(CelInt::from(value)),
+                        None => CowVal::owned(CelNull),
+                    })
+                }
+                fn steal<'v>(
+                    self: Box<Self>,
+                    idx: &dyn Val,
+                ) -> Result<Box<dyn Val + 'v>, ExecutionError>
+                where
+                    Self: 'v,
+                {
+                    self.get(idx).map(CowVal::into_owned)
+                }
+            }
+
+            impl Sizer for Object {
+                fn size(&self) -> CelInt {
+                    CelInt::from(self.0.len() as i64)
+                }
+            }
+
+            impl Val for Object {
+                fn get_type(&self) -> &Type {
+                    &OBJECT
+                }
+                fn cel_type() -> &'static Type {
+                    &OBJECT
+                }
+                fn as_field_tester(&self) -> Option<&dyn FieldTester> {
+                    Some(self)
+                }
+                fn as_indexer<'b, 'v>(&'b self) -> Option<&'b (dyn Indexer + 'v)>
+                where
+                    Self: 'v,
+                {
+                    Some(self)
+                }
+                fn as_sizer(&self) -> Option<&dyn Sizer> {
+                    Some(self)
+                }
+                fn equals(&self, other: &dyn Val) -> bool {
+                    other.downcast_ref::<Object>() == Some(self)
+                }
+                fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                    Box::new(self.clone())
+                }
+                fn as_any(&self) -> Option<&dyn Any> {
+                    Some(self)
+                }
+            }
+            impl StaticVal for Object {}
+
+            static FLAGS: Type = Type::new_unspecified_type("acme.Flags");
+
+            /// A value with a `FieldTester` but no `Indexer`, which says no
+            /// field is set.
+            #[derive(Debug)]
+            struct Flags;
+
+            impl FieldTester for Flags {
+                fn is_set(&self, _field: &dyn Val) -> Result<bool, ExecutionError> {
+                    Ok(false)
+                }
+            }
+
+            impl Val for Flags {
+                fn get_type(&self) -> &Type {
+                    &FLAGS
+                }
+                fn cel_type() -> &'static Type {
+                    &FLAGS
+                }
+                fn as_field_tester(&self) -> Option<&dyn FieldTester> {
+                    Some(self)
+                }
+                fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+                    Box::new(Flags)
+                }
+            }
+
+            /// Evaluates `expr` with `o`, whose `f` holds `null` and `g` holds
+            /// `1`, `same`, equal to it, `without_f`, which only has `g`, and
+            /// `flags`.
+            fn eval(expr: &str) -> Result<Value, ExecutionError> {
+                let mut env = Env::stdlib();
+                let size = Signature::new(vec![OBJECT.to_owned()]).returns(INT_TYPE);
+                env.add_overload("size", "size_acme_object", size, adapter::sizer_size)
+                    .unwrap();
+                let env = Arc::new(env);
+                let mut context = Context::with_env(Arc::clone(&env));
+                let object = |fields: &[(&'static str, Option<i64>)]| {
+                    Box::new(Object(fields.iter().copied().collect()))
+                };
+                context.add_variable_as_val("o", object(&[("f", None), ("g", Some(1))]));
+                context.add_variable_as_val("same", object(&[("f", None), ("g", Some(1))]));
+                context.add_variable_as_val("without_f", object(&[("g", Some(1))]));
+                context.add_variable_as_val("flags", Box::new(Flags));
+                env.compile(expr).unwrap().execute(&context)
+            }
+
+            /// `has()` and `.?` go by the `FieldTester`, even where the field
+            /// reads: a field holding `null` isn't there for them.
+            #[test]
+            fn a_field_that_is_not_set_is_absent() {
+                for (expr, expected) in [
+                    ("has(o.f)", false),
+                    ("has(o.g)", true),
+                    ("o.?f.hasValue()", false),
+                    ("o.?g == optional.of(1)", true),
+                    // the optional access carries over to `.f`
+                    ("optional.of(o).f.hasValue()", false),
+                    ("optional.of(o).g == optional.of(1)", true),
+                    ("has(optional.of(o).f)", false),
+                ] {
+                    assert_eq!(eval(expr), Ok(Value::Bool(expected)), "{expr}");
+                }
+            }
+
+            /// The field is still there to read, to `size()` and to equality,
+            /// and to `[?k]`, which only uses the `Indexer`.
+            #[test]
+            fn a_field_that_is_not_set_still_reads_and_counts() {
+                for (expr, expected) in [
+                    ("o.f", Value::Null),
+                    ("o['f']", Value::Null),
+                    ("o[?'f'] == optional.of(null)", Value::Bool(true)),
+                    (
+                        "optional.of(o)['f'] == optional.of(null)",
+                        Value::Bool(true),
+                    ),
+                    ("size(o)", Value::Int(2)),
+                    ("o == same", Value::Bool(true)),
+                    ("o == without_f", Value::Bool(false)),
+                ] {
+                    assert_eq!(eval(expr), Ok(expected), "{expr}");
+                }
+            }
+
+            /// What the `FieldTester` fails with is the result: here, a field
+            /// the object doesn't have, which its `Indexer` alone would make
+            /// absent.
+            #[test]
+            fn a_field_that_fails_the_test_is_an_error() {
+                for expr in ["has(o.h)", "o.?h", "optional.of(o).h"] {
+                    assert_eq!(eval(expr), Err(ExecutionError::no_such_key("h")), "{expr}");
+                }
+            }
+
+            /// A field the `FieldTester` says is set is read, and a failure to
+            /// read it is the result of `.?`, not `optional.none()`.
+            #[test]
+            fn a_field_that_is_set_but_cannot_be_read_is_an_error() {
+                assert_eq!(eval("has(o.gone)"), Ok(Value::Bool(true)));
+                for expr in ["o.gone", "o.?gone", "optional.of(o).gone"] {
+                    assert_eq!(
+                        eval(expr),
+                        Err(ExecutionError::no_such_key("gone")),
+                        "{expr}"
+                    );
+                }
+            }
+
+            /// As in cel-go, only a value with an `Indexer` has fields to
+            /// test: one without fails as any value that can't be indexed
+            /// does, whatever its `FieldTester` says.
+            #[test]
+            fn a_value_without_an_indexer_is_not_tested() {
+                let overload = |function: &str| {
+                    ExecutionError::no_such_overload(
+                        function,
+                        vec!["acme.Flags".to_owned(), "string".to_owned()],
+                    )
+                };
+                for (expr, error) in [
+                    ("has(flags.f)", overload("_._")),
+                    ("flags.?f", overload("_?._")),
+                    ("optional.of(flags).f", ExecutionError::no_such_key("f")),
+                    (
+                        "has(optional.of(flags).f)",
+                        ExecutionError::no_such_key("f"),
+                    ),
+                ] {
+                    assert_eq!(eval(expr), Err(error), "{expr}");
+                }
+            }
+
+            /// The built-in values have no `FieldTester`: a map, a list or a
+            /// struct has what its `Indexer` finds, a field holding `null`
+            /// included.
+            #[test]
+            fn a_built_in_value_has_what_its_indexer_finds() {
+                let mut env = Env::stdlib();
+                env.add_type(
+                    StructDef::new("acme.Struct".to_owned())
+                        .add_field("name".to_owned(), STRING_TYPE),
+                )
+                .unwrap();
+                let env = Arc::new(env);
+                let mut context = Context::with_env(Arc::clone(&env));
+                let mut s = CelStruct::new("acme.Struct".to_owned());
+                s.add_field_value("f".to_owned(), CowVal::owned(CelNull));
+                context.add_variable_as_val("s", Box::new(s));
+
+                for (expr, expected) in [
+                    ("has({'f': null}.f)", true),
+                    ("{'f': null}.?f == optional.of(null)", true),
+                    ("{'f': null}.?g.hasValue()", false),
+                    ("optional.of({'f': null}).f == optional.of(null)", true),
+                    ("[null][?0] == optional.of(null)", true),
+                    ("has(s.f)", true),
+                    ("s.?f == optional.of(null)", true),
+                    ("s.?g.hasValue()", false),
+                    ("optional.of(s).f == optional.of(null)", true),
+                    ("has(acme.Struct{name: 'x'}.name)", true),
+                    ("has(acme.Struct{}.name)", false),
+                    ("acme.Struct{name: 'x'}.?name == optional.of('x')", true),
+                    ("acme.Struct{}.?name.hasValue()", false),
+                ] {
+                    assert_eq!(
+                        env.compile(expr).unwrap().execute(&context),
+                        Ok(Value::Bool(expected)),
+                        "{expr}"
+                    );
+                }
             }
         }
     }
