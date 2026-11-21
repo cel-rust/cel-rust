@@ -32,6 +32,11 @@ impl Container {
         &self.name
     }
 
+    /// Whether this is no container: a name is then its own only candidate.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.name.is_empty()
+    }
+
     /// The names `name` may refer to, most specific first, ending with `name`
     /// itself: in container `a.b.c`, `R.s` is `a.b.c.R.s`, `a.b.R.s`,
     /// `a.R.s`, then `R.s`. A leading dot makes `name` absolute, so it is the
