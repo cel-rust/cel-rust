@@ -4105,9 +4105,17 @@ mod tests {
 
             impl FieldTester for Object {
                 fn is_set(&self, field: &dyn Val) -> Result<bool, ExecutionError> {
-                    // a field said to be set that can't be read
-                    if field.downcast_ref::<CelString>().map(|s| s.inner()) == Some("gone") {
-                        return Ok(true);
+                    match field.downcast_ref::<CelString>().map(|s| s.inner()) {
+                        // a field said to be set that can't be read
+                        Some("gone") => return Ok(true),
+                        // a field the tester fails on as on a type it doesn't take
+                        Some("mistyped") => {
+                            return Err(ExecutionError::UnexpectedType {
+                                got: "string".to_owned(),
+                                want: "int".to_owned(),
+                            })
+                        }
+                        _ => {}
                     }
                     self.field(field).map(|value| value.is_some())
                 }
@@ -4264,6 +4272,27 @@ mod tests {
             fn a_field_that_fails_the_test_is_an_error() {
                 for expr in ["has(o.h)", "o.?h", "optional.of(o).h"] {
                     assert_eq!(eval(expr), Err(ExecutionError::no_such_key("h")), "{expr}");
+                }
+            }
+
+            /// An [`ExecutionError::UnexpectedType`] from the `FieldTester` is
+            /// reported as a `NoSuchOverload` for the operator, as one from an
+            /// `Indexer` is.
+            #[test]
+            fn a_field_the_tester_does_not_take_is_no_such_overload() {
+                let overload = |function: &str| {
+                    ExecutionError::no_such_overload(
+                        function,
+                        vec!["acme.Object".to_owned(), "string".to_owned()],
+                    )
+                };
+                for (expr, function) in [
+                    ("has(o.mistyped)", "_._"),
+                    ("o.?mistyped", "_?._"),
+                    ("optional.of(o).mistyped", "_._"),
+                    ("has(optional.of(o).mistyped)", "_._"),
+                ] {
+                    assert_eq!(eval(expr), Err(overload(function)), "{expr}");
                 }
             }
 
