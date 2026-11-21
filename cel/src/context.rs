@@ -306,8 +306,22 @@ impl<'p, 'v> Context<'p, 'v> {
     /// container candidate in turn, most specific first. An absolute name
     /// skips the inner scopes.
     pub(crate) fn resolve_ident(&self, name: &str) -> Option<CowVal<'_, 'v>> {
+        let env = self.env();
+        let is_absolute = name.starts_with('.');
+        if env.container().is_empty() && !is_absolute {
+            return self.resolve_ident_without_container(env, name);
+        }
         self.scopes_for(name)
-            .find_map(|scope| scope.resolve_own(name, true))
+            .find_map(|scope| scope.resolve_own(env, name, true))
+    }
+
+    /// Fast path of [`Self::resolve_ident`] for a name that is not absolute,
+    /// without a container: the name is its own only candidate in every
+    /// scope, and only the root scope, the last one, has types. So this is
+    /// the variable `name` of the innermost scope that has one, else the type.
+    #[inline]
+    fn resolve_ident_without_container(&self, env: &Env, name: &str) -> Option<CowVal<'_, 'v>> {
+        self.get_variable(name).or_else(|| type_named(env, name))
     }
 
     /// Resolves the qualified name `a.b.c`, given as its segments, to a value
@@ -323,11 +337,12 @@ impl<'p, 'v> Context<'p, 'v> {
         segments: &'s [&'b str],
     ) -> Result<(CowVal<'b, 'v>, &'s [&'b str]), ExecutionError> {
         let name = segments.join(".");
+        let env = self.env();
         for scope in self.scopes_for(&name) {
             let mut len = name.len();
             for prefix in (1..=segments.len()).rev() {
                 let whole = prefix == segments.len();
-                if let Some(value) = scope.resolve_own(&name[..len], whole) {
+                if let Some(value) = scope.resolve_own(env, &name[..len], whole) {
                     return Ok((value, &segments[prefix..]));
                 }
                 // drop the last segment and its dot
@@ -340,17 +355,46 @@ impl<'p, 'v> Context<'p, 'v> {
     }
 
     /// The variable of this scope named by a container candidate of `name`,
-    /// else, in the root scope, the type, if `may_be_type`.
-    fn resolve_own(&self, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
-        let env = self.env();
-        env.container().candidates(name).find_map(|candidate| {
-            self.own_variable(&candidate).or_else(|| {
-                if !may_be_type || !matches!(self, Context::Root { .. }) {
-                    return None;
-                }
-                let t = env.types().find_type(&candidate)?;
-                Some(CowVal::owned(CelType::from(t)))
-            })
+    /// else, in the root scope, the type, if `may_be_type`. `env` is
+    /// [`Self::env`], which the caller looks up once for all the scopes.
+    fn resolve_own(&self, env: &Env, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
+        if env.container().is_empty() {
+            return self.resolve_own_without_container(env, name, may_be_type);
+        }
+        env.container()
+            .candidates(name)
+            .find_map(|candidate| self.resolve_own_candidate(env, &candidate, may_be_type))
+    }
+
+    /// Fast path of [`Self::resolve_own`] without a container: the only
+    /// candidate is `name`, without the leading dot of an absolute name, so
+    /// the candidates are not listed.
+    #[inline]
+    fn resolve_own_without_container(
+        &self,
+        env: &Env,
+        name: &str,
+        may_be_type: bool,
+    ) -> Option<CowVal<'_, 'v>> {
+        let only_candidate = name.strip_prefix('.').unwrap_or(name);
+        self.resolve_own_candidate(env, only_candidate, may_be_type)
+    }
+
+    /// The variable of this scope named `candidate`, else, in the root scope,
+    /// the type, if `may_be_type`.
+    #[inline]
+    fn resolve_own_candidate(
+        &self,
+        env: &Env,
+        candidate: &str,
+        may_be_type: bool,
+    ) -> Option<CowVal<'_, 'v>> {
+        self.own_variable(candidate).or_else(|| {
+            let is_root_scope = matches!(self, Context::Root { .. });
+            if !may_be_type || !is_root_scope {
+                return None;
+            }
+            type_named(env, candidate)
         })
     }
 
@@ -512,6 +556,12 @@ impl<'p, 'v> Context<'p, 'v> {
             interrupt: None,
         }
     }
+}
+
+/// The type `name` names in `env`, as a value.
+fn type_named<'b, 'v>(env: &Env, name: &str) -> Option<CowVal<'b, 'v>> {
+    let t = env.types().find_type(name)?;
+    Some(CowVal::owned(CelType::from(t)))
 }
 
 impl Default for Context<'_, '_> {
