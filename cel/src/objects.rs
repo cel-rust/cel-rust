@@ -4255,6 +4255,22 @@ mod tests {
             assert_eq!(execute(&context, "a.b.c"), undeclared("a"));
         }
 
+        /// Types are of the root scope: a variable of an inner scope, or a
+        /// field of one, is found before a type of that name.
+        #[test]
+        fn a_variable_of_an_inner_scope_shadows_a_type() {
+            let mut env = Env::stdlib();
+            env.add_type(Type::new_opaque_type("a.b")).unwrap();
+            env.add_type(Type::new_opaque_type("t")).unwrap();
+            let root = Context::with_env(Arc::new(env));
+            assert_eq!(execute(&root, "t.b"), undeclared("t"));
+            let mut child = root.new_inner_scope();
+            child.add_variable_from_value("a", HashMap::from([("b", 1)]));
+            child.add_variable_from_value("t", 2);
+            assert_eq!(execute(&child, "a.b"), Ok(Value::Int(1)));
+            assert_eq!(execute(&child, "t"), Ok(Value::Int(2)));
+        }
+
         #[test]
         fn an_unresolved_qualified_name_reports_its_root() {
             assert_eq!(execute(&Context::default(), "a.b.c"), undeclared("a"));

@@ -343,12 +343,13 @@ impl<'p, 'v> Context<'p, 'v> {
     /// else, in the root scope, the type, if `may_be_type`.
     fn resolve_own(&self, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
         let env = self.env();
+        let may_be_type = may_be_type && matches!(self, Context::Root { .. });
         env.container().candidates(name).find_map(|candidate| {
-            self.own_variable(&candidate).or_else(|| {
-                if !may_be_type || !matches!(self, Context::Root { .. }) {
+            self.own_variable(candidate).or_else(|| {
+                if !may_be_type {
                     return None;
                 }
-                let t = env.types().find_type(&candidate)?;
+                let t = env.types().find_type(candidate)?;
                 Some(CowVal::owned(CelType::from(t)))
             })
         })
@@ -360,7 +361,7 @@ impl<'p, 'v> Context<'p, 'v> {
         self.env()
             .container()
             .candidates(name)
-            .find_map(|candidate| types.find_struct(&candidate))
+            .find_map(|candidate| types.find_struct(candidate))
     }
 
     fn has_function(&self, name: &str) -> bool {
@@ -372,7 +373,7 @@ impl<'p, 'v> Context<'p, 'v> {
     /// reports itself undeclared. The plain name, the only candidate without
     /// a container, is not checked here: the call does that.
     pub(crate) fn resolve_function<'n>(&self, name: &'n str) -> Cow<'n, str> {
-        let mut candidates = self.env().container().candidates(name).peekable();
+        let mut candidates = self.env().container().candidates(name).iter().peekable();
         while let Some(candidate) = candidates.next() {
             if candidates.peek().is_none() || self.has_function(&candidate) {
                 return candidate;
@@ -396,6 +397,7 @@ impl<'p, 'v> Context<'p, 'v> {
         let root = target.expr.qualified_name_root()?;
         if !container
             .candidates(root)
+            .iter()
             .any(|c| self.has_function_namespace(c.split('.').next().unwrap_or_default()))
         {
             return None;
@@ -404,6 +406,7 @@ impl<'p, 'v> Context<'p, 'v> {
         let name = format!("{}.{func_name}", segments.join("."));
         let found = container
             .candidates(&name)
+            .iter()
             .find(|candidate| self.has_function(candidate))
             .map(Cow::into_owned);
         found

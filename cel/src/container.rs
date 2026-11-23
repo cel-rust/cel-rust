@@ -35,15 +35,45 @@ impl Container {
     /// The names `name` may refer to, most specific first, ending with `name`
     /// itself: in container `a.b.c`, `R.s` is `a.b.c.R.s`, `a.b.R.s`,
     /// `a.R.s`, then `R.s`. A leading dot makes `name` absolute, so it is the
-    /// only candidate, without the dot. Mirrors cel-go's
-    /// `Container.ResolveCandidateNames`.
-    pub(crate) fn candidates<'a, 'n: 'a>(
-        &'a self,
-        name: &'n str,
-    ) -> impl Iterator<Item = Cow<'n, str>> + 'a {
-        let (scope, name) = match name.strip_prefix('.') {
-            Some(absolute) => ("", absolute),
-            None => (self.name.as_str(), name),
+    /// only candidate, without the dot, as `name` is without a container.
+    /// Mirrors cel-go's `Container.ResolveCandidateNames`.
+    pub(crate) fn candidates<'a, 'n: 'a>(&'a self, name: &'n str) -> Candidates<'a, 'n> {
+        match name.strip_prefix('.') {
+            Some(absolute) => Candidates::One(absolute),
+            None if self.name.is_empty() => Candidates::One(name),
+            None => Candidates::Many {
+                container: &self.name,
+                name,
+            },
+        }
+    }
+}
+
+/// The names a name may refer to under a [`Container`]: see
+/// [`Container::candidates`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Candidates<'a, 'n> {
+    /// The name alone, as without a container or for an absolute name.
+    One(&'n str),
+    /// `name` under `container`, then under each of its parents, then alone.
+    Many { container: &'a str, name: &'n str },
+}
+
+impl<'a, 'n: 'a> Candidates<'a, 'n> {
+    /// The first `Some` `f` gives for a candidate, most specific first. The
+    /// only candidate, as most names have, is neither listed nor allocated.
+    pub(crate) fn find_map<T>(self, mut f: impl FnMut(&str) -> Option<T>) -> Option<T> {
+        match self {
+            Candidates::One(name) => f(name),
+            Candidates::Many { .. } => self.iter().find_map(|candidate| f(&candidate)),
+        }
+    }
+
+    /// Each candidate, most specific first.
+    pub(crate) fn iter(self) -> impl Iterator<Item = Cow<'n, str>> + 'a {
+        let (scope, name) = match self {
+            Candidates::One(name) => ("", name),
+            Candidates::Many { container, name } => (container, name),
         };
         successors(Some(scope).filter(|s| !s.is_empty()), |s| {
             s.rfind('.').map(|i| &s[..i])
@@ -59,7 +89,11 @@ mod tests {
 
     fn candidates(container: &str, name: &str) -> Vec<String> {
         let container = Container::new(container).unwrap();
-        container.candidates(name).map(Cow::into_owned).collect()
+        container
+            .candidates(name)
+            .iter()
+            .map(Cow::into_owned)
+            .collect()
     }
 
     #[test]
@@ -79,6 +113,40 @@ mod tests {
     fn a_leading_dot_makes_the_name_absolute() {
         assert_eq!(candidates("a.b", ".R.s"), ["R.s"]);
         assert_eq!(candidates("", ".y"), ["y"]);
+    }
+
+    #[test]
+    fn find_map_visits_the_candidates_iter_lists() {
+        for (container, name) in [("", "y"), ("", ".y"), ("a.b", "R.s"), ("a.b", ".R.s")] {
+            let mut visited = Vec::new();
+            let found = Container::new(container)
+                .unwrap()
+                .candidates(name)
+                .find_map(|candidate| {
+                    visited.push(candidate.to_owned());
+                    None::<()>
+                });
+            assert_eq!(found, None, "{container:?} {name:?}");
+            assert_eq!(
+                visited,
+                candidates(container, name),
+                "{container:?} {name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn find_map_stops_at_the_first_candidate_that_gives_a_value() {
+        let mut visited = Vec::new();
+        let found = Container::new("a.b.c")
+            .unwrap()
+            .candidates("R.s")
+            .find_map(|candidate| {
+                visited.push(candidate.to_owned());
+                (candidate == "a.b.R.s").then_some(candidate.len())
+            });
+        assert_eq!(found, Some("a.b.R.s".len()));
+        assert_eq!(visited, ["a.b.c.R.s", "a.b.R.s"]);
     }
 
     #[test]
