@@ -306,9 +306,8 @@ impl<'p, 'v> Context<'p, 'v> {
     /// container candidate in turn, most specific first. An absolute name
     /// skips the inner scopes.
     pub(crate) fn resolve_ident(&self, name: &str) -> Option<CowVal<'_, 'v>> {
-        let env = self.env();
         self.scopes_for(name)
-            .find_map(|scope| scope.resolve_own(env, name, true))
+            .find_map(|scope| scope.resolve_own(name, true))
     }
 
     /// Resolves the qualified name `a.b.c`, given as its segments, to a value
@@ -324,12 +323,11 @@ impl<'p, 'v> Context<'p, 'v> {
         segments: &'s [&'b str],
     ) -> Result<(CowVal<'b, 'v>, &'s [&'b str]), ExecutionError> {
         let name = segments.join(".");
-        let env = self.env();
         for scope in self.scopes_for(&name) {
             let mut len = name.len();
             for prefix in (1..=segments.len()).rev() {
                 let whole = prefix == segments.len();
-                if let Some(value) = scope.resolve_own(env, &name[..len], whole) {
+                if let Some(value) = scope.resolve_own(&name[..len], whole) {
                     return Ok((value, &segments[prefix..]));
                 }
                 // drop the last segment and its dot
@@ -342,9 +340,9 @@ impl<'p, 'v> Context<'p, 'v> {
     }
 
     /// The variable of this scope named by a container candidate of `name`,
-    /// else, in the root scope, the type, if `may_be_type`. `env` is
-    /// [`Self::env`], which the caller looks up once for all the scopes.
-    fn resolve_own(&self, env: &Env, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
+    /// else, in the root scope, the type, if `may_be_type`.
+    fn resolve_own(&self, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
+        let env = self.env();
         let may_be_type = may_be_type && matches!(self, Context::Root { .. });
         env.container().candidates(name).find_map(|candidate| {
             self.own_variable(candidate).or_else(|| {
