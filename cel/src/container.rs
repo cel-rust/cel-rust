@@ -116,6 +116,40 @@ mod tests {
     }
 
     #[test]
+    fn find_map_visits_the_candidates_iter_lists() {
+        for (container, name) in [("", "y"), ("", ".y"), ("a.b", "R.s"), ("a.b", ".R.s")] {
+            let mut visited = Vec::new();
+            let found = Container::new(container)
+                .unwrap()
+                .candidates(name)
+                .find_map(|candidate| {
+                    visited.push(candidate.to_owned());
+                    None::<()>
+                });
+            assert_eq!(found, None, "{container:?} {name:?}");
+            assert_eq!(
+                visited,
+                candidates(container, name),
+                "{container:?} {name:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn find_map_stops_at_the_first_candidate_that_gives_a_value() {
+        let mut visited = Vec::new();
+        let found = Container::new("a.b.c")
+            .unwrap()
+            .candidates("R.s")
+            .find_map(|candidate| {
+                visited.push(candidate.to_owned());
+                (candidate == "a.b.R.s").then_some(candidate.len())
+            });
+        assert_eq!(found, Some("a.b.R.s".len()));
+        assert_eq!(visited, ["a.b.c.R.s", "a.b.R.s"]);
+    }
+
+    #[test]
     fn a_container_must_be_a_qualified_identifier() {
         assert!(Container::new("").is_ok());
         assert!(Container::new("a.b").is_ok());
