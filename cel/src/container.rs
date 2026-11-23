@@ -32,23 +32,48 @@ impl Container {
         &self.name
     }
 
-    /// Whether this is no container: a name is then its own only candidate.
-    pub(crate) fn is_empty(&self) -> bool {
-        self.name.is_empty()
-    }
-
     /// The names `name` may refer to, most specific first, ending with `name`
     /// itself: in container `a.b.c`, `R.s` is `a.b.c.R.s`, `a.b.R.s`,
     /// `a.R.s`, then `R.s`. A leading dot makes `name` absolute, so it is the
-    /// only candidate, without the dot. Mirrors cel-go's
-    /// `Container.ResolveCandidateNames`.
-    pub(crate) fn candidates<'a, 'n: 'a>(
-        &'a self,
-        name: &'n str,
-    ) -> impl Iterator<Item = Cow<'n, str>> + 'a {
-        let (scope, name) = match name.strip_prefix('.') {
-            Some(absolute) => ("", absolute),
-            None => (self.name.as_str(), name),
+    /// only candidate, without the dot, as `name` is without a container.
+    /// Mirrors cel-go's `Container.ResolveCandidateNames`.
+    pub(crate) fn candidates<'a, 'n: 'a>(&'a self, name: &'n str) -> Candidates<'a, 'n> {
+        match name.strip_prefix('.') {
+            Some(absolute) => Candidates::One(absolute),
+            None if self.name.is_empty() => Candidates::One(name),
+            None => Candidates::Many {
+                container: &self.name,
+                name,
+            },
+        }
+    }
+}
+
+/// The names a name may refer to under a [`Container`]: see
+/// [`Container::candidates`].
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum Candidates<'a, 'n> {
+    /// The name alone, as without a container or for an absolute name.
+    One(&'n str),
+    /// `name` under `container`, then under each of its parents, then alone.
+    Many { container: &'a str, name: &'n str },
+}
+
+impl<'a, 'n: 'a> Candidates<'a, 'n> {
+    /// The first `Some` `f` gives for a candidate, most specific first. The
+    /// only candidate, as most names have, is neither listed nor allocated.
+    pub(crate) fn find_map<T>(self, mut f: impl FnMut(&str) -> Option<T>) -> Option<T> {
+        match self {
+            Candidates::One(name) => f(name),
+            Candidates::Many { .. } => self.iter().find_map(|candidate| f(&candidate)),
+        }
+    }
+
+    /// Each candidate, most specific first.
+    pub(crate) fn iter(self) -> impl Iterator<Item = Cow<'n, str>> + 'a {
+        let (scope, name) = match self {
+            Candidates::One(name) => ("", name),
+            Candidates::Many { container, name } => (container, name),
         };
         successors(Some(scope).filter(|s| !s.is_empty()), |s| {
             s.rfind('.').map(|i| &s[..i])
@@ -64,7 +89,11 @@ mod tests {
 
     fn candidates(container: &str, name: &str) -> Vec<String> {
         let container = Container::new(container).unwrap();
-        container.candidates(name).map(Cow::into_owned).collect()
+        container
+            .candidates(name)
+            .iter()
+            .map(Cow::into_owned)
+            .collect()
     }
 
     #[test]
