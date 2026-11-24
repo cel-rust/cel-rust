@@ -315,9 +315,9 @@ pub(crate) trait FromContext<'a, 'context, 'call> {
 ///
 /// # Type of `This`
 /// This also accepts a type `T` which determines the specific type
-/// that's extracted. Any type that supports [`FromVal`] can be used.
+/// that's extracted, such as `i64`, `f64`, `bool`, `Arc<String>` or [`Value`].
 /// In the previous example, the method `hasPrefix` is only ever called
-/// on a string, so we can use `This<Rc<String>>` to extract the string
+/// on a string, so we can use `This<Arc<String>>` to extract the string
 /// automatically prior to our method actually being called.
 ///
 /// In some cases, you may want access to the raw [`Value`] instead, for
@@ -403,7 +403,7 @@ impl From<Identifier> for String {
 ///
 /// # Example
 /// ```javascript
-/// sum(1, 2.0, uint(3)) == 5.0
+/// sum(1, 2.0, uint(3)) == 6.0
 /// ```
 ///
 /// ```rust
