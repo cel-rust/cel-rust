@@ -2,11 +2,10 @@ use crate::common::traits::{Adder, Comparer, Subtractor, Zeroer};
 use crate::common::types::{CelDuration, CelInt, CelString, Type};
 use crate::common::value::{CowVal, StaticVal, Val};
 use crate::{ExecutionError, Value};
-use chrono::{Datelike, Days, Months};
+use chrono::Datelike;
 use chrono::{TimeZone, Timelike};
 use std::any::Any;
 use std::cmp::Ordering;
-use std::ops::{Add, Sub};
 use std::sync::LazyLock;
 
 /// A CEL `google.protobuf.Timestamp`, of type
@@ -124,21 +123,46 @@ static MIN_TIMESTAMP: LazyLock<chrono::DateTime<chrono::FixedOffset>> = LazyLock
         .from_utc_datetime(&naive)
 });
 
+/// Whether `ts` lies within CEL's range, [`MIN_TIMESTAMP`] to
+/// [`MAX_TIMESTAMP`].
+fn in_range(ts: &chrono::DateTime<chrono::FixedOffset>) -> bool {
+    (*MIN_TIMESTAMP..=*MAX_TIMESTAMP).contains(ts)
+}
+
+impl Timestamp {
+    /// `self` moved by `d` with `shift`, or an `op` overflow when the result
+    /// is past CEL's range, or past chrono's, which a timestamp or duration
+    /// from the host can reach.
+    fn shifted(
+        &self,
+        op: &'static str,
+        d: &CelDuration,
+        shift: fn(
+            &chrono::DateTime<chrono::FixedOffset>,
+            chrono::Duration,
+        ) -> Option<chrono::DateTime<chrono::FixedOffset>>,
+    ) -> Result<Self, ExecutionError> {
+        shift(&self.0, *d.inner())
+            .filter(in_range)
+            .map(Self)
+            .ok_or_else(|| {
+                ExecutionError::Overflow(
+                    op,
+                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
+                    (d as &dyn Val).try_into().unwrap_or(Value::Null),
+                )
+            })
+    }
+}
+
 impl Adder for Timestamp {
     fn add<'b, 'v>(&'b self, rhs: &(dyn Val + 'v)) -> Result<CowVal<'b, 'v>, ExecutionError>
     where
         Self: 'v,
     {
         if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
-            let result = self.0.add(*rhs.inner());
-            if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
-                return Err(ExecutionError::Overflow(
-                    "add",
-                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                ));
-            }
-            Ok(CowVal::owned(Self(result)))
+            let result = self.shifted("add", rhs, |ts, d| ts.checked_add_signed(d))?;
+            Ok(CowVal::owned(result))
         } else {
             Err(ExecutionError::UnsupportedBinaryOperator(
                 "add",
@@ -165,15 +189,8 @@ impl Subtractor for Timestamp {
         Self: 'v,
     {
         if let Some(rhs) = rhs.downcast_ref::<CelDuration>() {
-            let result = self.0.sub(*rhs.inner());
-            if result > *MAX_TIMESTAMP || result < *MIN_TIMESTAMP {
-                return Err(ExecutionError::Overflow(
-                    "sub",
-                    (self as &dyn Val).try_into().unwrap_or(Value::Null),
-                    (rhs as &dyn Val).try_into().unwrap_or(Value::Null),
-                ));
-            }
-            Ok(CowVal::owned(Self(result)))
+            let result = self.shifted("sub", rhs, |ts, d| ts.checked_sub_signed(d))?;
+            Ok(CowVal::owned(result))
         } else if let Some(rhs) = rhs.downcast_ref::<Self>() {
             let result = self.0.signed_duration_since(rhs.inner());
             if crate::common::types::duration::out_of_range(&result) {
@@ -263,13 +280,7 @@ fn get_day_of_month(this: &Timestamp) -> CelInt {
 }
 
 fn get_day_of_year(this: &Timestamp) -> CelInt {
-    let year = this
-        .inner()
-        .checked_sub_days(Days::new(this.inner().day0() as u64))
-        .unwrap()
-        .checked_sub_months(Months::new(this.inner().month0()))
-        .unwrap();
-    CelInt::from(this.inner().signed_duration_since(year).num_days())
+    CelInt::from(this.inner().ordinal0() as i64)
 }
 
 fn get_month(this: &Timestamp) -> CelInt {
@@ -442,6 +453,84 @@ mod tests {
 
     fn eval(expr: &str) -> Result<crate::Value, crate::ExecutionError> {
         Program::compile(expr).unwrap().execute(&Context::default())
+    }
+
+    /// Evaluates `expr` with `t` and `d` bound to values from the host, which
+    /// CEL's range checks never saw.
+    fn eval_with(
+        expr: &str,
+        t: chrono::DateTime<chrono::Utc>,
+        d: chrono::Duration,
+    ) -> Result<crate::Value, crate::ExecutionError> {
+        let mut ctx = Context::default();
+        ctx.add_variable_from_value("t", crate::Value::Timestamp(t.fixed_offset()));
+        ctx.add_variable_from_value("d", crate::Value::Duration(d));
+        Program::compile(expr).unwrap().execute(&ctx)
+    }
+
+    #[test]
+    fn test_arithmetic_past_chrono_range_overflows() {
+        use crate::ExecutionError::Overflow;
+        use crate::Value::{Duration, Timestamp};
+        use chrono::{DateTime, TimeDelta};
+
+        let second = TimeDelta::seconds(1);
+        let (max, min) = (
+            DateTime::<chrono::Utc>::MAX_UTC,
+            DateTime::<chrono::Utc>::MIN_UTC,
+        );
+        let y2k = DateTime::from_timestamp(946_684_800, 0).unwrap();
+        let ts = |t: DateTime<chrono::Utc>| Timestamp(t.fixed_offset());
+
+        assert_eq!(
+            eval_with("t + d", max, second),
+            Err(Overflow("add", ts(max), Duration(second)))
+        );
+        assert_eq!(
+            eval_with("d + t", max, second),
+            Err(Overflow("add", Duration(second), ts(max)))
+        );
+        assert_eq!(
+            eval_with("t - d", min, second),
+            Err(Overflow("sub", ts(min), Duration(second)))
+        );
+        assert_eq!(
+            eval_with("t + d", y2k, TimeDelta::MAX),
+            Err(Overflow("add", ts(y2k), Duration(TimeDelta::MAX)))
+        );
+        assert_eq!(
+            eval_with("t - d", y2k, TimeDelta::MAX),
+            Err(Overflow("sub", ts(y2k), Duration(TimeDelta::MAX)))
+        );
+        assert_eq!(
+            eval_with("d + t", y2k, TimeDelta::MIN),
+            Err(Overflow("add", Duration(TimeDelta::MIN), ts(y2k)))
+        );
+    }
+
+    #[test]
+    fn test_day_of_year_past_chrono_range() {
+        let none = chrono::TimeDelta::zero();
+        // In -01:00, chrono's earliest instant falls on the last day of the
+        // year before its earliest year, a leap year.
+        assert_eq!(
+            eval_with(
+                "t.getDayOfYear('-01:00')",
+                chrono::DateTime::<chrono::Utc>::MIN_UTC,
+                none
+            ),
+            Ok(365.into())
+        );
+        // In +01:00, its latest instant falls on the first day of the year
+        // after its latest year.
+        assert_eq!(
+            eval_with(
+                "t.getDayOfYear('+01:00')",
+                chrono::DateTime::<chrono::Utc>::MAX_UTC,
+                none
+            ),
+            Ok(0.into())
+        );
     }
 
     #[test]
