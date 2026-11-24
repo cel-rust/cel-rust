@@ -136,6 +136,10 @@ pub struct Parser {
     errors: Vec<ParseError>,
     macros: Arc<Macros>,
     max_recursion_depth: u16,
+    /// How many operators the node being visited is an operand of, nested in
+    /// one another; see [`Parser::visit_operand`].
+    operand_depth: u16,
+    operand_depth_exceeded: bool,
     error_recovery_limit: u32,
     enable_optional_syntax: bool,
     enable_ident_escape_syntax: bool,
@@ -151,6 +155,8 @@ impl Parser {
             errors: Vec::default(),
             macros: Macros::standard(),
             max_recursion_depth: 96,
+            operand_depth: 0,
+            operand_depth_exceeded: false,
             error_recovery_limit: 30,
             enable_optional_syntax: false,
             enable_ident_escape_syntax: false,
@@ -163,6 +169,14 @@ impl Parser {
         self
     }
 
+    /// Sets how deeply an expression may nest, 96 levels by default.
+    ///
+    /// Two kinds of nesting are each held to the limit on their own:
+    /// sub-expressions nested in one another, such as `((a))`, `[[a]]` or
+    /// `f(f(a))`, and operators applied to one another's result, such as
+    /// `a + b + c`, `a.b.c`, `a.f().g()` or `a[0][1]`. Each operator of a chain
+    /// nests the expression it builds one level deeper, however flat the source
+    /// looks, and evaluating it takes stack in proportion.
     pub fn max_recursion_depth(mut self, max: u16) -> Self {
         self.max_recursion_depth = if max == u16::MAX { max } else { max + 1 };
         self
@@ -248,6 +262,11 @@ impl Parser {
         mut target: Option<IdedExpr>,
         mut args: Vec<IdedExpr>,
     ) -> IdedExpr {
+        // Past the recursion limit the parse fails, and arguments may be
+        // placeholders: nothing to expand, but errors about them.
+        if self.operand_depth_exceeded {
+            return IdedExpr::default();
+        }
         if let Some(m) = self.macros.find(&func_name, target.as_ref(), &args) {
             let mut helper = MacroExprHelper {
                 helper: &mut self.helper,
@@ -458,6 +477,34 @@ impl Parser {
             }
         }
         (list, optionals)
+    }
+
+    /// Visits `node`, an operand of an operator, so one level deeper than the
+    /// operator: `a` and `b` in `a + b`, `a < b`, `a.f(b)` or `a[b]`, `a` in
+    /// `a.b`, or any of `a ? b : c`.
+    ///
+    /// A chain of operators such as `a + b + c` parses into a tree one level
+    /// deeper per operator, without nesting any `expr` that
+    /// [`RecursionListener`] would count. Visiting the operands of one level
+    /// after another recurses that deep, and so does evaluating the result,
+    /// so the levels are counted here against `max_recursion_depth`, as
+    /// cel-go's `checkAndIncrementRecursionDepth` does. Past the limit, the
+    /// operand isn't visited and an error is reported for the first one.
+    fn visit_operand(
+        &mut self,
+        node: &<CELParserContextType as ParserNodeType<'_>>::Type,
+    ) -> IdedExpr {
+        if self.operand_depth >= self.max_recursion_depth {
+            if mem::replace(&mut self.operand_depth_exceeded, true) {
+                return IdedExpr::default();
+            }
+            let msg = format!("Recursion limit of {} exceeded", self.max_recursion_depth);
+            return self.report_error::<ParseError, _>(&node.start(), None, msg);
+        }
+        self.operand_depth += 1;
+        let expr = self.visit(node);
+        self.operand_depth -= 1;
+        expr
     }
 
     fn report_error<E: Error + Send + Sync + 'static, S: Into<String>>(
@@ -717,10 +764,10 @@ impl gen::CELVisitorCompat<'_> for Parser {
             },
             Some(op) => {
                 if let (Some(e), Some(e1), Some(e2)) = (&ctx.e, &ctx.e1, &ctx.e2) {
-                    let result = self.visit(e.as_ref());
+                    let result = self.visit_operand(e.as_ref());
                     let op_id = self.helper.next_id(op);
-                    let if_true = self.visit(e1.as_ref());
-                    let if_false = self.visit(e2.as_ref());
+                    let if_true = self.visit_operand(e1.as_ref());
+                    let if_false = self.visit_operand(e2.as_ref());
                     self.global_call_or_macro(
                         op_id,
                         operators::CONDITIONAL.to_string(),
@@ -822,9 +869,9 @@ impl gen::CELVisitorCompat<'_> for Parser {
                 None => <Self as ParseTreeVisitorCompat>::visit_children(self, ctx),
                 Some(op) => {
                     if let (Some(lhs), Some(rhs)) = (ctx.relation(0), ctx.relation(1)) {
-                        let lhs = self.visit(lhs.as_ref());
+                        let lhs = self.visit_operand(lhs.as_ref());
                         let op_id = self.helper.next_id(op.as_ref());
-                        let rhs = self.visit(rhs.as_ref());
+                        let rhs = self.visit_operand(rhs.as_ref());
                         match operators::find_operator(op.get_text()) {
                             None => {
                                 self.report_error::<ParseError, _>(
@@ -862,9 +909,9 @@ impl gen::CELVisitorCompat<'_> for Parser {
             },
             Some(op) => {
                 if let (Some(lhs), Some(rhs)) = (ctx.calc(0), ctx.calc(1)) {
-                    let lhs = self.visit(lhs.as_ref());
+                    let lhs = self.visit_operand(lhs.as_ref());
                     let op_id = self.helper.next_id(op);
-                    let rhs = self.visit(rhs.as_ref());
+                    let rhs = self.visit_operand(rhs.as_ref());
                     match operators::find_operator(op.get_text()) {
                         None => self.report_error::<ParseError, _>(
                             op,
@@ -936,14 +983,14 @@ impl gen::CELVisitorCompat<'_> for Parser {
 
     fn visit_MemberCall(&mut self, ctx: &MemberCallContext<'_>) -> Self::Return {
         if let (Some(operand), Some(id), Some(open)) = (&ctx.member(), &ctx.id, &ctx.open) {
-            let operand = self.visit(operand.as_ref());
+            let operand = self.visit_operand(operand.as_ref());
             let id = id.get_text();
             let op_id = self.helper.next_id(open.as_ref());
             let args = ctx
                 .args
                 .iter()
                 .flat_map(|arg| &arg.e)
-                .map(|arg| self.visit(arg.deref()))
+                .map(|arg| self.visit_operand(arg.deref()))
                 .collect::<Vec<IdedExpr>>();
             self.receiver_call_or_macro(op_id, id.to_string(), operand, args)
         } else {
@@ -957,7 +1004,7 @@ impl gen::CELVisitorCompat<'_> for Parser {
 
     fn visit_Select(&mut self, ctx: &SelectContext<'_>) -> Self::Return {
         if let (Some(member), Some(id), Some(op)) = (&ctx.member(), &ctx.id, &ctx.op) {
-            let operand = self.visit(member.as_ref());
+            let operand = self.visit_operand(member.as_ref());
             let field = match self.normalize_ident(id.as_ref()) {
                 Ok(f) => f,
                 Err(msg) => {
@@ -1004,12 +1051,12 @@ impl gen::CELVisitorCompat<'_> for Parser {
 
     fn visit_Index(&mut self, ctx: &IndexContext<'_>) -> Self::Return {
         if let (Some(member), Some(index)) = (&ctx.member(), &ctx.index) {
-            let target = self.visit(member.as_ref());
+            let target = self.visit_operand(member.as_ref());
             match &ctx.op {
                 None => self.report_error::<ParseError, _>(&ctx.start(), None, "No `Index`!"),
                 Some(op) => {
                     let op_id = self.helper.next_id(op);
-                    let index = self.visit(index.as_ref());
+                    let index = self.visit_operand(index.as_ref());
                     if let Some(_opt) = &ctx.opt {
                         return if self.enable_optional_syntax {
                             self.global_call_or_macro(
@@ -1500,6 +1547,34 @@ mod tests {
             .max_recursion_depth(0)
             .parse("(1 + 1)")
             .is_err());
+    }
+
+    /// Each operator of a chain nests the expression one level deeper, though
+    /// the source nests nothing.
+    #[test]
+    fn operator_chains_count_towards_recursion_limit() {
+        let chains: [fn(usize) -> String; 6] = [
+            |n| format!("1{}", " + 1".repeat(n)),
+            |n| format!("1{}", " < 1".repeat(n)),
+            |n| format!("a{}", ".b".repeat(n)),
+            |n| format!("a{}", ".f()".repeat(n)),
+            |n| format!("a{}", "[0]".repeat(n)),
+            |n| format!("[1]{}", ".map(x, x)".repeat(n)),
+        ];
+        for chain in chains {
+            let parser = || Parser::new().max_recursion_depth(10);
+            assert!(
+                parser().parse(&chain(11)).is_ok(),
+                "`{}` should parse",
+                chain(11)
+            );
+            let errors = parser().parse(&chain(12)).unwrap_err().errors;
+            assert!(
+                matches!(&errors[..], [e] if e.msg.starts_with("Recursion limit of")),
+                "`{}` should fail on the recursion limit alone: {errors:?}",
+                chain(12)
+            );
+        }
     }
 
     #[test]
