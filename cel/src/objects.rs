@@ -727,6 +727,7 @@ impl PartialEq for Value {
             (Value::Float(a), Value::Int(b)) => *a == (*b as f64),
             (Value::Float(a), Value::UInt(b)) => *a == (*b as f64),
             (Value::Opaque(a), Value::Opaque(b)) => a.opaque_eq(b.deref()),
+            (Value::Struct(a), Value::Struct(b)) => a.equals(b.deref()),
             (_, _) => false,
         }
     }
@@ -741,6 +742,7 @@ impl PartialOrd for Value {
             (Value::UInt(a), Value::UInt(b)) => Some(a.cmp(b)),
             (Value::Float(a), Value::Float(b)) => a.partial_cmp(b),
             (Value::String(a), Value::String(b)) => Some(a.cmp(b)),
+            (Value::Bytes(a), Value::Bytes(b)) => Some(a.cmp(b)),
             (Value::Bool(a), Value::Bool(b)) => Some(a.cmp(b)),
             (Value::Null, Value::Null) => Some(Ordering::Equal),
             #[cfg(feature = "chrono")]
@@ -5613,10 +5615,33 @@ mod tests {
                 .unwrap();
             let program = Program::compile("cel.MyStruct {}").unwrap();
             let value = program.execute(&Context::with_env(Arc::new(env))).unwrap();
-            match value {
-                Value::Struct(s) => assert_eq!(s.name(), "cel.MyStruct"),
-                _ => panic!("This can't be!"),
+            assert_eq!(
+                value,
+                Value::Struct(Arc::new(CelStruct::new("cel.MyStruct".to_owned())))
+            );
+        }
+
+        #[test]
+        fn test_struct_value_eq() {
+            let mut env = Env::stdlib();
+            for name in ["acme.Point", "acme.Other"] {
+                env.add_type(
+                    StructDef::new(name.to_owned()).add_field("x".into(), types::INT_TYPE),
+                )
+                .unwrap();
             }
+            let context = Context::with_env(Arc::new(env));
+            let eval = |expr: &str| Program::compile(expr).unwrap().execute(&context).unwrap();
+
+            let mut host = CelStruct::new("acme.Point".to_owned());
+            host.add_field_value("x".to_owned(), CowVal::owned(CelInt::from(1)));
+
+            let a = eval("acme.Point{x: 1}");
+            assert_eq!(a, a.clone());
+            assert_eq!(a, eval("acme.Point{x: 1}"));
+            assert_eq!(a, Value::Struct(Arc::new(host)));
+            assert_ne!(a, eval("acme.Point{x: 2}"));
+            assert_ne!(a, eval("acme.Other{x: 1}"));
         }
 
         #[test]
