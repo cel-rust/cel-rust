@@ -1,5 +1,6 @@
 use crate::common::types::CelType;
 use crate::common::value::{CowVal, Val};
+use crate::container::Candidates;
 use crate::magic::{Function, FunctionRegistry, IntoFunction};
 use crate::objects::{TryIntoValue, Value};
 use crate::parser::Expression;
@@ -306,8 +307,26 @@ impl<'p, 'v> Context<'p, 'v> {
     /// container candidate in turn, most specific first. An absolute name
     /// skips the inner scopes.
     pub(crate) fn resolve_ident(&self, name: &str) -> Option<CowVal<'_, 'v>> {
+        match self.env().container().candidates(name) {
+            // The only candidate, as without a container: no buffer to hold it
+            Candidates::One(only) => self
+                .scopes_for(name)
+                .find_map(|scope| scope.own_variable_or_type(only, true)),
+            candidates => self.resolve_ident_in_container(name, candidates),
+        }
+    }
+
+    /// [`Self::resolve_ident`] of the `candidates` of `name` under the
+    /// container. Apart, so that the path of the only candidate, the common
+    /// one, has no buffer to allocate or drop.
+    fn resolve_ident_in_container(
+        &self,
+        name: &str,
+        candidates: Candidates<'_, '_>,
+    ) -> Option<CowVal<'_, 'v>> {
+        let mut buffer = String::new();
         self.scopes_for(name)
-            .find_map(|scope| scope.resolve_own(name, true))
+            .find_map(|scope| scope.resolve_own(&mut buffer, candidates, true))
     }
 
     /// Resolves the qualified name `a.b.c`, given as its segments, to a value
@@ -323,11 +342,14 @@ impl<'p, 'v> Context<'p, 'v> {
         segments: &'s [&'b str],
     ) -> Result<(CowVal<'b, 'v>, &'s [&'b str]), ExecutionError> {
         let name = segments.join(".");
+        let container = self.env().container();
+        let mut buffer = String::new();
         for scope in self.scopes_for(&name) {
             let mut len = name.len();
             for prefix in (1..=segments.len()).rev() {
                 let whole = prefix == segments.len();
-                if let Some(value) = scope.resolve_own(&name[..len], whole) {
+                let candidates = container.candidates(&name[..len]);
+                if let Some(value) = scope.resolve_own(&mut buffer, candidates, whole) {
                     return Ok((value, &segments[prefix..]));
                 }
                 // drop the last segment and its dot
@@ -339,19 +361,30 @@ impl<'p, 'v> Context<'p, 'v> {
         )))
     }
 
-    /// The variable of this scope named by a container candidate of `name`,
-    /// else, in the root scope, the type, if `may_be_type`.
-    fn resolve_own(&self, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
-        let env = self.env();
-        let may_be_type = may_be_type && matches!(self, Context::Root { .. });
-        env.container().candidates(name).find_map(|candidate| {
-            self.own_variable(candidate).or_else(|| {
-                if !may_be_type {
-                    return None;
-                }
-                let t = env.types().find_type(candidate)?;
-                Some(CowVal::owned(CelType::from(t)))
-            })
+    /// The variable of this scope named by one of `candidates`, else, in the
+    /// root scope, the type, if `may_be_type`. `buffer` holds the candidates
+    /// under the container: the caller passes the same one to every scope of
+    /// a lookup, so that the lookup allocates at most once.
+    fn resolve_own(
+        &self,
+        buffer: &mut String,
+        candidates: Candidates<'_, '_>,
+        may_be_type: bool,
+    ) -> Option<CowVal<'_, 'v>> {
+        candidates.find_map(buffer, |candidate| {
+            self.own_variable_or_type(candidate, may_be_type)
+        })
+    }
+
+    /// The variable of this scope named `name`, else, in the root scope, the
+    /// type, if `may_be_type`.
+    fn own_variable_or_type(&self, name: &str, may_be_type: bool) -> Option<CowVal<'_, 'v>> {
+        self.own_variable(name).or_else(|| {
+            if !may_be_type || !matches!(self, Context::Root { .. }) {
+                return None;
+            }
+            let t = self.env().types().find_type(name)?;
+            Some(CowVal::owned(CelType::from(t)))
         })
     }
 
@@ -361,7 +394,7 @@ impl<'p, 'v> Context<'p, 'v> {
         self.env()
             .container()
             .candidates(name)
-            .find_map(|candidate| types.find_struct(candidate))
+            .find_map(&mut String::new(), |candidate| types.find_struct(candidate))
     }
 
     fn has_function(&self, name: &str) -> bool {

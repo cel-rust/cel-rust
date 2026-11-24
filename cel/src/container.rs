@@ -60,27 +60,66 @@ pub(crate) enum Candidates<'a, 'n> {
 }
 
 impl<'a, 'n: 'a> Candidates<'a, 'n> {
-    /// The first `Some` `f` gives for a candidate, most specific first. The
-    /// only candidate, as most names have, is neither listed nor allocated.
-    pub(crate) fn find_map<T>(self, mut f: impl FnMut(&str) -> Option<T>) -> Option<T> {
+    /// The first `Some` `f` gives for a candidate, most specific first.
+    ///
+    /// The only candidate, as most names have, is neither listed nor
+    /// allocated. A candidate under the container is written into `buffer`,
+    /// which the caller passes to every call of one lookup: as the first
+    /// candidate is the longest, the lookup allocates once, not once for each
+    /// candidate of each scope.
+    pub(crate) fn find_map<T>(
+        self,
+        buffer: &mut String,
+        mut f: impl FnMut(&str) -> Option<T>,
+    ) -> Option<T> {
         match self {
             Candidates::One(name) => f(name),
-            Candidates::Many { .. } => self.iter().find_map(|candidate| f(&candidate)),
+            Candidates::Many { container, name } => find_map_under(container, name, buffer, f),
         }
     }
 
     /// Each candidate, most specific first.
     pub(crate) fn iter(self) -> impl Iterator<Item = Cow<'n, str>> + 'a {
-        let (scope, name) = match self {
+        let (container, name) = match self {
             Candidates::One(name) => ("", name),
             Candidates::Many { container, name } => (container, name),
         };
-        successors(Some(scope).filter(|s| !s.is_empty()), |s| {
-            s.rfind('.').map(|i| &s[..i])
-        })
-        .map(move |scope| Cow::Owned(format!("{scope}.{name}")))
-        .chain(once(Cow::Borrowed(name)))
+        prefixes(container)
+            .map(move |prefix| Cow::Owned(format!("{prefix}.{name}")))
+            .chain(once(Cow::Borrowed(name)))
     }
+}
+
+/// [`Candidates::find_map`] of `name` under `container`.
+fn find_map_under<T>(
+    container: &str,
+    name: &str,
+    buffer: &mut String,
+    mut f: impl FnMut(&str) -> Option<T>,
+) -> Option<T> {
+    for prefix in prefixes(container) {
+        buffer.clear();
+        buffer.reserve(prefix.len() + 1 + name.len());
+        buffer.push_str(prefix);
+        buffer.push('.');
+        buffer.push_str(name);
+        if let Some(found) = f(buffer) {
+            return Some(found);
+        }
+    }
+    f(name)
+}
+
+/// The prefixes that `container` puts before a name, most specific first:
+/// the container, then each shorter prefix of it, one segment less each time.
+///
+/// For `a.b.c`: `a.b.c`, `a.b`, then `a`. For no container (`""`): none.
+/// With the name `R.s`, these give the candidates `a.b.c.R.s`, `a.b.R.s` and
+/// `a.R.s`; the caller then tries `R.s` itself.
+fn prefixes(container: &str) -> impl Iterator<Item = &str> {
+    successors(Some(container).filter(|s| !s.is_empty()), |s| {
+        s.rfind('.').map(|i| &s[..i])
+    })
 }
 
 #[cfg(test)]
@@ -122,7 +161,7 @@ mod tests {
             let found = Container::new(container)
                 .unwrap()
                 .candidates(name)
-                .find_map(|candidate| {
+                .find_map(&mut String::new(), |candidate| {
                     visited.push(candidate.to_owned());
                     None::<()>
                 });
@@ -138,15 +177,37 @@ mod tests {
     #[test]
     fn find_map_stops_at_the_first_candidate_that_gives_a_value() {
         let mut visited = Vec::new();
-        let found = Container::new("a.b.c")
-            .unwrap()
-            .candidates("R.s")
-            .find_map(|candidate| {
+        let found = Container::new("a.b.c").unwrap().candidates("R.s").find_map(
+            &mut String::new(),
+            |candidate| {
                 visited.push(candidate.to_owned());
                 (candidate == "a.b.R.s").then_some(candidate.len())
-            });
+            },
+        );
         assert_eq!(found, Some("a.b.R.s".len()));
         assert_eq!(visited, ["a.b.c.R.s", "a.b.R.s"]);
+    }
+
+    /// The buffer is shared by the calls of one lookup: what an earlier call
+    /// left in it, even a longer name, is no part of a candidate.
+    #[test]
+    fn find_map_ignores_what_the_buffer_holds() {
+        let mut buffer = String::from("an.earlier.longer.candidate");
+        let mut visited = Vec::new();
+        Container::new("a.b")
+            .unwrap()
+            .candidates("R")
+            .find_map(&mut buffer, |candidate| {
+                visited.push(candidate.to_owned());
+                None::<()>
+            });
+        assert_eq!(visited, ["a.b.R", "a.R", "R"]);
+    }
+
+    #[test]
+    fn prefixes_are_the_container_then_each_shorter_one() {
+        assert_eq!(prefixes("a.b.c").collect::<Vec<_>>(), ["a.b.c", "a.b", "a"]);
+        assert_eq!(prefixes("").count(), 0);
     }
 
     #[test]
