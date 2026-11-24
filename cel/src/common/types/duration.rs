@@ -21,7 +21,7 @@ pub(crate) fn out_of_range(d: &chrono::Duration) -> bool {
 }
 
 /// `d` in nanoseconds, which an `i128` always holds.
-fn nanos(d: &chrono::Duration) -> i128 {
+pub(crate) fn nanos(d: &chrono::Duration) -> i128 {
     i128::from(d.num_seconds()) * 1_000_000_000 + i128::from(d.subsec_nanos())
 }
 
