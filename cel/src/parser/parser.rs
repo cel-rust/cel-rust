@@ -27,7 +27,7 @@ use antlr4rust::parser_rule_context::ParserRuleContext;
 use antlr4rust::recognizer::Recognizer;
 use antlr4rust::token::{CommonToken, Token};
 use antlr4rust::token_factory::TokenFactory;
-use antlr4rust::tree::{ParseTree, ParseTreeListener, ParseTreeVisitorCompat, VisitChildren};
+use antlr4rust::tree::{ParseTree, ParseTreeListener, ParseTreeVisitorCompat, Tree, VisitChildren};
 use antlr4rust::{tid, InputStream, Parser as AntlrParser};
 use std::cell::RefCell;
 use std::error::Error;
@@ -307,7 +307,11 @@ impl Parser {
             gen::CELParserContextType,
         >::new(self.error_recovery_limit)));
         let r = match prsr.start() {
-            Ok(t) => Ok(self.visit(t.deref())),
+            Ok(t) => {
+                let expr = self.visit(t.deref());
+                drop_parse_tree::<CELParserContextType>(t);
+                Ok(expr)
+            }
             Err(e) => Err(ParseError {
                 source: Some(Box::new(e)),
                 pos: (0, 0),
@@ -517,6 +521,26 @@ impl Parser {
         e.expr_id = expr.id;
         self.errors.push(e);
         expr
+    }
+}
+
+/// Drops the parse tree under `root` one node at a time.
+///
+/// Dropping a node drops its children first, and ANTLR parses a chain of
+/// operators such as `a + b + c` into a tree one level deeper per operator,
+/// however long the chain: dropping its root would recurse that deep, and
+/// overflow the stack on a long enough chain, though the parser rejects it.
+fn drop_parse_tree<'input, Ctx: ParserNodeType<'input>>(root: Rc<Ctx::Type>) {
+    let mut nodes = vec![root];
+    while let Some(node) = nodes.pop() {
+        while let Some(child) = node
+            .get_child_count()
+            .checked_sub(1)
+            .and_then(|last| node.get_child(last))
+        {
+            node.remove_last_child();
+            nodes.push(child);
+        }
     }
 }
 
@@ -1557,6 +1581,24 @@ mod tests {
                 chain(12)
             );
         }
+    }
+
+    /// ANTLR parses a chain into a tree one level deeper per operator, which
+    /// takes stack to visit and to drop: neither may recurse that deep.
+    #[test]
+    fn long_operator_chains_fail_without_overflowing() {
+        let chain = "1".to_string() + &" + 1".repeat(100_000);
+        let expressions = [chain, format!("a{}", "[0]".repeat(100_000))];
+        std::thread::Builder::new()
+            .stack_size(2 << 20)
+            .spawn(move || {
+                for expr in expressions {
+                    assert!(Parser::new().parse(&expr).is_err());
+                }
+            })
+            .unwrap()
+            .join()
+            .unwrap();
     }
 
     #[test]
