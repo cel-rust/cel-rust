@@ -25,6 +25,7 @@ use antlr4rust::errors::ANTLRError;
 use antlr4rust::parser::ParserNodeType;
 use antlr4rust::parser_rule_context::ParserRuleContext;
 use antlr4rust::recognizer::Recognizer;
+use antlr4rust::rule_context::RuleContext;
 use antlr4rust::token::{CommonToken, Token};
 use antlr4rust::token_factory::TokenFactory;
 use antlr4rust::tree::{ParseTree, ParseTreeListener, ParseTreeVisitorCompat, Tree, VisitChildren};
@@ -644,6 +645,14 @@ impl<'input, Ctx: ParserNodeType<'input>> RecoveryLimitErrorStrategy<'input, Ctx
         if self.attempts >= self.limit {
             let msg = format!("error recovery attempt limit exceeded: {}", self.limit);
             recognizer.notify_error_listeners(msg, None, None);
+            // The rules being parsed return this error at once, each dropping
+            // the context it holds, partly parsed and not always in the tree
+            // yet: their parse trees go first, one node at a time.
+            let mut ancestor = Some(Rc::clone(recognizer.get_parser_rule_context()));
+            while let Some(ctx) = ancestor {
+                ancestor = ctx.get_parent_ctx();
+                drop_parse_tree::<Ctx>(ctx);
+            }
             return Err(ANTLRError::FallThrough(Arc::new(RecoveryLimitExceeded {
                 limit: self.limit,
             })));
@@ -1606,7 +1615,12 @@ mod tests {
     #[test]
     fn long_operator_chains_fail_without_overflowing() {
         let chain = "1".to_string() + &" + 1".repeat(100_000);
-        let expressions = [chain, format!("a{}", "[0]".repeat(100_000))];
+        let expressions = [
+            chain.clone(),
+            format!("a{}", "[0]".repeat(100_000)),
+            // The recovery limit aborts the parse with the chain parsed.
+            format!("f({chain}, {})", "?:".repeat(100)),
+        ];
         std::thread::Builder::new()
             .stack_size(2 << 20)
             .spawn(move || {
