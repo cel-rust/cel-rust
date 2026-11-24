@@ -253,6 +253,9 @@ mod tests {
             ("max negative", "max(-1, 0) == 0"),
             ("max float", "max(-1.0, 0.0) == 0.0"),
             ("max list", "max([1, 2, 3]) == 3"),
+            ("max bytes", "max(b'a', b'ab', b'b') == b'b'"),
+            ("max bytes prefix", "max(b'ab', b'a') == b'ab'"),
+            ("max equal bytes", "max(b'a', b'a') == b'a'"),
             ("max empty list", "max([]) == null"),
             ("max no args", "max() == null"),
         ]
@@ -279,6 +282,9 @@ mod tests {
                 "min(1.61803, 3.1415, 2.71828, 1.41421) == 1.41421",
             ),
             ("min list", "min([1, 2, 3]) == 1"),
+            ("min bytes", "min(b'b', b'ab', b'a') == b'a'"),
+            ("min bytes prefix", "min(b'a', b'ab') == b'a'"),
+            ("min equal bytes", "min(b'a', b'a') == b'a'"),
             ("min empty list", "min([]) == null"),
             ("min no args", "min() == null"),
         ]
