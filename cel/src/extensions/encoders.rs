@@ -123,10 +123,26 @@ mod tests {
             eval("base64.decode('aGVs\\r\\nbG8=')"),
             Ok(Value::from(b"hello".to_vec()))
         );
+        // a short value, with canonical padding and without it
+        assert_eq!(
+            eval("base64.decode('YQ==')"),
+            Ok(Value::from(b"a".to_vec()))
+        );
+        assert_eq!(eval("base64.decode('YQ')"), Ok(Value::from(b"a".to_vec())));
         // too much padding
         assert!(matches!(
             eval("base64.decode('aGVsbG8==')"),
             Err(ExecutionError::FunctionError { function, .. }) if function == "base64.decode"
         ));
+        // incomplete padding
+        for expr in ["base64.decode('YQ=')", "base64.decode('aGVsbA=')"] {
+            assert!(
+                matches!(
+                    eval(expr),
+                    Err(ExecutionError::FunctionError { function, .. }) if function == "base64.decode"
+                ),
+                "{expr} must be rejected"
+            );
+        }
     }
 }
