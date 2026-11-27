@@ -251,43 +251,43 @@ impl<'a, 'v> TryFrom<&'a (dyn Val + 'v)> for &'a chrono::DateTime<chrono::FixedO
     }
 }
 
-fn get_milliseconds(this: &Timestamp) -> CelInt {
+fn milliseconds(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().timestamp_subsec_millis() as i64)
 }
 
-fn get_seconds(this: &Timestamp) -> CelInt {
+fn seconds(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().second() as i64)
 }
 
-fn get_minutes(this: &Timestamp) -> CelInt {
+fn minutes(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().minute() as i64)
 }
 
-fn get_hours(this: &Timestamp) -> CelInt {
+fn hours(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().hour() as i64)
 }
 
-fn get_day_of_week(this: &Timestamp) -> CelInt {
+fn day_of_week(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().weekday().num_days_from_sunday() as i64)
 }
 
-fn get_date(this: &Timestamp) -> CelInt {
+fn date(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().day() as i64)
 }
 
-fn get_day_of_month(this: &Timestamp) -> CelInt {
+fn day_of_month(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().day0() as i64)
 }
 
-fn get_day_of_year(this: &Timestamp) -> CelInt {
+fn day_of_year(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().ordinal0() as i64)
 }
 
-fn get_month(this: &Timestamp) -> CelInt {
+fn month(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().month0() as i64)
 }
 
-fn get_full_year(this: &Timestamp) -> CelInt {
+fn full_year(this: &Timestamp) -> CelInt {
     CelInt::from(this.inner().year() as i64)
 }
 
@@ -326,6 +326,29 @@ fn in_time_zone(this: &Timestamp, tz: &CelString<'_>) -> Result<Timestamp, Execu
     Ok(dt.with_timezone(&offset).into())
 }
 
+/// Without a time zone the spec reads the fields in UTC, whatever offset the
+/// timestamp was written with.
+macro_rules! in_utc {
+    ($($name:ident => $get:ident),* $(,)?) => {$(
+        fn $name(this: &Timestamp) -> CelInt {
+            $get(&this.inner().with_timezone(&chrono::Utc).fixed_offset().into())
+        }
+    )*};
+}
+
+in_utc! {
+    get_full_year => full_year,
+    get_month => month,
+    get_day_of_year => day_of_year,
+    get_day_of_month => day_of_month,
+    get_date => date,
+    get_day_of_week => day_of_week,
+    get_hours => hours,
+    get_minutes => minutes,
+    get_seconds => seconds,
+    get_milliseconds => milliseconds,
+}
+
 macro_rules! with_time_zone {
     ($($name:ident => $get:ident),* $(,)?) => {$(
         fn $name(this: &Timestamp, tz: &CelString<'_>) -> Result<CelInt, ExecutionError> {
@@ -335,16 +358,16 @@ macro_rules! with_time_zone {
 }
 
 with_time_zone! {
-    get_full_year_tz => get_full_year,
-    get_month_tz => get_month,
-    get_day_of_year_tz => get_day_of_year,
-    get_day_of_month_tz => get_day_of_month,
-    get_date_tz => get_date,
-    get_day_of_week_tz => get_day_of_week,
-    get_hours_tz => get_hours,
-    get_minutes_tz => get_minutes,
-    get_seconds_tz => get_seconds,
-    get_milliseconds_tz => get_milliseconds,
+    get_full_year_tz => full_year,
+    get_month_tz => month,
+    get_day_of_year_tz => day_of_year,
+    get_day_of_month_tz => day_of_month,
+    get_date_tz => date,
+    get_day_of_week_tz => day_of_week,
+    get_hours_tz => hours,
+    get_minutes_tz => minutes,
+    get_seconds_tz => seconds,
+    get_milliseconds_tz => milliseconds,
 }
 
 fn timestamp_from_string(this: &CelString<'_>) -> Result<Timestamp, ExecutionError> {

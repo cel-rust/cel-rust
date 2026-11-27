@@ -391,6 +391,38 @@ mod tests {
                 "timestamp('2023-05-28T00:00:42.123Z').getMilliseconds() == 123",
             ),
             (
+                "timestamp getFullYear reads UTC",
+                "timestamp('2023-01-01T00:30:00+01:00').getFullYear() == 2022",
+            ),
+            (
+                "timestamp getMonth reads UTC",
+                "timestamp('2023-01-01T00:30:00+01:00').getMonth() == 11",
+            ),
+            (
+                "timestamp getDayOfYear reads UTC",
+                "timestamp('2023-01-01T00:30:00+01:00').getDayOfYear() == 364",
+            ),
+            (
+                "timestamp getDayOfMonth reads UTC",
+                "timestamp('2023-01-01T00:30:00+01:00').getDayOfMonth() == 30",
+            ),
+            (
+                "timestamp getDate reads UTC",
+                "timestamp('2023-01-01T00:30:00+01:00').getDate() == 31",
+            ),
+            (
+                "timestamp getDayOfWeek reads UTC",
+                "timestamp('2023-01-01T00:30:00+01:00').getDayOfWeek() == 6",
+            ),
+            (
+                "timestamp getHours reads UTC",
+                "timestamp('2023-01-01T00:30:00+01:00').getHours() == 23",
+            ),
+            (
+                "timestamp getMinutes reads UTC",
+                "timestamp('2023-05-28T06:15:00+05:30').getMinutes() == 45",
+            ),
+            (
                 "timestamp getFullYear tz offset",
                 "timestamp('2023-01-01T05:30:00Z').getFullYear('-08:00') == 2022",
             ),
