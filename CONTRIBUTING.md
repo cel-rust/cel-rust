@@ -44,8 +44,8 @@ need to open an issue prior to opening the PR.
 
 ## Reporting Security Issues
 
-Please don't open public issues for vulnerabilities. Report them privately through [GitHub private vulnerability
-reporting](https://github.com/cel-rust/cel-rust/security/advisories/new).
+Please don't open public issues for vulnerabilities. See [SECURITY.md](./SECURITY.md) for how to report one, what
+counts as one, and which versions receive fixes.
 
 ## AI Assistance Notice
 
