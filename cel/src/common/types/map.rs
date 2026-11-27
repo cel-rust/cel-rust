@@ -99,13 +99,37 @@ impl<'v> Val for DefaultMap<'v> {
     fn equals(&self, other: &dyn Val) -> bool {
         // As in cel-go, each of our keys is looked up in `other` with the numeric fallbacks of
         // `lookup`, so `{1: "a"} == {1u: "a"}`.
-        other.downcast_ref::<DefaultMap>().is_some_and(|other| {
-            self.0.len() == other.0.len()
+        if let Some(other) = other.downcast_ref::<DefaultMap>() {
+            return self.0.len() == other.0.len()
                 && self
                     .0
                     .iter()
-                    .all(|(k, v)| other.find(k.inner()).is_some_and(|ov| v.equals(ov)))
-        })
+                    .all(|(k, v)| other.find(k.inner()).is_some_and(|ov| v.equals(ov)));
+        }
+        // A `map` of another type is compared through `Iterable`, over its keys, and `Indexer`,
+        // as cel-go compares a map with any `traits.Mapper`: it has as many keys as we do, and
+        // each of ours finds an equal value in it. The lookup is its `Indexer`'s, fallbacks
+        // included, as for `m[k]`, so the result is only as consistent as that `Indexer` is with
+        // its keys. Its own `equals` isn't asked: that one answers when it is on the left.
+        if other.get_type().kind() != types::Kind::Map {
+            return false;
+        }
+        let (Some(keys), Some(map)) = (other.as_iterable(), other.as_indexer()) else {
+            return false;
+        };
+        let mut keys = keys.iter();
+        let mut len = 0;
+        while keys.next().is_some() {
+            len += 1;
+            if len > self.0.len() {
+                return false;
+            }
+        }
+        len == self.0.len()
+            && self
+                .0
+                .iter()
+                .all(|(k, v)| map.get(k.inner()).is_ok_and(|ov| v.equals(ov.as_ref())))
     }
 
     fn clone_as_boxed<'w>(&self) -> Box<dyn Val + 'w>
@@ -640,6 +664,7 @@ pub(crate) fn stdlib(env: &mut crate::Env) {
 #[cfg(test)]
 mod tests {
     use super::{DefaultMap, Key, MutableMap};
+    use crate::common::traits::{Indexer, Iterable};
     use crate::common::types::{self, CelDouble, CelInt, CelList, CelString, CelUInt, Type};
     use crate::common::value::{CowVal, Val};
     use crate::{Context, Env, ExecutionError, Value};
@@ -704,6 +729,145 @@ mod tests {
             key,
             Box::new(CelInt::from(value)) as Box<dyn Val>,
         )]))
+    }
+
+    /// A `map` that is not a [`DefaultMap`], as a downstream crate would
+    /// define one: its entries are reachable only through [`Iterable`] and
+    /// [`Indexer`], which look keys up as a [`DefaultMap`] does.
+    #[derive(Debug, Clone)]
+    struct Entries(DefaultMap<'static>);
+
+    impl Entries {
+        fn of(entries: Vec<(Key<'static>, Box<dyn Val>)>) -> Self {
+            Entries(DefaultMap::from(HashMap::from_iter(entries)))
+        }
+    }
+
+    impl Val for Entries {
+        fn get_type(&self) -> &Type {
+            &types::MAP_TYPE
+        }
+
+        fn cel_type() -> &'static Type {
+            &types::MAP_TYPE
+        }
+
+        fn as_indexer<'b, 'v>(&'b self) -> Option<&'b (dyn Indexer + 'v)>
+        where
+            Self: 'v,
+        {
+            Some(&self.0)
+        }
+
+        fn as_iterable<'b, 'v>(&'b self) -> Option<&'b (dyn Iterable + 'v)>
+        where
+            Self: 'v,
+        {
+            Some(&self.0)
+        }
+
+        fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// A `map` whose keys can be iterated over, but that can't be indexed.
+    #[derive(Debug, Clone)]
+    struct KeysOnly(Entries);
+
+    impl Val for KeysOnly {
+        fn get_type(&self) -> &Type {
+            &types::MAP_TYPE
+        }
+
+        fn cel_type() -> &'static Type {
+            &types::MAP_TYPE
+        }
+
+        fn as_iterable<'b, 'v>(&'b self) -> Option<&'b (dyn Iterable + 'v)>
+        where
+            Self: 'v,
+        {
+            Some(&self.0 .0)
+        }
+
+        fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// `==` compares a [`DefaultMap`] with a `map` of another type by its keys
+    /// and the values at them, as the spec defines map equality and cel-go
+    /// compares a map with any `traits.Mapper`.
+    #[test]
+    fn equals_a_map_of_another_type() {
+        fn val<V: Val + 'static>(v: V) -> Box<dyn Val> {
+            Box::new(v)
+        }
+        let env = Arc::new(Env::stdlib());
+        let mut ctx = Context::with_env(Arc::clone(&env));
+        ctx.add_variable_as_val(
+            "m",
+            val(Entries::of(vec![
+                (Key::from("a"), val(CelInt::from(1))),
+                (Key::from("b"), val(CelInt::from(2))),
+            ])),
+        );
+        ctx.add_variable_as_val(
+            "by_uint",
+            val(Entries::of(vec![(
+                Key::from(1u64),
+                val(CelString::from("x")),
+            )])),
+        );
+        ctx.add_variable_as_val(
+            "nested",
+            val(Entries::of(vec![(
+                Key::from("k"),
+                val(Entries::of(vec![(Key::from("a"), val(CelInt::from(1)))])),
+            )])),
+        );
+        ctx.add_variable_as_val("empty", val(Entries::of(vec![])));
+        ctx.add_variable_as_val(
+            "nan",
+            val(Entries::of(vec![(
+                Key::from("n"),
+                val(CelDouble::from(f64::NAN)),
+            )])),
+        );
+        ctx.add_variable_as_val(
+            "keys_only",
+            val(KeysOnly(Entries::of(vec![(
+                Key::from("a"),
+                val(CelInt::from(1)),
+            )]))),
+        );
+        let eval = |source: &str| env.compile(source).unwrap().execute(&ctx);
+        for (expr, expected) in [
+            ("{} == empty", true),
+            ("{'a': 1} == empty", false),
+            ("{'n': double('NaN')} == nan", false),
+            // A `map` that can't be indexed can't be compared.
+            ("{'a': 1} == keys_only", false),
+            ("{'a': 1, 'b': 2} == m", true),
+            ("{'b': 2, 'a': 1} == m", true),
+            ("{'a': 1, 'b': 2} != m", false),
+            ("{'a': 1, 'b': 2.0} == m", true),
+            ("{'a': 1, 'b': 3} == m", false),
+            ("{'a': 1, 'c': 2} == m", false),
+            ("{'a': 1} == m", false),
+            ("{'a': 1, 'b': 2, 'c': 3} == m", false),
+            // Keys are looked up with the other map's fallbacks, as in `{1: 'x'} == {1u: 'x'}`.
+            ("{1: 'x'} == by_uint", true),
+            ("{'1': 'x'} == by_uint", false),
+            ("{true: 'x'} == by_uint", false),
+            ("{'k': {'a': 1}} == nested", true),
+            ("[{'a': 1, 'b': 2}] == [m]", true),
+            // A list is iterable and indexable too, but it isn't a map.
+            ("{0: 1} == [1]", false),
+        ] {
+            assert_eq!(eval(expr), Ok(Value::Bool(expected)), "{expr}");
+        }
     }
 
     #[test]

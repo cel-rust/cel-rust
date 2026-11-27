@@ -11,8 +11,8 @@ use std::ops::Deref;
 ///
 /// Of type [`LIST_TYPE`](super::LIST_TYPE), `list(dyn)`, whatever its
 /// elements, which can be values of any type. It supports `+` with any
-/// `list` on the right, `in` (an element [equals](Val::equals) the
-/// value), `[i]` with an `int`, `uint` or whole `double` index, `size()`, and
+/// `list` on the right, `in` (the value [equals](Val::equals) an
+/// element), `[i]` with an `int`, `uint` or whole `double` index, `size()`, and
 /// the comprehensions, which iterate over its elements in order. Two lists
 /// are equal when their elements are, pairwise.
 #[derive(Debug, Default)]
@@ -94,14 +94,28 @@ impl<'v> Val for DefaultList<'v> {
     }
 
     fn equals(&self, other: &dyn Val) -> bool {
-        other.downcast_ref::<DefaultList>().is_some_and(|other| {
-            self.0.len() == other.0.len()
+        if let Some(other) = other.downcast_ref::<DefaultList>() {
+            return self.0.len() == other.0.len()
                 && self
                     .0
                     .iter()
                     .zip(other.0.iter())
-                    .all(|(a, b)| a.equals(b.as_ref()))
-        })
+                    .all(|(a, b)| a.equals(b.as_ref()));
+        }
+        // A `list` of another type is compared through `Iterable`, element by element and in
+        // order, as cel-go compares a list with any `traits.Lister`. Its own `equals` isn't
+        // asked: that one answers when it is on the left.
+        let Some(other) = other
+            .as_iterable()
+            .filter(|_| other.get_type().kind() == Kind::List)
+        else {
+            return false;
+        };
+        let mut theirs = other.iter();
+        self.0
+            .iter()
+            .all(|a| theirs.next().is_some_and(|b| a.equals(b)))
+            && theirs.next().is_none()
     }
 
     fn clone_as_boxed<'w>(&self) -> Box<dyn Val + 'w>
@@ -147,8 +161,10 @@ impl<'v> Adder for DefaultList<'v> {
 
 impl Container for DefaultList<'_> {
     fn contains(&self, value: &dyn Val) -> Result<bool, ExecutionError> {
+        // The value looked up is asked, as the left operand of `==` is, and as cel-go's
+        // `baseList.Contains` does: it only matters for a value whose `equals` isn't symmetric.
         for i in &self.0 {
-            if i.equals(value) {
+            if value.equals(i.as_ref()) {
                 return Ok(true);
             }
         }
@@ -570,6 +586,107 @@ pub mod tests {
 
     fn box_val<'v, V: Val + 'v>(v: V) -> Box<dyn Val + 'v> {
         Box::new(v)
+    }
+
+    /// A `list` that is not a [`DefaultList`], as a downstream crate would
+    /// define one: equal to a list of the same elements in any order, as a set
+    /// is.
+    #[derive(Debug, Clone)]
+    struct Set(DefaultList<'static>);
+
+    impl Set {
+        fn of(ints: &[i64]) -> Self {
+            Set(DefaultList::from(
+                ints.iter()
+                    .map(|&i| box_val(CelInt::from(i)))
+                    .collect::<Vec<_>>(),
+            ))
+        }
+    }
+
+    impl Val for Set {
+        fn get_type(&self) -> &Type {
+            &types::LIST_TYPE
+        }
+
+        fn cel_type() -> &'static Type {
+            &types::LIST_TYPE
+        }
+
+        fn as_iterable<'b, 'v>(&'b self) -> Option<&'b (dyn Iterable + 'v)>
+        where
+            Self: 'v,
+        {
+            Some(&self.0)
+        }
+
+        fn equals(&self, other: &dyn Val) -> bool {
+            let Some(theirs) = other.as_iterable() else {
+                return false;
+            };
+            let mut theirs = theirs.iter();
+            let mut len = 0;
+            while let Some(b) = theirs.next() {
+                if !self.0.inner().iter().any(|a| a.equals(b)) {
+                    return false;
+                }
+                len += 1;
+            }
+            len == self.0.len()
+        }
+
+        fn clone_as_boxed<'v>(&self) -> Box<dyn Val + 'v> {
+            Box::new(self.clone())
+        }
+    }
+
+    /// `==` compares a [`DefaultList`] with a `list` of another type element by
+    /// element, in order, as the spec defines list equality and cel-go
+    /// compares a list with any `traits.Lister`. The other list's own `equals`
+    /// answers only when that list is on the left.
+    #[test]
+    fn equals_a_list_of_another_type() {
+        let env = Arc::new(Env::stdlib());
+        let mut ctx = Context::with_env(Arc::clone(&env));
+        ctx.add_variable_as_val("s", Box::new(Set::of(&[1, 2])));
+        ctx.add_variable_as_val("empty", Box::new(Set::of(&[])));
+        let eval = |source: &str| env.compile(source).unwrap().execute(&ctx);
+        for (expr, expected) in [
+            ("[1, 2] == s", true),
+            ("[1, 2] != s", false),
+            ("[1u, 2.0] == s", true),
+            ("[2, 1] == s", false),
+            ("s == [2, 1]", true),
+            ("[1] == s", false),
+            ("[1, 2, 3] == s", false),
+            ("[] == empty", true),
+            ("[[1, 2]] == [s]", true),
+            ("{'k': [1, 2]} == {'k': s}", true),
+            ("[1, 2] in [s]", true),
+            // A map is iterable too, over its keys, but it isn't a list.
+            ("[1] == {1: 'a'}", false),
+        ] {
+            assert_eq!(eval(expr), Ok(Value::Bool(expected)), "{expr}");
+        }
+    }
+
+    /// `in` asks the value looked up whether it equals an element, as `==` asks
+    /// its left operand: with a `list` whose equality differs from a
+    /// [`DefaultList`]'s, the value's equality decides.
+    #[test]
+    fn in_asks_the_value_looked_up() {
+        let env = Arc::new(Env::stdlib());
+        let mut ctx = Context::with_env(Arc::clone(&env));
+        ctx.add_variable_as_val("s", Box::new(Set::of(&[1, 2])));
+        let eval = |source: &str| env.compile(source).unwrap().execute(&ctx);
+        for (expr, expected) in [
+            ("[2, 1] in [s]", false),
+            ("s in [[2, 1]]", true),
+            ("1 in [1u, 2.0]", true),
+            ("2.0 in [1, 2]", true),
+        ] {
+            assert_eq!(eval(expr), Ok(Value::Bool(expected)), "{expr}");
+        }
     }
 
     /// `+` takes any `list` on its right, not just a [`DefaultList`]: it
