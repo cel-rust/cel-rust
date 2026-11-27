@@ -993,13 +993,18 @@ fn pos_for_offset(source: &str, start: usize) -> (isize, isize) {
         line += 1;
         offset += l.len() as isize;
         if start < offset {
-            return (line, start + (l.len() as isize) - offset + 1);
+            let before = (start + l.len() as isize - offset) as usize;
+            let column = l.get(..before).map_or(before, |p| p.chars().count());
+            return (line, column as isize + 1);
         }
     }
     if line == 0 {
         (1, 1)
     } else {
-        let last_line_len = source.lines().last().map_or(0, |l| l.len() as isize);
+        let last_line_len = source
+            .lines()
+            .last()
+            .map_or(0, |l| l.chars().count() as isize);
         (line, last_line_len + 1)
     }
 }
@@ -2582,6 +2587,34 @@ mod tests {
             .max_recursion_depth(0)
             .parse("(1 + 1)")
             .is_err());
+    }
+
+    #[test]
+    fn error_snippet_window_counts_columns_in_chars() {
+        let expression = format!("'{}' + has(7){}", "é".repeat(120), " ".repeat(200));
+        let err = Parser::new()
+            .parse(&expression)
+            .expect_err("expression should fail to parse");
+
+        let rendered = err.to_string();
+        assert!(
+            rendered.starts_with("ERROR: <input>:1:130: "),
+            "unexpected header: {rendered}"
+        );
+        let lines: Vec<&str> = rendered.lines().collect();
+        let [.., snippet, caret] = lines[..] else {
+            panic!("missing snippet lines: {rendered}");
+        };
+        let under_caret = snippet.chars().nth(caret.len() - 1);
+        assert_eq!(under_caret, Some('7'), "{rendered}");
+    }
+
+    #[test]
+    fn syntax_error_columns_count_chars() {
+        for (src, pos) in [("'é' + )", (1, 7)), ("'é' +", (1, 6))] {
+            let err = Parser::new().parse(src).unwrap_err();
+            assert_eq!(err.errors[0].pos, pos, "{src:?}");
+        }
     }
 
     #[test]

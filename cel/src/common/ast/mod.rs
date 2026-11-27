@@ -222,7 +222,10 @@ impl SourceInfo {
                     line += 1;
                     offset += l.len() as isize;
                     if start < offset {
-                        return Some((line, start + (l.len() as isize) - offset + 1));
+                        // Count chars as ANTLR does for syntax errors.
+                        let before = (start + l.len() as isize - offset) as usize;
+                        let column = l.get(..before).map_or(before, |p| p.chars().count());
+                        return Some((line, column as isize + 1));
                     }
                 }
                 None
