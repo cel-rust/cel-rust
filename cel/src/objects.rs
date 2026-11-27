@@ -1110,7 +1110,7 @@ impl Value {
                 // START OF SPECIAL CASES FOR operators::...
                 if call.args.len() == 3 && call.func_name == operators::CONDITIONAL {
                     let cond = Value::resolve_in(&call.args[0], ctx, frame);
-                    return if try_bool(cond)? {
+                    return if try_condition(cond)? {
                         Value::resolve_in(&call.args[1], ctx, frame)
                     } else {
                         Value::resolve_in(&call.args[2], ctx, frame)
@@ -1437,7 +1437,9 @@ impl Value {
                         let func = match ctx.get_function(&call.func_name) {
                             Some(func) => func,
                             None => {
-                                return Err(if ctx.env().has_member_overload(&call.func_name) {
+                                // A function declared with global overloads
+                                // only is still declared.
+                                return Err(if ctx.env().function(&call.func_name).is_some() {
                                     ExecutionError::overload_for_values(
                                         &call.func_name,
                                         args.iter().map(|arg| arg.as_ref()),
@@ -1852,7 +1854,7 @@ fn guard_holds<'v>(
     frame: Option<&BlockFrame<'_, 'v>>,
 ) -> Result<bool, ExecutionError> {
     guard.map_or(Ok(true), |guard| {
-        try_bool(Value::resolve_in(guard, scope, frame))
+        try_condition(Value::resolve_in(guard, scope, frame))
     })
 }
 
@@ -2224,6 +2226,19 @@ fn try_bool(val: Result<CowVal<'_, '_>, ExecutionError>) -> Result<bool, Executi
     }
 }
 
+/// The condition of `_?_:_`, or of the guard of an [`InPlaceStep`], which is
+/// one. The conditional is declared as `bool ? A : A -> A`, so a condition that
+/// isn't a `bool` matches no overload. The branches aren't evaluated, so only
+/// the condition's type is reported.
+fn try_condition(val: Result<CowVal<'_, '_>, ExecutionError>) -> Result<bool, ExecutionError> {
+    let val = val?;
+    val.downcast_ref::<CelBool>()
+        .map(|b| *b.inner())
+        .ok_or_else(|| {
+            ExecutionError::overload_for_values(operators::CONDITIONAL, [val.as_ref()], false)
+        })
+}
+
 /// Calls the global function `name` with `args`. The function is told
 /// `ftx_name`, borrowed for as long as the result: a qualified function is
 /// told its unqualified name.
@@ -2239,7 +2254,8 @@ fn call_function<'e, 'p, 'v>(
     }
     let func = match ctx.get_function(name) {
         Some(func) => func,
-        None if ctx.env().has_overload(name) => {
+        // A function declared with member overloads only is still declared.
+        None if ctx.env().function(name).is_some() => {
             return Err(ExecutionError::overload_for_values(
                 name,
                 args.iter().map(|arg| arg.as_ref()),

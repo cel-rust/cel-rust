@@ -773,4 +773,63 @@ mod tests {
         assert_eq!(overload.argument_types(), ["string", "int"]);
         assert!(overload.is_member_function());
     }
+
+    /// The conditional is declared as `bool ? A : A -> A`: a condition that
+    /// isn't a `bool` matches no overload, also where a macro expands to it.
+    /// Nested in `&&`, the error still names the conditional.
+    #[test]
+    fn non_bool_condition_matches_no_overload_of_the_conditional() {
+        for (script, condition_type) in [
+            ("'cows' ? false : 17", "string"),
+            ("dyn(1) ? 2 : 3", "int"),
+            ("('cows' ? false : 17) && true", "string"),
+            ("[1].filter(x, 1)", "int"),
+            ("{1: 2}.filter(k, 1)", "int"),
+            ("[1].map(x, 1, x)", "int"),
+            ("[1].exists_one(x, 1)", "int"),
+        ] {
+            assert_eq!(
+                test_script(script, None),
+                Err(ExecutionError::no_such_overload(
+                    "_?_:_",
+                    vec![condition_type.to_owned()],
+                )),
+                "{script}"
+            );
+        }
+    }
+
+    /// A function declared with overloads of one call style only is still
+    /// declared when called in the other style.
+    #[test]
+    fn function_called_in_the_other_style_matches_no_overload() {
+        for (script, function, argument_types) in [
+            ("contains('abc', 'a')", "contains", ["string", "string"]),
+            ("startsWith('abc', 'a')", "startsWith", ["string", "string"]),
+        ] {
+            assert_eq!(
+                test_script(script, None),
+                Err(ExecutionError::no_such_overload(
+                    function,
+                    argument_types.map(str::to_owned).to_vec(),
+                )),
+                "{script}"
+            );
+        }
+        assert_eq!(
+            test_script("1.int()", None),
+            Err(ExecutionError::no_such_member_overload(
+                "int",
+                vec!["int".to_owned()],
+            ))
+        );
+        assert_eq!(
+            test_script("nosuch(1)", None),
+            Err(ExecutionError::undeclared_reference("nosuch"))
+        );
+        assert_eq!(
+            test_script("1.nosuch()", None),
+            Err(ExecutionError::undeclared_reference("nosuch"))
+        );
+    }
 }
