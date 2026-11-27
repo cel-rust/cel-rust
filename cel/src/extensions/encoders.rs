@@ -9,11 +9,20 @@ use base64::prelude::*;
 
 /// The standard alphabet, as lenient as Go's `base64.StdEncoding`, which
 /// cel-go falls back to `RawStdEncoding` from: padding is optional, and
-/// non-zero trailing bits are ignored.
+/// non-zero trailing bits are ignored. Incomplete padding is rejected.
 const DECODER: GeneralPurpose = GeneralPurpose::new(
     &alphabet::STANDARD,
     GeneralPurposeConfig::new()
-        .with_decode_padding_mode(DecodePaddingMode::Indifferent)
+        .with_decode_padding_mode(DecodePaddingMode::RequireCanonical)
+        .with_decode_allow_trailing_bits(true),
+);
+
+/// The unpadded form Go accepts through `RawStdEncoding`. This is tried only
+/// after `DECODER`, so a string with partial padding cannot slip through.
+const UNPADDED_DECODER: GeneralPurpose = GeneralPurpose::new(
+    &alphabet::STANDARD,
+    GeneralPurposeConfig::new()
+        .with_decode_padding_mode(DecodePaddingMode::RequireNone)
         .with_decode_allow_trailing_bits(true),
 );
 
@@ -47,10 +56,15 @@ fn encode(this: &CelBytes<'_>) -> CelString<'static> {
 
 /// Decodes standard base64, skipping line breaks, as Go's decoder does.
 fn decode(this: &CelString<'_>) -> Result<CelBytes<'static>, ExecutionError> {
+    let decode_input = |input: &[u8]| {
+        DECODER
+            .decode(input)
+            .or_else(|_| UNPADDED_DECODER.decode(input))
+    };
     let decoded = if this.contains(['\r', '\n']) {
-        DECODER.decode(this.replace(['\r', '\n'], ""))
+        decode_input(this.replace(['\r', '\n'], "").as_bytes())
     } else {
-        DECODER.decode(this.inner())
+        decode_input(this.inner().as_bytes())
     };
     decoded
         .map(CelBytes::from)
@@ -109,10 +123,26 @@ mod tests {
             eval("base64.decode('aGVs\\r\\nbG8=')"),
             Ok(Value::from(b"hello".to_vec()))
         );
+        // a short value, with canonical padding and without it
+        assert_eq!(
+            eval("base64.decode('YQ==')"),
+            Ok(Value::from(b"a".to_vec()))
+        );
+        assert_eq!(eval("base64.decode('YQ')"), Ok(Value::from(b"a".to_vec())));
         // too much padding
         assert!(matches!(
             eval("base64.decode('aGVsbG8==')"),
             Err(ExecutionError::FunctionError { function, .. }) if function == "base64.decode"
         ));
+        // incomplete padding
+        for expr in ["base64.decode('YQ=')", "base64.decode('aGVsbA=')"] {
+            assert!(
+                matches!(
+                    eval(expr),
+                    Err(ExecutionError::FunctionError { function, .. }) if function == "base64.decode"
+                ),
+                "{expr} must be rejected"
+            );
+        }
     }
 }
