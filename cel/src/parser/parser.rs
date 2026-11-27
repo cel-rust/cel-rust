@@ -30,6 +30,7 @@ use antlr4rust::token::{CommonToken, Token};
 use antlr4rust::token_factory::TokenFactory;
 use antlr4rust::tree::{ParseTree, ParseTreeListener, ParseTreeVisitorCompat, Tree, VisitChildren};
 use antlr4rust::{tid, InputStream, Parser as AntlrParser};
+use std::borrow::Cow;
 use std::cell::RefCell;
 use std::error::Error;
 use std::fmt::Display;
@@ -112,6 +113,49 @@ pub struct ParseError {
     pub source_info: Option<Arc<SourceInfo>>,
 }
 
+/// The threshold of returned snippet size in char.
+const SNIPPET_WIDTH: usize = 100;
+/// Chars kept before the caret when a long line is cut on both sides.
+const SNIPPET_BEFORE: usize = 60;
+
+/// The snippet to print under a parse error at `column` (1-based, in chars):
+/// - `.0`: the part of `line` to show
+/// - `.1`: how many chars of it come before the caret
+///
+/// Lines of at most `SNIPPET_WIDTH` chars are returned whole. Longer ones are cut to
+/// `SNIPPET_WIDTH` chars around the caret, with `...` marking each cut.
+fn snippet_window(line: &str, column: isize) -> (Cow<'_, str>, usize) {
+    let len = line.chars().count();
+    // 0 based
+    let caret = usize::try_from(column.saturating_sub(1))
+        .unwrap_or(0)
+        .min(len);
+    if len <= SNIPPET_WIDTH {
+        return (Cow::Borrowed(line), caret);
+    }
+    let chars = |start: usize| {
+        line.chars()
+            .skip(start)
+            .take(SNIPPET_WIDTH)
+            .collect::<String>()
+    };
+    let (text, dots) = if caret <= SNIPPET_BEFORE {
+        // Caret near the start: truncate the end
+        (format!("{}...", chars(0)), caret)
+    } else if caret + (SNIPPET_WIDTH - SNIPPET_BEFORE) >= len {
+        // Near the end: truncate the start
+        let start = len - SNIPPET_WIDTH;
+        (format!("...{}", chars(start)), 3 + caret - start)
+    } else {
+        // Mid: cut both, keeping SNIPPET_BEFORE chars before the caret.
+        (
+            format!("...{}...", chars(caret - SNIPPET_BEFORE)),
+            3 + SNIPPET_BEFORE,
+        )
+    };
+    (Cow::Owned(text), dots)
+}
+
 impl Display for ParseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
@@ -121,8 +165,9 @@ impl Display for ParseError {
         )?;
         if let Some(info) = &self.source_info {
             if let Some(line) = info.snippet(self.pos.0 - 1) {
-                write!(f, "\n| {line}")?;
-                write!(f, "\n| {:.>width$}", "^", width = self.pos.1 as usize)?;
+                let (snippet, dots) = snippet_window(line, self.pos.1);
+                write!(f, "\n| {snippet}")?;
+                write!(f, "\n| {}^", ".".repeat(dots))?;
             }
         }
         Ok(())
@@ -1631,6 +1676,80 @@ mod tests {
             .unwrap()
             .join()
             .unwrap();
+    }
+
+    #[test]
+    fn error_past_column_u16_max_renders_without_panic() {
+        let expression = " ".repeat(70_000) + "1 +";
+        let err = Parser::new()
+            .parse(&expression)
+            .expect_err("expression should fail to parse");
+
+        let rendered = err.to_string();
+        assert!(
+            rendered.starts_with("ERROR: <input>:1:70004: "),
+            "unexpected header: {}",
+            &rendered[..rendered.len().min(80)]
+        );
+        let lines: Vec<&str> = rendered.lines().collect();
+        let [.., snippet, caret] = lines[..] else {
+            panic!("missing snippet lines: {rendered}");
+        };
+        assert_eq!(snippet, format!("| ...{}1 +", " ".repeat(97)));
+        assert_eq!(caret, format!("| {}^", ".".repeat(103)));
+    }
+
+    #[test]
+    fn error_snippet_window_over_long_line() {
+        let line: String = (0..300u32)
+            .map(|i| char::from_digit(i % 10, 10).unwrap())
+            .collect();
+        let window = |column| {
+            let (text, dots) = snippet_window(&line, column);
+            (text.into_owned(), dots)
+        };
+        let digits = |start: usize, n: usize| line[start..start + n].to_string();
+
+        assert_eq!(window(5), (digits(0, 100) + "...", 4));
+        assert_eq!(window(150), (format!("...{}...", digits(89, 100)), 63));
+        assert_eq!(window(290), (format!("...{}", digits(200, 100)), 92));
+        assert_eq!(window(301), (format!("...{}", digits(200, 100)), 103));
+        for column in 1..=300 {
+            let (text, dots) = window(column);
+            assert_eq!(text.trim_matches('.').len(), 100);
+            assert_eq!(text.as_bytes()[dots], line.as_bytes()[column as usize - 1]);
+        }
+    }
+
+    #[test]
+    fn error_snippet_window_cuts_multibyte_lines_on_char_boundaries() {
+        let line = "é".repeat(200);
+        let (text, dots) = snippet_window(&line, 101);
+        assert_eq!(text, format!("...{}...", "é".repeat(100)));
+        assert_eq!(dots, 63);
+        let (text, dots) = snippet_window(&line, 1000);
+        assert_eq!(text, format!("...{}", "é".repeat(100)));
+        assert_eq!(dots, 103);
+    }
+
+    #[test]
+    fn error_snippet_window_counts_columns_in_chars() {
+        let expression = format!("'{}' + has(7){}", "é".repeat(120), " ".repeat(200));
+        let err = Parser::new()
+            .parse(&expression)
+            .expect_err("expression should fail to parse");
+
+        let rendered = err.to_string();
+        assert!(
+            rendered.starts_with("ERROR: <input>:1:130: "),
+            "unexpected header: {rendered}"
+        );
+        let lines: Vec<&str> = rendered.lines().collect();
+        let [.., snippet, caret] = lines[..] else {
+            panic!("missing snippet lines: {rendered}");
+        };
+        let under_caret = snippet.chars().nth(caret.len() - 1);
+        assert_eq!(under_caret, Some('7'), "{rendered}");
     }
 
     #[test]
