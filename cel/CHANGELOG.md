@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.17.0](https://github.com/cel-rust/cel-rust/compare/v0.16.0...v0.17.0) - 2026-11-27
+
+### Added
+
+- *(traits)* add the `FieldTester` trait for `has()` and `.?f`
+
+### Fixed
+
+- *(timestamp)* [**breaking**] read the no-argument accessors in UTC
+- *(timestamp)* fail arithmetic past chrono's range instead of panicking
+- *(parser)* drop a parse abandoned on the recovery limit without recursing
+- *(parser)* drop the parse tree of a long chain without recursing
+- *(parser)* count chains of operators against the recursion limit
+- *(value)* compare structs in `PartialEq`, order bytes in `PartialOrd`
+- *(comprehensions)* [**breaking**] keep the iteration variables out of the result
+
+### Other
+
+- Merge pull request #470 from alexsnaps/ts-max
+- Merge pull request #466 from doxxx93/value-eq-struct-bytes
+- Merge pull request #468 from doxxx93/magic-rustdoc
+- *(magic)* fix errors in This and Arguments extractor docs
+- Merge pull request #463 from doxxx93/449-field-tester
+- *(context)* remove Env parameter from resolve_own
+- *(container)* add Container::find_map iteration tests
+- *(container)* extract candidate code under Candidates enum
+- *(context)* resolve names without a container directly
+- *(value)* pin `[?i]` on a value without an `Indexer` as an error
+- *(traits)* report an `UnexpectedType` from a `FieldTester` as `NoSuchOverload`
+- *(value)* say that a value without an `Indexer` fails all five accesses
+- *(clippy)* fixes with v1.100
+
 ## [0.16.0](https://github.com/cel-rust/cel-rust/compare/v0.15.0...v0.16.0) - 2026-11-14
 
 ### Added
